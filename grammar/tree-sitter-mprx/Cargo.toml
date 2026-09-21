@@ -1,0 +1,25 @@
+[package]
+authors = [ "Jack Miller" ]
+autoexamples = false
+categories = [ "parser-implementations", "parsing", "text-editors" ]
+description = "Mprx grammar for tree-sitter"
+edition = "2024"
+keywords = [ "incremental", "parsing", "tree-sitter", "mprx" ]
+license = "MIT"
+name = "tree-sitter-mprx"
+readme = "README.md"
+repository = "https://github.com/tree-sitter/tree-sitter-mprx"
+version = "0.1.0"
+
+build = "bindings/rust/build.rs"
+include = [ "bindings/rust/*", "grammar.js", "queries/*", "src/*", "tree-sitter.json", "/LICENSE" ]
+
+[lib]
+path = "bindings/rust/lib.rs"
+
+[dependencies]
+tree-sitter-language = "0.1"
+tree-sitter = "0.27.0"
+
+[build-dependencies]
+cc = "1.2"

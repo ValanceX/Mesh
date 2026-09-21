@@ -7,6 +7,7 @@ members = [
     "crates/mesh-compiler",
     "crates/mesh-lsp",
     "crates/mesh-cli",
+    "grammar/tree-sitter-mprx",
 ]
 
 [workspace.package]
