@@ -9,3 +9,4 @@ description = "Type checking, diagnostics, transformation, and code generation f
 [dependencies]
 mesh-syntax.workspace = true
 mesh-semantic.workspace = true
+mesh-parser.workspace = true
