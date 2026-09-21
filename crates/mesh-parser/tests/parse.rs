@@ -26,3 +26,11 @@ fn reports_a_parse_error_for_invalid_source() {
     assert!(!error.message.is_empty());
     let _: Span = error.span;
 }
+
+#[test]
+fn parses_a_root_element_preceded_by_whitespace() {
+    let element = mesh_parser::parse("\n<page title=\"Users\" />")
+        .expect("leading whitespace before the root element should still parse");
+
+    assert_eq!(element.name, "page");
+}

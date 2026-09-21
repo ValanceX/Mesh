@@ -33,7 +33,7 @@ pub fn parse(source: &str) -> Result<Element, ParseError> {
     }
 
     let element_node = root
-        .child(0)
+        .named_child(0)
         .and_then(|element| element.child(0))
         .ok_or_else(|| ParseError {
             message: "expected a single root element".to_string(),
