@@ -1,0 +1,10 @@
+[package]
+name = "mesh-parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Tree-sitter integration for MPRX: source text to concrete syntax tree to mesh-syntax AST."
+
+[dependencies]
+mesh-syntax.workspace = true

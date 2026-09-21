@@ -1,0 +1,10 @@
+[package]
+name = "mesh-semantic"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Semantic model for MPRX: component/prop/binding resolution and the Semantic IR."
+
+[dependencies]
+mesh-syntax.workspace = true

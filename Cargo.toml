@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/mesh-syntax",
+    "crates/mesh-parser",
+    "crates/mesh-semantic",
+    "crates/mesh-compiler",
+    "crates/mesh-lsp",
+    "crates/mesh-cli",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+authors = ["Jack Miller <jackmiller0899@gmail.com>"]
+repository = "https://github.com/valence-ui/mesh"
+
+[workspace.dependencies]
+mesh-syntax = { path = "crates/mesh-syntax" }
+mesh-parser = { path = "crates/mesh-parser" }
+mesh-semantic = { path = "crates/mesh-semantic" }
+mesh-compiler = { path = "crates/mesh-compiler" }

@@ -1,0 +1,23 @@
+{
+  "name": "@valence/mesh-compiler",
+  "version": "0.0.1",
+  "description": "Semantic analysis, type checking, diagnostics, and compilation for MPRX (thin wrapper over the mesh-compiler Rust crate, native or WASM).",
+  "type": "module",
+  "license": "MIT",
+  "author": "Jack Miller <jackmiller0899@gmail.com>",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@valence/mesh-language": "0.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

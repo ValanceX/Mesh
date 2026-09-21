@@ -1,0 +1,20 @@
+{
+  "name": "@valence/mesh-language",
+  "version": "0.0.1",
+  "description": "MPRX grammar, parser bindings, syntax nodes, and AST types (thin wrapper over the mesh-syntax/mesh-parser Rust crates).",
+  "type": "module",
+  "license": "MIT",
+  "author": "Jack Miller <jackmiller0899@gmail.com>",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
