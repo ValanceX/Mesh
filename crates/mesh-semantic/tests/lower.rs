@@ -6,12 +6,21 @@ fn lowers_a_self_closing_element() {
             name: "title".to_string(),
             value: mesh_syntax::StringLiteral {
                 value: "Users".to_string(),
-                span: mesh_syntax::Span { start_byte: 0, end_byte: 0 },
+                span: mesh_syntax::Span {
+                    start_byte: 0,
+                    end_byte: 0,
+                },
             },
-            span: mesh_syntax::Span { start_byte: 0, end_byte: 0 },
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
         }],
         children: vec![],
-        span: mesh_syntax::Span { start_byte: 0, end_byte: 0 },
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
     };
 
     let ir = mesh_semantic::lower(&ast);

@@ -1,3 +1,7 @@
+// The `!"....".is_empty()` checks below are boilerplate emitted by the
+// tree-sitter CLI's binding generator; the query paths are always non-empty
+// string literals here, which newer clippy flags as a constant condition.
+#[allow(clippy::const_is_empty)]
 fn main() {
     let src_dir = std::path::Path::new("src");
 
@@ -9,7 +13,9 @@ fn main() {
 
     if std::env::var("TARGET").unwrap() == "wasm32-unknown-unknown" {
         let Ok(wasm_headers) = std::env::var("DEP_TREE_SITTER_LANGUAGE_WASM_HEADERS") else {
-            panic!("Environment variable DEP_TREE_SITTER_LANGUAGE_WASM_HEADERS must be set by the language crate");
+            panic!(
+                "Environment variable DEP_TREE_SITTER_LANGUAGE_WASM_HEADERS must be set by the language crate"
+            );
         };
 
         c_config.include(&wasm_headers);
@@ -28,11 +34,15 @@ fn main() {
     c_config.compile("tree-sitter-mprx");
 
     println!("cargo:rustc-check-cfg=cfg(with_highlights_query)");
-    if !"queries/highlights.scm".is_empty() && std::path::Path::new("queries/highlights.scm").exists() {
+    if !"queries/highlights.scm".is_empty()
+        && std::path::Path::new("queries/highlights.scm").exists()
+    {
         println!("cargo:rustc-cfg=with_highlights_query");
     }
     println!("cargo:rustc-check-cfg=cfg(with_injections_query)");
-    if !"queries/injections.scm".is_empty() && std::path::Path::new("queries/injections.scm").exists() {
+    if !"queries/injections.scm".is_empty()
+        && std::path::Path::new("queries/injections.scm").exists()
+    {
         println!("cargo:rustc-cfg=with_injections_query");
     }
     println!("cargo:rustc-check-cfg=cfg(with_locals_query)");

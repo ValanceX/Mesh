@@ -29,8 +29,17 @@ pub fn lower(ast: &mesh_syntax::Element) -> Element {
         attributes: ast
             .attributes
             .iter()
-            .map(|a| Attribute { name: a.name.clone(), value: a.value.value.clone() })
+            .map(|a| Attribute {
+                name: a.name.clone(),
+                value: a.value.value.clone(),
+            })
             .collect(),
-        children: ast.children.iter().map(|t| Text { value: t.value.clone() }).collect(),
+        children: ast
+            .children
+            .iter()
+            .map(|t| Text {
+                value: t.value.clone(),
+            })
+            .collect(),
     }
 }

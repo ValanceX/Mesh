@@ -21,7 +21,10 @@ pub fn parse(source: &str) -> Result<Element, ParseError> {
 
     let tree = parser.parse(source, None).ok_or_else(|| ParseError {
         message: "failed to parse source".to_string(),
-        span: Span { start_byte: 0, end_byte: source.len() },
+        span: Span {
+            start_byte: 0,
+            end_byte: source.len(),
+        },
     })?;
 
     let root = tree.root_node();
@@ -37,7 +40,10 @@ pub fn parse(source: &str) -> Result<Element, ParseError> {
         .and_then(|element| element.child(0))
         .ok_or_else(|| ParseError {
             message: "expected a single root element".to_string(),
-            span: Span { start_byte: 0, end_byte: source.len() },
+            span: Span {
+                start_byte: 0,
+                end_byte: source.len(),
+            },
         })?;
 
     Ok(lower_element(element_node, source))
@@ -58,10 +64,20 @@ fn lower_element(node: Node, source: &str) -> Element {
 
     let children = node
         .child_by_field_name("text")
-        .map(|n| vec![Text { value: text_of(n, source), span: span_of(n) }])
+        .map(|n| {
+            vec![Text {
+                value: text_of(n, source),
+                span: span_of(n),
+            }]
+        })
         .unwrap_or_default();
 
-    Element { name, attributes, children, span: span_of(node) }
+    Element {
+        name,
+        attributes,
+        children,
+        span: span_of(node),
+    }
 }
 
 fn lower_attribute(node: Node, source: &str) -> Attribute {
@@ -76,18 +92,28 @@ fn lower_attribute(node: Node, source: &str) -> Attribute {
             .and_then(|v| v.child_by_field_name("value"))
             .map(|n| text_of(n, source))
             .unwrap_or_default(),
-        span: value_node
-            .map(span_of)
-            .unwrap_or(Span { start_byte: 0, end_byte: 0 }),
+        span: value_node.map(span_of).unwrap_or(Span {
+            start_byte: 0,
+            end_byte: 0,
+        }),
     };
 
-    Attribute { name, value, span: span_of(node) }
+    Attribute {
+        name,
+        value,
+        span: span_of(node),
+    }
 }
 
 fn text_of(node: Node, source: &str) -> String {
-    node.utf8_text(source.as_bytes()).unwrap_or_default().to_string()
+    node.utf8_text(source.as_bytes())
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn span_of(node: Node) -> Span {
-    Span { start_byte: node.start_byte(), end_byte: node.end_byte() }
+    Span {
+        start_byte: node.start_byte(),
+        end_byte: node.end_byte(),
+    }
 }

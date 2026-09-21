@@ -49,12 +49,21 @@ mod tests {
                 name: "title".to_string(),
                 value: StringLiteral {
                     value: "Users".to_string(),
-                    span: Span { start_byte: 12, end_byte: 19 },
+                    span: Span {
+                        start_byte: 12,
+                        end_byte: 19,
+                    },
                 },
-                span: Span { start_byte: 6, end_byte: 19 },
+                span: Span {
+                    start_byte: 6,
+                    end_byte: 19,
+                },
             }],
             children: vec![],
-            span: Span { start_byte: 0, end_byte: 22 },
+            span: Span {
+                start_byte: 0,
+                end_byte: 22,
+            },
         };
 
         assert_eq!(element.name, "page");

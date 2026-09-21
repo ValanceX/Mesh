@@ -27,7 +27,10 @@ pub fn compile(source: &str) -> CompileResult {
     match mesh_parser::parse(source) {
         Ok(ast) => {
             let ir = mesh_semantic::lower(&ast);
-            CompileResult { ir: Some(ir), diagnostics: vec![] }
+            CompileResult {
+                ir: Some(ir),
+                diagnostics: vec![],
+            }
         }
         Err(err) => CompileResult {
             ir: None,
