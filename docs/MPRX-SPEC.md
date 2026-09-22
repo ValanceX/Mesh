@@ -24,13 +24,13 @@ ambiguity) are shipped, per
 `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`'s 3a/3b
 split; Pass 3a's `mesh-syntax`/`mesh-semantic` type shapes are recorded
 in §8 below. **Pass 3b** (`ArrayExpression`/`ObjectExpression`/
-`CommandInvocation`/`EventValue`) is next up and not yet implemented —
-its own type shapes are deliberately left open to be reviewed and
-adjusted against real Pass 3a implementation experience rather than
-fixed speculatively; §8 still marks those rows "TBD at Pass 3b planning".
-**Not yet implemented:** Pass 3b (as above), §4's event bindings (Pass 4),
-and §3's nested elements (Pass 4). The rest of this document is the
-target those remaining passes implement against.
+`CommandInvocation`/`EventValue`) is being planned now, informed by real
+Pass 3a implementation experience as intended — its `mesh-syntax`/
+`mesh-semantic` type shapes are now fixed in §8 below, ahead of its
+`writing-plans` cycle, same treatment Pass 3a's shapes got. **Not yet
+implemented:** Pass 3b (as above), §4's event bindings (Pass 4), and
+§3's nested elements (Pass 4). The rest of this document is the target
+those remaining passes implement against.
 
 ---
 
@@ -88,6 +88,19 @@ previously-shipped Pass 2 behavior: `{-3.5}` now lowers to a `Unary`
 node wrapping `Literal::Number("3.5")`, not a `Literal::Number("-3.5")`
 directly. `NumberLiteral.value` (the raw source text) correspondingly
 never contains a leading `-` after this change.
+
+**`event_value` is a single atomic token** (clarified for Pass 3b
+planning), not `'$'` followed by a separately-tokenized `identifier`.
+Written as `'$' identifier` above for readability, but implemented as
+one regex token with no whitespace permitted between `$` and the name —
+`$event` is valid, `$ event` (with a space) is not. This follows directly
+from `event_value` living in this section (§2, *lexical* grammar) rather
+than §5 (*structural* grammar): a structural `seq('$', identifier)` rule
+would let Tree-sitter's automatic whitespace-insertion between tokens
+silently accept the spaced form, which doesn't fit "one lexical token."
+`command_invocation` (`identifier '(' ...`, §5) stays a structural rule
+by contrast — whitespace before its `(` is unremarkable, same as
+anywhere else in the structural grammar.
 
 **Comments:** not supported in v0.1. MPRX is primarily compiled/generated
 rather than hand-authored, and nothing in the existing architecture calls
@@ -257,22 +270,23 @@ table rather than re-deriving names per pass.
 | UnaryExpression                             | Pass 3a                              | `UnaryExpression` (+ `UnaryOperator`)                     | `Expression::Unary{operator,operand}` (reuses `mesh_syntax::UnaryOperator`) |
 | BinaryExpression                            | Pass 3a                              | `BinaryExpression` (+ `BinaryOperator`)                   | `Expression::Binary{operator,left,right}` (reuses `mesh_syntax::BinaryOperator`) |
 | ConditionalExpression                       | Pass 3a                              | `ConditionalExpression`                                  | `Expression::Conditional{condition,consequent,alternate}` |
-| ArrayExpression                             | Pass 3b                              | `ArrayExpression`                                        | TBD at Pass 3b planning          |
-| ObjectExpression                            | Pass 3b                              | `ObjectExpression` (+ `ObjectMember`, `ObjectKey`)        | TBD at Pass 3b planning          |
-| CommandInvocation                           | Pass 3b                              | `CommandInvocation`                                      | TBD at Pass 3b planning          |
-| EventValue                                  | Pass 3b (alongside CommandInvocation) | `EventValue`                                             | TBD at Pass 3b planning          |
+| ArrayExpression                             | Pass 3b                              | `ArrayExpression`                                        | `Expression::Array(Vec<Expression>)` |
+| ObjectExpression                            | Pass 3b                              | `ObjectExpression` (+ `ObjectMember`, `ObjectKey`)        | `Expression::Object(Vec<ObjectMember>)` (IR-local `ObjectMember{key: String, value}` — `ObjectKey` flattens, see note below) |
+| CommandInvocation                           | Pass 3b                              | `CommandInvocation`                                      | `Expression::Command{command,arguments}` |
+| EventValue                                  | Pass 3b (alongside CommandInvocation) | `EventValue`                                             | `Expression::EventValue(String)` |
 | EventBinding                                | Pass 4                               | `EventBinding`                                           | TBD at Pass 4 planning          |
 | Child::Element (nested)                     | Pass 4                               | extends `Child` enum                                     | same                            |
 | Diagnostics (plural, from both parse+lower) | Pass 4                               | n/a — changes `parse`/`lower` signatures                 | n/a                             |
 
-Pass 3b/4's exact Rust type shapes are intentionally left "TBD at
+Pass 4's exact Rust type shapes are intentionally left "TBD at
 planning" — this spec fixes the *grammar and semantics*, not Rust API
 signatures, which is exactly the layer that should still get decided at
 `writing-plans` time per real implementation experience (same reasoning
 the Pass 3-5 outline already gave for not writing bite-sized plans this
-far ahead). Pass 3a's shapes are fixed above as an exception: 3a's
-brainstorm happened immediately ahead of its `writing-plans` cycle, so
-there was no gap between deciding and implementing to leave open.
+far ahead). Pass 3a's and Pass 3b's shapes are fixed above as an
+exception in each case: both brainstorms happened immediately ahead of
+their own `writing-plans` cycle, so there was no gap between deciding
+and implementing to leave open.
 
 **`mesh-semantic` operator-enum reuse (Pass 3a):** `UnaryOperator` and
 `BinaryOperator` are the first `mesh-syntax` types the Semantic IR
@@ -326,3 +340,11 @@ step, not a reuse.
   cycle, and splits the former single "Pass 3" into Pass 3a (this) and
   Pass 3b (`ArrayExpression`/`ObjectExpression`/`CommandInvocation`/
   `EventValue`, deferred until 3a ships and can be reviewed).
+- **This revision (2026-09-22, third pass)**, written after Pass 3a
+  shipped: fixes §8's Pass 3b row shapes (`ArrayExpression`,
+  `ObjectExpression`/`ObjectMember`/`ObjectKey`, `CommandInvocation`,
+  `EventValue`) ahead of Pass 3b's `writing-plans` cycle, and adds §2's
+  `event_value`-is-an-atomic-token clarification — a real lexical-grammar
+  decision surfaced by actually designing the grammar rule, the same way
+  Pass 3a's number/unary-minus ambiguity was surfaced by designing that
+  pass's grammar rather than being visible from the EBNF alone.
