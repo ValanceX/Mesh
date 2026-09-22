@@ -65,7 +65,9 @@ fn lower_attribute(attribute: &mesh_syntax::Attribute) -> Attribute {
 
 fn lower_attribute_value(value: &mesh_syntax::AttributeValue) -> AttributeValue {
     match value {
-        mesh_syntax::AttributeValue::String(literal) => AttributeValue::String(literal.value.clone()),
+        mesh_syntax::AttributeValue::String(literal) => {
+            AttributeValue::String(literal.value.clone())
+        }
         mesh_syntax::AttributeValue::Expression(expression) => {
             AttributeValue::Expression(lower_expression(expression))
         }
@@ -75,14 +77,18 @@ fn lower_attribute_value(value: &mesh_syntax::AttributeValue) -> AttributeValue 
 fn lower_child(child: &mesh_syntax::Child) -> Child {
     match child {
         mesh_syntax::Child::Text(text) => Child::Text(text.value.clone()),
-        mesh_syntax::Child::Expression(expression) => Child::Expression(lower_expression(expression)),
+        mesh_syntax::Child::Expression(expression) => {
+            Child::Expression(lower_expression(expression))
+        }
     }
 }
 
 fn lower_expression(expression: &mesh_syntax::Expression) -> Expression {
     match expression {
         mesh_syntax::Expression::Literal(literal) => Expression::Literal(lower_literal(literal)),
-        mesh_syntax::Expression::Reference(reference) => Expression::Reference(reference.name.clone()),
+        mesh_syntax::Expression::Reference(reference) => {
+            Expression::Reference(reference.name.clone())
+        }
         mesh_syntax::Expression::MemberAccess(member) => Expression::MemberAccess {
             object: Box::new(lower_expression(&member.object)),
             property: member.property.clone(),

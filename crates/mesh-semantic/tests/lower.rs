@@ -85,15 +85,15 @@ fn lowers_an_expression_child() {
     let ast = mesh_syntax::Element {
         name: "title".to_string(),
         attributes: vec![],
-        children: vec![mesh_syntax::Child::Expression(mesh_syntax::Expression::Reference(
-            mesh_syntax::Reference {
+        children: vec![mesh_syntax::Child::Expression(
+            mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "user".to_string(),
                 span: mesh_syntax::Span {
                     start_byte: 0,
                     end_byte: 0,
                 },
-            },
-        ))],
+            }),
+        )],
         span: mesh_syntax::Span {
             start_byte: 0,
             end_byte: 0,
