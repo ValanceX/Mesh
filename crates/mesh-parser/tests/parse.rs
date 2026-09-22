@@ -362,6 +362,34 @@ fn left_associates_repeated_additive_operators() {
 }
 
 #[test]
+fn allows_a_unary_operand_inside_a_binary_expression() {
+    let element = mesh_parser::parse(r#"<page v={-a * b} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Binary(outer)) => {
+            assert_eq!(outer.operator, mesh_syntax::BinaryOperator::Mul);
+            match outer.left.as_ref() {
+                mesh_syntax::Expression::Unary(unary) => {
+                    assert_eq!(unary.operator, mesh_syntax::UnaryOperator::Negate);
+                    match unary.operand.as_ref() {
+                        mesh_syntax::Expression::Reference(reference) => {
+                            assert_eq!(reference.name, "a");
+                        }
+                        other => panic!("expected unary operand to be a reference, got {other:?}"),
+                    }
+                }
+                other => panic!("expected left operand to be a unary expression, got {other:?}"),
+            }
+            match outer.right.as_ref() {
+                mesh_syntax::Expression::Reference(reference) => assert_eq!(reference.name, "b"),
+                other => panic!("expected right operand to be a reference, got {other:?}"),
+            }
+        }
+        other => panic!("expected a binary expression, got {other:?}"),
+    }
+}
+
+#[test]
 fn parenthesized_expression_overrides_precedence() {
     let element = mesh_parser::parse(r#"<page total={(a + b) * c} />"#).expect("should parse");
 

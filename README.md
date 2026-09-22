@@ -85,7 +85,8 @@ around the compiled Rust/WASM artifacts.
 ## Status
 
 The Tree-sitter grammar and parser are implemented and under active
-development (v0.1 Pass 1 and Pass 2 shipped). See
+development (v0.1 Pass 1, Pass 2, and Pass 3a — Unary/Binary/Conditional
+expressions — shipped). See
 [`docs/MPRX-SPEC.md`](./docs/MPRX-SPEC.md) for the current language spec
 and what's implemented vs. still planned, and
 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the system rationale.

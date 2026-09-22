@@ -13,23 +13,24 @@ document covers the "what" — precise grammar and per-construct semantics.
 
 **Status:** describes the full v0.1 grammar target. The "Introduced in"
 column throughout marks what's actually implemented today vs. planned.
-As of 2026-09-22: Pass 1 (elements, attributes, string values, plain text)
-and Pass 2 (the `{...}` expression syntax in both attribute values and
-child content — covering `Literal` (String/Number/Boolean/Null),
-`Reference`, and `MemberAccess`; the `tag_name`/`identifier` lexical
-split; and string escape decoding) are shipped. **Pass 3 is split into two
-plans**, per `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`:
-**Pass 3a** (`UnaryExpression`/`BinaryExpression`/`ConditionalExpression` —
-§5's precedence ladder) is planned and about to be implemented; its
-`mesh-syntax`/`mesh-semantic` type shapes are now fixed in §8 below.
-**Pass 3b** (`ArrayExpression`/`ObjectExpression`/`CommandInvocation`/
-`EventValue`) is deferred until 3a ships, so its own type shapes can be
-reviewed and adjusted against real 3a implementation experience rather
-than fixed speculatively now — §8 still marks those rows "TBD at Pass 3b
-planning". **Not yet implemented:** everything from §5's
-`UnaryExpression` onward, §4's event bindings (Pass 4), and §3's nested
-elements (Pass 4). The rest of this document is the target those
-remaining passes implement against.
+As of 2026-09-22: Pass 1 (elements, attributes, string values, plain text),
+Pass 2 (the `{...}` expression syntax in both attribute values and child
+content — covering `Literal` (String/Number/Boolean/Null), `Reference`,
+and `MemberAccess`; the `tag_name`/`identifier` lexical split; and string
+escape decoding), and **Pass 3a** (`UnaryExpression`/`BinaryExpression`/
+`ConditionalExpression` — §5's precedence ladder — plus the unsigned
+`number` token fix above that resolves the signed-literal/unary-minus
+ambiguity) are shipped, per
+`docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`'s 3a/3b
+split; Pass 3a's `mesh-syntax`/`mesh-semantic` type shapes are recorded
+in §8 below. **Pass 3b** (`ArrayExpression`/`ObjectExpression`/
+`CommandInvocation`/`EventValue`) is next up and not yet implemented —
+its own type shapes are deliberately left open to be reviewed and
+adjusted against real Pass 3a implementation experience rather than
+fixed speculatively; §8 still marks those rows "TBD at Pass 3b planning".
+**Not yet implemented:** Pass 3b (as above), §4's event bindings (Pass 4),
+and §3's nested elements (Pass 4). The rest of this document is the
+target those remaining passes implement against.
 
 ---
 

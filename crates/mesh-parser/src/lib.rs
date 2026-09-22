@@ -197,7 +197,9 @@ fn lower_expression(node: Node, source: &str) -> Expression {
     // specifically because of that case: the parenthesized alternative's
     // literal `(`/`)` tokens are anonymous children that would otherwise
     // land at index 0.
-    let inner = node.named_child(0).unwrap_or(node);
+    let Some(inner) = node.named_child(0) else {
+        return missing_expression(node);
+    };
     match inner.kind() {
         "expression" => lower_expression(inner, source),
         "literal" => Expression::Literal(lower_literal(inner, source)),
