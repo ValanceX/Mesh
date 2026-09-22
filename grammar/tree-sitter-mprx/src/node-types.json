@@ -1,5 +1,20 @@
 [
   {
+    "type": "array_expression",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "attribute",
     "named": true,
     "fields": {
@@ -138,6 +153,32 @@
     }
   },
   {
+    "type": "command_invocation",
+    "named": true,
+    "fields": {
+      "command": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "conditional_expression",
     "named": true,
     "fields": {
@@ -235,11 +276,23 @@
       "required": true,
       "types": [
         {
+          "type": "array_expression",
+          "named": true
+        },
+        {
           "type": "binary_expression",
           "named": true
         },
         {
+          "type": "command_invocation",
+          "named": true
+        },
+        {
           "type": "conditional_expression",
+          "named": true
+        },
+        {
+          "type": "event_value",
           "named": true
         },
         {
@@ -252,6 +305,10 @@
         },
         {
           "type": "member_access",
+          "named": true
+        },
+        {
+          "type": "object_expression",
           "named": true
         },
         {
@@ -332,6 +389,51 @@
         "types": [
           {
             "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "object_expression",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "object_member",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "object_member",
+    "named": true,
+    "fields": {
+      "key": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
             "named": true
           }
         ]
@@ -478,6 +580,10 @@
     "named": false
   },
   {
+    "type": ",",
+    "named": false
+  },
+  {
     "type": "-",
     "named": false
   },
@@ -528,6 +634,18 @@
   {
     "type": "?",
     "named": false
+  },
+  {
+    "type": "[",
+    "named": false
+  },
+  {
+    "type": "]",
+    "named": false
+  },
+  {
+    "type": "event_value",
+    "named": true
   },
   {
     "type": "false",

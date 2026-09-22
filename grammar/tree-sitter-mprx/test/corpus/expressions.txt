@@ -335,3 +335,302 @@ Nested conditional expressions are right-associative
                   alternate: (expression
                     (reference
                       (identifier))))))))))))
+
+================================================================================
+Attribute with an empty array expression
+================================================================================
+
+<page items={[]} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (array_expression)))))))
+
+================================================================================
+Attribute with an array expression with elements
+================================================================================
+
+<page items={[1, 2, 3]} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (array_expression
+              (expression
+                (literal
+                  (number_literal)))
+              (expression
+                (literal
+                  (number_literal)))
+              (expression
+                (literal
+                  (number_literal))))))))))
+
+================================================================================
+Array expression with a trailing comma
+================================================================================
+
+<page items={[1, 2,]} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (array_expression
+              (expression
+                (literal
+                  (number_literal)))
+              (expression
+                (literal
+                  (number_literal))))))))))
+
+================================================================================
+Attribute with an empty object expression (doubled braces)
+================================================================================
+
+<page data={{}} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (object_expression)))))))
+
+================================================================================
+Attribute with an object expression with an identifier key
+================================================================================
+
+<page data={{ name: "value" }} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (object_expression
+              (object_member
+                key: (identifier)
+                value: (expression
+                  (literal
+                    (string
+                      value: (string_content))))))))))))
+
+================================================================================
+Attribute with an object expression with a string key
+================================================================================
+
+<page data={{ "a-b": 1 }} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (object_expression
+              (object_member
+                key: (string
+                  value: (string_content))
+                value: (expression
+                  (literal
+                    (number_literal)))))))))))
+
+================================================================================
+Object expression with multiple members and a trailing comma
+================================================================================
+
+<page data={{ a: 1, b: 2, }} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (object_expression
+              (object_member
+                key: (identifier)
+                value: (expression
+                  (literal
+                    (number_literal))))
+              (object_member
+                key: (identifier)
+                value: (expression
+                  (literal
+                    (number_literal)))))))))))
+
+================================================================================
+Attribute with a command invocation with no arguments
+================================================================================
+
+<page action={selectUser()} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (command_invocation
+              command: (identifier))))))))
+
+================================================================================
+Attribute with a command invocation with an event-value argument
+================================================================================
+
+<page action={selectUser($event)} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (command_invocation
+              command: (identifier)
+              (expression
+                (event_value)))))))))
+
+================================================================================
+Command invocation with multiple arguments
+================================================================================
+
+<page action={update(a, b)} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (command_invocation
+              command: (identifier)
+              (expression
+                (reference
+                  (identifier)))
+              (expression
+                (reference
+                  (identifier))))))))))
+
+================================================================================
+Attribute with a bare event value
+================================================================================
+
+<page handler={$event} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (event_value)))))))
+
+================================================================================
+Nested array expression inside an object expression
+================================================================================
+
+<page data={{ items: [1, 2] }} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (object_expression
+              (object_member
+                key: (identifier)
+                value: (expression
+                  (array_expression
+                    (expression
+                      (literal
+                        (number_literal)))
+                    (expression
+                      (literal
+                        (number_literal)))))))))))))
+
+================================================================================
+Nested object expression inside an array expression
+================================================================================
+
+<page items={[{a: 1}]} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (array_expression
+              (expression
+                (object_expression
+                  (object_member
+                    key: (identifier)
+                    value: (expression
+                      (literal
+                        (number_literal)))))))))))))

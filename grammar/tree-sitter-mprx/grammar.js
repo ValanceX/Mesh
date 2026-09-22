@@ -73,6 +73,10 @@ module.exports = grammar({
       $.unary_expression,
       $.binary_expression,
       $.conditional_expression,
+      $.array_expression,
+      $.object_expression,
+      $.command_invocation,
+      $.event_value,
       seq('(', $.expression, ')'),
     ),
 
@@ -121,6 +125,44 @@ module.exports = grammar({
       ':',
       field('alternate', $.expression),
     )),
+
+    array_expression: $ => seq(
+      '[',
+      optional(seq(
+        $.expression,
+        repeat(seq(',', $.expression)),
+        optional(','),
+      )),
+      ']',
+    ),
+
+    object_expression: $ => seq(
+      '{',
+      optional(seq(
+        $.object_member,
+        repeat(seq(',', $.object_member)),
+        optional(','),
+      )),
+      '}',
+    ),
+
+    object_member: $ => seq(
+      field('key', choice($.identifier, $.string)),
+      ':',
+      field('value', $.expression),
+    ),
+
+    command_invocation: $ => seq(
+      field('command', $.identifier),
+      '(',
+      optional(seq(
+        $.expression,
+        repeat(seq(',', $.expression)),
+      )),
+      ')',
+    ),
+
+    event_value: $ => /\$[a-zA-Z_][a-zA-Z0-9_]*/,
 
     literal: $ => choice(
       $.string,
