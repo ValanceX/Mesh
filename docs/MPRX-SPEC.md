@@ -14,8 +14,15 @@ document covers the "what" — precise grammar and per-construct semantics.
 **Status:** describes the full v0.1 grammar target. The "Introduced in"
 column throughout marks what's actually implemented today vs. planned.
 As of 2026-09-22: Pass 1 (elements, attributes, string values, plain text)
-is shipped. Nothing past that is implemented yet — the rest of this
-document is the target Pass 2-5 implements against.
+and Pass 2 (the `{...}` expression syntax in both attribute values and
+child content — covering `Literal` (String/Number/Boolean/Null),
+`Reference`, and `MemberAccess`; the `tag_name`/`identifier` lexical
+split; and string escape decoding) are shipped. **Not yet implemented:**
+everything from §5's `UnaryExpression`/`BinaryExpression`/
+`ConditionalExpression`/`ArrayExpression`/`ObjectExpression`/
+`CommandInvocation`/`EventValue` onward (Pass 3), §4's event bindings
+(Pass 4), and §3's nested elements (Pass 4). The rest of this document is
+the target those remaining passes implement against.
 
 ---
 
@@ -52,21 +59,20 @@ references, member-access properties, event names, command names. This
 matters once Pass 3 introduces `-` as binary subtraction — if references
 allowed hyphens, `a-b` would be lexically ambiguous between "one
 identifier" and "`a` minus `b`". JSX has the same split for the same
-reason. **This retroactively affects the shipped Pass 1 grammar**, whose
-`attribute` rule currently reuses the hyphen-allowing token for attribute
-names — not a live bug yet (Pass 1 has no binary operators to collide
-with), but it must be corrected before Pass 3, and naturally belongs in
-Pass 2's grammar work since Pass 2 is the first pass to introduce
-`reference`.
+reason. **This split is implemented as of Pass 2**: the `attribute` rule
+now uses the hyphen-free `identifier` token for attribute names (distinct
+from `tag_name`, which still allows hyphens for element names), avoiding
+the ambiguity before Pass 3 introduces binary operators.
 
 **Comments:** not supported in v0.1. MPRX is primarily compiled/generated
 rather than hand-authored, and nothing in the existing architecture calls
 for them. Revisit if real usage shows a need.
 
-**String escapes:** `\"`, `\\`, `\n`, `\t`. The shipped Pass 1 grammar has
-no escape handling at all (a literal `"` inside a string is currently
-unrepresentable) — this is a gap this spec closes, to be picked up
-whenever grammar work next touches the `string` rule (Pass 2).
+**String escapes:** `\"`, `\\`, `\n`, `\t`. Escape decoding is implemented
+as of Pass 2 — a literal `"` inside a string is representable via `\"`,
+and both `mesh-parser`'s attribute-value strings and string literals used
+inside `{...}` expressions decode escapes through the same `lower_string`
+path.
 
 ---
 
@@ -88,12 +94,22 @@ expression_block          ::= '{' expression '}'
 `child` allows three things: plain text, an `{expr}` block, or a nested
 `element`. **Nested elements are Pass 4 scope** (see §8's pass column) —
 until then, `child` is effectively `text | expression_block`. Expressions
-are valid in child/content position from Pass 2 onward, not just in
+are valid in child/content position as of Pass 2, not just in
 attribute values — `docs/ARCHITECTURE.md`'s own example,
 `<text>{user.name}</text>`, puts an expression directly in element
-content. The already-written Pass 2 plan only threaded `{...}` through
-attribute values; it needs amending to cover child content too (tracked in
-§10).
+content, and `container_element`'s grammar now uses `repeat($.child)` so
+an element can hold any number of text/expression children in any order.
+
+**Whitespace in child content (open question for Pass 4):** a
+whitespace-only text run between children (e.g. the newline/indentation in
+`<title>\n  {user}\n</title>`) currently produces a literal `Child::Text`
+node containing that whitespace, exactly matching `text ::= [^<{]+` — MPRX
+does not trim or collapse whitespace-only text children the way JSX trims
+whitespace-only `JSXText`. This is the current, shipped, tested behavior
+for Pass 2 (see `crates/mesh-parser/tests/parse.rs`), not a final
+decision: whether to keep it as-is or add JSX-style trimming is an open
+question to revisit deliberately at Pass 4, once nested elements make
+multi-child content the common case.
 
 Open/close tag name matching (`<foo>...</bar>` should be rejected) is
 **Pass 4** structural-validation scope, same as the existing roadmap spec
@@ -249,12 +265,12 @@ far ahead).
 ## 10. Impact on already-written plans
 
 - **`docs/superpowers/plans/2026-09-22-mesh-v0.1-pass-2-expressions.md`**
-  needs amending before execution: (a) split `identifier` into `tag_name`
-  (element names) vs. hyphen-free `identifier` (attribute names,
-  references, member-access properties); (b) extend expression support to
-  child/content position, not just attribute values; (c) add string escape
-  handling; (d) add Boolean/Null literals alongside String/Number. See the
-  updated plan file — this spec's approval is what authorizes rewriting it.
+  was amended per this spec before execution and has now shipped: (a)
+  `identifier` was split into `tag_name` (element names) vs. hyphen-free
+  `identifier` (attribute names, references, member-access properties);
+  (b) expression support was extended to child/content position, not just
+  attribute values; (c) string escape handling was added; (d) Boolean/Null
+  literals were added alongside String/Number.
 - **`docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`**'s
   previously-open questions (exact operator set, precedence, event-binding
   token shape, array/object syntax) are now resolved by §4-§5 above. The
