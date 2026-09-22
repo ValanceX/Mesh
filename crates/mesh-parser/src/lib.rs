@@ -5,8 +5,9 @@
 //! never exposed as the application's final UI model.
 
 use mesh_syntax::{
-    Attribute, AttributeValue, BooleanLiteral, Child, Element, Expression, Literal, MemberAccess,
-    NullLiteral, NumberLiteral, Reference, Span, StringLiteral, Text,
+    Attribute, AttributeValue, BinaryExpression, BinaryOperator, BooleanLiteral, Child,
+    ConditionalExpression, Element, Expression, Literal, MemberAccess, NullLiteral,
+    NumberLiteral, Reference, Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
 };
 use tree_sitter::Node;
 
@@ -137,11 +138,20 @@ fn lower_attribute(node: Node, source: &str) -> Attribute {
 fn lower_expression_block(node: Node, source: &str) -> Expression {
     match node.child_by_field_name("expression") {
         Some(e) => lower_expression(e, source),
-        None => Expression::Reference(Reference {
-            name: String::new(),
-            span: span_of(node),
-        }),
+        None => missing_expression(node),
     }
+}
+
+/// A placeholder used where the grammar guarantees a field is present for
+/// any successfully-parsed tree — the branch it backs is never actually
+/// reached in practice. Returning a harmlessly-empty reference here (as
+/// opposed to `unwrap`-ing) means a future grammar bug would surface as a
+/// wrong-but-visible AST shape rather than a panic.
+fn missing_expression(node: Node) -> Expression {
+    Expression::Reference(Reference {
+        name: String::new(),
+        span: span_of(node),
+    })
 }
 
 fn lower_string(node: Node, source: &str) -> StringLiteral {
@@ -180,15 +190,124 @@ fn decode_string_escapes(raw: &str) -> String {
 }
 
 fn lower_expression(node: Node, source: &str) -> Expression {
-    // `node` is an `expression` node; its single child is the real variant.
-    let inner = node.child(0).unwrap_or(node);
+    // `node` is an `expression` node; its single named child is the real
+    // variant — except the parenthesized-grouping case, where that child
+    // is itself another `expression` node to recurse into (no AST node
+    // for the parens themselves). Uses `named_child` rather than `child`
+    // specifically because of that case: the parenthesized alternative's
+    // literal `(`/`)` tokens are anonymous children that would otherwise
+    // land at index 0.
+    let inner = node.named_child(0).unwrap_or(node);
     match inner.kind() {
+        "expression" => lower_expression(inner, source),
         "literal" => Expression::Literal(lower_literal(inner, source)),
         "member_access" => Expression::MemberAccess(lower_member_access(inner, source)),
         "reference" => Expression::Reference(lower_reference(inner, source)),
+        "unary_expression" => Expression::Unary(lower_unary_expression(inner, source)),
+        "binary_expression" => Expression::Binary(lower_binary_expression(inner, source)),
+        "conditional_expression" => {
+            Expression::Conditional(lower_conditional_expression(inner, source))
+        }
         other => unreachable!(
             "unexpected expression node kind {other:?} inside a successfully-parsed tree"
         ),
+    }
+}
+
+fn lower_unary_expression(node: Node, source: &str) -> UnaryExpression {
+    let operator = node
+        .child_by_field_name("operator")
+        .map(|n| lower_unary_operator(&text_of(n, source)))
+        .unwrap_or(UnaryOperator::Negate);
+
+    let operand = node
+        .child_by_field_name("operand")
+        .map(|n| lower_expression(n, source))
+        .unwrap_or_else(|| missing_expression(node));
+
+    UnaryExpression {
+        operator,
+        operand: Box::new(operand),
+        span: span_of(node),
+    }
+}
+
+fn lower_unary_operator(text: &str) -> UnaryOperator {
+    match text {
+        "!" => UnaryOperator::Not,
+        "-" => UnaryOperator::Negate,
+        other => unreachable!(
+            "unexpected unary operator token {other:?} inside a successfully-parsed tree"
+        ),
+    }
+}
+
+fn lower_binary_expression(node: Node, source: &str) -> BinaryExpression {
+    let operator = node
+        .child_by_field_name("operator")
+        .map(|n| lower_binary_operator(&text_of(n, source)))
+        .unwrap_or(BinaryOperator::Add);
+
+    let left = node
+        .child_by_field_name("left")
+        .map(|n| lower_expression(n, source))
+        .unwrap_or_else(|| missing_expression(node));
+
+    let right = node
+        .child_by_field_name("right")
+        .map(|n| lower_expression(n, source))
+        .unwrap_or_else(|| missing_expression(node));
+
+    BinaryExpression {
+        operator,
+        left: Box::new(left),
+        right: Box::new(right),
+        span: span_of(node),
+    }
+}
+
+fn lower_binary_operator(text: &str) -> BinaryOperator {
+    match text {
+        "*" => BinaryOperator::Mul,
+        "/" => BinaryOperator::Div,
+        "%" => BinaryOperator::Mod,
+        "+" => BinaryOperator::Add,
+        "-" => BinaryOperator::Sub,
+        "<" => BinaryOperator::Lt,
+        "<=" => BinaryOperator::Le,
+        ">" => BinaryOperator::Gt,
+        ">=" => BinaryOperator::Ge,
+        "==" => BinaryOperator::Eq,
+        "!=" => BinaryOperator::Ne,
+        "&&" => BinaryOperator::And,
+        "||" => BinaryOperator::Or,
+        other => unreachable!(
+            "unexpected binary operator token {other:?} inside a successfully-parsed tree"
+        ),
+    }
+}
+
+fn lower_conditional_expression(node: Node, source: &str) -> ConditionalExpression {
+    let condition = node
+        .child_by_field_name("condition")
+        .map(|n| lower_expression(n, source))
+        .unwrap_or_else(|| missing_expression(node));
+
+    let consequent = node
+        .child_by_field_name("consequent")
+        .map(|n| lower_expression(n, source))
+        .unwrap_or_else(|| missing_expression(node));
+
+    let alternate = node
+        .child_by_field_name("alternate")
+        .map(|n| lower_expression(n, source))
+        .unwrap_or_else(|| missing_expression(node));
+
+    ConditionalExpression {
+        condition: Box::new(condition),
+        consequent: Box::new(consequent),
+        alternate: Box::new(alternate),
+        span: span_of(node),
     }
 }
 
