@@ -45,7 +45,10 @@ pub struct Text {
 }
 
 /// A number literal. Stored as the raw source text (not parsed to `f64`)
-/// so the AST stays a lossless representation of what was written.
+/// so the AST stays a lossless representation of what was written. Always
+/// unsigned as of Pass 3a — a negative numeric literal like `-3.5` lowers
+/// to a [`UnaryExpression`] (`Negate`) wrapping this, not a signed token;
+/// see `docs/MPRX-SPEC.md` §2.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumberLiteral {
     pub value: String,
@@ -90,14 +93,73 @@ pub struct MemberAccess {
     pub span: Span,
 }
 
-/// An expression inside an `{...}` block: a literal, a reference, or a
-/// member access. Pass 3 will extend this with unary/binary/conditional/
-/// array/object/command/event-value variants.
+/// A prefix operator applicable to a [`UnaryExpression`]: `!` (logical
+/// negation) or `-` (numeric negation).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOperator {
+    Not,
+    Negate,
+}
+
+/// A unary expression: a prefix operator applied to its operand, e.g.
+/// `{!disabled}` or `{-count}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnaryExpression {
+    pub operator: UnaryOperator,
+    pub operand: Box<Expression>,
+    pub span: Span,
+}
+
+/// An infix operator applicable to a [`BinaryExpression`], covering
+/// `docs/MPRX-SPEC.md` §5's multiplicative, additive, relational,
+/// equality, and logical operator tiers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinaryOperator {
+    Mul,
+    Div,
+    Mod,
+    Add,
+    Sub,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Eq,
+    Ne,
+    And,
+    Or,
+}
+
+/// A binary expression: an infix operator applied to a left and right
+/// operand, e.g. `{a + b}` or `{count > 0}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BinaryExpression {
+    pub operator: BinaryOperator,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
+    pub span: Span,
+}
+
+/// A ternary conditional expression, e.g. `{compact ? "sm" : "md"}`.
+/// Right-associative: `a ? b : c ? d : e` parses as `a ? b : (c ? d : e)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConditionalExpression {
+    pub condition: Box<Expression>,
+    pub consequent: Box<Expression>,
+    pub alternate: Box<Expression>,
+    pub span: Span,
+}
+
+/// An expression inside an `{...}` block. Pass 3b will extend this
+/// further with array/object/command/event-value variants.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     Literal(Literal),
     Reference(Reference),
     MemberAccess(MemberAccess),
+    Unary(UnaryExpression),
+    Binary(BinaryExpression),
+    Conditional(ConditionalExpression),
 }
 
 /// The value side of an [`Attribute`]: either a plain quoted string or an
@@ -220,6 +282,113 @@ mod tests {
                 assert_eq!(reference.name, "user");
             }
             other => panic!("expected an expression child, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructs_a_unary_expression() {
+        let expression = Expression::Unary(UnaryExpression {
+            operator: UnaryOperator::Negate,
+            operand: Box::new(Expression::Reference(Reference {
+                name: "count".to_string(),
+                span: Span {
+                    start_byte: 1,
+                    end_byte: 6,
+                },
+            })),
+            span: Span {
+                start_byte: 0,
+                end_byte: 6,
+            },
+        });
+
+        match expression {
+            Expression::Unary(unary) => {
+                assert_eq!(unary.operator, UnaryOperator::Negate);
+                match unary.operand.as_ref() {
+                    Expression::Reference(reference) => assert_eq!(reference.name, "count"),
+                    other => panic!("expected operand to be a reference, got {other:?}"),
+                }
+            }
+            other => panic!("expected a unary expression, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructs_a_binary_expression() {
+        let expression = Expression::Binary(BinaryExpression {
+            operator: BinaryOperator::Add,
+            left: Box::new(Expression::Reference(Reference {
+                name: "a".to_string(),
+                span: Span {
+                    start_byte: 0,
+                    end_byte: 1,
+                },
+            })),
+            right: Box::new(Expression::Reference(Reference {
+                name: "b".to_string(),
+                span: Span {
+                    start_byte: 4,
+                    end_byte: 5,
+                },
+            })),
+            span: Span {
+                start_byte: 0,
+                end_byte: 5,
+            },
+        });
+
+        match expression {
+            Expression::Binary(binary) => {
+                assert_eq!(binary.operator, BinaryOperator::Add);
+                match (binary.left.as_ref(), binary.right.as_ref()) {
+                    (Expression::Reference(left), Expression::Reference(right)) => {
+                        assert_eq!(left.name, "a");
+                        assert_eq!(right.name, "b");
+                    }
+                    other => panic!("expected both operands to be references, got {other:?}"),
+                }
+            }
+            other => panic!("expected a binary expression, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructs_a_conditional_expression() {
+        let expression = Expression::Conditional(ConditionalExpression {
+            condition: Box::new(Expression::Reference(Reference {
+                name: "compact".to_string(),
+                span: Span {
+                    start_byte: 0,
+                    end_byte: 7,
+                },
+            })),
+            consequent: Box::new(Expression::Literal(Literal::String(StringLiteral {
+                value: "sm".to_string(),
+                span: Span {
+                    start_byte: 10,
+                    end_byte: 14,
+                },
+            }))),
+            alternate: Box::new(Expression::Literal(Literal::String(StringLiteral {
+                value: "md".to_string(),
+                span: Span {
+                    start_byte: 17,
+                    end_byte: 21,
+                },
+            }))),
+            span: Span {
+                start_byte: 0,
+                end_byte: 21,
+            },
+        });
+
+        match expression {
+            Expression::Conditional(conditional) => match conditional.consequent.as_ref() {
+                Expression::Literal(Literal::String(s)) => assert_eq!(s.value, "sm"),
+                other => panic!("expected consequent to be a string literal, got {other:?}"),
+            },
+            other => panic!("expected a conditional expression, got {other:?}"),
         }
     }
 }
