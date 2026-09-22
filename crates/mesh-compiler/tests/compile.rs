@@ -106,3 +106,58 @@ fn diagnostic_display_includes_message_and_span() {
 
     assert_eq!(diagnostic.to_string(), "syntax error (0..5)");
 }
+
+#[test]
+fn compiles_a_unary_expression_attribute() {
+    let result = mesh_compiler::compile(r#"<page disabled={!enabled} />"#);
+
+    assert!(result.diagnostics.is_empty());
+    let ir = result.ir.expect("should produce IR");
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Unary {
+            operator: mesh_syntax::UnaryOperator::Not,
+            operand: Box::new(mesh_semantic::Expression::Reference("enabled".to_string())),
+        })
+    );
+}
+
+#[test]
+fn compiles_a_binary_expression_attribute_respecting_precedence() {
+    let result = mesh_compiler::compile(r#"<page total={a + b * c} />"#);
+
+    assert!(result.diagnostics.is_empty());
+    let ir = result.ir.expect("should produce IR");
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Binary {
+            operator: mesh_syntax::BinaryOperator::Add,
+            left: Box::new(mesh_semantic::Expression::Reference("a".to_string())),
+            right: Box::new(mesh_semantic::Expression::Binary {
+                operator: mesh_syntax::BinaryOperator::Mul,
+                left: Box::new(mesh_semantic::Expression::Reference("b".to_string())),
+                right: Box::new(mesh_semantic::Expression::Reference("c".to_string())),
+            }),
+        })
+    );
+}
+
+#[test]
+fn compiles_a_conditional_expression_attribute() {
+    let result = mesh_compiler::compile(r#"<page size={compact ? "sm" : "md"} />"#);
+
+    assert!(result.diagnostics.is_empty());
+    let ir = result.ir.expect("should produce IR");
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Conditional {
+            condition: Box::new(mesh_semantic::Expression::Reference("compact".to_string())),
+            consequent: Box::new(mesh_semantic::Expression::Literal(
+                mesh_semantic::Literal::String("sm".to_string())
+            )),
+            alternate: Box::new(mesh_semantic::Expression::Literal(
+                mesh_semantic::Literal::String("md".to_string())
+            )),
+        })
+    );
+}

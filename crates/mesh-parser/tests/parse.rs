@@ -294,7 +294,8 @@ fn parses_every_binary_operator() {
     ];
 
     for (source, expected_operator) in cases {
-        let element = mesh_parser::parse(source).unwrap_or_else(|_| panic!("should parse: {source}"));
+        let element =
+            mesh_parser::parse(source).unwrap_or_else(|_| panic!("should parse: {source}"));
         match &element.attributes[0].value {
             mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Binary(binary)) => {
                 assert_eq!(binary.operator, expected_operator, "source: {source}");
@@ -347,7 +348,9 @@ fn left_associates_repeated_additive_operators() {
                         other => panic!("expected inner operands to be references, got {other:?}"),
                     }
                 }
-                other => panic!("expected left operand to be a nested binary expression, got {other:?}"),
+                other => {
+                    panic!("expected left operand to be a nested binary expression, got {other:?}")
+                }
             }
             match outer.right.as_ref() {
                 mesh_syntax::Expression::Reference(reference) => assert_eq!(reference.name, "c"),
@@ -369,7 +372,9 @@ fn parenthesized_expression_overrides_precedence() {
                 mesh_syntax::Expression::Binary(inner) => {
                     assert_eq!(inner.operator, mesh_syntax::BinaryOperator::Add);
                 }
-                other => panic!("expected left operand to be the parenthesized addition, got {other:?}"),
+                other => {
+                    panic!("expected left operand to be the parenthesized addition, got {other:?}")
+                }
             }
         }
         other => panic!("expected a binary expression, got {other:?}"),
@@ -378,12 +383,17 @@ fn parenthesized_expression_overrides_precedence() {
 
 #[test]
 fn parses_a_conditional_expression_attribute() {
-    let element = mesh_parser::parse(r#"<page size={compact ? "sm" : "md"} />"#).expect("should parse");
+    let element =
+        mesh_parser::parse(r#"<page size={compact ? "sm" : "md"} />"#).expect("should parse");
 
     match &element.attributes[0].value {
-        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Conditional(conditional)) => {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Conditional(
+            conditional,
+        )) => {
             match conditional.condition.as_ref() {
-                mesh_syntax::Expression::Reference(reference) => assert_eq!(reference.name, "compact"),
+                mesh_syntax::Expression::Reference(reference) => {
+                    assert_eq!(reference.name, "compact")
+                }
                 other => panic!("expected condition to be a reference, got {other:?}"),
             }
             match conditional.consequent.as_ref() {
@@ -420,7 +430,9 @@ fn right_associates_nested_conditional_expressions() {
                     }
                     other => panic!("expected inner condition to be a reference, got {other:?}"),
                 },
-                other => panic!("expected outer alternate to be a nested conditional, got {other:?}"),
+                other => {
+                    panic!("expected outer alternate to be a nested conditional, got {other:?}")
+                }
             }
         }
         other => panic!("expected a conditional expression, got {other:?}"),
