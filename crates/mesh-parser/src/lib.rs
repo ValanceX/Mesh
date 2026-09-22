@@ -4,7 +4,10 @@
 //! The Tree-sitter CST is an implementation detail of this crate — it is
 //! never exposed as the application's final UI model.
 
-use mesh_syntax::{Attribute, Element, Span, StringLiteral, Text};
+use mesh_syntax::{
+    Attribute, AttributeValue, BooleanLiteral, Child, Element, Expression, Literal, MemberAccess,
+    NullLiteral, NumberLiteral, Reference, Span, StringLiteral, Text,
+};
 use tree_sitter::Node;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,28 +58,36 @@ fn lower_element(node: Node, source: &str) -> Element {
         .map(|n| text_of(n, source))
         .unwrap_or_default();
 
-    let mut cursor = node.walk();
+    let mut attr_cursor = node.walk();
     let attributes = node
-        .children(&mut cursor)
+        .children(&mut attr_cursor)
         .filter(|n| n.kind() == "attribute")
         .map(|n| lower_attribute(n, source))
         .collect();
 
+    let mut child_cursor = node.walk();
     let children = node
-        .child_by_field_name("text")
-        .map(|n| {
-            vec![Text {
-                value: text_of(n, source),
-                span: span_of(n),
-            }]
-        })
-        .unwrap_or_default();
+        .children(&mut child_cursor)
+        .filter(|n| n.kind() == "child")
+        .map(|n| lower_child(n, source))
+        .collect();
 
     Element {
         name,
         attributes,
         children,
         span: span_of(node),
+    }
+}
+
+fn lower_child(node: Node, source: &str) -> Child {
+    let inner = node.child(0).unwrap_or(node);
+    match inner.kind() {
+        "expression_block" => Child::Expression(lower_expression_block(inner, source)),
+        _ => Child::Text(Text {
+            value: text_of(inner, source),
+            span: span_of(inner),
+        }),
     }
 }
 
@@ -87,20 +98,121 @@ fn lower_attribute(node: Node, source: &str) -> Attribute {
         .unwrap_or_default();
 
     let value_node = node.child_by_field_name("value");
-    let value = StringLiteral {
-        value: value_node
-            .and_then(|v| v.child_by_field_name("value"))
-            .map(|n| text_of(n, source))
-            .unwrap_or_default(),
-        span: value_node.map(span_of).unwrap_or(Span {
-            start_byte: 0,
-            end_byte: 0,
+    let value = match value_node {
+        Some(v) if v.kind() == "expression_block" => {
+            AttributeValue::Expression(lower_expression_block(v, source))
+        }
+        Some(v) => AttributeValue::String(lower_string(v, source)),
+        None => AttributeValue::String(StringLiteral {
+            value: String::new(),
+            span: span_of(node),
         }),
     };
 
     Attribute {
         name,
         value,
+        span: span_of(node),
+    }
+}
+
+fn lower_expression_block(node: Node, source: &str) -> Expression {
+    match node.child_by_field_name("expression") {
+        Some(e) => lower_expression(e, source),
+        None => Expression::Reference(Reference {
+            name: String::new(),
+            span: span_of(node),
+        }),
+    }
+}
+
+fn lower_string(node: Node, source: &str) -> StringLiteral {
+    let raw = node
+        .child_by_field_name("value")
+        .map(|n| text_of(n, source))
+        .unwrap_or_default();
+
+    StringLiteral {
+        value: decode_string_escapes(&raw),
+        span: span_of(node),
+    }
+}
+
+fn decode_string_escapes(raw: &str) -> String {
+    let mut result = String::with_capacity(raw.len());
+    let mut chars = raw.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            result.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('"') => result.push('"'),
+            Some('\\') => result.push('\\'),
+            Some('n') => result.push('\n'),
+            Some('t') => result.push('\t'),
+            Some(other) => {
+                result.push('\\');
+                result.push(other);
+            }
+            None => result.push('\\'),
+        }
+    }
+    result
+}
+
+fn lower_expression(node: Node, source: &str) -> Expression {
+    // `node` is an `expression` node; its single child is the real variant.
+    let inner = node.child(0).unwrap_or(node);
+    match inner.kind() {
+        "literal" => Expression::Literal(lower_literal(inner, source)),
+        "member_access" => Expression::MemberAccess(lower_member_access(inner, source)),
+        _ => Expression::Reference(lower_reference(inner, source)),
+    }
+}
+
+fn lower_literal(node: Node, source: &str) -> Literal {
+    let inner = node.child(0).unwrap_or(node);
+    match inner.kind() {
+        "string" => Literal::String(lower_string(inner, source)),
+        "boolean_literal" => Literal::Boolean(BooleanLiteral {
+            value: text_of(inner, source) == "true",
+            span: span_of(inner),
+        }),
+        "null_literal" => Literal::Null(NullLiteral {
+            span: span_of(inner),
+        }),
+        _ => Literal::Number(NumberLiteral {
+            value: text_of(inner, source),
+            span: span_of(inner),
+        }),
+    }
+}
+
+fn lower_reference(node: Node, source: &str) -> Reference {
+    Reference {
+        name: text_of(node, source),
+        span: span_of(node),
+    }
+}
+
+fn lower_member_access(node: Node, source: &str) -> MemberAccess {
+    let object = node
+        .child_by_field_name("object")
+        .map(|o| match o.kind() {
+            "member_access" => Expression::MemberAccess(lower_member_access(o, source)),
+            _ => Expression::Reference(lower_reference(o, source)),
+        })
+        .unwrap_or_else(|| Expression::Reference(lower_reference(node, source)));
+
+    let property = node
+        .child_by_field_name("property")
+        .map(|p| text_of(p, source))
+        .unwrap_or_default();
+
+    MemberAccess {
+        object: Box::new(object),
+        property,
         span: span_of(node),
     }
 }

@@ -7,7 +7,10 @@ fn parses_a_self_closing_element_with_a_string_attribute() {
     assert_eq!(element.name, "page");
     assert_eq!(element.attributes.len(), 1);
     assert_eq!(element.attributes[0].name, "title");
-    assert_eq!(element.attributes[0].value.value, "Users");
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::String(literal) => assert_eq!(literal.value, "Users"),
+        other => panic!("expected a string attribute value, got {other:?}"),
+    }
     assert!(element.children.is_empty());
 }
 
@@ -17,7 +20,23 @@ fn parses_a_container_element_with_text() {
 
     assert_eq!(element.name, "title");
     assert_eq!(element.children.len(), 1);
-    assert_eq!(element.children[0].value, "Users");
+    match &element.children[0] {
+        mesh_syntax::Child::Text(text) => assert_eq!(text.value, "Users"),
+        other => panic!("expected a text child, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_container_element_with_an_expression_child() {
+    let element = mesh_parser::parse("<title>{user}</title>").expect("should parse");
+
+    assert_eq!(element.children.len(), 1);
+    match &element.children[0] {
+        mesh_syntax::Child::Expression(mesh_syntax::Expression::Reference(reference)) => {
+            assert_eq!(reference.name, "user");
+        }
+        other => panic!("expected a reference expression child, got {other:?}"),
+    }
 }
 
 #[test]
@@ -33,4 +52,110 @@ fn parses_a_root_element_preceded_by_whitespace() {
         .expect("leading whitespace before the root element should still parse");
 
     assert_eq!(element.name, "page");
+}
+
+#[test]
+fn parses_a_reference_expression_attribute() {
+    let element = mesh_parser::parse(r#"<page title={title} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Reference(reference)) => {
+            assert_eq!(reference.name, "title");
+        }
+        other => panic!("expected a reference expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_member_access_expression_attribute() {
+    let element = mesh_parser::parse(r#"<page title={user.name} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::MemberAccess(member)) => {
+            assert_eq!(member.property, "name");
+            match member.object.as_ref() {
+                mesh_syntax::Expression::Reference(reference) => assert_eq!(reference.name, "user"),
+                other => panic!("expected object to be a reference, got {other:?}"),
+            }
+        }
+        other => panic!("expected a member access expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_chained_member_access_expression_attribute() {
+    let element = mesh_parser::parse(r#"<page value={a.b.c} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::MemberAccess(outer)) => {
+            assert_eq!(outer.property, "c");
+            match outer.object.as_ref() {
+                mesh_syntax::Expression::MemberAccess(inner) => {
+                    assert_eq!(inner.property, "b");
+                    match inner.object.as_ref() {
+                        mesh_syntax::Expression::Reference(reference) => {
+                            assert_eq!(reference.name, "a");
+                        }
+                        other => {
+                            panic!("expected innermost object to be a reference, got {other:?}")
+                        }
+                    }
+                }
+                other => panic!("expected outer object to be a member access, got {other:?}"),
+            }
+        }
+        other => panic!("expected a member access expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_number_literal_expression_attribute() {
+    let element = mesh_parser::parse(r#"<page count={5} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Literal(
+            mesh_syntax::Literal::Number(number),
+        )) => {
+            assert_eq!(number.value, "5");
+        }
+        other => panic!("expected a number literal expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_boolean_literal_expression_attribute() {
+    let element = mesh_parser::parse(r#"<page disabled={true} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Literal(
+            mesh_syntax::Literal::Boolean(boolean),
+        )) => {
+            assert!(boolean.value);
+        }
+        other => panic!("expected a boolean literal expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_null_literal_expression_attribute() {
+    let element = mesh_parser::parse(r#"<page value={null} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Literal(
+            mesh_syntax::Literal::Null(_),
+        )) => {}
+        other => panic!("expected a null literal expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn decodes_string_escape_sequences() {
+    let element = mesh_parser::parse(r#"<page title="She said \"hi\"" />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::String(literal) => {
+            assert_eq!(literal.value, "She said \"hi\"");
+        }
+        other => panic!("expected a string attribute value, got {other:?}"),
+    }
 }
