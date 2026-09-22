@@ -150,8 +150,60 @@ pub struct ConditionalExpression {
     pub span: Span,
 }
 
-/// An expression inside an `{...}` block. Pass 3b will extend this
-/// further with array/object/command/event-value variants.
+/// An array literal expression, e.g. `{[1, 2, 3]}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArrayExpression {
+    pub elements: Vec<Expression>,
+    pub span: Span,
+}
+
+/// The key side of an [`ObjectMember`]: either a bare identifier or a
+/// quoted string, e.g. `name: 1` vs `"a-b": 1`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ObjectKey {
+    Identifier(String),
+    String(StringLiteral),
+}
+
+/// One `key: value` entry inside an [`ObjectExpression`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObjectMember {
+    pub key: ObjectKey,
+    pub value: Expression,
+    pub span: Span,
+}
+
+/// An object literal expression, e.g. `{{ name: user.name, active: true }}`
+/// — doubled braces, since the outer pair is the `{...}` expression-block
+/// wrapper and the inner pair is the object literal itself; see
+/// `docs/MPRX-SPEC.md` §5.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObjectExpression {
+    pub members: Vec<ObjectMember>,
+    pub span: Span,
+}
+
+/// A command invocation, representing intent rather than execution — see
+/// `docs/MPRX-SPEC.md` §6. e.g. `selectUser($event)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandInvocation {
+    pub command: String,
+    pub arguments: Vec<Expression>,
+    pub span: Span,
+}
+
+/// A `$`-prefixed special value, e.g. `$event`. The lexical rule is
+/// general (`'$' identifier`), but v0.1 semantics only meaningfully
+/// understand `$event` — structural parsing only, no validation of the
+/// name; see `docs/MPRX-SPEC.md` §2 and §5.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventValue {
+    pub name: String,
+    pub span: Span,
+}
+
+/// An expression inside an `{...}` block. This is §5's complete v0.1
+/// expression grammar — every node kind the spec defines has a variant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     Literal(Literal),
@@ -160,6 +212,10 @@ pub enum Expression {
     Unary(UnaryExpression),
     Binary(BinaryExpression),
     Conditional(ConditionalExpression),
+    Array(ArrayExpression),
+    Object(ObjectExpression),
+    Command(CommandInvocation),
+    EventValue(EventValue),
 }
 
 /// The value side of an [`Attribute`]: either a plain quoted string or an
@@ -389,6 +445,149 @@ mod tests {
                 other => panic!("expected consequent to be a string literal, got {other:?}"),
             },
             other => panic!("expected a conditional expression, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructs_an_array_expression() {
+        let expression = Expression::Array(ArrayExpression {
+            elements: vec![
+                Expression::Reference(Reference {
+                    name: "a".to_string(),
+                    span: Span {
+                        start_byte: 1,
+                        end_byte: 2,
+                    },
+                }),
+                Expression::Reference(Reference {
+                    name: "b".to_string(),
+                    span: Span {
+                        start_byte: 4,
+                        end_byte: 5,
+                    },
+                }),
+            ],
+            span: Span {
+                start_byte: 0,
+                end_byte: 6,
+            },
+        });
+
+        match expression {
+            Expression::Array(array) => {
+                assert_eq!(array.elements.len(), 2);
+                match &array.elements[0] {
+                    Expression::Reference(reference) => assert_eq!(reference.name, "a"),
+                    other => panic!("expected first element to be a reference, got {other:?}"),
+                }
+            }
+            other => panic!("expected an array expression, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructs_an_object_expression_with_an_identifier_key() {
+        let expression = Expression::Object(ObjectExpression {
+            members: vec![ObjectMember {
+                key: ObjectKey::Identifier("name".to_string()),
+                value: Expression::Literal(Literal::String(StringLiteral {
+                    value: "Users".to_string(),
+                    span: Span {
+                        start_byte: 6,
+                        end_byte: 13,
+                    },
+                })),
+                span: Span {
+                    start_byte: 0,
+                    end_byte: 13,
+                },
+            }],
+            span: Span {
+                start_byte: 0,
+                end_byte: 13,
+            },
+        });
+
+        match expression {
+            Expression::Object(object) => {
+                assert_eq!(object.members.len(), 1);
+                match &object.members[0].key {
+                    ObjectKey::Identifier(name) => assert_eq!(name, "name"),
+                    other => panic!("expected an identifier key, got {other:?}"),
+                }
+            }
+            other => panic!("expected an object expression, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructs_an_object_expression_with_a_string_key() {
+        let member = ObjectMember {
+            key: ObjectKey::String(StringLiteral {
+                value: "a-b".to_string(),
+                span: Span {
+                    start_byte: 0,
+                    end_byte: 5,
+                },
+            }),
+            value: Expression::Literal(Literal::Number(NumberLiteral {
+                value: "1".to_string(),
+                span: Span {
+                    start_byte: 7,
+                    end_byte: 8,
+                },
+            })),
+            span: Span {
+                start_byte: 0,
+                end_byte: 8,
+            },
+        };
+
+        match member.key {
+            ObjectKey::String(s) => assert_eq!(s.value, "a-b"),
+            other => panic!("expected a string key, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructs_a_command_invocation() {
+        let expression = Expression::Command(CommandInvocation {
+            command: "selectUser".to_string(),
+            arguments: vec![Expression::EventValue(EventValue {
+                name: "event".to_string(),
+                span: Span {
+                    start_byte: 11,
+                    end_byte: 17,
+                },
+            })],
+            span: Span {
+                start_byte: 0,
+                end_byte: 18,
+            },
+        });
+
+        match expression {
+            Expression::Command(command) => {
+                assert_eq!(command.command, "selectUser");
+                assert_eq!(command.arguments.len(), 1);
+            }
+            other => panic!("expected a command invocation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructs_an_event_value() {
+        let expression = Expression::EventValue(EventValue {
+            name: "event".to_string(),
+            span: Span {
+                start_byte: 0,
+                end_byte: 6,
+            },
+        });
+
+        match expression {
+            Expression::EventValue(event) => assert_eq!(event.name, "event"),
+            other => panic!("expected an event value, got {other:?}"),
         }
     }
 }
