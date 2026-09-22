@@ -217,10 +217,12 @@ fn lower_expression(node: Node, source: &str) -> Expression {
 }
 
 fn lower_unary_expression(node: Node, source: &str) -> UnaryExpression {
-    let operator = node
-        .child_by_field_name("operator")
-        .map(|n| lower_unary_operator(&text_of(n, source)))
-        .unwrap_or(UnaryOperator::Negate);
+    let operator = match node.child_by_field_name("operator") {
+        Some(n) => lower_unary_operator(&text_of(n, source)),
+        None => unreachable!(
+            "unary_expression node missing its operator field inside a successfully-parsed tree"
+        ),
+    };
 
     let operand = node
         .child_by_field_name("operand")
@@ -245,10 +247,12 @@ fn lower_unary_operator(text: &str) -> UnaryOperator {
 }
 
 fn lower_binary_expression(node: Node, source: &str) -> BinaryExpression {
-    let operator = node
-        .child_by_field_name("operator")
-        .map(|n| lower_binary_operator(&text_of(n, source)))
-        .unwrap_or(BinaryOperator::Add);
+    let operator = match node.child_by_field_name("operator") {
+        Some(n) => lower_binary_operator(&text_of(n, source)),
+        None => unreachable!(
+            "binary_expression node missing its operator field inside a successfully-parsed tree"
+        ),
+    };
 
     let left = node
         .child_by_field_name("left")
