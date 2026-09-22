@@ -4,12 +4,15 @@
 //! (see `mesh-parser`) and does not perform semantic analysis (see
 //! `mesh-semantic`).
 
+/// A byte-offset range into the original source text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
     pub start_byte: usize,
     pub end_byte: usize,
 }
 
+/// An MPRX element: `<name attr={...}>children</name>` or
+/// `<name attr={...} />`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
     pub name: String,
@@ -18,6 +21,7 @@ pub struct Element {
     pub span: Span,
 }
 
+/// A single `name=value` or `name={expression}` attribute on an [`Element`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Attribute {
     pub name: String,
@@ -25,35 +29,43 @@ pub struct Attribute {
     pub span: Span,
 }
 
+/// A quoted string literal, with escape sequences already decoded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StringLiteral {
     pub value: String,
     pub span: Span,
 }
 
+/// A run of literal text inside an element's children (not inside an
+/// `{expression}` block).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Text {
     pub value: String,
     pub span: Span,
 }
 
+/// A number literal. Stored as the raw source text (not parsed to `f64`)
+/// so the AST stays a lossless representation of what was written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumberLiteral {
     pub value: String,
     pub span: Span,
 }
 
+/// A `true` or `false` literal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BooleanLiteral {
     pub value: bool,
     pub span: Span,
 }
 
+/// A `null` literal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NullLiteral {
     pub span: Span,
 }
 
+/// A literal value inside an `{expression}` block.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Literal {
     String(StringLiteral),
@@ -62,12 +74,15 @@ pub enum Literal {
     Null(NullLiteral),
 }
 
+/// A bare identifier reference, e.g. `{user}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reference {
     pub name: String,
     pub span: Span,
 }
 
+/// A property access on another expression, e.g. `{user.name}` or the
+/// chained `{a.b.c}` (whose `object` is itself a `MemberAccess`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MemberAccess {
     pub object: Box<Expression>,
@@ -75,6 +90,9 @@ pub struct MemberAccess {
     pub span: Span,
 }
 
+/// An expression inside an `{...}` block: a literal, a reference, or a
+/// member access. Pass 3 will extend this with unary/binary/conditional/
+/// array/object/command/event-value variants.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     Literal(Literal),
@@ -82,12 +100,16 @@ pub enum Expression {
     MemberAccess(MemberAccess),
 }
 
+/// The value side of an [`Attribute`]: either a plain quoted string or an
+/// `{expression}` block.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttributeValue {
     String(StringLiteral),
     Expression(Expression),
 }
 
+/// One child of an [`Element`]: either literal [`Text`] or an
+/// `{expression}` block.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Child {
     Text(Text),
