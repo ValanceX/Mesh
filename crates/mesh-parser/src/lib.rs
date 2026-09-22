@@ -10,12 +10,27 @@ use mesh_syntax::{
 };
 use tree_sitter::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// An error produced while parsing MPRX source text.
+///
+/// Currently carries a single message and the source [`Span`] it applies
+/// to. `mesh_parser::parse`/`mesh_semantic::lower`'s signatures will need
+/// to change to carry multiple diagnostics once Pass 4 needs more than one
+/// per compile — see the v0.1 roadmap.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{message}")]
 pub struct ParseError {
     pub message: String,
     pub span: Span,
 }
 
+/// Parses `source` as MPRX and lowers the resulting concrete syntax tree
+/// into the [`mesh_syntax`] AST.
+///
+/// # Errors
+///
+/// Returns [`ParseError`] if the source fails to parse outright, if the
+/// resulting tree contains a syntax error, or if the tree does not contain
+/// exactly one root element.
 pub fn parse(source: &str) -> Result<Element, ParseError> {
     let mut parser = tree_sitter::Parser::new();
     parser
@@ -84,10 +99,13 @@ fn lower_child(node: Node, source: &str) -> Child {
     let inner = node.child(0).unwrap_or(node);
     match inner.kind() {
         "expression_block" => Child::Expression(lower_expression_block(inner, source)),
-        _ => Child::Text(Text {
+        "text" => Child::Text(Text {
             value: text_of(inner, source),
             span: span_of(inner),
         }),
+        other => {
+            unreachable!("unexpected child node kind {other:?} inside a successfully-parsed tree")
+        }
     }
 }
 
@@ -167,7 +185,10 @@ fn lower_expression(node: Node, source: &str) -> Expression {
     match inner.kind() {
         "literal" => Expression::Literal(lower_literal(inner, source)),
         "member_access" => Expression::MemberAccess(lower_member_access(inner, source)),
-        _ => Expression::Reference(lower_reference(inner, source)),
+        "reference" => Expression::Reference(lower_reference(inner, source)),
+        other => unreachable!(
+            "unexpected expression node kind {other:?} inside a successfully-parsed tree"
+        ),
     }
 }
 
@@ -182,10 +203,13 @@ fn lower_literal(node: Node, source: &str) -> Literal {
         "null_literal" => Literal::Null(NullLiteral {
             span: span_of(inner),
         }),
-        _ => Literal::Number(NumberLiteral {
+        "number_literal" => Literal::Number(NumberLiteral {
             value: text_of(inner, source),
             span: span_of(inner),
         }),
+        other => {
+            unreachable!("unexpected literal node kind {other:?} inside a successfully-parsed tree")
+        }
     }
 }
 
@@ -201,7 +225,10 @@ fn lower_member_access(node: Node, source: &str) -> MemberAccess {
         .child_by_field_name("object")
         .map(|o| match o.kind() {
             "member_access" => Expression::MemberAccess(lower_member_access(o, source)),
-            _ => Expression::Reference(lower_reference(o, source)),
+            "reference" => Expression::Reference(lower_reference(o, source)),
+            other => unreachable!(
+                "unexpected member-access object kind {other:?} inside a successfully-parsed tree"
+            ),
         })
         .unwrap_or_else(|| Expression::Reference(lower_reference(node, source)));
 

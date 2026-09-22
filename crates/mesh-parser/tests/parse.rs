@@ -227,3 +227,17 @@ fn decodes_string_escape_sequences() {
         other => panic!("expected a string attribute value, got {other:?}"),
     }
 }
+
+#[test]
+fn parse_error_implements_display_and_std_error() {
+    let error = mesh_parser::parse("<page").expect_err("should fail to parse");
+
+    // Display uses the message.
+    assert_eq!(error.to_string(), "syntax error");
+
+    // Implements std::error::Error — this is a compile-time check: if
+    // ParseError didn't implement the trait, this generic call wouldn't
+    // type-check.
+    fn assert_is_std_error<E: std::error::Error>(_: &E) {}
+    assert_is_std_error(&error);
+}
