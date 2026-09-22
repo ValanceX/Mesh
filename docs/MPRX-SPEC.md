@@ -17,12 +17,19 @@ As of 2026-09-22: Pass 1 (elements, attributes, string values, plain text)
 and Pass 2 (the `{...}` expression syntax in both attribute values and
 child content — covering `Literal` (String/Number/Boolean/Null),
 `Reference`, and `MemberAccess`; the `tag_name`/`identifier` lexical
-split; and string escape decoding) are shipped. **Not yet implemented:**
-everything from §5's `UnaryExpression`/`BinaryExpression`/
-`ConditionalExpression`/`ArrayExpression`/`ObjectExpression`/
-`CommandInvocation`/`EventValue` onward (Pass 3), §4's event bindings
-(Pass 4), and §3's nested elements (Pass 4). The rest of this document is
-the target those remaining passes implement against.
+split; and string escape decoding) are shipped. **Pass 3 is split into two
+plans**, per `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`:
+**Pass 3a** (`UnaryExpression`/`BinaryExpression`/`ConditionalExpression` —
+§5's precedence ladder) is planned and about to be implemented; its
+`mesh-syntax`/`mesh-semantic` type shapes are now fixed in §8 below.
+**Pass 3b** (`ArrayExpression`/`ObjectExpression`/`CommandInvocation`/
+`EventValue`) is deferred until 3a ships, so its own type shapes can be
+reviewed and adjusted against real 3a implementation experience rather
+than fixed speculatively now — §8 still marks those rows "TBD at Pass 3b
+planning". **Not yet implemented:** everything from §5's
+`UnaryExpression` onward, §4's event bindings (Pass 4), and §3's nested
+elements (Pass 4). The rest of this document is the target those
+remaining passes implement against.
 
 ---
 
@@ -46,7 +53,7 @@ event_value ::= '$' identifier
 string      ::= '"' string_char* '"'
 string_char ::= [^"\\] | '\\' escape
 escape      ::= '"' | '\\' | 'n' | 't'
-number      ::= '-'? digit+ ( '.' digit+ )?
+number      ::= digit+ ( '.' digit+ )?
 digit       ::= [0-9]
 whitespace  ::= [ \t\n\r]+   (* not significant; separates tokens *)
 ```
@@ -56,13 +63,30 @@ tokens, not one.** `tag_name` allows hyphens (`user-card`, matching
 HTML/JSX custom-element convention) and is used *only* for element names.
 `identifier` forbids hyphens and is used everywhere else: attribute names,
 references, member-access properties, event names, command names. This
-matters once Pass 3 introduces `-` as binary subtraction — if references
+matters once Pass 3a introduces `-` as binary subtraction — if references
 allowed hyphens, `a-b` would be lexically ambiguous between "one
 identifier" and "`a` minus `b`". JSX has the same split for the same
 reason. **This split is implemented as of Pass 2**: the `attribute` rule
 now uses the hyphen-free `identifier` token for attribute names (distinct
 from `tag_name`, which still allows hyphens for element names), avoiding
-the ambiguity before Pass 3 introduces binary operators.
+the ambiguity before Pass 3a introduces binary operators.
+
+**`number` no longer allows a leading `-` (revised for Pass 3a).** Pass 2
+shipped `number ::= '-'? digit+ (...)`, matching a signed literal like
+`-3.5` as one token. Pass 3a's §5 grammar adds unary `-` as a real
+operator, which collides with a signed `number` token: input `-3` would
+be simultaneously valid as a single `number_literal` token *and* as
+`unary_expression`'s `'-' unary_expression` production applied to `3` —
+two different parse trees for the same two characters, an outright
+ambiguity, not just an edge case. The fix is the standard C-family
+resolution: `number` itself is always unsigned, and a negative numeric
+literal is represented as `UnaryExpression{ operator: Negate, operand:
+Literal::Number(...) }` like any other negated expression (`-x`,
+`-(a+b)`) — one representation for "negative", not two. This changes
+previously-shipped Pass 2 behavior: `{-3.5}` now lowers to a `Unary`
+node wrapping `Literal::Number("3.5")`, not a `Literal::Number("-3.5")`
+directly. `NumberLiteral.value` (the raw source text) correspondingly
+never contains a leading `-` after this change.
 
 **Comments:** not supported in v0.1. MPRX is primarily compiled/generated
 rather than hand-authored, and nothing in the existing architecture calls
@@ -217,35 +241,50 @@ Every node kind, which pass introduces it, and its `mesh-syntax` /
 `mesh-semantic` type names. Implementation plans should reference this
 table rather than re-deriving names per pass.
 
-| Node kind | Introduced in | `mesh-syntax` type | `mesh-semantic` type |
-|---|---|---|---|
-| Element | Pass 1 | `Element` | `Element` |
-| Attribute | Pass 1 | `Attribute` | `Attribute` |
-| StringLiteral (attr value) | Pass 1 | `StringLiteral` | `String` (inline) |
-| Text (child) | Pass 1 | `Text` | `Text` |
-| AttributeValue | Pass 1 (revised Pass 2) | `AttributeValue` | `AttributeValue` |
-| Expression (wrapper) | Pass 2 | `Expression` | `Expression` |
-| Literal (String/Number/Boolean/Null) | Pass 2 | `Literal` | `Literal` |
-| Reference | Pass 2 | `Reference` | `Expression::Reference(String)` |
-| MemberAccess | Pass 2 | `MemberAccess` | `Expression::MemberAccess{..}` |
-| Child (Text \| Expression) | Pass 2 | *extends existing `Vec<Text>` to a child enum — see §10* | same |
-| UnaryExpression | Pass 3 | `UnaryExpression` | TBD at Pass 3 planning |
-| BinaryExpression | Pass 3 | `BinaryExpression` | TBD at Pass 3 planning |
-| ConditionalExpression | Pass 3 | `ConditionalExpression` | TBD at Pass 3 planning |
-| ArrayExpression | Pass 3 | `ArrayExpression` | TBD at Pass 3 planning |
-| ObjectExpression | Pass 3 | `ObjectExpression` | TBD at Pass 3 planning |
-| CommandInvocation | Pass 3 | `CommandInvocation` | TBD at Pass 3 planning |
-| EventValue | Pass 3 (alongside CommandInvocation) | `EventValue` | TBD at Pass 3 planning |
-| EventBinding | Pass 4 | `EventBinding` | TBD at Pass 4 planning |
-| Child::Element (nested) | Pass 4 | extends `Child` enum | same |
-| Diagnostics (plural, from both parse+lower) | Pass 4 | n/a — changes `parse`/`lower` signatures | n/a |
+| Node kind                                   | Introduced in                        | `mesh-syntax` type                                       | `mesh-semantic` type            |
+| ------------------------------------------- | ------------------------------------ | -------------------------------------------------------- | ------------------------------- |
+| Element                                     | Pass 1                               | `Element`                                                | `Element`                       |
+| Attribute                                   | Pass 1                               | `Attribute`                                              | `Attribute`                     |
+| StringLiteral (attr value)                  | Pass 1                               | `StringLiteral`                                          | `String` (inline)               |
+| Text (child)                                | Pass 1                               | `Text`                                                   | `Text`                          |
+| AttributeValue                              | Pass 1 (revised Pass 2)              | `AttributeValue`                                         | `AttributeValue`                |
+| Expression (wrapper)                        | Pass 2                               | `Expression`                                             | `Expression`                    |
+| Literal (String/Number/Boolean/Null)        | Pass 2                               | `Literal`                                                | `Literal`                       |
+| Reference                                   | Pass 2                               | `Reference`                                              | `Expression::Reference(String)` |
+| MemberAccess                                | Pass 2                               | `MemberAccess`                                           | `Expression::MemberAccess{..}`  |
+| Child (Text \| Expression)                  | Pass 2                               | *extends existing `Vec<Text>` to a child enum — see §10* | same                            |
+| UnaryExpression                             | Pass 3a                              | `UnaryExpression` (+ `UnaryOperator`)                     | `Expression::Unary{operator,operand}` (reuses `mesh_syntax::UnaryOperator`) |
+| BinaryExpression                            | Pass 3a                              | `BinaryExpression` (+ `BinaryOperator`)                   | `Expression::Binary{operator,left,right}` (reuses `mesh_syntax::BinaryOperator`) |
+| ConditionalExpression                       | Pass 3a                              | `ConditionalExpression`                                  | `Expression::Conditional{condition,consequent,alternate}` |
+| ArrayExpression                             | Pass 3b                              | `ArrayExpression`                                        | TBD at Pass 3b planning          |
+| ObjectExpression                            | Pass 3b                              | `ObjectExpression` (+ `ObjectMember`, `ObjectKey`)        | TBD at Pass 3b planning          |
+| CommandInvocation                           | Pass 3b                              | `CommandInvocation`                                      | TBD at Pass 3b planning          |
+| EventValue                                  | Pass 3b (alongside CommandInvocation) | `EventValue`                                             | TBD at Pass 3b planning          |
+| EventBinding                                | Pass 4                               | `EventBinding`                                           | TBD at Pass 4 planning          |
+| Child::Element (nested)                     | Pass 4                               | extends `Child` enum                                     | same                            |
+| Diagnostics (plural, from both parse+lower) | Pass 4                               | n/a — changes `parse`/`lower` signatures                 | n/a                             |
 
-Pass 3/4's exact Rust type shapes are intentionally left "TBD at planning"
-— this spec fixes the *grammar and semantics*, not Rust API signatures,
-which is exactly the layer that should still get decided at
+Pass 3b/4's exact Rust type shapes are intentionally left "TBD at
+planning" — this spec fixes the *grammar and semantics*, not Rust API
+signatures, which is exactly the layer that should still get decided at
 `writing-plans` time per real implementation experience (same reasoning
 the Pass 3-5 outline already gave for not writing bite-sized plans this
-far ahead).
+far ahead). Pass 3a's shapes are fixed above as an exception: 3a's
+brainstorm happened immediately ahead of its `writing-plans` cycle, so
+there was no gap between deciding and implementing to leave open.
+
+**`mesh-semantic` operator-enum reuse (Pass 3a):** `UnaryOperator` and
+`BinaryOperator` are the first `mesh-syntax` types the Semantic IR
+reuses directly instead of mirroring span-free. Every other AST type
+mirrored so far (`Literal`, `Expression`, etc.) carries a `Span` that the
+IR must strip — these operator enums never had one, so there's nothing
+to strip and no reason to redeclare an identical enum in `mesh-semantic`.
+Pass 3b's `ObjectKey` does *not* get this treatment: its two variants
+(`Identifier(String)` vs `String(StringLiteral)`) carry a span on the
+`StringLiteral` side and are semantically equivalent once lowered (both
+just name a field), so the IR flattens `ObjectMember`'s key to a plain
+`String` rather than reusing or mirroring `ObjectKey` — a genuine lowering
+step, not a reuse.
 
 ---
 
@@ -276,4 +315,13 @@ far ahead).
   token shape, array/object syntax) are now resolved by §4-§5 above. The
   outline's cross-cutting risk assessment for Pass 4 (children model
   change, diagnostic-plurality change) still stands — this spec doesn't
-  resolve Rust-level signatures, only grammar/semantics.
+  resolve Rust-level signatures, only grammar/semantics. The outline's own
+  Pass 3 section has since been updated (same date) to reflect the 3a/3b
+  split and 3a's fixed Rust type shapes — see that document directly
+  rather than re-deriving it here.
+- **This revision (2026-09-22, second pass)** fixes §8's Pass 3a row
+  shapes (`UnaryExpression`/`BinaryExpression`/`ConditionalExpression`
+  and their `mesh-semantic` mirrors) ahead of Pass 3a's `writing-plans`
+  cycle, and splits the former single "Pass 3" into Pass 3a (this) and
+  Pass 3b (`ArrayExpression`/`ObjectExpression`/`CommandInvocation`/
+  `EventValue`, deferred until 3a ships and can be reviewed).
