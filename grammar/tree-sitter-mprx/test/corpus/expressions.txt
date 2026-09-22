@@ -1,0 +1,337 @@
+================================================================================
+Attribute with a logical-not unary expression
+================================================================================
+
+<page disabled={!enabled} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (unary_expression
+              operand: (expression
+                (reference
+                  (identifier))))))))))
+
+================================================================================
+Attribute with a negation unary expression
+================================================================================
+
+<page count={-3} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (unary_expression
+              operand: (expression
+                (literal
+                  (number_literal))))))))))
+
+================================================================================
+Attribute with a multiplicative binary expression
+================================================================================
+
+<page total={a * b} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (binary_expression
+              left: (expression
+                (reference
+                  (identifier)))
+              right: (expression
+                (reference
+                  (identifier))))))))))
+
+================================================================================
+Attribute with an additive binary expression
+================================================================================
+
+<page total={a + b} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (binary_expression
+              left: (expression
+                (reference
+                  (identifier)))
+              right: (expression
+                (reference
+                  (identifier))))))))))
+
+================================================================================
+Attribute with a relational binary expression
+================================================================================
+
+<page visible={count > 0} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (binary_expression
+              left: (expression
+                (reference
+                  (identifier)))
+              right: (expression
+                (literal
+                  (number_literal))))))))))
+
+================================================================================
+Attribute with an equality binary expression
+================================================================================
+
+<page match={a == b} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (binary_expression
+              left: (expression
+                (reference
+                  (identifier)))
+              right: (expression
+                (reference
+                  (identifier))))))))))
+
+================================================================================
+Attribute with a logical-and binary expression
+================================================================================
+
+<page ready={a && b} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (binary_expression
+              left: (expression
+                (reference
+                  (identifier)))
+              right: (expression
+                (reference
+                  (identifier))))))))))
+
+================================================================================
+Attribute with a logical-or binary expression
+================================================================================
+
+<page ready={a || b} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (binary_expression
+              left: (expression
+                (reference
+                  (identifier)))
+              right: (expression
+                (reference
+                  (identifier))))))))))
+
+================================================================================
+Multiplicative binds tighter than additive
+================================================================================
+
+<page total={a + b * c} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (binary_expression
+              left: (expression
+                (reference
+                  (identifier)))
+              right: (expression
+                (binary_expression
+                  left: (expression
+                    (reference
+                      (identifier)))
+                  right: (expression
+                    (reference
+                      (identifier))))))))))))
+
+================================================================================
+Repeated additive operators are left-associative
+================================================================================
+
+<page total={a - b - c} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (binary_expression
+              left: (expression
+                (binary_expression
+                  left: (expression
+                    (reference
+                      (identifier)))
+                  right: (expression
+                    (reference
+                      (identifier)))))
+              right: (expression
+                (reference
+                  (identifier))))))))))
+
+================================================================================
+Parenthesized expression overrides precedence
+================================================================================
+
+<page total={(a + b) * c} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (binary_expression
+              left: (expression
+                (expression
+                  (binary_expression
+                    left: (expression
+                      (reference
+                        (identifier)))
+                    right: (expression
+                      (reference
+                        (identifier))))))
+              right: (expression
+                (reference
+                  (identifier))))))))))
+
+================================================================================
+Attribute with a conditional expression
+================================================================================
+
+<page size={compact ? "sm" : "md"} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (conditional_expression
+              condition: (expression
+                (reference
+                  (identifier)))
+              consequent: (expression
+                (literal
+                  (string
+                    value: (string_content))))
+              alternate: (expression
+                (literal
+                  (string
+                    value: (string_content)))))))))))
+
+================================================================================
+Nested conditional expressions are right-associative
+================================================================================
+
+<page size={a ? b : c ? d : e} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (conditional_expression
+              condition: (expression
+                (reference
+                  (identifier)))
+              consequent: (expression
+                (reference
+                  (identifier)))
+              alternate: (expression
+                (conditional_expression
+                  condition: (expression
+                    (reference
+                      (identifier)))
+                  consequent: (expression
+                    (reference
+                      (identifier)))
+                  alternate: (expression
+                    (reference
+                      (identifier))))))))))))

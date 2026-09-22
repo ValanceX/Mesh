@@ -7,6 +7,17 @@
 /// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
 
+const PREC = {
+  CONDITIONAL: 1,
+  LOGICAL_OR: 2,
+  LOGICAL_AND: 3,
+  EQUALITY: 4,
+  RELATIONAL: 5,
+  ADDITIVE: 6,
+  MULTIPLICATIVE: 7,
+  UNARY: 8,
+};
+
 module.exports = grammar({
   name: 'mprx',
 
@@ -59,7 +70,57 @@ module.exports = grammar({
       $.literal,
       $.reference,
       $.member_access,
+      $.unary_expression,
+      $.binary_expression,
+      $.conditional_expression,
+      seq('(', $.expression, ')'),
     ),
+
+    unary_expression: $ => prec(PREC.UNARY, seq(
+      field('operator', choice('!', '-')),
+      field('operand', $.expression),
+    )),
+
+    binary_expression: $ => choice(
+      prec.left(PREC.MULTIPLICATIVE, seq(
+        field('left', $.expression),
+        field('operator', choice('*', '/', '%')),
+        field('right', $.expression),
+      )),
+      prec.left(PREC.ADDITIVE, seq(
+        field('left', $.expression),
+        field('operator', choice('+', '-')),
+        field('right', $.expression),
+      )),
+      prec.left(PREC.RELATIONAL, seq(
+        field('left', $.expression),
+        field('operator', choice('<', '<=', '>', '>=')),
+        field('right', $.expression),
+      )),
+      prec.left(PREC.EQUALITY, seq(
+        field('left', $.expression),
+        field('operator', choice('==', '!=')),
+        field('right', $.expression),
+      )),
+      prec.left(PREC.LOGICAL_AND, seq(
+        field('left', $.expression),
+        field('operator', '&&'),
+        field('right', $.expression),
+      )),
+      prec.left(PREC.LOGICAL_OR, seq(
+        field('left', $.expression),
+        field('operator', '||'),
+        field('right', $.expression),
+      )),
+    ),
+
+    conditional_expression: $ => prec.right(PREC.CONDITIONAL, seq(
+      field('condition', $.expression),
+      '?',
+      field('consequent', $.expression),
+      ':',
+      field('alternate', $.expression),
+    )),
 
     literal: $ => choice(
       $.string,
@@ -68,7 +129,7 @@ module.exports = grammar({
       $.null_literal,
     ),
 
-    number_literal: $ => /-?[0-9]+(\.[0-9]+)?/,
+    number_literal: $ => /[0-9]+(\.[0-9]+)?/,
 
     boolean_literal: $ => choice('true', 'false'),
 
