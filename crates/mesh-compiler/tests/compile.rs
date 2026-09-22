@@ -98,3 +98,11 @@ fn compiling_invalid_source_produces_an_error_diagnostic() {
         mesh_compiler::Severity::Error
     );
 }
+
+#[test]
+fn diagnostic_display_includes_message_and_span() {
+    let result = mesh_compiler::compile("<page");
+    let diagnostic = &result.diagnostics[0];
+
+    assert_eq!(diagnostic.to_string(), "syntax error (0..5)");
+}
