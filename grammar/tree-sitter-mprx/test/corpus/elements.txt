@@ -9,7 +9,7 @@ Self-closing element with a string attribute
 (source_file
   (element
     (self_closing_element
-      name: (identifier)
+      name: (tag_name)
       (attribute
         name: (identifier)
         value: (string
@@ -26,7 +26,7 @@ Self-closing element with no attributes
 (source_file
   (element
     (self_closing_element
-      name: (identifier))))
+      name: (tag_name))))
 
 ================================================================================
 Container element with text content
@@ -39,6 +39,146 @@ Container element with text content
 (source_file
   (element
     (container_element
-      name: (identifier)
-      text: (text)
-      (identifier))))
+      name: (tag_name)
+      (child
+        (text))
+      (tag_name))))
+
+================================================================================
+Container element with an expression child
+================================================================================
+
+<title>{user}</title>
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (container_element
+      name: (tag_name)
+      (child
+        (expression_block
+          expression: (expression
+            (reference
+              (identifier)))))
+      (tag_name))))
+
+================================================================================
+Attribute with a reference expression
+================================================================================
+
+<page title={title} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (reference
+              (identifier))))))))
+
+================================================================================
+Attribute with a member access expression
+================================================================================
+
+<page title={user.name} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (member_access
+              object: (reference
+                (identifier))
+              property: (identifier))))))))
+
+================================================================================
+Attribute with a chained member access expression
+================================================================================
+
+<page value={a.b.c} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (member_access
+              object: (member_access
+                object: (reference
+                  (identifier))
+                property: (identifier))
+              property: (identifier))))))))
+
+================================================================================
+Attribute with a number literal expression
+================================================================================
+
+<page count={5} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (literal
+              (number_literal))))))))
+
+================================================================================
+Attribute with a boolean literal expression
+================================================================================
+
+<page disabled={true} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (literal
+              (boolean_literal))))))))
+
+================================================================================
+Attribute with a null literal expression
+================================================================================
+
+<page value={null} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (literal
+              (null_literal))))))))

@@ -22,26 +22,64 @@ module.exports = grammar({
 
     self_closing_element: $ => seq(
       '<',
-      field('name', $.identifier),
+      field('name', $.tag_name),
       repeat($.attribute),
       '/>',
     ),
 
     container_element: $ => seq(
       '<',
-      field('name', $.identifier),
+      field('name', $.tag_name),
       repeat($.attribute),
       '>',
-      optional(field('text', $.text)),
+      repeat($.child),
       '</',
-      $.identifier,
+      $.tag_name,
       '>',
+    ),
+
+    child: $ => choice(
+      $.text,
+      $.expression_block,
     ),
 
     attribute: $ => seq(
       field('name', $.identifier),
       '=',
-      field('value', $.string),
+      field('value', choice($.string, $.expression_block)),
+    ),
+
+    expression_block: $ => seq(
+      '{',
+      field('expression', $.expression),
+      '}',
+    ),
+
+    expression: $ => choice(
+      $.literal,
+      $.reference,
+      $.member_access,
+    ),
+
+    literal: $ => choice(
+      $.string,
+      $.number_literal,
+      $.boolean_literal,
+      $.null_literal,
+    ),
+
+    number_literal: $ => /-?[0-9]+(\.[0-9]+)?/,
+
+    boolean_literal: $ => choice('true', 'false'),
+
+    null_literal: $ => 'null',
+
+    reference: $ => $.identifier,
+
+    member_access: $ => seq(
+      field('object', choice($.reference, $.member_access)),
+      '.',
+      field('property', $.identifier),
     ),
 
     string: $ => seq(
@@ -50,10 +88,12 @@ module.exports = grammar({
       '"',
     ),
 
-    string_content: $ => /[^"]*/,
+    string_content: $ => /([^"\\]|\\.)*/,
 
-    text: $ => /[^<]+/,
+    text: $ => /[^<{]+/,
 
-    identifier: $ => /[a-zA-Z_][a-zA-Z0-9_-]*/,
+    tag_name: $ => /[a-zA-Z_][a-zA-Z0-9_-]*/,
+
+    identifier: $ => /[a-zA-Z_][a-zA-Z0-9_]*/,
   },
 });
