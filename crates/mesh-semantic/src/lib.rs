@@ -46,7 +46,11 @@ pub enum Literal {
     Null,
 }
 
-/// The Semantic IR form of an [`mesh_syntax::Expression`].
+/// The Semantic IR form of an [`mesh_syntax::Expression`]. `Unary` and
+/// `Binary` reuse [`mesh_syntax::UnaryOperator`]/[`mesh_syntax::BinaryOperator`]
+/// directly rather than redeclaring an IR-local copy — those enums carry
+/// no [`mesh_syntax::Span`] to strip, unlike every other AST type mirrored
+/// here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     Literal(Literal),
@@ -54,6 +58,20 @@ pub enum Expression {
     MemberAccess {
         object: Box<Expression>,
         property: String,
+    },
+    Unary {
+        operator: mesh_syntax::UnaryOperator,
+        operand: Box<Expression>,
+    },
+    Binary {
+        operator: mesh_syntax::BinaryOperator,
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+    Conditional {
+        condition: Box<Expression>,
+        consequent: Box<Expression>,
+        alternate: Box<Expression>,
     },
 }
 
@@ -106,6 +124,20 @@ fn lower_expression(expression: &mesh_syntax::Expression) -> Expression {
         mesh_syntax::Expression::MemberAccess(member) => Expression::MemberAccess {
             object: Box::new(lower_expression(&member.object)),
             property: member.property.clone(),
+        },
+        mesh_syntax::Expression::Unary(unary) => Expression::Unary {
+            operator: unary.operator,
+            operand: Box::new(lower_expression(&unary.operand)),
+        },
+        mesh_syntax::Expression::Binary(binary) => Expression::Binary {
+            operator: binary.operator,
+            left: Box::new(lower_expression(&binary.left)),
+            right: Box::new(lower_expression(&binary.right)),
+        },
+        mesh_syntax::Expression::Conditional(conditional) => Expression::Conditional {
+            condition: Box::new(lower_expression(&conditional.condition)),
+            consequent: Box::new(lower_expression(&conditional.consequent)),
+            alternate: Box::new(lower_expression(&conditional.alternate)),
         },
     }
 }

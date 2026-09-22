@@ -167,3 +167,194 @@ fn lowers_boolean_and_null_literals() {
         ))
     );
 }
+
+#[test]
+fn lowers_a_unary_expression() {
+    let ast = mesh_syntax::Element {
+        name: "page".to_string(),
+        attributes: vec![mesh_syntax::Attribute {
+            name: "disabled".to_string(),
+            value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Unary(
+                mesh_syntax::UnaryExpression {
+                    operator: mesh_syntax::UnaryOperator::Not,
+                    operand: Box::new(mesh_syntax::Expression::Reference(mesh_syntax::Reference {
+                        name: "disabled".to_string(),
+                        span: mesh_syntax::Span {
+                            start_byte: 0,
+                            end_byte: 0,
+                        },
+                    })),
+                    span: mesh_syntax::Span {
+                        start_byte: 0,
+                        end_byte: 0,
+                    },
+                },
+            )),
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
+        }],
+        children: vec![],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let ir = mesh_semantic::lower(&ast);
+
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Unary {
+            operator: mesh_syntax::UnaryOperator::Not,
+            operand: Box::new(mesh_semantic::Expression::Reference("disabled".to_string())),
+        })
+    );
+}
+
+#[test]
+fn lowers_a_binary_expression_preserving_nested_precedence() {
+    let ast = mesh_syntax::Element {
+        name: "page".to_string(),
+        attributes: vec![mesh_syntax::Attribute {
+            name: "total".to_string(),
+            value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Binary(
+                mesh_syntax::BinaryExpression {
+                    operator: mesh_syntax::BinaryOperator::Add,
+                    left: Box::new(mesh_syntax::Expression::Reference(mesh_syntax::Reference {
+                        name: "a".to_string(),
+                        span: mesh_syntax::Span {
+                            start_byte: 0,
+                            end_byte: 0,
+                        },
+                    })),
+                    right: Box::new(mesh_syntax::Expression::Binary(
+                        mesh_syntax::BinaryExpression {
+                            operator: mesh_syntax::BinaryOperator::Mul,
+                            left: Box::new(mesh_syntax::Expression::Reference(
+                                mesh_syntax::Reference {
+                                    name: "b".to_string(),
+                                    span: mesh_syntax::Span {
+                                        start_byte: 0,
+                                        end_byte: 0,
+                                    },
+                                },
+                            )),
+                            right: Box::new(mesh_syntax::Expression::Reference(
+                                mesh_syntax::Reference {
+                                    name: "c".to_string(),
+                                    span: mesh_syntax::Span {
+                                        start_byte: 0,
+                                        end_byte: 0,
+                                    },
+                                },
+                            )),
+                            span: mesh_syntax::Span {
+                                start_byte: 0,
+                                end_byte: 0,
+                            },
+                        },
+                    )),
+                    span: mesh_syntax::Span {
+                        start_byte: 0,
+                        end_byte: 0,
+                    },
+                },
+            )),
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
+        }],
+        children: vec![],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let ir = mesh_semantic::lower(&ast);
+
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Binary {
+            operator: mesh_syntax::BinaryOperator::Add,
+            left: Box::new(mesh_semantic::Expression::Reference("a".to_string())),
+            right: Box::new(mesh_semantic::Expression::Binary {
+                operator: mesh_syntax::BinaryOperator::Mul,
+                left: Box::new(mesh_semantic::Expression::Reference("b".to_string())),
+                right: Box::new(mesh_semantic::Expression::Reference("c".to_string())),
+            }),
+        })
+    );
+}
+
+#[test]
+fn lowers_a_conditional_expression() {
+    let ast = mesh_syntax::Element {
+        name: "page".to_string(),
+        attributes: vec![mesh_syntax::Attribute {
+            name: "size".to_string(),
+            value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Conditional(
+                mesh_syntax::ConditionalExpression {
+                    condition: Box::new(mesh_syntax::Expression::Reference(
+                        mesh_syntax::Reference {
+                            name: "compact".to_string(),
+                            span: mesh_syntax::Span {
+                                start_byte: 0,
+                                end_byte: 0,
+                            },
+                        },
+                    )),
+                    consequent: Box::new(mesh_syntax::Expression::Literal(
+                        mesh_syntax::Literal::String(mesh_syntax::StringLiteral {
+                            value: "sm".to_string(),
+                            span: mesh_syntax::Span {
+                                start_byte: 0,
+                                end_byte: 0,
+                            },
+                        }),
+                    )),
+                    alternate: Box::new(mesh_syntax::Expression::Literal(
+                        mesh_syntax::Literal::String(mesh_syntax::StringLiteral {
+                            value: "md".to_string(),
+                            span: mesh_syntax::Span {
+                                start_byte: 0,
+                                end_byte: 0,
+                            },
+                        }),
+                    )),
+                    span: mesh_syntax::Span {
+                        start_byte: 0,
+                        end_byte: 0,
+                    },
+                },
+            )),
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
+        }],
+        children: vec![],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let ir = mesh_semantic::lower(&ast);
+
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Conditional {
+            condition: Box::new(mesh_semantic::Expression::Reference("compact".to_string())),
+            consequent: Box::new(mesh_semantic::Expression::Literal(
+                mesh_semantic::Literal::String("sm".to_string())
+            )),
+            alternate: Box::new(mesh_semantic::Expression::Literal(
+                mesh_semantic::Literal::String("md".to_string())
+            )),
+        })
+    );
+}
