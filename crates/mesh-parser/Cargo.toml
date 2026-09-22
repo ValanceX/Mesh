@@ -6,6 +6,9 @@ license.workspace = true
 authors.workspace = true
 description = "Tree-sitter integration for MPRX: source text to concrete syntax tree to mesh-syntax AST."
 
+[lints]
+workspace = true
+
 [dependencies]
 mesh-syntax.workspace = true
 tree-sitter = "0.27.0"

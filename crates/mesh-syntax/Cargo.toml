@@ -6,4 +6,7 @@ license.workspace = true
 authors.workspace = true
 description = "Syntax nodes, AST types, and source locations for MPRX."
 
+[lints]
+workspace = true
+
 [dependencies]

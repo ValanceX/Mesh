@@ -6,6 +6,9 @@ license.workspace = true
 authors.workspace = true
 description = "Type checking, diagnostics, transformation, and code generation for MPRX."
 
+[lints]
+workspace = true
+
 [dependencies]
 mesh-syntax.workspace = true
 mesh-semantic.workspace = true

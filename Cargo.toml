@@ -22,3 +22,9 @@ mesh-syntax = { path = "crates/mesh-syntax" }
 mesh-parser = { path = "crates/mesh-parser" }
 mesh-semantic = { path = "crates/mesh-semantic" }
 mesh-compiler = { path = "crates/mesh-compiler" }
+
+[workspace.lints.rust]
+warnings = "deny"
+
+[workspace.lints.clippy]
+all = "deny"

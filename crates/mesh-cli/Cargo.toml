@@ -6,6 +6,9 @@ license.workspace = true
 authors.workspace = true
 description = "Native CLI for the MESH toolchain (parse, check, compile MPRX)."
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "mesh"
 path = "src/main.rs"

@@ -6,5 +6,8 @@ license.workspace = true
 authors.workspace = true
 description = "Semantic model for MPRX: component/prop/binding resolution and the Semantic IR."
 
+[lints]
+workspace = true
+
 [dependencies]
 mesh-syntax.workspace = true
