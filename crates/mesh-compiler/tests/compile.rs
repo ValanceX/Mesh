@@ -161,3 +161,67 @@ fn compiles_a_conditional_expression_attribute() {
         })
     );
 }
+
+#[test]
+fn compiles_an_array_expression_attribute() {
+    let result = mesh_compiler::compile(r#"<page items={[1, 2, 3]} />"#);
+
+    assert!(result.diagnostics.is_empty());
+    let ir = result.ir.expect("should produce IR");
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Array(vec![
+            mesh_semantic::Expression::Literal(mesh_semantic::Literal::Number("1".to_string())),
+            mesh_semantic::Expression::Literal(mesh_semantic::Literal::Number("2".to_string())),
+            mesh_semantic::Expression::Literal(mesh_semantic::Literal::Number("3".to_string())),
+        ]))
+    );
+}
+
+#[test]
+fn compiles_an_object_expression_attribute() {
+    let result = mesh_compiler::compile(r#"<page data={{ name: "Users" }} />"#);
+
+    assert!(result.diagnostics.is_empty());
+    let ir = result.ir.expect("should produce IR");
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Object(vec![
+            mesh_semantic::ObjectMember {
+                key: "name".to_string(),
+                value: mesh_semantic::Expression::Literal(mesh_semantic::Literal::String(
+                    "Users".to_string()
+                )),
+            },
+        ]))
+    );
+}
+
+#[test]
+fn compiles_a_command_invocation_attribute() {
+    let result = mesh_compiler::compile(r#"<page action={selectUser($event)} />"#);
+
+    assert!(result.diagnostics.is_empty());
+    let ir = result.ir.expect("should produce IR");
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Command {
+            command: "selectUser".to_string(),
+            arguments: vec![mesh_semantic::Expression::EventValue("event".to_string())],
+        })
+    );
+}
+
+#[test]
+fn compiles_an_event_value_attribute() {
+    let result = mesh_compiler::compile(r#"<page handler={$event} />"#);
+
+    assert!(result.diagnostics.is_empty());
+    let ir = result.ir.expect("should produce IR");
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::EventValue(
+            "event".to_string()
+        ))
+    );
+}

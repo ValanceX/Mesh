@@ -7,8 +7,8 @@
 use mesh_syntax::{
     ArrayExpression, Attribute, AttributeValue, BinaryExpression, BinaryOperator, BooleanLiteral,
     Child, CommandInvocation, ConditionalExpression, Element, EventValue, Expression, Literal,
-    MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember,
-    Reference, Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
+    MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember, Reference,
+    Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
 };
 use tree_sitter::Node;
 

@@ -525,8 +525,7 @@ fn parses_an_empty_object_expression_attribute() {
 
 #[test]
 fn parses_an_object_expression_with_an_identifier_key_attribute() {
-    let element =
-        mesh_parser::parse(r#"<page data={{ name: "Users" }} />"#).expect("should parse");
+    let element = mesh_parser::parse(r#"<page data={{ name: "Users" }} />"#).expect("should parse");
 
     match &element.attributes[0].value {
         mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(object)) => {
@@ -646,8 +645,7 @@ fn parses_a_bare_event_value_attribute() {
 
 #[test]
 fn parses_a_nested_array_inside_an_object_attribute() {
-    let element =
-        mesh_parser::parse(r#"<page data={{ items: [1, 2] }} />"#).expect("should parse");
+    let element = mesh_parser::parse(r#"<page data={{ items: [1, 2] }} />"#).expect("should parse");
 
     match &element.attributes[0].value {
         mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(object)) => {
