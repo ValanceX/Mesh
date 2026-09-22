@@ -5,8 +5,9 @@
 //! never exposed as the application's final UI model.
 
 use mesh_syntax::{
-    Attribute, AttributeValue, BinaryExpression, BinaryOperator, BooleanLiteral, Child,
-    ConditionalExpression, Element, Expression, Literal, MemberAccess, NullLiteral, NumberLiteral,
+    ArrayExpression, Attribute, AttributeValue, BinaryExpression, BinaryOperator, BooleanLiteral,
+    Child, CommandInvocation, ConditionalExpression, Element, EventValue, Expression, Literal,
+    MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember,
     Reference, Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
 };
 use tree_sitter::Node;
@@ -210,6 +211,10 @@ fn lower_expression(node: Node, source: &str) -> Expression {
         "conditional_expression" => {
             Expression::Conditional(lower_conditional_expression(inner, source))
         }
+        "array_expression" => Expression::Array(lower_array_expression(inner, source)),
+        "object_expression" => Expression::Object(lower_object_expression(inner, source)),
+        "command_invocation" => Expression::Command(lower_command_invocation(inner, source)),
+        "event_value" => Expression::EventValue(lower_event_value(inner, source)),
         other => unreachable!(
             "unexpected expression node kind {other:?} inside a successfully-parsed tree"
         ),
@@ -313,6 +318,94 @@ fn lower_conditional_expression(node: Node, source: &str) -> ConditionalExpressi
         condition: Box::new(condition),
         consequent: Box::new(consequent),
         alternate: Box::new(alternate),
+        span: span_of(node),
+    }
+}
+
+fn lower_array_expression(node: Node, source: &str) -> ArrayExpression {
+    let mut cursor = node.walk();
+    let elements = node
+        .children(&mut cursor)
+        .filter(|n| n.kind() == "expression")
+        .map(|n| lower_expression(n, source))
+        .collect();
+
+    ArrayExpression {
+        elements,
+        span: span_of(node),
+    }
+}
+
+fn lower_object_expression(node: Node, source: &str) -> ObjectExpression {
+    let mut cursor = node.walk();
+    let members = node
+        .children(&mut cursor)
+        .filter(|n| n.kind() == "object_member")
+        .map(|n| lower_object_member(n, source))
+        .collect();
+
+    ObjectExpression {
+        members,
+        span: span_of(node),
+    }
+}
+
+fn lower_object_member(node: Node, source: &str) -> ObjectMember {
+    let key = match node.child_by_field_name("key") {
+        Some(n) => lower_object_key(n, source),
+        None => unreachable!(
+            "object_member node missing its key field inside a successfully-parsed tree"
+        ),
+    };
+
+    let value = node
+        .child_by_field_name("value")
+        .map(|n| lower_expression(n, source))
+        .unwrap_or_else(|| missing_expression(node));
+
+    ObjectMember {
+        key,
+        value,
+        span: span_of(node),
+    }
+}
+
+fn lower_object_key(node: Node, source: &str) -> ObjectKey {
+    match node.kind() {
+        "identifier" => ObjectKey::Identifier(text_of(node, source)),
+        "string" => ObjectKey::String(lower_string(node, source)),
+        other => unreachable!(
+            "unexpected object key node kind {other:?} inside a successfully-parsed tree"
+        ),
+    }
+}
+
+fn lower_command_invocation(node: Node, source: &str) -> CommandInvocation {
+    let command = node
+        .child_by_field_name("command")
+        .map(|n| text_of(n, source))
+        .unwrap_or_default();
+
+    let mut cursor = node.walk();
+    let arguments = node
+        .children(&mut cursor)
+        .filter(|n| n.kind() == "expression")
+        .map(|n| lower_expression(n, source))
+        .collect();
+
+    CommandInvocation {
+        command,
+        arguments,
+        span: span_of(node),
+    }
+}
+
+fn lower_event_value(node: Node, source: &str) -> EventValue {
+    let text = text_of(node, source);
+    let name = text.strip_prefix('$').unwrap_or(&text).to_string();
+
+    EventValue {
+        name,
         span: span_of(node),
     }
 }

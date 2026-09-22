@@ -466,3 +466,212 @@ fn right_associates_nested_conditional_expressions() {
         other => panic!("expected a conditional expression, got {other:?}"),
     }
 }
+
+#[test]
+fn parses_an_empty_array_expression_attribute() {
+    let element = mesh_parser::parse(r#"<page items={[]} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Array(array)) => {
+            assert!(array.elements.is_empty());
+        }
+        other => panic!("expected an array expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_an_array_expression_with_elements_attribute() {
+    let element = mesh_parser::parse(r#"<page items={[1, 2, 3]} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Array(array)) => {
+            assert_eq!(array.elements.len(), 3);
+            for (element, expected) in array.elements.iter().zip(["1", "2", "3"]) {
+                match element {
+                    mesh_syntax::Expression::Literal(mesh_syntax::Literal::Number(number)) => {
+                        assert_eq!(number.value, expected);
+                    }
+                    other => panic!("expected a number literal element, got {other:?}"),
+                }
+            }
+        }
+        other => panic!("expected an array expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_an_array_expression_with_a_trailing_comma_attribute() {
+    let element = mesh_parser::parse(r#"<page items={[1, 2,]} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Array(array)) => {
+            assert_eq!(array.elements.len(), 2);
+        }
+        other => panic!("expected an array expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_an_empty_object_expression_attribute() {
+    let element = mesh_parser::parse(r#"<page data={{}} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(object)) => {
+            assert!(object.members.is_empty());
+        }
+        other => panic!("expected an object expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_an_object_expression_with_an_identifier_key_attribute() {
+    let element =
+        mesh_parser::parse(r#"<page data={{ name: "Users" }} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(object)) => {
+            assert_eq!(object.members.len(), 1);
+            match &object.members[0].key {
+                mesh_syntax::ObjectKey::Identifier(name) => assert_eq!(name, "name"),
+                other => panic!("expected an identifier key, got {other:?}"),
+            }
+            match &object.members[0].value {
+                mesh_syntax::Expression::Literal(mesh_syntax::Literal::String(s)) => {
+                    assert_eq!(s.value, "Users");
+                }
+                other => panic!("expected a string literal value, got {other:?}"),
+            }
+        }
+        other => panic!("expected an object expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_an_object_expression_with_a_string_key_attribute() {
+    let element = mesh_parser::parse(r#"<page data={{ "a-b": 1 }} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(object)) => {
+            match &object.members[0].key {
+                mesh_syntax::ObjectKey::String(s) => assert_eq!(s.value, "a-b"),
+                other => panic!("expected a string key, got {other:?}"),
+            }
+        }
+        other => panic!("expected an object expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_an_object_expression_with_a_trailing_comma_attribute() {
+    let element = mesh_parser::parse(r#"<page data={{ a: 1, b: 2, }} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(object)) => {
+            assert_eq!(object.members.len(), 2);
+        }
+        other => panic!("expected an object expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn rejects_a_single_brace_object_literal() {
+    // Proves the doubled-brace requirement (docs/MPRX-SPEC.md §5) is
+    // actually enforced, not just documented: `data={{ ... }}` is valid,
+    // but the single-brace form below is not — `key` parses as a bare
+    // reference, then `:` has no valid continuation without a preceding
+    // `?`, so this must fail to parse.
+    let result = mesh_parser::parse(r#"<page data={ key: "value" } />"#);
+
+    assert!(
+        result.is_err(),
+        "single-brace object literal should not parse"
+    );
+}
+
+#[test]
+fn parses_a_command_invocation_with_no_arguments_attribute() {
+    let element = mesh_parser::parse(r#"<page action={selectUser()} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Command(command)) => {
+            assert_eq!(command.command, "selectUser");
+            assert!(command.arguments.is_empty());
+        }
+        other => panic!("expected a command invocation, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_command_invocation_with_an_event_value_argument_attribute() {
+    let element =
+        mesh_parser::parse(r#"<page action={selectUser($event)} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Command(command)) => {
+            assert_eq!(command.command, "selectUser");
+            assert_eq!(command.arguments.len(), 1);
+            match &command.arguments[0] {
+                mesh_syntax::Expression::EventValue(event) => assert_eq!(event.name, "event"),
+                other => panic!("expected an event value argument, got {other:?}"),
+            }
+        }
+        other => panic!("expected a command invocation, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_command_invocation_with_multiple_arguments_attribute() {
+    let element = mesh_parser::parse(r#"<page action={update(a, b)} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Command(command)) => {
+            assert_eq!(command.command, "update");
+            assert_eq!(command.arguments.len(), 2);
+        }
+        other => panic!("expected a command invocation, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_bare_event_value_attribute() {
+    let element = mesh_parser::parse(r#"<page handler={$event} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::EventValue(event)) => {
+            assert_eq!(event.name, "event");
+        }
+        other => panic!("expected an event value, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_nested_array_inside_an_object_attribute() {
+    let element =
+        mesh_parser::parse(r#"<page data={{ items: [1, 2] }} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(object)) => {
+            match &object.members[0].value {
+                mesh_syntax::Expression::Array(array) => assert_eq!(array.elements.len(), 2),
+                other => panic!("expected an array value, got {other:?}"),
+            }
+        }
+        other => panic!("expected an object expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_nested_object_inside_an_array_attribute() {
+    let element = mesh_parser::parse(r#"<page items={[{a: 1}]} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Array(array)) => {
+            assert_eq!(array.elements.len(), 1);
+            match &array.elements[0] {
+                mesh_syntax::Expression::Object(object) => assert_eq!(object.members.len(), 1),
+                other => panic!("expected an object element, got {other:?}"),
+            }
+        }
+        other => panic!("expected an array expression, got {other:?}"),
+    }
+}
