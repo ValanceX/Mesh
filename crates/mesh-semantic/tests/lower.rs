@@ -358,3 +358,231 @@ fn lowers_a_conditional_expression() {
         })
     );
 }
+
+#[test]
+fn lowers_an_array_expression() {
+    let ast = mesh_syntax::Element {
+        name: "page".to_string(),
+        attributes: vec![mesh_syntax::Attribute {
+            name: "items".to_string(),
+            value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Array(
+                mesh_syntax::ArrayExpression {
+                    elements: vec![
+                        mesh_syntax::Expression::Literal(mesh_syntax::Literal::Number(
+                            mesh_syntax::NumberLiteral {
+                                value: "1".to_string(),
+                                span: mesh_syntax::Span {
+                                    start_byte: 0,
+                                    end_byte: 0,
+                                },
+                            },
+                        )),
+                        mesh_syntax::Expression::Literal(mesh_syntax::Literal::Number(
+                            mesh_syntax::NumberLiteral {
+                                value: "2".to_string(),
+                                span: mesh_syntax::Span {
+                                    start_byte: 0,
+                                    end_byte: 0,
+                                },
+                            },
+                        )),
+                    ],
+                    span: mesh_syntax::Span {
+                        start_byte: 0,
+                        end_byte: 0,
+                    },
+                },
+            )),
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
+        }],
+        children: vec![],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let ir = mesh_semantic::lower(&ast);
+
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Array(vec![
+            mesh_semantic::Expression::Literal(mesh_semantic::Literal::Number("1".to_string())),
+            mesh_semantic::Expression::Literal(mesh_semantic::Literal::Number("2".to_string())),
+        ]))
+    );
+}
+
+#[test]
+fn lowers_an_object_expression_flattening_the_key() {
+    let ast = mesh_syntax::Element {
+        name: "page".to_string(),
+        attributes: vec![mesh_syntax::Attribute {
+            name: "data".to_string(),
+            value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(
+                mesh_syntax::ObjectExpression {
+                    members: vec![
+                        mesh_syntax::ObjectMember {
+                            key: mesh_syntax::ObjectKey::Identifier("name".to_string()),
+                            value: mesh_syntax::Expression::Literal(mesh_syntax::Literal::String(
+                                mesh_syntax::StringLiteral {
+                                    value: "Users".to_string(),
+                                    span: mesh_syntax::Span {
+                                        start_byte: 0,
+                                        end_byte: 0,
+                                    },
+                                },
+                            )),
+                            span: mesh_syntax::Span {
+                                start_byte: 0,
+                                end_byte: 0,
+                            },
+                        },
+                        mesh_syntax::ObjectMember {
+                            key: mesh_syntax::ObjectKey::String(mesh_syntax::StringLiteral {
+                                value: "a-b".to_string(),
+                                span: mesh_syntax::Span {
+                                    start_byte: 0,
+                                    end_byte: 0,
+                                },
+                            }),
+                            value: mesh_syntax::Expression::Literal(mesh_syntax::Literal::Number(
+                                mesh_syntax::NumberLiteral {
+                                    value: "1".to_string(),
+                                    span: mesh_syntax::Span {
+                                        start_byte: 0,
+                                        end_byte: 0,
+                                    },
+                                },
+                            )),
+                            span: mesh_syntax::Span {
+                                start_byte: 0,
+                                end_byte: 0,
+                            },
+                        },
+                    ],
+                    span: mesh_syntax::Span {
+                        start_byte: 0,
+                        end_byte: 0,
+                    },
+                },
+            )),
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
+        }],
+        children: vec![],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let ir = mesh_semantic::lower(&ast);
+
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Object(vec![
+            mesh_semantic::ObjectMember {
+                key: "name".to_string(),
+                value: mesh_semantic::Expression::Literal(mesh_semantic::Literal::String(
+                    "Users".to_string()
+                )),
+            },
+            mesh_semantic::ObjectMember {
+                key: "a-b".to_string(),
+                value: mesh_semantic::Expression::Literal(mesh_semantic::Literal::Number(
+                    "1".to_string()
+                )),
+            },
+        ]))
+    );
+}
+
+#[test]
+fn lowers_a_command_invocation() {
+    let ast = mesh_syntax::Element {
+        name: "page".to_string(),
+        attributes: vec![mesh_syntax::Attribute {
+            name: "action".to_string(),
+            value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Command(
+                mesh_syntax::CommandInvocation {
+                    command: "selectUser".to_string(),
+                    arguments: vec![mesh_syntax::Expression::EventValue(
+                        mesh_syntax::EventValue {
+                            name: "event".to_string(),
+                            span: mesh_syntax::Span {
+                                start_byte: 0,
+                                end_byte: 0,
+                            },
+                        },
+                    )],
+                    span: mesh_syntax::Span {
+                        start_byte: 0,
+                        end_byte: 0,
+                    },
+                },
+            )),
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
+        }],
+        children: vec![],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let ir = mesh_semantic::lower(&ast);
+
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Command {
+            command: "selectUser".to_string(),
+            arguments: vec![mesh_semantic::Expression::EventValue("event".to_string())],
+        })
+    );
+}
+
+#[test]
+fn lowers_an_event_value() {
+    let ast = mesh_syntax::Element {
+        name: "page".to_string(),
+        attributes: vec![mesh_syntax::Attribute {
+            name: "handler".to_string(),
+            value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::EventValue(
+                mesh_syntax::EventValue {
+                    name: "event".to_string(),
+                    span: mesh_syntax::Span {
+                        start_byte: 0,
+                        end_byte: 0,
+                    },
+                },
+            )),
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
+        }],
+        children: vec![],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let ir = mesh_semantic::lower(&ast);
+
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::EventValue(
+            "event".to_string()
+        ))
+    );
+}

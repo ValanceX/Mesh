@@ -46,6 +46,16 @@ pub enum Literal {
     Null,
 }
 
+/// The Semantic IR form of an [`mesh_syntax::ObjectMember`]. `key`
+/// flattens [`mesh_syntax::ObjectKey`] to a plain `String` — its two
+/// variants (bare identifier vs. quoted string) are semantically
+/// equivalent once lowered, both just naming a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObjectMember {
+    pub key: String,
+    pub value: Expression,
+}
+
 /// The Semantic IR form of an [`mesh_syntax::Expression`]. `Unary` and
 /// `Binary` reuse [`mesh_syntax::UnaryOperator`]/[`mesh_syntax::BinaryOperator`]
 /// directly rather than redeclaring an IR-local copy — those enums carry
@@ -73,6 +83,13 @@ pub enum Expression {
         consequent: Box<Expression>,
         alternate: Box<Expression>,
     },
+    Array(Vec<Expression>),
+    Object(Vec<ObjectMember>),
+    Command {
+        command: String,
+        arguments: Vec<Expression>,
+    },
+    EventValue(String),
 }
 
 /// Lowers an AST [`mesh_syntax::Element`] into its Semantic IR form.
@@ -139,6 +156,31 @@ fn lower_expression(expression: &mesh_syntax::Expression) -> Expression {
             consequent: Box::new(lower_expression(&conditional.consequent)),
             alternate: Box::new(lower_expression(&conditional.alternate)),
         },
+        mesh_syntax::Expression::Array(array) => {
+            Expression::Array(array.elements.iter().map(lower_expression).collect())
+        }
+        mesh_syntax::Expression::Object(object) => {
+            Expression::Object(object.members.iter().map(lower_object_member).collect())
+        }
+        mesh_syntax::Expression::Command(command) => Expression::Command {
+            command: command.command.clone(),
+            arguments: command.arguments.iter().map(lower_expression).collect(),
+        },
+        mesh_syntax::Expression::EventValue(event) => Expression::EventValue(event.name.clone()),
+    }
+}
+
+fn lower_object_member(member: &mesh_syntax::ObjectMember) -> ObjectMember {
+    ObjectMember {
+        key: lower_object_key(&member.key),
+        value: lower_expression(&member.value),
+    }
+}
+
+fn lower_object_key(key: &mesh_syntax::ObjectKey) -> String {
+    match key {
+        mesh_syntax::ObjectKey::Identifier(name) => name.clone(),
+        mesh_syntax::ObjectKey::String(s) => s.value.clone(),
     }
 }
 
