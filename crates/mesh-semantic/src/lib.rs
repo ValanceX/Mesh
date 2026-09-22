@@ -5,6 +5,8 @@
 //! component/prop/binding references against an external component model —
 //! that requires a typed component model that doesn't exist yet.
 
+/// The Semantic IR form of an [`mesh_syntax::Element`] — structurally
+/// identical to the AST for v0.1, since no resolution happens yet.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
     pub name: String,
@@ -12,24 +14,30 @@ pub struct Element {
     pub children: Vec<Child>,
 }
 
+/// The Semantic IR form of an [`mesh_syntax::Attribute`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Attribute {
     pub name: String,
     pub value: AttributeValue,
 }
 
+/// The Semantic IR form of an [`mesh_syntax::AttributeValue`]. Unlike the
+/// AST's `String(StringLiteral)`, the string case here is a plain `String`
+/// — source spans are AST-only and don't carry into the IR.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttributeValue {
     String(String),
     Expression(Expression),
 }
 
+/// The Semantic IR form of an [`mesh_syntax::Child`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Child {
     Text(String),
     Expression(Expression),
 }
 
+/// The Semantic IR form of an [`mesh_syntax::Literal`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Literal {
     String(String),
@@ -38,6 +46,7 @@ pub enum Literal {
     Null,
 }
 
+/// The Semantic IR form of an [`mesh_syntax::Expression`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     Literal(Literal),
@@ -48,6 +57,11 @@ pub enum Expression {
     },
 }
 
+/// Lowers an AST [`mesh_syntax::Element`] into its Semantic IR form.
+///
+/// For v0.1 this is a structural pass-through (drops source spans, copies
+/// everything else) — it does not yet resolve references against a
+/// component model.
 pub fn lower(ast: &mesh_syntax::Element) -> Element {
     Element {
         name: ast.name.clone(),
