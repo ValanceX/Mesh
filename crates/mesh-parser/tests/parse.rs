@@ -632,6 +632,16 @@ fn parses_a_command_invocation_with_multiple_arguments_attribute() {
 }
 
 #[test]
+fn rejects_a_command_invocation_with_a_trailing_comma() {
+    // docs/MPRX-SPEC.md §5 deliberately gives `command_invocation` no
+    // `','?` even though array/object expressions have one. Guard the
+    // asymmetry so it can't be "fixed" for consistency.
+    let result = mesh_parser::parse(r#"<page action={selectUser(a,)} />"#);
+
+    assert!(result.is_err(), "command arguments allow no trailing comma");
+}
+
+#[test]
 fn parses_a_bare_event_value_attribute() {
     let element = mesh_parser::parse(r#"<page handler={$event} />"#).expect("should parse");
 
