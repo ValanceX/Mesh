@@ -74,6 +74,20 @@ fn compiles_boolean_and_null_literal_attributes() {
 }
 
 #[test]
+fn compiles_a_string_literal_expression_attribute() {
+    let result = mesh_compiler::compile(r#"<page value={"hi"} />"#);
+
+    assert!(result.diagnostics.is_empty());
+    let ir = result.ir.expect("should produce IR");
+    assert_eq!(
+        ir.attributes[0].value,
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Literal(
+            mesh_semantic::Literal::String("hi".to_string())
+        ))
+    );
+}
+
+#[test]
 fn compiling_invalid_source_produces_an_error_diagnostic() {
     let result = mesh_compiler::compile("<page");
 

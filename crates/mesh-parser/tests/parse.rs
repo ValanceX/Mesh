@@ -149,6 +149,74 @@ fn parses_a_null_literal_expression_attribute() {
 }
 
 #[test]
+fn parses_multiple_mixed_children() {
+    let element = mesh_parser::parse("<title>Hello {user}!</title>").expect("should parse");
+
+    assert_eq!(element.children.len(), 3);
+    match &element.children[0] {
+        mesh_syntax::Child::Text(text) => assert_eq!(text.value, "Hello "),
+        other => panic!("expected first child to be text, got {other:?}"),
+    }
+    match &element.children[1] {
+        mesh_syntax::Child::Expression(mesh_syntax::Expression::Reference(reference)) => {
+            assert_eq!(reference.name, "user");
+        }
+        other => panic!("expected second child to be a reference expression, got {other:?}"),
+    }
+    match &element.children[2] {
+        mesh_syntax::Child::Text(text) => assert_eq!(text.value, "!"),
+        other => panic!("expected third child to be text, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_string_literal_expression_attribute() {
+    let element = mesh_parser::parse(r#"<page value={"hi"} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Literal(
+            mesh_syntax::Literal::String(literal),
+        )) => {
+            assert_eq!(literal.value, "hi");
+        }
+        other => panic!("expected a string literal expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_a_negative_decimal_number_literal_expression_attribute() {
+    let element = mesh_parser::parse(r#"<page count={-3.5} />"#).expect("should parse");
+
+    match &element.attributes[0].value {
+        mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Literal(
+            mesh_syntax::Literal::Number(number),
+        )) => {
+            assert_eq!(number.value, "-3.5");
+        }
+        other => panic!("expected a number literal expression, got {other:?}"),
+    }
+}
+
+#[test]
+fn preserves_whitespace_only_text_children() {
+    // Pins current behavior: MPRX does not trim whitespace-only text
+    // children (unlike JSX). This is an open question for Pass 4 to
+    // revisit deliberately, not a decision this test is making — see
+    // docs/MPRX-SPEC.md §3.
+    let element = mesh_parser::parse("<title>\n  {user}\n</title>").expect("should parse");
+
+    assert_eq!(element.children.len(), 3);
+    match &element.children[0] {
+        mesh_syntax::Child::Text(text) => assert_eq!(text.value, "\n  "),
+        other => panic!("expected first child to be whitespace text, got {other:?}"),
+    }
+    match &element.children[2] {
+        mesh_syntax::Child::Text(text) => assert_eq!(text.value, "\n"),
+        other => panic!("expected third child to be whitespace text, got {other:?}"),
+    }
+}
+
+#[test]
 fn decodes_string_escape_sequences() {
     let element = mesh_parser::parse(r#"<page title="She said \"hi\"" />"#).expect("should parse");
 
