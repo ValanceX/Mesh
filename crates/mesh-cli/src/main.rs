@@ -4,6 +4,8 @@ use clap::{Parser, Subcommand};
 use std::fs;
 use std::process::ExitCode;
 
+/// The MESH command-line toolchain: parse, check, and (eventually) compile
+/// MPRX source files.
 #[derive(Parser)]
 #[command(name = "mesh")]
 struct Cli {
@@ -14,7 +16,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Parse and validate an MPRX file, printing any diagnostics.
-    Check { file: String },
+    Check {
+        /// Path to the `.mprx` file to check.
+        file: String,
+    },
 }
 
 fn main() -> ExitCode {
@@ -41,10 +46,7 @@ fn run_check(file: &str) -> ExitCode {
     }
 
     for diagnostic in &result.diagnostics {
-        eprintln!(
-            "error: {} ({}..{})",
-            diagnostic.message, diagnostic.span.start_byte, diagnostic.span.end_byte
-        );
+        eprintln!("error: {diagnostic}");
     }
     ExitCode::FAILURE
 }

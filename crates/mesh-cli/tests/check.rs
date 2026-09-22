@@ -1,5 +1,6 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::io::Write;
 
 #[test]
 fn check_reports_no_errors_for_the_canonical_pass_1_example() {
@@ -14,14 +15,16 @@ fn check_reports_no_errors_for_the_canonical_pass_1_example() {
 
 #[test]
 fn check_reports_an_error_for_invalid_source() {
-    let dir = std::env::temp_dir();
-    let path = dir.join("mesh_cli_invalid_test.mprx");
-    std::fs::write(&path, "<page").unwrap();
+    let mut file = tempfile::Builder::new()
+        .suffix(".mprx")
+        .tempfile()
+        .expect("should create a temp file");
+    write!(file, "<page").expect("should write to the temp file");
 
     Command::cargo_bin("mesh")
         .unwrap()
         .arg("check")
-        .arg(&path)
+        .arg(file.path())
         .assert()
         .failure()
         .stderr(predicate::str::contains("error:"));
