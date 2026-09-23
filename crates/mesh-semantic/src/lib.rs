@@ -119,7 +119,7 @@ fn lower_element(ast: &mesh_syntax::Element) -> Element {
     Element {
         name: ast.name.clone(),
         attributes: ast.attributes.iter().map(lower_attribute).collect(),
-        children: ast.children.iter().map(lower_child).collect(),
+        children: ast.children.iter().filter_map(lower_child).collect(),
     }
 }
 
@@ -141,11 +141,17 @@ fn lower_attribute_value(value: &mesh_syntax::AttributeValue) -> AttributeValue 
     }
 }
 
-fn lower_child(child: &mesh_syntax::Child) -> Child {
+/// Lowers one AST child into its IR form, or `None` if the child is
+/// formatting-only. "Whitespace-only" is exactly Rust's
+/// `str::trim().is_empty()` (Unicode-aware) — not a custom character
+/// class. This is IR-only: `mesh-parser`'s CST -> AST lowering performs
+/// no filtering, so the AST retains every text node exactly as parsed.
+fn lower_child(child: &mesh_syntax::Child) -> Option<Child> {
     match child {
-        mesh_syntax::Child::Text(text) => Child::Text(text.value.clone()),
+        mesh_syntax::Child::Text(text) if text.value.trim().is_empty() => None,
+        mesh_syntax::Child::Text(text) => Some(Child::Text(text.value.clone())),
         mesh_syntax::Child::Expression(expression) => {
-            Child::Expression(lower_expression(expression))
+            Some(Child::Expression(lower_expression(expression)))
         }
     }
 }

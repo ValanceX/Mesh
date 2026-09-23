@@ -597,3 +597,64 @@ fn lowers_an_event_value() {
         ))
     );
 }
+
+#[test]
+fn omits_whitespace_only_text_children_from_the_ir() {
+    let ast = mesh_syntax::Element {
+        name: "div".to_string(),
+        closing_name: Some("div".to_string()),
+        attributes: vec![],
+        children: vec![
+            mesh_syntax::Child::Text(mesh_syntax::Text {
+                value: "\n    ".to_string(),
+                span: mesh_syntax::Span {
+                    start_byte: 0,
+                    end_byte: 0,
+                },
+            }),
+            mesh_syntax::Child::Text(mesh_syntax::Text {
+                value: "Hello".to_string(),
+                span: mesh_syntax::Span {
+                    start_byte: 0,
+                    end_byte: 0,
+                },
+            }),
+        ],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
+
+    assert_eq!(ir.children.len(), 1);
+    assert_eq!(ir.children[0], mesh_semantic::Child::Text("Hello".to_string()));
+}
+
+#[test]
+fn preserves_meaningful_text_verbatim_including_internal_whitespace() {
+    let ast = mesh_syntax::Element {
+        name: "div".to_string(),
+        closing_name: Some("div".to_string()),
+        attributes: vec![],
+        children: vec![mesh_syntax::Child::Text(mesh_syntax::Text {
+            value: "Hello     world".to_string(),
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
+        })],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
+
+    assert_eq!(
+        ir.children[0],
+        mesh_semantic::Child::Text("Hello     world".to_string())
+    );
+}

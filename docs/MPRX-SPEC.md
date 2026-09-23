@@ -138,16 +138,15 @@ attribute values — `docs/ARCHITECTURE.md`'s own example,
 content, and `container_element`'s grammar now uses `repeat($.child)` so
 an element can hold any number of text/expression children in any order.
 
-**Whitespace in child content (open question for Pass 4):** a
-whitespace-only text run between children (e.g. the newline/indentation in
-`<title>\n  {user}\n</title>`) currently produces a literal `Child::Text`
-node containing that whitespace, exactly matching `text ::= [^<{]+` — MPRX
-does not trim or collapse whitespace-only text children the way JSX trims
-whitespace-only `JSXText`. This is the current, shipped, tested behavior
-for Pass 2 (see `crates/mesh-parser/tests/parse.rs`), not a final
-decision: whether to keep it as-is or add JSX-style trimming is an open
-question to revisit deliberately at Pass 4, once nested elements make
-multi-child content the common case.
+**Whitespace in child content:** whitespace-only text children are
+formatting and are omitted from the semantic model; text containing any
+non-whitespace character is preserved verbatim, with no trimming,
+collapsing, or normalization. "Whitespace-only" is exactly Rust's
+`str::trim().is_empty()` (Unicode-aware), applied during AST -> IR
+lowering (`mesh-semantic::lower_child`) — the CST and AST both retain
+every text node exactly as parsed, including whitespace-only ones, for
+tooling/source-location/diagnostic purposes. Only the IR omits them. See
+`crates/mesh-semantic/tests/lower.rs` for the shipped, tested behavior.
 
 Open/close tag name matching (`<foo>...</bar>` should be rejected) is
 **Pass 4** structural-validation scope, same as the existing roadmap spec
