@@ -182,3 +182,30 @@ Attribute with a null literal expression
           expression: (expression
             (literal
               (null_literal))))))))
+
+================================================================================
+Nested element with surrounding whitespace
+================================================================================
+
+<div>
+  <span>A</span>
+</div>
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (container_element
+      name: (tag_name)
+      (child
+        (text))
+      (child
+        (element
+          (container_element
+            name: (tag_name)
+            (child
+              (text))
+            (tag_name))))
+      (child
+        (text))
+      (tag_name))))

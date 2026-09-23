@@ -236,10 +236,9 @@ fn parses_a_negated_number_literal_expression_attribute() {
 
 #[test]
 fn preserves_whitespace_only_text_children() {
-    // Pins current behavior: MPRX does not trim whitespace-only text
-    // children (unlike JSX). This is an open question for Pass 4 to
-    // revisit deliberately, not a decision this test is making — see
-    // docs/MPRX-SPEC.md §3.
+    // Pins AST-level behavior: the AST retains whitespace-only text
+    // children verbatim (unlike the IR, which omits them — see
+    // mesh-semantic's lower tests and docs/MPRX-SPEC.md §3).
     let element = mesh_parser::parse("<title>\n  {user}\n</title>")
         .ast
         .expect("should parse");
@@ -818,5 +817,43 @@ fn parses_a_nested_self_closing_element() {
             assert_eq!(inner.children.len(), 0);
         }
         other => panic!("expected an element child, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_nested_elements_with_surrounding_whitespace() {
+    // Regression test for the tree-sitter parser-state-merging defect Task 6
+    // hit: nested elements with whitespace between siblings and a trailing
+    // newline after the root close tag. See grammar.js's comment above
+    // `_nested_self_closing_element` for the full mechanism.
+    let element = mesh_parser::parse("<div>\n  <span>A</span>\n  <span>B</span>\n</div>\n")
+        .ast
+        .expect("should parse");
+
+    // Every text/element node between tags is one AST child, including
+    // whitespace-only text nodes — AST-level filtering doesn't happen, only
+    // IR-level filtering does (see mesh-semantic's lower_child). So: leading
+    // whitespace, span A, whitespace, span B, trailing whitespace.
+    assert_eq!(element.children.len(), 5);
+
+    match &element.children[0] {
+        mesh_syntax::Child::Text(text) => assert_eq!(text.value, "\n  "),
+        other => panic!("expected first child to be whitespace text, got {other:?}"),
+    }
+    match &element.children[1] {
+        mesh_syntax::Child::Element(inner) => assert_eq!(inner.name, "span"),
+        other => panic!("expected second child to be the first span, got {other:?}"),
+    }
+    match &element.children[2] {
+        mesh_syntax::Child::Text(text) => assert_eq!(text.value, "\n  "),
+        other => panic!("expected third child to be whitespace text, got {other:?}"),
+    }
+    match &element.children[3] {
+        mesh_syntax::Child::Element(inner) => assert_eq!(inner.name, "span"),
+        other => panic!("expected fourth child to be the second span, got {other:?}"),
+    }
+    match &element.children[4] {
+        mesh_syntax::Child::Text(text) => assert_eq!(text.value, "\n"),
+        other => panic!("expected fifth child to be whitespace text, got {other:?}"),
     }
 }

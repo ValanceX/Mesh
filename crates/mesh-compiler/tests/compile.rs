@@ -27,6 +27,25 @@ fn compiles_container_element_and_preserves_text_content() {
 }
 
 #[test]
+fn compiles_nested_elements_with_surrounding_whitespace() {
+    let result = mesh_compiler::compile("<div>\n  <span>A</span>\n  <span>B</span>\n</div>\n");
+
+    assert!(result.diagnostics.is_empty());
+    let ir = result.ir.expect("should produce IR");
+    assert_eq!(ir.name, "div");
+
+    // Whitespace-only text children are filtered at the IR level (Task 5),
+    // so only the two `span` elements should remain.
+    assert_eq!(ir.children.len(), 2);
+    for child in &ir.children {
+        match child {
+            mesh_semantic::Child::Element(inner) => assert_eq!(inner.name, "span"),
+            other => panic!("expected an element child, got {other:?}"),
+        }
+    }
+}
+
+#[test]
 fn compiles_a_member_access_expression_attribute() {
     let result = mesh_compiler::compile(r#"<page title={user.name} />"#);
 
