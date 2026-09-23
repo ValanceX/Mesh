@@ -15,15 +15,17 @@ pub struct Span {
 
 /// How serious a [`Diagnostic`] is.
 ///
-/// Only `Error` exists for v0.1. A compile can now produce multiple
-/// diagnostics (see `ParseResult`/`LowerResult`), but only the `Error`
-/// severity is used so far. Marked `#[non_exhaustive]` because future
-/// passes are expected to add more variants (e.g. `Warning`), and that
-/// should not be a breaking change for consumers.
+/// For v0.1, `Error` denotes fatal issues that prevent compilation,
+/// while `Warning` denotes non-fatal issues (e.g. duplicate attributes).
+/// A compile can produce multiple diagnostics with either severity
+/// (see `ParseResult`/`LowerResult`). Marked `#[non_exhaustive]` because
+/// future passes are expected to add more variants, and that should not
+/// be a breaking change for consumers.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
     Error,
+    Warning,
 }
 
 /// A single compile-time diagnostic: a message, its severity, and the

@@ -259,3 +259,44 @@ fn compiling_an_event_binding_produces_it_in_the_ir_with_no_diagnostics() {
 
     assert!(result.diagnostics.is_empty());
 }
+
+#[test]
+fn compiling_duplicate_attributes_produces_warning_diagnostics_and_still_compiles() {
+    let result = mesh_compiler::compile(r#"<div class="a" class="b" />"#);
+
+    let element = result.ir.expect("should compile");
+    assert_eq!(element.attributes.len(), 1);
+    assert_eq!(element.attributes[0].name, "class");
+
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Warning);
+}
+
+#[test]
+fn compiling_duplicate_event_bindings_produces_warning_diagnostics_and_still_compiles() {
+    let source = r#"<div on.click={a} on.click={b} />"#;
+    let result = mesh_compiler::compile(source);
+
+    let element = result.ir.expect("should compile");
+    assert_eq!(element.event_bindings.len(), 1);
+    assert_eq!(element.event_bindings[0].name, "click");
+    match &element.event_bindings[0].handler {
+        mesh_semantic::Expression::Reference(reference) => assert_eq!(reference, "b"),
+        other => panic!("expected a reference expression handler, got {other:?}"),
+    }
+
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Warning);
+    assert_eq!(
+        result.diagnostics[0].message,
+        "duplicate event binding \"click\": this occurrence is shadowed by a later one"
+    );
+    // The diagnostic's span must point at the shadowed *earlier*
+    // occurrence (`on.click={a}`), never the surviving one
+    // (`on.click={b}`). Slicing the original source with the returned
+    // span — rather than hardcoding byte offsets — makes this assertion
+    // self-verifying against whatever span convention the parser
+    // actually uses.
+    let diagnostic_span = result.diagnostics[0].span;
+    assert_eq!(&source[diagnostic_span.start_byte..diagnostic_span.end_byte], "on.click={a}");
+}
