@@ -95,7 +95,7 @@ fn compiling_invalid_source_produces_an_error_diagnostic() {
     assert_eq!(result.diagnostics.len(), 1);
     assert_eq!(
         result.diagnostics[0].severity,
-        mesh_compiler::Severity::Error
+        mesh_syntax::Severity::Error
     );
 }
 

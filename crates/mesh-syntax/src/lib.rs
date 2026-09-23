@@ -4,11 +4,44 @@
 //! (see `mesh-parser`) and does not perform semantic analysis (see
 //! `mesh-semantic`).
 
+use std::fmt;
+
 /// A byte-offset range into the original source text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
     pub start_byte: usize,
     pub end_byte: usize,
+}
+
+/// How serious a [`Diagnostic`] is.
+///
+/// Only `Error` exists for v0.1 — a compile either fully succeeds or
+/// produces exactly one fatal error. Marked `#[non_exhaustive]` because
+/// future passes are expected to add more variants (e.g. `Warning`), and
+/// that should not be a breaking change for consumers.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Severity {
+    Error,
+}
+
+/// A single compile-time diagnostic: a message, its severity, and the
+/// source [`Span`] it applies to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Diagnostic {
+    pub severity: Severity,
+    pub message: String,
+    pub span: Span,
+}
+
+impl fmt::Display for Diagnostic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} ({}..{})",
+            self.message, self.span.start_byte, self.span.end_byte
+        )
+    }
 }
 
 /// An MPRX element: `<name attr={...}>children</name>` or
