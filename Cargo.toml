@@ -15,7 +15,7 @@ version = "0.0.1"
 edition = "2021"
 license = "MIT"
 authors = ["Jack Miller <jackmiller0899@gmail.com>"]
-repository = "https://github.com/valence-ui/mesh"
+repository = "https://github.com/ValanceX/Mesh"
 
 [workspace.dependencies]
 mesh-syntax = { path = "crates/mesh-syntax" }

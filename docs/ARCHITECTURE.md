@@ -1,39 +1,41 @@
-# MESH — Architecture
+# MESH Architecture
 
-This is the MESH-relevant excerpt of the VALENCE architecture. MESH is one of
-three independent repos (`nexus`, `mesh`, `port`) that make up VALENCE; see
-each repo's own docs for its slice, or the full design doc kept in the
-[VALENCE namespace folder](https://github.com/valence-ui) for the complete
-picture.
+This document explains *why* MESH and MPRX are designed the way they are. For the exact syntax, see the [MPRX Language Spec](./MPRX-SPEC.md). The sibling repos, [NEXUS](https://github.com/ValanceX/Nexus) and [PORT](https://github.com/ValanceX/Port), each have their own architecture doc. For the big picture, start at the [ValanceX organization page](https://github.com/ValanceX).
 
-## Role
+## The short version
 
-MESH is the UI language/toolchain/runtime ecosystem.
+Valance splits a UI app into three questions:
 
-> MPRX is the language. MESH is the system that understands, compiles,
-> validates, transforms, and executes that language.
+| Question | Answered by |
+|---|---|
+| What should the UI *mean*? | **MESH** |
+| What should the app *do*? | NEXUS |
+| Where and how should it *appear*? | PORT |
 
-MESH is NOT merely an AST representation. Tree-sitter is an implementation
-detail used by MESH, not the application's final UI model.
+MESH owns the first one. It's a small language toolchain, with a grammar, parser, semantic model, compiler, and language server, all built around one language: **MPRX**.
+
+> MPRX is the language. MESH is the system that understands, compiles, validates, transforms, and executes it.
+
+## How source becomes UI
+
+MESH is more than an AST. Tree-sitter parses the source, but its tree is only an intermediate step. What the rest of Valance actually consumes is the **MESH Semantic IR**.
 
 ```text
 MPRX Source → Tree-sitter → Concrete Syntax Tree → MESH Semantic AST/IR
   → Semantic Analysis → Validation/Transformation → Runtime/PORT
 ```
 
-Eventually:
+Long-term, the Rust compiler produces the IR, and runtimes for different languages consume it:
 
 ```text
 MPRX → Rust MESH Compiler → MESH Semantic IR → Target Adapter/Runtime → NEXUS + PORT
 ```
 
-MESH must remain renderer-independent.
+Whatever changes, MESH stays **renderer-independent**. It never assumes a DOM, a canvas, or a particular device.
 
-## MPRX
+## MPRX: a deliberately small language
 
-MPRX means MeshExpr/Mesh Expression — a declarative UI language with an
-HTML/XML-like syntax, familiar to developers from HTML, Angular templates,
-JSX, Vue, or Svelte, but not simply copying their semantics.
+MPRX (MeshExpr, "Mesh Expression") is a declarative UI language with HTML/XML-like syntax. If you've written HTML, JSX, Angular templates, Vue, or Svelte, it will look familiar, though it doesn't copy any of their semantics wholesale.
 
 ```xml
 <user-card
@@ -42,24 +44,25 @@ JSX, Vue, or Svelte, but not simply copying their semantics.
   on.select={selectUser($event)} />
 ```
 
-Expressions use `{...}`. Do not use Angular's `[foo]` / `(click)` syntax.
+Expressions go in `{...}`. There's no Angular-style `[foo]` or `(click)` syntax.
 
-### Philosophy
+### What MPRX is for, and what it isn't
 
-MPRX is NOT: TypeScript inside XML, a general-purpose programming language,
-a replacement for Effect, or a business-logic DSL.
+MPRX isn't TypeScript inside XML, and it isn't a general-purpose language, a replacement for Effect, or a business-logic DSL.
 
-MPRX should express: UI structure, component composition, bindings, simple
-derived expressions, UI/application/environment state references,
-command/event intent, styling references, control flow where appropriate.
+| MPRX expresses | MPRX never contains |
+|---|---|
+| UI structure and component composition | HTTP calls or database access |
+| Bindings and simple derived expressions | Business rules or infrastructure logic |
+| References to UI, app, and environment state | Arbitrary TypeScript or service imports |
+| Command and event *intent* | Side effects or hardware operations |
+| Styling references and control flow | |
 
-MPRX should NOT contain: HTTP calls, database access, infrastructure logic,
-arbitrary side effects, business rules, arbitrary TypeScript, imports of
-application services, hardware operations. Expressions are side-effect free.
+**Why so strict?** Every limit is something the compiler can check. A UI that can't make network calls can't make unexpected ones. And since expressions are side-effect free, evaluating one can never change anything.
 
-### Expression Model
+### The expression model
 
-Deliberately constrained initial node set:
+The starting set of expression nodes is small on purpose:
 
 ```text
 Literal, Reference, MemberAccess, UnaryExpression, BinaryExpression,
@@ -74,16 +77,15 @@ ConditionalExpression, ArrayExpression, ObjectExpression, CommandInvocation
 </page>
 ```
 
-Do not allow arbitrary TypeScript expressions just because the parser can
-technically support them.
+We don't add an expression form just because the parser *could* support it. New syntax needs a concrete reason.
 
-### Commands
+### Commands are intent, not code
 
 ```xml
 <user-card user={user} on.select={selectUser($event)} />
 ```
 
-parses to:
+This doesn't call a function. It records a request:
 
 ```text
 CommandInvocation
@@ -92,22 +94,31 @@ CommandInvocation
     └── $event
 ```
 
-NEXUS (a separate repo) resolves the command's actual behavior. MESH only
-represents the invocation — it never executes application logic.
+NEXUS decides what `selectUser` actually does. MESH only represents the invocation and never executes application logic.
 
-## Static Verification
+## Static verification
 
-A major goal of MESH is strong static verification: the compiler should
-verify MPRX references against the component model (e.g. flag
-`<user-card user={usr} />` at compile time if `usr` doesn't exist). It
-should understand component names, props, local variables, references,
-member access, expression types, commands, command argument types, event
-values, bindings, control flow, and eventually slots.
+A core goal is catching mistakes at compile time. If you write `<user-card user={usr} />` and `usr` doesn't exist, the compiler should tell you before anything renders.
 
-> MPRX should feel lightweight like a template while providing
-> compiler-level verification of its semantics.
+Over time the compiler will understand component names, props, local variables, references, member access, expression types, commands and their argument types, event values, bindings, control flow, and eventually slots.
 
-## Rust Implementation
+> MPRX should feel as light as a template while giving you compiler-level checking.
+
+## Built for generated UI
+
+This is where the constraints pay off. When an AI model (or any other untrusted source) produces UI, it goes through the same checks as hand-written code:
+
+```text
+AI → MPRX source → Parser → MESH AST → Semantic validation → Compilation → PORT
+```
+
+Valance never blindly executes generated UI. The compiler rejects invalid syntax, unknown components or properties, bad references, malformed command calls, type errors, and unsupported constructs.
+
+## Implementation
+
+### Why Rust
+
+Compilers are a good fit for Rust. It gives us a strong type system, explicit invariants, efficient tree manipulation, room for incremental compilation and parallelism, native CLI tooling, WASM distribution, and first-class LSP support.
 
 ```text
 mesh/
@@ -123,25 +134,17 @@ mesh/
 └── Cargo.toml
 ```
 
-Reasons for Rust: compiler-style workloads, strong type system, explicit
-invariants, efficient AST/IR manipulation, incremental compilation,
-parallelism, native CLI tooling, WASM distribution, LSP support. Crate
-boundaries can evolve with implementation experience.
+Crate boundaries can change as we learn more.
 
-## Package Responsibilities
+### Who does what
 
-- **mesh-language** — MPRX grammar, Tree-sitter parser, syntax nodes, AST
-  types, source locations, expression grammar, basic semantic model, AST
-  traversal.
-- **mesh-compiler** — semantic analysis, type checking, component
-  resolution, binding resolution, template compilation, diagnostics,
-  transformation, optimization, code generation.
-- **mesh-lsp** — LSP protocol, completion, hover, diagnostics,
-  go-to-definition, references, rename, document symbols, formatting. Must
-  reuse the same parser/compiler infrastructure as mesh-compiler — never a
-  second parser/type system for editor tooling.
+- **mesh-language**: the MPRX grammar, Tree-sitter parser, syntax nodes, AST types, source locations, expression grammar, basic semantic model, and AST traversal.
+- **mesh-compiler**: semantic analysis, type checking, component and binding resolution, template compilation, diagnostics, transformation, optimization, and code generation.
+- **mesh-lsp**: completion, hover, diagnostics, go-to-definition, references, rename, document symbols, and formatting. It **reuses the compiler's own parser and type system**. There is never a second implementation for editor tooling, so the editor and the build can't disagree.
 
-## Language-Neutral Semantic IR (long-term)
+### A language-neutral IR (long-term)
+
+The Semantic IR describes UI without tying it to any runtime language:
 
 ```text
 Component("user-card")
@@ -154,26 +157,17 @@ Component("user-card")
 MPRX → Rust MESH Compiler → MESH Semantic IR → {TypeScript, WASM, Native} Runtime → PORT
 ```
 
-Do not prematurely lock down a binary/serialized IR format — establish
-semantic correctness and runtime boundaries first.
+We're intentionally *not* locking down a binary or serialized IR format yet. Semantic correctness and runtime boundaries come first.
 
-## AI UI Generation
+## The rules
 
-```text
-AI → MPRX source → Parser → MESH AST → Semantic validation → Compilation → PORT
-```
+These invariants hold for everything in this repo:
 
-The framework must never blindly execute arbitrary AI-generated UI. The
-compiler rejects invalid syntax, components, properties, references,
-command calls, types, and unsupported constructs.
-
-## Invariants relevant to MESH
-
-1. MESH never performs hardware operations.
-2. A MESH tree is renderer-independent.
-3. Generated UI must pass structural and semantic validation before rendering.
-4. MPRX does not contain arbitrary TypeScript.
-5. MPRX expressions are side-effect free.
-6. MESH compiler/tooling must not require NEXUS.
-7. LSP and compiler share the same language implementation.
-8. Component references and bindings should be statically verifiable.
+1. **MESH never performs hardware operations.**
+2. **A MESH tree is renderer-independent.**
+3. **Generated UI must pass structural and semantic validation before rendering.**
+4. **MPRX does not contain arbitrary TypeScript.**
+5. **MPRX expressions are side-effect free.**
+6. **The MESH compiler and tooling must not require NEXUS.**
+7. **The LSP and compiler share one language implementation.**
+8. **Component references and bindings should be statically verifiable.**

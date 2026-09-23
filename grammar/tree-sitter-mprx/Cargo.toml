@@ -8,7 +8,7 @@ keywords = [ "incremental", "parsing", "tree-sitter", "mprx" ]
 license = "MIT"
 name = "tree-sitter-mprx"
 readme = "README.md"
-repository = "https://github.com/tree-sitter/tree-sitter-mprx"
+repository = "https://github.com/ValanceX/Mesh"
 version = "0.1.0"
 
 build = "bindings/rust/build.rs"

@@ -1,34 +1,50 @@
 # MPRX Language Specification
 
-This is the canonical syntax reference for MPRX (MeshExpr), the declarative
-UI language owned by MESH. It is a **living document**: updated as each
-v0.1 pass ships, not a one-time design proposal. Every grammar/AST
-implementation task should be written against this spec rather than
-inventing syntax inline — see `docs/superpowers/plans/` for the
-implementation plans that build it out incrementally.
+MPRX (MeshExpr) is the declarative UI language at the heart of [MESH](../README.md). This document is the **canonical syntax reference**: the exact grammar and the rules for each construct.
 
-For the conceptual "why" behind MPRX (what it is, what it deliberately
-excludes, how it relates to NEXUS/PORT), see `docs/ARCHITECTURE.md`. This
-document covers the "what" — precise grammar and per-construct semantics.
+- **New to MPRX?** Read the [tour](#mprx-in-five-minutes) below, then skim §3–§5.
+- **Want the "why"?** See the [Architecture doc](./ARCHITECTURE.md).
+- **Implementing something?** Write against this spec rather than inventing syntax inline. The plans in `docs/superpowers/plans/` build it out step by step.
 
-**Status:** describes the full v0.1 grammar target. The "Introduced in"
-column throughout marks what's actually implemented today vs. planned.
-As of 2026-09-23: Pass 1 (elements, attributes, string values, plain
-text), Pass 2 (the `{...}` expression syntax in both attribute values and
-child content), Pass 3a (`UnaryExpression`/`BinaryExpression`/
-`ConditionalExpression` — §5's precedence ladder), Pass 3b
-(`ArrayExpression`/`ObjectExpression`/`CommandInvocation`/`EventValue`),
-Pass 4a (diagnostic plurality — `ParseResult`/`LowerResult` replacing the
-prior `Result`-based signatures; `Child::Element` for nested elements;
-`Element.closing_name`, the AST-only close-tag capture Pass 4b's
-tag-mismatch check depends on), and **Pass 4b** (§4's event bindings;
-structural validation — duplicate-attribute/duplicate-event-binding
-warnings and open/close tag-name-mismatch errors, both in
-`mesh-semantic::lower`) are shipped, per
-`docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`. Pass 5
-(canonical example and diagnostic-rendering polish, per
-`docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`) remains
-— any further grammar/semantics work starts a new spec.
+This is a **living document**. It's updated as each v0.1 pass ships, and the "Introduced in" column in §8 shows what's real today and what's still planned.
+
+---
+
+## MPRX in five minutes
+
+An MPRX document is a single element tree:
+
+```xml
+<page title="Users">
+  <text>{user.name}</text>
+  <avatar src={user.avatar} size={compact ? "sm" : "md"} />
+  <button disabled={!user.active} on.click={selectUser($event)}>Select</button>
+</page>
+```
+
+What's going on:
+
+- **Elements** use HTML-style tags. Names may contain hyphens (`user-card`). Tags either close themselves (`<avatar ... />`) or wrap children (`<text>...</text>`).
+- **Attributes** take either a plain string (`title="Users"`) or an expression in braces (`src={user.avatar}`).
+- **Expressions** in `{...}` can read values (`user.name`), combine them (`!user.active`, `a + b`, `x ? "sm" : "md"`), and build arrays or objects (`{[1, 2]}`, `{{ key: "value" }}`). They can never *do* anything: every expression is side-effect free.
+- **Event bindings** (`on.click={...}`) say what should happen when an element emits an event. The handler is usually a **command invocation** like `selectUser($event)`. MESH only records this intent, and NEXUS decides what it does.
+- **`$event`** refers to the value the event carries.
+
+What's intentionally *missing*: comments, subscripts (`a[0]`), optional chaining (`a?.b`), and arbitrary code. §9 lists everything that's out of scope for v0.1.
+
+## Implementation status
+
+| Pass | What it added | Status |
+|---|---|---|
+| 1 | Elements, attributes, string values, plain text | ✅ Shipped |
+| 2 | `{...}` expressions in attributes and content: literals, references, member access | ✅ Shipped |
+| 3a | Unary, binary, and conditional operators (§5's precedence ladder) | ✅ Shipped |
+| 3b | Arrays, objects, command invocations, `$event` | ✅ Shipped |
+| 4a | Multiple diagnostics per run (`ParseResult`/`LowerResult`), nested elements, close-tag capture | ✅ Shipped |
+| 4b | Event bindings (§4); structural validation: duplicate attributes and bindings (warnings), mismatched close tags (errors) | ✅ Shipped |
+| 5 | Canonical example and polished diagnostic rendering | Planned |
+
+*Last updated 2026-09-23. Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. Any grammar or semantics work beyond Pass 5 starts a new spec.*
 
 ---
 
@@ -343,7 +359,9 @@ step, not a reuse.
 
 ---
 
-## 10. Impact on already-written plans
+## 10. Revision history
+
+*For contributors: how each revision of this spec changed the implementation plans. You can skip this section if you just want to write MPRX.*
 
 - **`docs/superpowers/plans/2026-09-22-mesh-v0.1-pass-2-expressions.md`**
   was amended per this spec before execution and has now shipped: (a)

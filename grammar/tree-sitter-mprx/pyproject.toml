@@ -20,7 +20,7 @@ version = "0.1.0"
 
 [project.urls]
 Funding = ""
-Homepage = "https://github.com/tree-sitter/tree-sitter-mprx"
+Homepage = "https://github.com/ValanceX/Mesh"
 
 [project.optional-dependencies]
 core = [ "tree-sitter~=0.24" ]

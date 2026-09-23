@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
-	tree_sitter_mprx "github.com/tree-sitter/tree-sitter-mprx/bindings/go"
+	tree_sitter_mprx "github.com/ValanceX/Mesh/grammar/tree-sitter-mprx/bindings/go"
 )
 
 func TestCanLoadGrammar(t *testing.T) {

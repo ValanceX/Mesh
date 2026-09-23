@@ -1,4 +1,4 @@
-module github.com/tree-sitter/tree-sitter-mprx
+module github.com/ValanceX/Mesh/grammar/tree-sitter-mprx
 
 go 1.22
 
