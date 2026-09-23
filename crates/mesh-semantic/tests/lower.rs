@@ -971,3 +971,178 @@ fn a_nested_child_s_duplicate_event_binding_diagnostic_propagates_to_the_parent_
     };
     assert_eq!(child.event_bindings.len(), 1);
 }
+
+#[test]
+fn mismatched_closing_tag_produces_a_non_fatal_error_diagnostic_and_still_lowers() {
+    let ast = mesh_syntax::Element {
+        name: "div".to_string(),
+        closing_name: Some("span".to_string()),
+        attributes: vec![],
+        event_bindings: vec![],
+        children: vec![],
+        span: mesh_syntax::Span { start_byte: 0, end_byte: 10 },
+    };
+
+    let result = mesh_semantic::lower(&ast);
+    let element = result.ir.expect("should still lower despite the mismatch");
+
+    assert_eq!(element.name, "div");
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Error);
+    assert_eq!(result.diagnostics[0].span, mesh_syntax::Span { start_byte: 0, end_byte: 10 });
+}
+
+#[test]
+fn self_closing_elements_are_never_tag_mismatch_checked() {
+    let ast = mesh_syntax::Element {
+        name: "div".to_string(),
+        closing_name: None,
+        attributes: vec![],
+        event_bindings: vec![],
+        children: vec![],
+        span: mesh_syntax::Span { start_byte: 0, end_byte: 5 },
+    };
+
+    let result = mesh_semantic::lower(&ast);
+    assert!(result.diagnostics.is_empty());
+}
+
+#[test]
+fn matching_closing_tag_produces_no_diagnostics() {
+    let ast = mesh_syntax::Element {
+        name: "div".to_string(),
+        closing_name: Some("div".to_string()),
+        attributes: vec![],
+        event_bindings: vec![],
+        children: vec![],
+        span: mesh_syntax::Span { start_byte: 0, end_byte: 10 },
+    };
+
+    let result = mesh_semantic::lower(&ast);
+    assert!(result.diagnostics.is_empty());
+}
+
+#[test]
+fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
+    fn string_attribute(name: &str, value: &str, start_byte: usize, end_byte: usize) -> mesh_syntax::Attribute {
+        mesh_syntax::Attribute {
+            name: name.to_string(),
+            value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
+                value: value.to_string(),
+                span: mesh_syntax::Span { start_byte, end_byte },
+            }),
+            span: mesh_syntax::Span { start_byte, end_byte },
+        }
+    }
+
+    fn event_binding(name: &str, start_byte: usize, end_byte: usize) -> mesh_syntax::EventBinding {
+        mesh_syntax::EventBinding {
+            name: name.to_string(),
+            handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
+                name: "handler".to_string(),
+                span: mesh_syntax::Span { start_byte, end_byte },
+            }),
+            span: mesh_syntax::Span { start_byte, end_byte },
+        }
+    }
+
+    // Child: one duplicate attribute only (id="x" shadowed by id="y").
+    let child = mesh_syntax::Element {
+        name: "button".to_string(),
+        closing_name: None,
+        attributes: vec![
+            string_attribute("id", "x", 10, 11),
+            string_attribute("id", "y", 12, 13),
+        ],
+        event_bindings: vec![],
+        children: vec![],
+        span: mesh_syntax::Span { start_byte: 9, end_byte: 14 },
+    };
+
+    // Outer: duplicate attribute + duplicate event binding + mismatched
+    // closing tag, and one nested child (above) with its own duplicate
+    // attribute.
+    let ast = mesh_syntax::Element {
+        name: "div".to_string(),
+        closing_name: Some("span".to_string()),
+        attributes: vec![
+            string_attribute("class", "a", 0, 1),
+            string_attribute("class", "b", 2, 3),
+        ],
+        event_bindings: vec![
+            event_binding("click", 4, 5),
+            event_binding("click", 6, 7),
+        ],
+        children: vec![mesh_syntax::Child::Element(Box::new(child))],
+        span: mesh_syntax::Span { start_byte: 0, end_byte: 20 },
+    };
+
+    let result = mesh_semantic::lower(&ast);
+    let element = result.ir.expect("all three diagnostic categories are non-fatal");
+
+    // IR is still fully populated despite 4 diagnostics.
+    assert_eq!(element.name, "div");
+    assert_eq!(element.attributes.len(), 1);
+    assert_eq!(element.attributes[0].name, "class");
+    assert_eq!(element.event_bindings.len(), 1);
+    assert_eq!(element.event_bindings[0].name, "click");
+    assert_eq!(element.children.len(), 1);
+    let mesh_semantic::Child::Element(child) = &element.children[0] else {
+        panic!("expected a nested element child");
+    };
+    assert_eq!(child.attributes.len(), 1);
+    assert_eq!(child.attributes[0].name, "id");
+
+    // Exact order: (1) outer's own duplicate-attribute warning, (2)
+    // outer's own duplicate-event-binding warning, (3) outer's own
+    // tag-mismatch error, (4) the child's duplicate-attribute warning
+    // — per the depth-first, pre-order rule: a parent's own diagnostics
+    // precede its children's. This ordering is never produced by a sort:
+    // it falls directly out of lower_element's traversal (attribute
+    // dedup -> event-binding dedup -> tag-mismatch check -> children
+    // recursion, per Step 5 below), so asserting exact vector position
+    // here is what proves no post-lowering sort exists.
+    assert_eq!(result.diagnostics.len(), 4);
+
+    // (1) Outer's own duplicate-attribute warning — shadowed occurrence
+    // of "class" at (0, 1). Message format matches dedupe_last_wins
+    // (Task 2 Step 7): `duplicate {kind} {name:?}: this occurrence is
+    // shadowed by a later one`.
+    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Warning);
+    assert_eq!(
+        result.diagnostics[0].message,
+        "duplicate attribute \"class\": this occurrence is shadowed by a later one"
+    );
+    assert_eq!(result.diagnostics[0].span, mesh_syntax::Span { start_byte: 0, end_byte: 1 });
+
+    // (2) Outer's own duplicate-event-binding warning — shadowed
+    // occurrence of "click" at (4, 5). Same dedupe_last_wins format,
+    // kind = "event binding".
+    assert_eq!(result.diagnostics[1].severity, mesh_syntax::Severity::Warning);
+    assert_eq!(
+        result.diagnostics[1].message,
+        "duplicate event binding \"click\": this occurrence is shadowed by a later one"
+    );
+    assert_eq!(result.diagnostics[1].span, mesh_syntax::Span { start_byte: 4, end_byte: 5 });
+
+    // (3) Outer's own tag-mismatch error, spanning the whole opening
+    // element (ast.span). Message format matches the tag-mismatch check
+    // (Task 3 Step 5): `mismatched closing tag: opened with {name:?},
+    // closed with {closing_name:?}`.
+    assert_eq!(result.diagnostics[2].severity, mesh_syntax::Severity::Error);
+    assert_eq!(
+        result.diagnostics[2].message,
+        "mismatched closing tag: opened with \"div\", closed with \"span\""
+    );
+    assert_eq!(result.diagnostics[2].span, mesh_syntax::Span { start_byte: 0, end_byte: 20 });
+
+    // (4) The nested child's own duplicate-attribute warning — shadowed
+    // occurrence of "id" at (10, 11), propagated up through
+    // lower_element's recursion into children.
+    assert_eq!(result.diagnostics[3].severity, mesh_syntax::Severity::Warning);
+    assert_eq!(
+        result.diagnostics[3].message,
+        "duplicate attribute \"id\": this occurrence is shadowed by a later one"
+    );
+    assert_eq!(result.diagnostics[3].span, mesh_syntax::Span { start_byte: 10, end_byte: 11 });
+}

@@ -178,6 +178,19 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
     );
     diagnostics.extend(event_binding_diagnostics);
 
+    if let Some(closing_name) = &ast.closing_name {
+        if closing_name != &ast.name {
+            diagnostics.push(mesh_syntax::Diagnostic {
+                severity: mesh_syntax::Severity::Error,
+                message: format!(
+                    "mismatched closing tag: opened with {:?}, closed with {:?}",
+                    ast.name, closing_name
+                ),
+                span: ast.span,
+            });
+        }
+    }
+
     let mut children = Vec::new();
     for child in &ast.children {
         let (lowered, child_diagnostics) = lower_child(child);
