@@ -803,3 +803,20 @@ fn parses_a_nested_element() {
         other => panic!("expected an element child, got {other:?}"),
     }
 }
+
+#[test]
+fn parses_a_nested_self_closing_element() {
+    let element = mesh_parser::parse("<div><span/></div>")
+        .ast
+        .expect("should parse");
+
+    assert_eq!(element.children.len(), 1);
+    match &element.children[0] {
+        mesh_syntax::Child::Element(inner) => {
+            assert_eq!(inner.name, "span");
+            assert_eq!(inner.closing_name, None);
+            assert_eq!(inner.children.len(), 0);
+        }
+        other => panic!("expected an element child, got {other:?}"),
+    }
+}
