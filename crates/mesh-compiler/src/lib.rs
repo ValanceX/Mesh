@@ -17,9 +17,8 @@ pub struct CompileResult {
 /// collects any diagnostics produced along the way.
 ///
 /// Returns a [`CompileResult`] rather than a `Result` because a compile
-/// will be able to produce diagnostics without failing outright once
-/// warnings exist (Pass 4) — check `diagnostics.is_empty()` or
-/// `ir.is_some()` depending on what you need.
+/// can produce diagnostics without failing outright — check
+/// `diagnostics.is_empty()` or `ir.is_some()` depending on what you need.
 pub fn compile(source: &str) -> CompileResult {
     let parsed = mesh_parser::parse(source);
     let mut diagnostics: Vec<mesh_syntax::Diagnostic> = parsed

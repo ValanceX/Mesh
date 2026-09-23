@@ -112,10 +112,7 @@ fn compiling_invalid_source_produces_an_error_diagnostic() {
 
     assert!(result.ir.is_none());
     assert_eq!(result.diagnostics.len(), 1);
-    assert_eq!(
-        result.diagnostics[0].severity,
-        mesh_syntax::Severity::Error
-    );
+    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Error);
 }
 
 #[test]
@@ -269,7 +266,10 @@ fn compiling_duplicate_attributes_produces_warning_diagnostics_and_still_compile
     assert_eq!(element.attributes[0].name, "class");
 
     assert_eq!(result.diagnostics.len(), 1);
-    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Warning);
+    assert_eq!(
+        result.diagnostics[0].severity,
+        mesh_syntax::Severity::Warning
+    );
 }
 
 #[test]
@@ -286,7 +286,10 @@ fn compiling_duplicate_event_bindings_produces_warning_diagnostics_and_still_com
     }
 
     assert_eq!(result.diagnostics.len(), 1);
-    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Warning);
+    assert_eq!(
+        result.diagnostics[0].severity,
+        mesh_syntax::Severity::Warning
+    );
     assert_eq!(
         result.diagnostics[0].message,
         "duplicate event binding \"click\": this occurrence is shadowed by a later one"
@@ -298,14 +301,19 @@ fn compiling_duplicate_event_bindings_produces_warning_diagnostics_and_still_com
     // self-verifying against whatever span convention the parser
     // actually uses.
     let diagnostic_span = result.diagnostics[0].span;
-    assert_eq!(&source[diagnostic_span.start_byte..diagnostic_span.end_byte], "on.click={a}");
+    assert_eq!(
+        &source[diagnostic_span.start_byte..diagnostic_span.end_byte],
+        "on.click={a}"
+    );
 }
 
 #[test]
 fn compiling_a_mismatched_closing_tag_produces_a_non_fatal_error_diagnostic() {
     let result = mesh_compiler::compile("<div>hi</span>");
 
-    let element = result.ir.expect("should still compile despite the mismatch");
+    let element = result
+        .ir
+        .expect("should still compile despite the mismatch");
     assert_eq!(element.name, "div");
 
     assert_eq!(result.diagnostics.len(), 1);

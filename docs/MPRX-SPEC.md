@@ -25,9 +25,10 @@ tag-mismatch check depends on), and **Pass 4b** (§4's event bindings;
 structural validation — duplicate-attribute/duplicate-event-binding
 warnings and open/close tag-name-mismatch errors, both in
 `mesh-semantic::lower`) are shipped, per
-`docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`. As of
-Pass 4b, every pass named in the v0.1 roadmap outline is shipped — any
-further grammar/semantics work starts a new spec.
+`docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`. Pass 5
+(canonical example and diagnostic-rendering polish, per
+`docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`) remains
+— any further grammar/semantics work starts a new spec.
 
 ---
 

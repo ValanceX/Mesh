@@ -1,9 +1,10 @@
 //! Semantic model for MPRX.
 //!
-//! For v0.1, this crate builds the Semantic IR from the `mesh-syntax` AST
-//! and performs structural pass-through only. It does not yet resolve
-//! component/prop/binding references against an external component model —
-//! that requires a typed component model that doesn't exist yet.
+//! For v0.1, this crate builds the Semantic IR from the `mesh-syntax` AST,
+//! applying structural validation (duplicate-attribute/duplicate-event-binding
+//! deduplication, tag-name-mismatch checks) along the way. It does not yet
+//! resolve component/prop/binding references against an external component
+//! model — that requires a typed component model that doesn't exist yet.
 
 /// The Semantic IR form of an [`mesh_syntax::Element`] — structurally
 /// identical to the AST for v0.1, since no resolution happens yet.
@@ -118,7 +119,8 @@ fn dedupe_last_wins<'a, T>(
     span: fn(&T) -> mesh_syntax::Span,
     kind: &str,
 ) -> (Vec<&'a T>, Vec<mesh_syntax::Diagnostic>) {
-    let mut last_index_for_name: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    let mut last_index_for_name: std::collections::HashMap<&str, usize> =
+        std::collections::HashMap::new();
     for (index, item) in items.iter().enumerate() {
         last_index_for_name.insert(name(item), index);
     }
@@ -146,11 +148,11 @@ fn dedupe_last_wins<'a, T>(
 
 /// Lowers an AST [`mesh_syntax::Element`] into its Semantic IR form.
 ///
-/// For v0.1 this is a structural pass-through (drops source spans, copies
-/// everything else) — it does not yet resolve references against a
-/// component model. `ir` is always `Some(..)`: v0.1 introduces no fatal
-/// semantic validation rule that prevents producing IR for an AST that
-/// exists.
+/// For v0.1 this drops source spans, deduplicates shadowed attributes and
+/// event bindings (last occurrence wins), and flags mismatched closing
+/// tags — it does not yet resolve references against a component model.
+/// `ir` is always `Some(..)`: no diagnostic in v0.1, regardless of
+/// severity, prevents producing IR for an AST that exists.
 pub fn lower(ast: &mesh_syntax::Element) -> LowerResult {
     let (element, diagnostics) = lower_element(ast);
     LowerResult {
@@ -201,7 +203,10 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
     let element = Element {
         name: ast.name.clone(),
         attributes: attributes.into_iter().map(lower_attribute).collect(),
-        event_bindings: event_bindings.into_iter().map(lower_event_binding).collect(),
+        event_bindings: event_bindings
+            .into_iter()
+            .map(lower_event_binding)
+            .collect(),
         children,
     };
 
@@ -242,9 +247,10 @@ fn lower_child(child: &mesh_syntax::Child) -> (Option<Child>, Vec<mesh_syntax::D
     match child {
         mesh_syntax::Child::Text(text) if text.value.trim().is_empty() => (None, Vec::new()),
         mesh_syntax::Child::Text(text) => (Some(Child::Text(text.value.clone())), Vec::new()),
-        mesh_syntax::Child::Expression(expression) => {
-            (Some(Child::Expression(lower_expression(expression))), Vec::new())
-        }
+        mesh_syntax::Child::Expression(expression) => (
+            Some(Child::Expression(lower_expression(expression))),
+            Vec::new(),
+        ),
         // Second mutually-recursive lowering path (AST -> IR), same
         // deferred no-guard status as mesh-parser's lower_child (see its
         // comment on the CST -> AST path for the full explanation).

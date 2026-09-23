@@ -860,7 +860,9 @@ fn parses_nested_elements_with_surrounding_whitespace() {
 
 #[test]
 fn parses_an_attribute_named_on_as_a_plain_attribute() {
-    let element = mesh_parser::parse(r#"<div on="x" />"#).ast.expect("should parse");
+    let element = mesh_parser::parse(r#"<div on="x" />"#)
+        .ast
+        .expect("should parse");
 
     assert_eq!(element.attributes.len(), 1);
     assert_eq!(element.attributes[0].name, "on");

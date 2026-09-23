@@ -15,8 +15,11 @@ pub struct Span {
 
 /// How serious a [`Diagnostic`] is.
 ///
-/// For v0.1, `Error` denotes fatal issues that prevent compilation,
-/// while `Warning` denotes non-fatal issues (e.g. duplicate attributes).
+/// For v0.1, `Error` and `Warning` both describe how serious an issue is,
+/// not whether it blocks lowering — check `ir.is_some()` on the
+/// `LowerResult`/`ParseResult` to see whether IR was produced, regardless
+/// of severity (e.g. a mismatched closing tag is an `Error` but still
+/// produces IR).
 /// A compile can produce multiple diagnostics with either severity
 /// (see `ParseResult`/`LowerResult`). Marked `#[non_exhaustive]` because
 /// future passes are expected to add more variants, and that should not

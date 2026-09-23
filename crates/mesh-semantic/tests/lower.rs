@@ -641,7 +641,10 @@ fn omits_whitespace_only_text_children_from_the_ir() {
     let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(ir.children.len(), 1);
-    assert_eq!(ir.children[0], mesh_semantic::Child::Text("Hello".to_string()));
+    assert_eq!(
+        ir.children[0],
+        mesh_semantic::Child::Text("Hello".to_string())
+    );
 }
 
 #[test]
@@ -679,23 +682,25 @@ fn lowers_a_nested_element() {
         closing_name: Some("div".to_string()),
         attributes: vec![],
         event_bindings: vec![],
-        children: vec![mesh_syntax::Child::Element(Box::new(mesh_syntax::Element {
-            name: "span".to_string(),
-            closing_name: Some("span".to_string()),
-            attributes: vec![],
-            event_bindings: vec![],
-            children: vec![mesh_syntax::Child::Text(mesh_syntax::Text {
-                value: "A".to_string(),
+        children: vec![mesh_syntax::Child::Element(Box::new(
+            mesh_syntax::Element {
+                name: "span".to_string(),
+                closing_name: Some("span".to_string()),
+                attributes: vec![],
+                event_bindings: vec![],
+                children: vec![mesh_syntax::Child::Text(mesh_syntax::Text {
+                    value: "A".to_string(),
+                    span: mesh_syntax::Span {
+                        start_byte: 0,
+                        end_byte: 0,
+                    },
+                })],
                 span: mesh_syntax::Span {
                     start_byte: 0,
                     end_byte: 0,
                 },
-            })],
-            span: mesh_syntax::Span {
-                start_byte: 0,
-                end_byte: 0,
             },
-        }))],
+        ))],
         span: mesh_syntax::Span {
             start_byte: 0,
             end_byte: 0,
@@ -708,7 +713,10 @@ fn lowers_a_nested_element() {
     match &ir.children[0] {
         mesh_semantic::Child::Element(inner) => {
             assert_eq!(inner.name, "span");
-            assert_eq!(inner.children[0], mesh_semantic::Child::Text("A".to_string()));
+            assert_eq!(
+                inner.children[0],
+                mesh_semantic::Child::Text("A".to_string())
+            );
         }
         other => panic!("expected an element child, got {other:?}"),
     }
@@ -754,14 +762,25 @@ fn lowers_an_event_binding() {
 
 #[test]
 fn duplicate_attributes_keep_the_last_occurrence_and_warn_about_earlier_ones() {
-    fn string_attribute(name: &str, value: &str, start_byte: usize, end_byte: usize) -> mesh_syntax::Attribute {
+    fn string_attribute(
+        name: &str,
+        value: &str,
+        start_byte: usize,
+        end_byte: usize,
+    ) -> mesh_syntax::Attribute {
         mesh_syntax::Attribute {
             name: name.to_string(),
             value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
                 value: value.to_string(),
-                span: mesh_syntax::Span { start_byte, end_byte },
+                span: mesh_syntax::Span {
+                    start_byte,
+                    end_byte,
+                },
             }),
-            span: mesh_syntax::Span { start_byte, end_byte },
+            span: mesh_syntax::Span {
+                start_byte,
+                end_byte,
+            },
         }
     }
 
@@ -776,7 +795,10 @@ fn duplicate_attributes_keep_the_last_occurrence_and_warn_about_earlier_ones() {
         ],
         event_bindings: vec![],
         children: vec![],
-        span: mesh_syntax::Span { start_byte: 0, end_byte: 8 },
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 8,
+        },
     };
 
     let result = mesh_semantic::lower(&ast);
@@ -787,22 +809,51 @@ fn duplicate_attributes_keep_the_last_occurrence_and_warn_about_earlier_ones() {
     assert_eq!(element.attributes[1].name, "id");
 
     assert_eq!(result.diagnostics.len(), 2);
-    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Warning);
-    assert_eq!(result.diagnostics[0].span, mesh_syntax::Span { start_byte: 0, end_byte: 1 });
-    assert_eq!(result.diagnostics[1].severity, mesh_syntax::Severity::Warning);
-    assert_eq!(result.diagnostics[1].span, mesh_syntax::Span { start_byte: 2, end_byte: 3 });
+    assert_eq!(
+        result.diagnostics[0].severity,
+        mesh_syntax::Severity::Warning
+    );
+    assert_eq!(
+        result.diagnostics[0].span,
+        mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 1
+        }
+    );
+    assert_eq!(
+        result.diagnostics[1].severity,
+        mesh_syntax::Severity::Warning
+    );
+    assert_eq!(
+        result.diagnostics[1].span,
+        mesh_syntax::Span {
+            start_byte: 2,
+            end_byte: 3
+        }
+    );
 }
 
 #[test]
 fn surviving_attributes_are_ordered_by_their_winning_occurrence_not_first_encountered_order() {
-    fn string_attribute(name: &str, value: &str, start_byte: usize, end_byte: usize) -> mesh_syntax::Attribute {
+    fn string_attribute(
+        name: &str,
+        value: &str,
+        start_byte: usize,
+        end_byte: usize,
+    ) -> mesh_syntax::Attribute {
         mesh_syntax::Attribute {
             name: name.to_string(),
             value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
                 value: value.to_string(),
-                span: mesh_syntax::Span { start_byte, end_byte },
+                span: mesh_syntax::Span {
+                    start_byte,
+                    end_byte,
+                },
             }),
-            span: mesh_syntax::Span { start_byte, end_byte },
+            span: mesh_syntax::Span {
+                start_byte,
+                end_byte,
+            },
         }
     }
 
@@ -825,7 +876,10 @@ fn surviving_attributes_are_ordered_by_their_winning_occurrence_not_first_encoun
         ],
         event_bindings: vec![],
         children: vec![],
-        span: mesh_syntax::Span { start_byte: 0, end_byte: 10 },
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 10,
+        },
     };
 
     let result = mesh_semantic::lower(&ast);
@@ -847,10 +901,28 @@ fn surviving_attributes_are_ordered_by_their_winning_occurrence_not_first_encoun
     // Diagnostics are ordered by shadowed-occurrence source position:
     // the shadowed "class" (pos 0) precedes the shadowed "id" (pos 2).
     assert_eq!(result.diagnostics.len(), 2);
-    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Warning);
-    assert_eq!(result.diagnostics[0].span, mesh_syntax::Span { start_byte: 0, end_byte: 1 });
-    assert_eq!(result.diagnostics[1].severity, mesh_syntax::Severity::Warning);
-    assert_eq!(result.diagnostics[1].span, mesh_syntax::Span { start_byte: 2, end_byte: 3 });
+    assert_eq!(
+        result.diagnostics[0].severity,
+        mesh_syntax::Severity::Warning
+    );
+    assert_eq!(
+        result.diagnostics[0].span,
+        mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 1
+        }
+    );
+    assert_eq!(
+        result.diagnostics[1].severity,
+        mesh_syntax::Severity::Warning
+    );
+    assert_eq!(
+        result.diagnostics[1].span,
+        mesh_syntax::Span {
+            start_byte: 2,
+            end_byte: 3
+        }
+    );
 }
 
 #[test]
@@ -860,9 +932,15 @@ fn duplicate_event_bindings_keep_the_last_occurrence_and_warn_about_earlier_ones
             name: name.to_string(),
             handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "handler".to_string(),
-                span: mesh_syntax::Span { start_byte, end_byte },
+                span: mesh_syntax::Span {
+                    start_byte,
+                    end_byte,
+                },
             }),
-            span: mesh_syntax::Span { start_byte, end_byte },
+            span: mesh_syntax::Span {
+                start_byte,
+                end_byte,
+            },
         }
     }
 
@@ -870,12 +948,12 @@ fn duplicate_event_bindings_keep_the_last_occurrence_and_warn_about_earlier_ones
         name: "div".to_string(),
         closing_name: None,
         attributes: vec![],
-        event_bindings: vec![
-            event_binding("click", 0, 1),
-            event_binding("click", 2, 3),
-        ],
+        event_bindings: vec![event_binding("click", 0, 1), event_binding("click", 2, 3)],
         children: vec![],
-        span: mesh_syntax::Span { start_byte: 0, end_byte: 4 },
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 4,
+        },
     };
 
     let result = mesh_semantic::lower(&ast);
@@ -883,8 +961,17 @@ fn duplicate_event_bindings_keep_the_last_occurrence_and_warn_about_earlier_ones
 
     assert_eq!(element.event_bindings.len(), 1);
     assert_eq!(result.diagnostics.len(), 1);
-    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Warning);
-    assert_eq!(result.diagnostics[0].span, mesh_syntax::Span { start_byte: 0, end_byte: 1 });
+    assert_eq!(
+        result.diagnostics[0].severity,
+        mesh_syntax::Severity::Warning
+    );
+    assert_eq!(
+        result.diagnostics[0].span,
+        mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 1
+        }
+    );
 }
 
 #[test]
@@ -896,20 +983,35 @@ fn an_attribute_and_an_event_binding_with_the_same_name_do_not_collide() {
             name: "click".to_string(),
             value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
                 value: "x".to_string(),
-                span: mesh_syntax::Span { start_byte: 0, end_byte: 1 },
+                span: mesh_syntax::Span {
+                    start_byte: 0,
+                    end_byte: 1,
+                },
             }),
-            span: mesh_syntax::Span { start_byte: 0, end_byte: 1 },
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 1,
+            },
         }],
         event_bindings: vec![mesh_syntax::EventBinding {
             name: "click".to_string(),
             handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "handler".to_string(),
-                span: mesh_syntax::Span { start_byte: 2, end_byte: 3 },
+                span: mesh_syntax::Span {
+                    start_byte: 2,
+                    end_byte: 3,
+                },
             }),
-            span: mesh_syntax::Span { start_byte: 2, end_byte: 3 },
+            span: mesh_syntax::Span {
+                start_byte: 2,
+                end_byte: 3,
+            },
         }],
         children: vec![],
-        span: mesh_syntax::Span { start_byte: 0, end_byte: 4 },
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 4,
+        },
     };
 
     let result = mesh_semantic::lower(&ast);
@@ -927,9 +1029,15 @@ fn a_nested_child_s_duplicate_event_binding_diagnostic_propagates_to_the_parent_
             name: name.to_string(),
             handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "handler".to_string(),
-                span: mesh_syntax::Span { start_byte, end_byte },
+                span: mesh_syntax::Span {
+                    start_byte,
+                    end_byte,
+                },
             }),
-            span: mesh_syntax::Span { start_byte, end_byte },
+            span: mesh_syntax::Span {
+                start_byte,
+                end_byte,
+            },
         }
     }
 
@@ -942,7 +1050,10 @@ fn a_nested_child_s_duplicate_event_binding_diagnostic_propagates_to_the_parent_
             event_binding("click", 12, 13),
         ],
         children: vec![],
-        span: mesh_syntax::Span { start_byte: 9, end_byte: 14 },
+        span: mesh_syntax::Span {
+            start_byte: 9,
+            end_byte: 14,
+        },
     };
 
     let ast = mesh_syntax::Element {
@@ -951,7 +1062,10 @@ fn a_nested_child_s_duplicate_event_binding_diagnostic_propagates_to_the_parent_
         attributes: vec![],
         event_bindings: vec![],
         children: vec![mesh_syntax::Child::Element(Box::new(child))],
-        span: mesh_syntax::Span { start_byte: 0, end_byte: 15 },
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 15,
+        },
     };
 
     let result = mesh_semantic::lower(&ast);
@@ -962,8 +1076,17 @@ fn a_nested_child_s_duplicate_event_binding_diagnostic_propagates_to_the_parent_
     // child, per the "Diagnostic ordering (global invariant)" rule:
     // the parent's own diagnostics (none, here) precede its children's.
     assert_eq!(result.diagnostics.len(), 1);
-    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Warning);
-    assert_eq!(result.diagnostics[0].span, mesh_syntax::Span { start_byte: 10, end_byte: 11 });
+    assert_eq!(
+        result.diagnostics[0].severity,
+        mesh_syntax::Severity::Warning
+    );
+    assert_eq!(
+        result.diagnostics[0].span,
+        mesh_syntax::Span {
+            start_byte: 10,
+            end_byte: 11
+        }
+    );
 
     assert_eq!(element.children.len(), 1);
     let mesh_semantic::Child::Element(child) = &element.children[0] else {
@@ -980,7 +1103,10 @@ fn mismatched_closing_tag_produces_a_non_fatal_error_diagnostic_and_still_lowers
         attributes: vec![],
         event_bindings: vec![],
         children: vec![],
-        span: mesh_syntax::Span { start_byte: 0, end_byte: 10 },
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 10,
+        },
     };
 
     let result = mesh_semantic::lower(&ast);
@@ -989,7 +1115,13 @@ fn mismatched_closing_tag_produces_a_non_fatal_error_diagnostic_and_still_lowers
     assert_eq!(element.name, "div");
     assert_eq!(result.diagnostics.len(), 1);
     assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Error);
-    assert_eq!(result.diagnostics[0].span, mesh_syntax::Span { start_byte: 0, end_byte: 10 });
+    assert_eq!(
+        result.diagnostics[0].span,
+        mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 10
+        }
+    );
 }
 
 #[test]
@@ -1000,7 +1132,10 @@ fn self_closing_elements_are_never_tag_mismatch_checked() {
         attributes: vec![],
         event_bindings: vec![],
         children: vec![],
-        span: mesh_syntax::Span { start_byte: 0, end_byte: 5 },
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 5,
+        },
     };
 
     let result = mesh_semantic::lower(&ast);
@@ -1015,7 +1150,10 @@ fn matching_closing_tag_produces_no_diagnostics() {
         attributes: vec![],
         event_bindings: vec![],
         children: vec![],
-        span: mesh_syntax::Span { start_byte: 0, end_byte: 10 },
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 10,
+        },
     };
 
     let result = mesh_semantic::lower(&ast);
@@ -1024,14 +1162,25 @@ fn matching_closing_tag_produces_no_diagnostics() {
 
 #[test]
 fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
-    fn string_attribute(name: &str, value: &str, start_byte: usize, end_byte: usize) -> mesh_syntax::Attribute {
+    fn string_attribute(
+        name: &str,
+        value: &str,
+        start_byte: usize,
+        end_byte: usize,
+    ) -> mesh_syntax::Attribute {
         mesh_syntax::Attribute {
             name: name.to_string(),
             value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
                 value: value.to_string(),
-                span: mesh_syntax::Span { start_byte, end_byte },
+                span: mesh_syntax::Span {
+                    start_byte,
+                    end_byte,
+                },
             }),
-            span: mesh_syntax::Span { start_byte, end_byte },
+            span: mesh_syntax::Span {
+                start_byte,
+                end_byte,
+            },
         }
     }
 
@@ -1040,9 +1189,15 @@ fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
             name: name.to_string(),
             handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "handler".to_string(),
-                span: mesh_syntax::Span { start_byte, end_byte },
+                span: mesh_syntax::Span {
+                    start_byte,
+                    end_byte,
+                },
             }),
-            span: mesh_syntax::Span { start_byte, end_byte },
+            span: mesh_syntax::Span {
+                start_byte,
+                end_byte,
+            },
         }
     }
 
@@ -1056,7 +1211,10 @@ fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
         ],
         event_bindings: vec![],
         children: vec![],
-        span: mesh_syntax::Span { start_byte: 9, end_byte: 14 },
+        span: mesh_syntax::Span {
+            start_byte: 9,
+            end_byte: 14,
+        },
     };
 
     // Outer: duplicate attribute + duplicate event binding + mismatched
@@ -1069,16 +1227,18 @@ fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
             string_attribute("class", "a", 0, 1),
             string_attribute("class", "b", 2, 3),
         ],
-        event_bindings: vec![
-            event_binding("click", 4, 5),
-            event_binding("click", 6, 7),
-        ],
+        event_bindings: vec![event_binding("click", 4, 5), event_binding("click", 6, 7)],
         children: vec![mesh_syntax::Child::Element(Box::new(child))],
-        span: mesh_syntax::Span { start_byte: 0, end_byte: 20 },
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 20,
+        },
     };
 
     let result = mesh_semantic::lower(&ast);
-    let element = result.ir.expect("all three diagnostic categories are non-fatal");
+    let element = result
+        .ir
+        .expect("all three diagnostic categories are non-fatal");
 
     // IR is still fully populated despite 4 diagnostics.
     assert_eq!(element.name, "div");
@@ -1108,22 +1268,40 @@ fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
     // of "class" at (0, 1). Message format matches dedupe_last_wins
     // (Task 2 Step 7): `duplicate {kind} {name:?}: this occurrence is
     // shadowed by a later one`.
-    assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Warning);
+    assert_eq!(
+        result.diagnostics[0].severity,
+        mesh_syntax::Severity::Warning
+    );
     assert_eq!(
         result.diagnostics[0].message,
         "duplicate attribute \"class\": this occurrence is shadowed by a later one"
     );
-    assert_eq!(result.diagnostics[0].span, mesh_syntax::Span { start_byte: 0, end_byte: 1 });
+    assert_eq!(
+        result.diagnostics[0].span,
+        mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 1
+        }
+    );
 
     // (2) Outer's own duplicate-event-binding warning — shadowed
     // occurrence of "click" at (4, 5). Same dedupe_last_wins format,
     // kind = "event binding".
-    assert_eq!(result.diagnostics[1].severity, mesh_syntax::Severity::Warning);
+    assert_eq!(
+        result.diagnostics[1].severity,
+        mesh_syntax::Severity::Warning
+    );
     assert_eq!(
         result.diagnostics[1].message,
         "duplicate event binding \"click\": this occurrence is shadowed by a later one"
     );
-    assert_eq!(result.diagnostics[1].span, mesh_syntax::Span { start_byte: 4, end_byte: 5 });
+    assert_eq!(
+        result.diagnostics[1].span,
+        mesh_syntax::Span {
+            start_byte: 4,
+            end_byte: 5
+        }
+    );
 
     // (3) Outer's own tag-mismatch error, spanning the whole opening
     // element (ast.span). Message format matches the tag-mismatch check
@@ -1134,15 +1312,30 @@ fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
         result.diagnostics[2].message,
         "mismatched closing tag: opened with \"div\", closed with \"span\""
     );
-    assert_eq!(result.diagnostics[2].span, mesh_syntax::Span { start_byte: 0, end_byte: 20 });
+    assert_eq!(
+        result.diagnostics[2].span,
+        mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 20
+        }
+    );
 
     // (4) The nested child's own duplicate-attribute warning — shadowed
     // occurrence of "id" at (10, 11), propagated up through
     // lower_element's recursion into children.
-    assert_eq!(result.diagnostics[3].severity, mesh_syntax::Severity::Warning);
+    assert_eq!(
+        result.diagnostics[3].severity,
+        mesh_syntax::Severity::Warning
+    );
     assert_eq!(
         result.diagnostics[3].message,
         "duplicate attribute \"id\": this occurrence is shadowed by a later one"
     );
-    assert_eq!(result.diagnostics[3].span, mesh_syntax::Span { start_byte: 10, end_byte: 11 });
+    assert_eq!(
+        result.diagnostics[3].span,
+        mesh_syntax::Span {
+            start_byte: 10,
+            end_byte: 11
+        }
+    );
 }
