@@ -244,3 +244,18 @@ fn compiles_an_event_value_attribute() {
         ))
     );
 }
+
+#[test]
+fn compiling_an_event_binding_produces_it_in_the_ir_with_no_diagnostics() {
+    let result = mesh_compiler::compile(r#"<div on.click={handler} />"#);
+
+    let element = result.ir.expect("should compile");
+    assert_eq!(element.event_bindings.len(), 1);
+    assert_eq!(element.event_bindings[0].name, "click");
+    match &element.event_bindings[0].handler {
+        mesh_semantic::Expression::Reference(reference) => assert_eq!(reference, "handler"),
+        other => panic!("expected a reference expression handler, got {other:?}"),
+    }
+
+    assert!(result.diagnostics.is_empty());
+}

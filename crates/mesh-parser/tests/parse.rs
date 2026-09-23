@@ -857,3 +857,66 @@ fn parses_nested_elements_with_surrounding_whitespace() {
         other => panic!("expected fifth child to be whitespace text, got {other:?}"),
     }
 }
+
+#[test]
+fn parses_an_attribute_named_on_as_a_plain_attribute() {
+    let element = mesh_parser::parse(r#"<div on="x" />"#).ast.expect("should parse");
+
+    assert_eq!(element.attributes.len(), 1);
+    assert_eq!(element.attributes[0].name, "on");
+    assert!(element.event_bindings.is_empty());
+}
+
+#[test]
+fn parses_an_event_binding() {
+    let element = mesh_parser::parse("<div on.click={handler} />")
+        .ast
+        .expect("should parse");
+
+    assert!(element.attributes.is_empty());
+    assert_eq!(element.event_bindings.len(), 1);
+    assert_eq!(element.event_bindings[0].name, "click");
+    match &element.event_bindings[0].handler {
+        mesh_syntax::Expression::Reference(reference) => assert_eq!(reference.name, "handler"),
+        other => panic!("expected a reference expression handler, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_an_attribute_and_an_event_binding_on_the_same_element_into_separate_collections() {
+    let element = mesh_parser::parse(r#"<div on="x" on.click={handler} />"#)
+        .ast
+        .expect("should parse");
+
+    assert_eq!(element.attributes.len(), 1);
+    assert_eq!(element.attributes[0].name, "on");
+    assert_eq!(element.event_bindings.len(), 1);
+    assert_eq!(element.event_bindings[0].name, "click");
+}
+
+#[test]
+fn parses_nested_event_bindings_independently() {
+    let element = mesh_parser::parse("<div on.click={outer}><button on.click={inner} /></div>")
+        .ast
+        .expect("should parse");
+
+    assert_eq!(element.event_bindings.len(), 1);
+    assert_eq!(element.event_bindings[0].name, "click");
+    match &element.event_bindings[0].handler {
+        mesh_syntax::Expression::Reference(reference) => assert_eq!(reference.name, "outer"),
+        other => panic!("expected a reference expression handler, got {other:?}"),
+    }
+
+    assert_eq!(element.children.len(), 1);
+    let child = match &element.children[0] {
+        mesh_syntax::Child::Element(child) => child,
+        other => panic!("expected a nested element child, got {other:?}"),
+    };
+
+    assert_eq!(child.event_bindings.len(), 1);
+    assert_eq!(child.event_bindings[0].name, "click");
+    match &child.event_bindings[0].handler {
+        mesh_syntax::Expression::Reference(reference) => assert_eq!(reference.name, "inner"),
+        other => panic!("expected a reference expression handler, got {other:?}"),
+    }
+}

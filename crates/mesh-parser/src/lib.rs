@@ -6,9 +6,9 @@
 
 use mesh_syntax::{
     ArrayExpression, Attribute, AttributeValue, BinaryExpression, BinaryOperator, BooleanLiteral,
-    Child, CommandInvocation, ConditionalExpression, Element, EventValue, Expression, Literal,
-    MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember, Reference,
-    Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
+    Child, CommandInvocation, ConditionalExpression, Element, EventBinding, EventValue, Expression,
+    Literal, MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember,
+    Reference, Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
 };
 use tree_sitter::Node;
 
@@ -112,6 +112,13 @@ fn lower_element(node: Node, source: &str) -> Element {
         .map(|n| lower_attribute(n, source))
         .collect();
 
+    let mut event_binding_cursor = node.walk();
+    let event_bindings = node
+        .children(&mut event_binding_cursor)
+        .filter(|n| n.kind() == "event_binding")
+        .map(|n| lower_event_binding(n, source))
+        .collect();
+
     let mut child_cursor = node.walk();
     let children = node
         .children(&mut child_cursor)
@@ -123,6 +130,7 @@ fn lower_element(node: Node, source: &str) -> Element {
         name,
         closing_name,
         attributes,
+        event_bindings,
         children,
         span: span_of(node),
     }
@@ -177,6 +185,24 @@ fn lower_attribute(node: Node, source: &str) -> Attribute {
     Attribute {
         name,
         value,
+        span: span_of(node),
+    }
+}
+
+fn lower_event_binding(node: Node, source: &str) -> EventBinding {
+    let name = node
+        .child_by_field_name("name")
+        .map(|n| text_of(n, source))
+        .unwrap_or_default();
+
+    let handler = node
+        .child_by_field_name("handler")
+        .map(|n| lower_expression_block(n, source))
+        .unwrap_or_else(|| missing_expression(node));
+
+    EventBinding {
+        name,
+        handler,
         span: span_of(node),
     }
 }

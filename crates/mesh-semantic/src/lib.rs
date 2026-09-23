@@ -11,6 +11,7 @@
 pub struct Element {
     pub name: String,
     pub attributes: Vec<Attribute>,
+    pub event_bindings: Vec<EventBinding>,
     pub children: Vec<Child>,
 }
 
@@ -19,6 +20,15 @@ pub struct Element {
 pub struct Attribute {
     pub name: String,
     pub value: AttributeValue,
+}
+
+/// The Semantic IR form of an [`mesh_syntax::EventBinding`]. `name` holds
+/// only the identifier that follows `on.` in source (e.g. `"click"`) —
+/// the `on.` prefix itself is never part of this field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventBinding {
+    pub name: String,
+    pub handler: Expression,
 }
 
 /// The Semantic IR form of an [`mesh_syntax::AttributeValue`]. Unlike the
@@ -120,6 +130,7 @@ fn lower_element(ast: &mesh_syntax::Element) -> Element {
     Element {
         name: ast.name.clone(),
         attributes: ast.attributes.iter().map(lower_attribute).collect(),
+        event_bindings: ast.event_bindings.iter().map(lower_event_binding).collect(),
         children: ast.children.iter().filter_map(lower_child).collect(),
     }
 }
@@ -128,6 +139,13 @@ fn lower_attribute(attribute: &mesh_syntax::Attribute) -> Attribute {
     Attribute {
         name: attribute.name.clone(),
         value: lower_attribute_value(&attribute.value),
+    }
+}
+
+fn lower_event_binding(binding: &mesh_syntax::EventBinding) -> EventBinding {
+    EventBinding {
+        name: binding.name.clone(),
+        handler: lower_expression(&binding.handler),
     }
 }
 

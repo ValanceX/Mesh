@@ -57,6 +57,7 @@ pub struct Element {
     /// check has the close tag's text to compare against `name`.
     pub closing_name: Option<String>,
     pub attributes: Vec<Attribute>,
+    pub event_bindings: Vec<EventBinding>,
     pub children: Vec<Child>,
     pub span: Span,
 }
@@ -66,6 +67,14 @@ pub struct Element {
 pub struct Attribute {
     pub name: String,
     pub value: AttributeValue,
+    pub span: Span,
+}
+
+/// A single `on.name={handler}` event binding on an [`Element`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventBinding {
+    pub name: String,
+    pub handler: Expression,
     pub span: Span,
 }
 
@@ -300,6 +309,7 @@ mod tests {
                     end_byte: 19,
                 },
             }],
+            event_bindings: vec![],
             children: vec![],
             span: Span {
                 start_byte: 0,
@@ -341,6 +351,7 @@ mod tests {
                     end_byte: 9,
                 },
             }],
+            event_bindings: vec![],
             children: vec![],
             span: Span {
                 start_byte: 0,
@@ -366,6 +377,7 @@ mod tests {
             name: "title".to_string(),
             closing_name: None,
             attributes: vec![],
+            event_bindings: vec![],
             children: vec![Child::Expression(Expression::Reference(Reference {
                 name: "user".to_string(),
                 span: Span {

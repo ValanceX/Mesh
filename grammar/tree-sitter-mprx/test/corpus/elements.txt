@@ -209,3 +209,62 @@ Nested element with surrounding whitespace
       (child
         (text))
       (tag_name))))
+
+================================================================================
+Self-closing element with an attribute named "on"
+================================================================================
+
+<div on="x" />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (string
+          value: (string_content))))))
+
+================================================================================
+Self-closing element with an event binding
+================================================================================
+
+<div on.click={handler} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (event_binding
+        name: (identifier)
+        handler: (expression_block
+          expression: (expression
+            (reference
+              (identifier))))))))
+
+================================================================================
+Self-closing element with an attribute and an event binding in source order
+================================================================================
+
+<div on="x" on.click={handler} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (string
+          value: (string_content)))
+      (event_binding
+        name: (identifier)
+        handler: (expression_block
+          expression: (expression
+            (reference
+              (identifier))))))))

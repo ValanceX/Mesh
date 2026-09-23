@@ -33,14 +33,14 @@ const PREC = {
 const selfClosingElement = $ => seq(
   '<',
   field('name', $.tag_name),
-  repeat($.attribute),
+  repeat($._element_modifier),
   '/>',
 );
 
 const containerElement = $ => seq(
   '<',
   field('name', $.tag_name),
-  repeat($.attribute),
+  repeat($._element_modifier),
   '>',
   repeat($.child),
   '</',
@@ -117,6 +117,15 @@ module.exports = grammar({
       field('name', $.identifier),
       '=',
       field('value', choice($.string, $.expression_block)),
+    ),
+
+    _element_modifier: $ => choice($.attribute, $.event_binding),
+
+    event_binding: $ => seq(
+      token(seq('on', '.')),
+      field('name', $.identifier),
+      '=',
+      field('handler', $.expression_block),
     ),
 
     expression_block: $ => seq(

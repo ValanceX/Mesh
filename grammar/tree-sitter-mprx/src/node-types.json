@@ -246,6 +246,10 @@
           "named": true
         },
         {
+          "type": "event_binding",
+          "named": true
+        },
+        {
           "type": "tag_name",
           "named": true
         }
@@ -269,6 +273,32 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "event_binding",
+    "named": true,
+    "fields": {
+      "handler": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression_block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -480,6 +510,10 @@
       "types": [
         {
           "type": "attribute",
+          "named": true
+        },
+        {
+          "type": "event_binding",
           "named": true
         }
       ]

@@ -17,6 +17,7 @@ fn lowers_a_self_closing_element_with_a_string_attribute() {
                 end_byte: 0,
             },
         }],
+        event_bindings: vec![],
         children: vec![],
         span: mesh_syntax::Span {
             start_byte: 0,
@@ -64,6 +65,7 @@ fn lowers_a_member_access_expression_attribute() {
                 end_byte: 0,
             },
         }],
+        event_bindings: vec![],
         children: vec![],
         span: mesh_syntax::Span {
             start_byte: 0,
@@ -88,6 +90,7 @@ fn lowers_an_expression_child() {
         name: "title".to_string(),
         closing_name: None,
         attributes: vec![],
+        event_bindings: vec![],
         children: vec![mesh_syntax::Child::Expression(
             mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "user".to_string(),
@@ -149,6 +152,7 @@ fn lowers_boolean_and_null_literals() {
                 },
             },
         ],
+        event_bindings: vec![],
         children: vec![],
         span: mesh_syntax::Span {
             start_byte: 0,
@@ -200,6 +204,7 @@ fn lowers_a_unary_expression() {
                 end_byte: 0,
             },
         }],
+        event_bindings: vec![],
         children: vec![],
         span: mesh_syntax::Span {
             start_byte: 0,
@@ -273,6 +278,7 @@ fn lowers_a_binary_expression_preserving_nested_precedence() {
                 end_byte: 0,
             },
         }],
+        event_bindings: vec![],
         children: vec![],
         span: mesh_syntax::Span {
             start_byte: 0,
@@ -343,6 +349,7 @@ fn lowers_a_conditional_expression() {
                 end_byte: 0,
             },
         }],
+        event_bindings: vec![],
         children: vec![],
         span: mesh_syntax::Span {
             start_byte: 0,
@@ -406,6 +413,7 @@ fn lowers_an_array_expression() {
                 end_byte: 0,
             },
         }],
+        event_bindings: vec![],
         children: vec![],
         span: mesh_syntax::Span {
             start_byte: 0,
@@ -484,6 +492,7 @@ fn lowers_an_object_expression_flattening_the_key() {
                 end_byte: 0,
             },
         }],
+        event_bindings: vec![],
         children: vec![],
         span: mesh_syntax::Span {
             start_byte: 0,
@@ -542,6 +551,7 @@ fn lowers_a_command_invocation() {
                 end_byte: 0,
             },
         }],
+        event_bindings: vec![],
         children: vec![],
         span: mesh_syntax::Span {
             start_byte: 0,
@@ -581,6 +591,7 @@ fn lowers_an_event_value() {
                 end_byte: 0,
             },
         }],
+        event_bindings: vec![],
         children: vec![],
         span: mesh_syntax::Span {
             start_byte: 0,
@@ -604,6 +615,7 @@ fn omits_whitespace_only_text_children_from_the_ir() {
         name: "div".to_string(),
         closing_name: Some("div".to_string()),
         attributes: vec![],
+        event_bindings: vec![],
         children: vec![
             mesh_syntax::Child::Text(mesh_syntax::Text {
                 value: "\n    ".to_string(),
@@ -638,6 +650,7 @@ fn preserves_meaningful_text_verbatim_including_internal_whitespace() {
         name: "div".to_string(),
         closing_name: Some("div".to_string()),
         attributes: vec![],
+        event_bindings: vec![],
         children: vec![mesh_syntax::Child::Text(mesh_syntax::Text {
             value: "Hello     world".to_string(),
             span: mesh_syntax::Span {
@@ -665,10 +678,12 @@ fn lowers_a_nested_element() {
         name: "div".to_string(),
         closing_name: Some("div".to_string()),
         attributes: vec![],
+        event_bindings: vec![],
         children: vec![mesh_syntax::Child::Element(Box::new(mesh_syntax::Element {
             name: "span".to_string(),
             closing_name: Some("span".to_string()),
             attributes: vec![],
+            event_bindings: vec![],
             children: vec![mesh_syntax::Child::Text(mesh_syntax::Text {
                 value: "A".to_string(),
                 span: mesh_syntax::Span {
@@ -696,5 +711,43 @@ fn lowers_a_nested_element() {
             assert_eq!(inner.children[0], mesh_semantic::Child::Text("A".to_string()));
         }
         other => panic!("expected an element child, got {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_an_event_binding() {
+    let ast = mesh_syntax::Element {
+        name: "div".to_string(),
+        closing_name: None,
+        attributes: vec![],
+        event_bindings: vec![mesh_syntax::EventBinding {
+            name: "click".to_string(),
+            handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
+                name: "handler".to_string(),
+                span: mesh_syntax::Span {
+                    start_byte: 0,
+                    end_byte: 0,
+                },
+            }),
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
+        }],
+        children: vec![],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let result = mesh_semantic::lower(&ast);
+    let element = result.ir.expect("should lower");
+
+    assert_eq!(element.event_bindings.len(), 1);
+    assert_eq!(element.event_bindings[0].name, "click");
+    match &element.event_bindings[0].handler {
+        mesh_semantic::Expression::Reference(reference) => assert_eq!(reference, "handler"),
+        other => panic!("expected a reference expression handler, got {other:?}"),
     }
 }
