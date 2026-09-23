@@ -1,16 +1,22 @@
 {
   "name": "tree-sitter-mprx",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Tree-sitter grammar for MPRX (MeshExpr), the declarative UI language used by Valance. Consumed by the `mesh-parser` crate to produce a concrete syntax tree, which `mesh-parser` then lowers into the `mesh-syntax` AST.",
-  "main": "index.js",
+  "main": "bindings/node",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tree-sitter test"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Jack Miller",
+  "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
     "tree-sitter-cli": "^0.27.0"
+  },
+  "types": "bindings/node",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ValanceX/Mesh.git",
+    "directory": "grammar/tree-sitter-mprx"
   }
 }

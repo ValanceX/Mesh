@@ -74,12 +74,12 @@ mesh/
 │   ├── mesh-syntax/          syntax nodes and source locations
 │   ├── mesh-parser/          Tree-sitter integration, CST → AST
 │   ├── mesh-semantic/        semantic model, lowering, structural validation
-│   ├── mesh-compiler/        diagnostics, type checking, codegen
-│   ├── mesh-lsp/             language server (reuses the compiler)
+│   ├── mesh-compiler/        compile API, diagnostics, and rendering
+│   ├── mesh-lsp/             language server (placeholder in v0.1)
 │   └── mesh-cli/             the `mesh` command-line tool
 ├── grammar/
 │   └── tree-sitter-mprx/     the MPRX Tree-sitter grammar
-└── packages/               thin npm wrappers around the Rust/WASM build
+└── packages/               npm wrappers for the Rust/WASM build (placeholders in v0.1)
     ├── mesh-language/        @valence/mesh-language
     ├── mesh-compiler/        @valence/mesh-compiler
     └── mesh-lsp/             @valence/mesh-lsp
