@@ -142,6 +142,10 @@
       "required": true,
       "types": [
         {
+          "type": "element",
+          "named": true
+        },
+        {
           "type": "expression_block",
           "named": true
         },

@@ -265,12 +265,15 @@ pub enum AttributeValue {
     Expression(Expression),
 }
 
-/// One child of an [`Element`]: either literal [`Text`] or an
-/// `{expression}` block.
+/// One child of an [`Element`]: literal [`Text`], an `{expression}`
+/// block, or a nested [`Element`]. `Box` is required for `Element` —
+/// `Element` contains `Vec<Child>`, so an unboxed variant would make
+/// `Child` infinitely-sized.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Child {
     Text(Text),
     Expression(Expression),
+    Element(Box<Element>),
 }
 
 #[cfg(test)]

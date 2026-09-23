@@ -136,6 +136,20 @@ fn lower_child(node: Node, source: &str) -> Child {
             value: text_of(inner, source),
             span: span_of(inner),
         }),
+        // `element` wraps `choice(self_closing_element, container_element)` —
+        // unwrap it the same way `parse()` unwraps the root element node.
+        //
+        // Nested elements introduce a second mutually-recursive lowering
+        // path (lower_element -> lower_child -> lower_element -> ...)
+        // alongside the pre-existing, unguarded recursion in expression
+        // lowering. No recursion-depth guard exists for either path —
+        // tracked as a known, deferred concern, not fixed here.
+        "element" => Child::Element(Box::new(lower_element(
+            inner
+                .child(0)
+                .expect("element node always wraps a self_closing_element or container_element"),
+            source,
+        ))),
         other => {
             unreachable!("unexpected child node kind {other:?} inside a successfully-parsed tree")
         }

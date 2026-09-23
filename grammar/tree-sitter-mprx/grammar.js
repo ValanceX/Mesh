@@ -52,6 +52,55 @@ module.exports = grammar({
     child: $ => choice(
       $.text,
       $.expression_block,
+      alias($._nested_element, $.element),
+    ),
+
+    // `_nested_element` (and the `_nested_self_closing_element` /
+    // `_nested_container_element` rules below it) are structurally
+    // identical to `element` / `self_closing_element` / `container_element`
+    // above, but are distinct grammar symbols, all aliased back to the
+    // same node names so the CST shape — and every consumer that matches
+    // on `"element"` / `"self_closing_element"` / `"container_element"`
+    // node kinds — is identical either way.
+    //
+    // The duplication exists because `element` is only ever reached from
+    // `source_file` (FOLLOW = end of input) while this path is only ever
+    // reached from `child` (FOLLOW = another child or a close tag).
+    // tree-sitter's LALR table construction merges parser states with an
+    // identical item core, dropping lookahead-only distinctions — and the
+    // interior states of `self_closing_element`/`container_element`
+    // (reached while still consuming '<name ... />' or '<name ...>...') have
+    // an identical core regardless of which outer rule will eventually
+    // reduce them. Aliasing only the outer `element` layer (leaving
+    // `self_closing_element`/`container_element` shared) still merges those
+    // interior states, so the lexer offers `text` as a candidate token
+    // immediately after completing the root element too — and greedily
+    // consumes trailing whitespace after the root element as a spurious
+    // `text` node, producing an unrecoverable parse error. Duplicating
+    // `self_closing_element`/`container_element` themselves gives the two
+    // call sites distinct item cores from their first token, so their
+    // states no longer merge.
+    _nested_element: $ => choice(
+      alias($._nested_self_closing_element, $.self_closing_element),
+      alias($._nested_container_element, $.container_element),
+    ),
+
+    _nested_self_closing_element: $ => seq(
+      '<',
+      field('name', $.tag_name),
+      repeat($.attribute),
+      '/>',
+    ),
+
+    _nested_container_element: $ => seq(
+      '<',
+      field('name', $.tag_name),
+      repeat($.attribute),
+      '>',
+      repeat($.child),
+      '</',
+      $.tag_name,
+      '>',
     ),
 
     attribute: $ => seq(

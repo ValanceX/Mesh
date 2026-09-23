@@ -35,6 +35,7 @@ pub enum AttributeValue {
 pub enum Child {
     Text(String),
     Expression(Expression),
+    Element(Box<Element>),
 }
 
 /// The Semantic IR form of an [`mesh_syntax::Literal`].
@@ -152,6 +153,9 @@ fn lower_child(child: &mesh_syntax::Child) -> Option<Child> {
         mesh_syntax::Child::Text(text) => Some(Child::Text(text.value.clone())),
         mesh_syntax::Child::Expression(expression) => {
             Some(Child::Expression(lower_expression(expression)))
+        }
+        mesh_syntax::Child::Element(element) => {
+            Some(Child::Element(Box::new(lower_element(element))))
         }
     }
 }

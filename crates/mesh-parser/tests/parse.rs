@@ -782,3 +782,24 @@ fn self_closing_element_has_no_closing_name() {
 
     assert_eq!(element.closing_name, None);
 }
+
+#[test]
+fn parses_a_nested_element() {
+    let element = mesh_parser::parse("<div><span>A</span></div>")
+        .ast
+        .expect("should parse");
+
+    assert_eq!(element.children.len(), 1);
+    match &element.children[0] {
+        mesh_syntax::Child::Element(inner) => {
+            assert_eq!(inner.name, "span");
+            assert_eq!(inner.closing_name, Some("span".to_string()));
+            assert_eq!(inner.children.len(), 1);
+            match &inner.children[0] {
+                mesh_syntax::Child::Text(text) => assert_eq!(text.value, "A"),
+                other => panic!("expected a text child, got {other:?}"),
+            }
+        }
+        other => panic!("expected an element child, got {other:?}"),
+    }
+}

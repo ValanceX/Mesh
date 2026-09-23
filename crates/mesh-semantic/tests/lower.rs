@@ -658,3 +658,43 @@ fn preserves_meaningful_text_verbatim_including_internal_whitespace() {
         mesh_semantic::Child::Text("Hello     world".to_string())
     );
 }
+
+#[test]
+fn lowers_a_nested_element() {
+    let ast = mesh_syntax::Element {
+        name: "div".to_string(),
+        closing_name: Some("div".to_string()),
+        attributes: vec![],
+        children: vec![mesh_syntax::Child::Element(Box::new(mesh_syntax::Element {
+            name: "span".to_string(),
+            closing_name: Some("span".to_string()),
+            attributes: vec![],
+            children: vec![mesh_syntax::Child::Text(mesh_syntax::Text {
+                value: "A".to_string(),
+                span: mesh_syntax::Span {
+                    start_byte: 0,
+                    end_byte: 0,
+                },
+            })],
+            span: mesh_syntax::Span {
+                start_byte: 0,
+                end_byte: 0,
+            },
+        }))],
+        span: mesh_syntax::Span {
+            start_byte: 0,
+            end_byte: 0,
+        },
+    };
+
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
+
+    assert_eq!(ir.children.len(), 1);
+    match &ir.children[0] {
+        mesh_semantic::Child::Element(inner) => {
+            assert_eq!(inner.name, "span");
+            assert_eq!(inner.children[0], mesh_semantic::Child::Text("A".to_string()));
+        }
+        other => panic!("expected an element child, got {other:?}"),
+    }
+}
