@@ -764,3 +764,21 @@ fn parses_a_nested_object_inside_an_array_attribute() {
         other => panic!("expected an array expression, got {other:?}"),
     }
 }
+
+#[test]
+fn captures_closing_name_for_a_container_element() {
+    let element = mesh_parser::parse("<title>Users</title>")
+        .ast
+        .expect("should parse");
+
+    assert_eq!(element.closing_name, Some("title".to_string()));
+}
+
+#[test]
+fn self_closing_element_has_no_closing_name() {
+    let element = mesh_parser::parse(r#"<page title="Users" />"#)
+        .ast
+        .expect("should parse");
+
+    assert_eq!(element.closing_name, None);
+}

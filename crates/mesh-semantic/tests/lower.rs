@@ -2,6 +2,7 @@
 fn lowers_a_self_closing_element_with_a_string_attribute() {
     let ast = mesh_syntax::Element {
         name: "page".to_string(),
+        closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
             name: "title".to_string(),
             value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
@@ -39,6 +40,7 @@ fn lowers_a_self_closing_element_with_a_string_attribute() {
 fn lowers_a_member_access_expression_attribute() {
     let ast = mesh_syntax::Element {
         name: "page".to_string(),
+        closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
             name: "user".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::MemberAccess(
@@ -84,6 +86,7 @@ fn lowers_a_member_access_expression_attribute() {
 fn lowers_an_expression_child() {
     let ast = mesh_syntax::Element {
         name: "title".to_string(),
+        closing_name: None,
         attributes: vec![],
         children: vec![mesh_syntax::Child::Expression(
             mesh_syntax::Expression::Reference(mesh_syntax::Reference {
@@ -112,6 +115,7 @@ fn lowers_an_expression_child() {
 fn lowers_boolean_and_null_literals() {
     let ast = mesh_syntax::Element {
         name: "page".to_string(),
+        closing_name: None,
         attributes: vec![
             mesh_syntax::Attribute {
                 name: "disabled".to_string(),
@@ -172,6 +176,7 @@ fn lowers_boolean_and_null_literals() {
 fn lowers_a_unary_expression() {
     let ast = mesh_syntax::Element {
         name: "page".to_string(),
+        closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
             name: "disabled".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Unary(
@@ -217,6 +222,7 @@ fn lowers_a_unary_expression() {
 fn lowers_a_binary_expression_preserving_nested_precedence() {
     let ast = mesh_syntax::Element {
         name: "page".to_string(),
+        closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
             name: "total".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Binary(
@@ -294,6 +300,7 @@ fn lowers_a_binary_expression_preserving_nested_precedence() {
 fn lowers_a_conditional_expression() {
     let ast = mesh_syntax::Element {
         name: "page".to_string(),
+        closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
             name: "size".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Conditional(
@@ -363,6 +370,7 @@ fn lowers_a_conditional_expression() {
 fn lowers_an_array_expression() {
     let ast = mesh_syntax::Element {
         name: "page".to_string(),
+        closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
             name: "items".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Array(
@@ -420,6 +428,7 @@ fn lowers_an_array_expression() {
 fn lowers_an_object_expression_flattening_the_key() {
     let ast = mesh_syntax::Element {
         name: "page".to_string(),
+        closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
             name: "data".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(
@@ -507,6 +516,7 @@ fn lowers_an_object_expression_flattening_the_key() {
 fn lowers_a_command_invocation() {
     let ast = mesh_syntax::Element {
         name: "page".to_string(),
+        closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
             name: "action".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Command(
@@ -554,6 +564,7 @@ fn lowers_a_command_invocation() {
 fn lowers_an_event_value() {
     let ast = mesh_syntax::Element {
         name: "page".to_string(),
+        closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
             name: "handler".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::EventValue(

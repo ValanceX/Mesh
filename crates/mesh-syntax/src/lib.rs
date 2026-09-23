@@ -49,6 +49,12 @@ impl fmt::Display for Diagnostic {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
     pub name: String,
+    /// The close tag's text, verbatim as written in source. `None` for a
+    /// self-closing element (no close tag exists); `Some(..)` for a
+    /// container element. AST-only — the Semantic IR does not retain
+    /// this field; it exists solely so `mesh-semantic`'s tag-mismatch
+    /// check has the close tag's text to compare against `name`.
+    pub closing_name: Option<String>,
     pub attributes: Vec<Attribute>,
     pub children: Vec<Child>,
     pub span: Span,
@@ -275,6 +281,7 @@ mod tests {
     fn constructs_a_self_closing_element() {
         let element = Element {
             name: "page".to_string(),
+            closing_name: None,
             attributes: vec![Attribute {
                 name: "title".to_string(),
                 value: AttributeValue::String(StringLiteral {
@@ -308,6 +315,7 @@ mod tests {
     fn constructs_an_element_with_an_expression_attribute() {
         let element = Element {
             name: "page".to_string(),
+            closing_name: None,
             attributes: vec![Attribute {
                 name: "title".to_string(),
                 value: AttributeValue::Expression(Expression::MemberAccess(MemberAccess {
@@ -352,6 +360,7 @@ mod tests {
     fn constructs_an_element_with_an_expression_child() {
         let element = Element {
             name: "title".to_string(),
+            closing_name: None,
             attributes: vec![],
             children: vec![Child::Expression(Expression::Reference(Reference {
                 name: "user".to_string(),

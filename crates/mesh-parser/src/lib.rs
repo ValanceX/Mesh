@@ -93,6 +93,18 @@ fn lower_element(node: Node, source: &str) -> Element {
         .map(|n| text_of(n, source))
         .unwrap_or_default();
 
+    // `tag_name` appears once for a self-closing element (the fielded
+    // open-tag name, already captured above) and twice for a container
+    // element (open name + unfielded close-tag name) — see grammar.js's
+    // `container_element` rule. The second occurrence, if any, is the
+    // close tag.
+    let mut closing_name_cursor = node.walk();
+    let closing_name = node
+        .children(&mut closing_name_cursor)
+        .filter(|n| n.kind() == "tag_name")
+        .nth(1)
+        .map(|n| text_of(n, source));
+
     let mut attr_cursor = node.walk();
     let attributes = node
         .children(&mut attr_cursor)
@@ -109,6 +121,7 @@ fn lower_element(node: Node, source: &str) -> Element {
 
     Element {
         name,
+        closing_name,
         attributes,
         children,
         span: span_of(node),
