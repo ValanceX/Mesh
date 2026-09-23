@@ -97,6 +97,8 @@ mesh/
 - The `mesh check` CLI
 - rustc-style diagnostics with source snippets; warnings don't fail the check
 
+Known limitation: a syntax error is reported as one `syntax error` spanning the whole document, so its location always points at line 1 rather than at the mistake. Narrowing syntax-error spans is the first post-v0.1 follow-up.
+
 Next up: component-aware type checking.
 
 ## Learn more
