@@ -42,9 +42,9 @@ What's intentionally *missing*: comments, subscripts (`a[0]`), optional chaining
 | 3b | Arrays, objects, command invocations, `$event` | ✅ Shipped |
 | 4a | Multiple diagnostics per run (`ParseResult`/`LowerResult`), nested elements, close-tag capture | ✅ Shipped |
 | 4b | Event bindings (§4); structural validation: duplicate attributes and bindings (warnings), mismatched close tags (errors) | ✅ Shipped |
-| 5 | Canonical example and polished diagnostic rendering | Planned |
+| 5 | Canonical example and polished diagnostic rendering | ✅ Shipped |
 
-*Last updated 2026-09-23. Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. Any grammar or semantics work beyond Pass 5 starts a new spec.*
+*Last updated 2026-09-23. v0.1 is complete. Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. Any grammar or semantics work beyond Pass 5 starts a new spec.*
 
 ---
 

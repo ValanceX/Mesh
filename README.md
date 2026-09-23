@@ -35,9 +35,15 @@ no errors
 Mistakes are reported with their location:
 
 ```console
-$ cargo run -p mesh-cli -- check broken.mprx
-error: mismatched closing tag: opened with "user-card", closed with "user-kard" (0..94)
+$ cargo run -p mesh-cli -- check examples/fixtures/fail/mismatched-closing-tag.mprx
+error: mismatched closing tag: opened with "title", closed with "heading"
+ --> examples/fixtures/fail/mismatched-closing-tag.mprx:2:3
+  |
+2 |   <title>Users</heading>
+  |   ^^^^^^^^^^^^^^^^^^^^^^
 ```
+
+Warnings (such as a duplicate attribute) are printed the same way but don't fail the check.
 
 ## How it works
 
@@ -82,15 +88,16 @@ mesh/
 
 ## Status
 
-**v0.1 in active development.** What works today:
+**v0.1 complete.** What works today:
 
 - Elements, attributes, strings, and text
 - `{...}` expressions in attributes and content: literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`
 - Event bindings (`on.click={...}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings
 - The `mesh check` CLI
+- rustc-style diagnostics with source snippets; warnings don't fail the check
 
-Next up: polishing the canonical example and diagnostic rendering. After that comes component-aware type checking.
+Next up: component-aware type checking.
 
 ## Learn more
 
