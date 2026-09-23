@@ -13,24 +13,21 @@ document covers the "what" — precise grammar and per-construct semantics.
 
 **Status:** describes the full v0.1 grammar target. The "Introduced in"
 column throughout marks what's actually implemented today vs. planned.
-As of 2026-09-22: Pass 1 (elements, attributes, string values, plain text),
-Pass 2 (the `{...}` expression syntax in both attribute values and child
-content — covering `Literal` (String/Number/Boolean/Null), `Reference`,
-and `MemberAccess`; the `tag_name`/`identifier` lexical split; and string
-escape decoding), and **Pass 3a** (`UnaryExpression`/`BinaryExpression`/
-`ConditionalExpression` — §5's precedence ladder — plus the unsigned
-`number` token fix above that resolves the signed-literal/unary-minus
-ambiguity) are shipped, per
-`docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`'s 3a/3b
-split; Pass 3a's `mesh-syntax`/`mesh-semantic` type shapes are recorded
-in §8 below. **Pass 3b** (`ArrayExpression`/`ObjectExpression`/
-`CommandInvocation`/`EventValue`) is being planned now, informed by real
-Pass 3a implementation experience as intended — its `mesh-syntax`/
-`mesh-semantic` type shapes are now fixed in §8 below, ahead of its
-`writing-plans` cycle, same treatment Pass 3a's shapes got. **Not yet
-implemented:** Pass 3b (as above) and §4's event bindings (Pass 4). The
-rest of this document is the target those remaining passes implement
-against.
+As of 2026-09-23: Pass 1 (elements, attributes, string values, plain
+text), Pass 2 (the `{...}` expression syntax in both attribute values and
+child content), Pass 3a (`UnaryExpression`/`BinaryExpression`/
+`ConditionalExpression` — §5's precedence ladder), Pass 3b
+(`ArrayExpression`/`ObjectExpression`/`CommandInvocation`/`EventValue`),
+Pass 4a (diagnostic plurality — `ParseResult`/`LowerResult` replacing the
+prior `Result`-based signatures; `Child::Element` for nested elements;
+`Element.closing_name`, the AST-only close-tag capture Pass 4b's
+tag-mismatch check depends on), and **Pass 4b** (§4's event bindings;
+structural validation — duplicate-attribute/duplicate-event-binding
+warnings and open/close tag-name-mismatch errors, both in
+`mesh-semantic::lower`) are shipped, per
+`docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`. As of
+Pass 4b, every pass named in the v0.1 roadmap outline is shipped — any
+further grammar/semantics work starts a new spec.
 
 ---
 
@@ -146,9 +143,28 @@ every text node exactly as parsed, including whitespace-only ones, for
 tooling/source-location/diagnostic purposes. Only the IR omits them. See
 `crates/mesh-semantic/tests/lower.rs` for the shipped, tested behavior.
 
-Open/close tag name matching (`<foo>...</bar>` should be rejected) is
-**Pass 4** structural-validation scope, same as the existing roadmap spec
-already states — not re-litigated here.
+**Open/close tag-name matching** is implemented as of Pass 4b, in
+`mesh-semantic::lower`, not in the grammar — `<foo>...</bar>` still
+parses successfully (the grammar captures the close tag's `tag_name`
+without a back-reference to the open tag), but lowering it reports an
+`Error`-severity diagnostic and still produces usable IR: the mismatch is
+non-fatal, lowering continues, and the resulting `Element.name` is always
+the *opening* tag's name. Comparison is exact Rust string equality — no
+case-folding or Unicode normalization. Self-closing elements are never
+checked (there is no close tag to mismatch against). See
+`crates/mesh-semantic/tests/lower.rs` for the shipped, tested behavior.
+
+**Duplicate attributes and duplicate event bindings** are also a Pass 4b
+`mesh-semantic::lower` policy: for each attribute name (respectively,
+event-binding name) that appears more than once on an element, the
+semantic IR keeps only that name's final source occurrence, in the
+surviving entries' own winning-occurrence source order; every shadowed
+occurrence is dropped from the IR and reported as a `Warning`-severity
+diagnostic, ordered by the shadowed occurrence's own source position.
+Attributes and event bindings are deduplicated independently of one
+another — an attribute named `click` and an `on.click` event binding
+never collide. See `crates/mesh-semantic/tests/lower.rs` for the shipped,
+tested behavior.
 
 ---
 
@@ -162,7 +178,20 @@ Example: `on.select={selectUser($event)}`. Distinct from `member_access`
 even though both use `.` — an event binding is a declaration (this element
 emits this event, handle it with this expression), not a value expression,
 so it gets its own grammar rule rather than reusing `member_access`.
-**Pass 4 scope.**
+
+**Implemented as of Pass 4b.** `'on' '.'` is lexed as a single atomic
+token (`token(seq('on', '.'))` in `grammar.js`), which is what lets a
+plain attribute literally named `on` (`on="x"`) and a real event binding
+(`on.click={...}`) coexist with no `prec`/`conflicts` declarations
+needed — the two productions diverge at the token immediately following
+the shared `on` prefix. `EventBinding.name` is extracted only from the
+grammar's `field('name', $.identifier)` node and therefore never includes
+the `on.` prefix token — `on.click={...}` always yields `name ==
+"click"`, never `"on.click"`. Pass 4b performs no event-name or handler
+validation: any identifier is accepted as an event name (there is no
+registry of known DOM/runtime events), and the handler expression's type
+is not checked — both are out of scope for this pass. `mesh-syntax`/
+`mesh-semantic` type shapes are recorded in §8 below.
 
 ---
 
@@ -271,19 +300,19 @@ table rather than re-deriving names per pass.
 | ObjectExpression                            | Pass 3b                              | `ObjectExpression` (+ `ObjectMember`, `ObjectKey`)        | `Expression::Object(Vec<ObjectMember>)` (IR-local `ObjectMember{key: String, value}` — `ObjectKey` flattens, see note below) |
 | CommandInvocation                           | Pass 3b                              | `CommandInvocation`                                      | `Expression::Command{command,arguments}` |
 | EventValue                                  | Pass 3b (alongside CommandInvocation) | `EventValue`                                             | `Expression::EventValue(String)` |
-| EventBinding                                | Pass 4                               | `EventBinding`                                           | TBD at Pass 4 planning          |
+| EventBinding                                | Pass 4b                              | `EventBinding`                                            | `EventBinding`                  |
 | Child::Element (nested)                     | Pass 4a                              | extends `Child` enum                                     | same                            |
 | Diagnostics (plural, from both parse+lower) | Pass 4a                              | n/a — changes `parse`/`lower` signatures                 | n/a                             |
 
-Pass 4's exact Rust type shapes are intentionally left "TBD at
-planning" — this spec fixes the *grammar and semantics*, not Rust API
-signatures, which is exactly the layer that should still get decided at
-`writing-plans` time per real implementation experience (same reasoning
-the Pass 3-5 outline already gave for not writing bite-sized plans this
-far ahead). Pass 3a's and Pass 3b's shapes are fixed above as an
-exception in each case: both brainstorms happened immediately ahead of
-their own `writing-plans` cycle, so there was no gap between deciding
-and implementing to leave open.
+Pass 4a's and Pass 4b's Rust type shapes are fixed above too, for the
+same reason Pass 3a's and Pass 3b's were:
+`docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`'s
+brainstorm happened immediately ahead of both passes' `writing-plans`
+cycles, so there was no gap between deciding and implementing to leave
+open. This spec still fixes only *grammar and semantics*, not Rust API
+signatures, as a general rule — a future pass without that immediate
+brainstorm-to-plan adjacency should leave its own Rust shapes open at
+spec time, same as the original reasoning intended.
 
 **`mesh-semantic` operator-enum reuse (Pass 3a):** `UnaryOperator` and
 `BinaryOperator` are the first `mesh-syntax` types the Semantic IR
@@ -325,7 +354,7 @@ step, not a reuse.
 - **`docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`**'s
   previously-open questions (exact operator set, precedence, event-binding
   token shape, array/object syntax) are now resolved by §4-§5 above. The
-  outline's cross-cutting risk assessment for Pass 4 (children model
+  outline's cross-cutting risk assessment for Pass 4a (children model
   change, diagnostic-plurality change) still stands — this spec doesn't
   resolve Rust-level signatures, only grammar/semantics. The outline's own
   Pass 3 section has since been updated (same date) to reflect the 3a/3b
