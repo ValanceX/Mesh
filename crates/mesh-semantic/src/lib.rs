@@ -154,6 +154,9 @@ fn lower_child(child: &mesh_syntax::Child) -> Option<Child> {
         mesh_syntax::Child::Expression(expression) => {
             Some(Child::Expression(lower_expression(expression)))
         }
+        // Second mutually-recursive lowering path (AST -> IR), same
+        // deferred no-guard status as mesh-parser's lower_child (see its
+        // comment on the CST -> AST path for the full explanation).
         mesh_syntax::Child::Element(element) => {
             Some(Child::Element(Box::new(lower_element(element))))
         }

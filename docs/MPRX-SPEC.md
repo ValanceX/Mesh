@@ -28,9 +28,9 @@ in §8 below. **Pass 3b** (`ArrayExpression`/`ObjectExpression`/
 Pass 3a implementation experience as intended — its `mesh-syntax`/
 `mesh-semantic` type shapes are now fixed in §8 below, ahead of its
 `writing-plans` cycle, same treatment Pass 3a's shapes got. **Not yet
-implemented:** Pass 3b (as above), §4's event bindings (Pass 4), and
-§3's nested elements (Pass 4). The rest of this document is the target
-those remaining passes implement against.
+implemented:** Pass 3b (as above) and §4's event bindings (Pass 4). The
+rest of this document is the target those remaining passes implement
+against.
 
 ---
 
@@ -130,10 +130,8 @@ expression_block          ::= '{' expression '}'
 ```
 
 `child` allows three things: plain text, an `{expr}` block, or a nested
-`element`. **Nested elements are Pass 4 scope** (see §8's pass column) —
-until then, `child` is effectively `text | expression_block`. Expressions
-are valid in child/content position as of Pass 2, not just in
-attribute values — `docs/ARCHITECTURE.md`'s own example,
+`element`. Expressions are valid in child/content position as of Pass 2,
+not just in attribute values — `docs/ARCHITECTURE.md`'s own example,
 `<text>{user.name}</text>`, puts an expression directly in element
 content, and `container_element`'s grammar now uses `repeat($.child)` so
 an element can hold any number of text/expression children in any order.
@@ -274,8 +272,8 @@ table rather than re-deriving names per pass.
 | CommandInvocation                           | Pass 3b                              | `CommandInvocation`                                      | `Expression::Command{command,arguments}` |
 | EventValue                                  | Pass 3b (alongside CommandInvocation) | `EventValue`                                             | `Expression::EventValue(String)` |
 | EventBinding                                | Pass 4                               | `EventBinding`                                           | TBD at Pass 4 planning          |
-| Child::Element (nested)                     | Pass 4                               | extends `Child` enum                                     | same                            |
-| Diagnostics (plural, from both parse+lower) | Pass 4                               | n/a — changes `parse`/`lower` signatures                 | n/a                             |
+| Child::Element (nested)                     | Pass 4a                              | extends `Child` enum                                     | same                            |
+| Diagnostics (plural, from both parse+lower) | Pass 4a                              | n/a — changes `parse`/`lower` signatures                 | n/a                             |
 
 Pass 4's exact Rust type shapes are intentionally left "TBD at
 planning" — this spec fixes the *grammar and semantics*, not Rust API
