@@ -14,10 +14,7 @@ use tree_sitter::Node;
 
 /// An error produced while parsing MPRX source text.
 ///
-/// Currently carries a single message and the source [`Span`] it applies
-/// to. `mesh_parser::parse`/`mesh_semantic::lower`'s signatures will need
-/// to change to carry multiple diagnostics once Pass 4 needs more than one
-/// per compile — see the v0.1 roadmap.
+/// Carries a single message and the source [`Span`] it applies to.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{message}")]
 pub struct ParseError {
@@ -25,48 +22,69 @@ pub struct ParseError {
     pub span: Span,
 }
 
+/// The result of parsing one MPRX source file: the AST, if parsing
+/// produced a usable tree, and every [`ParseError`] encountered along the
+/// way.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseResult {
+    pub ast: Option<Element>,
+    pub errors: Vec<ParseError>,
+}
+
 /// Parses `source` as MPRX and lowers the resulting concrete syntax tree
 /// into the [`mesh_syntax`] AST.
 ///
-/// # Errors
-///
-/// Returns [`ParseError`] if the source fails to parse outright, if the
-/// resulting tree contains a syntax error, or if the tree does not contain
-/// exactly one root element.
-pub fn parse(source: &str) -> Result<Element, ParseError> {
+/// `ast` is `None` if the source fails to parse outright, if the
+/// resulting tree contains a syntax error, or if the tree does not
+/// contain exactly one root element — in each case `errors` holds the
+/// corresponding [`ParseError`].
+pub fn parse(source: &str) -> ParseResult {
     let mut parser = tree_sitter::Parser::new();
     parser
         .set_language(&tree_sitter_mprx::language())
         .expect("loading the MPRX grammar should never fail");
 
-    let tree = parser.parse(source, None).ok_or_else(|| ParseError {
-        message: "failed to parse source".to_string(),
-        span: Span {
-            start_byte: 0,
-            end_byte: source.len(),
-        },
-    })?;
+    let Some(tree) = parser.parse(source, None) else {
+        return ParseResult {
+            ast: None,
+            errors: vec![ParseError {
+                message: "failed to parse source".to_string(),
+                span: Span {
+                    start_byte: 0,
+                    end_byte: source.len(),
+                },
+            }],
+        };
+    };
 
     let root = tree.root_node();
     if root.has_error() {
-        return Err(ParseError {
-            message: "syntax error".to_string(),
-            span: span_of(root),
-        });
+        return ParseResult {
+            ast: None,
+            errors: vec![ParseError {
+                message: "syntax error".to_string(),
+                span: span_of(root),
+            }],
+        };
     }
 
-    let element_node = root
-        .named_child(0)
-        .and_then(|element| element.child(0))
-        .ok_or_else(|| ParseError {
-            message: "expected a single root element".to_string(),
-            span: Span {
-                start_byte: 0,
-                end_byte: source.len(),
-            },
-        })?;
+    let Some(element_node) = root.named_child(0).and_then(|element| element.child(0)) else {
+        return ParseResult {
+            ast: None,
+            errors: vec![ParseError {
+                message: "expected a single root element".to_string(),
+                span: Span {
+                    start_byte: 0,
+                    end_byte: source.len(),
+                },
+            }],
+        };
+    };
 
-    Ok(lower_element(element_node, source))
+    ParseResult {
+        ast: Some(lower_element(element_node, source)),
+        errors: vec![],
+    }
 }
 
 fn lower_element(node: Node, source: &str) -> Element {
