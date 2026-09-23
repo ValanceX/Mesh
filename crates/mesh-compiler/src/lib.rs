@@ -5,6 +5,10 @@
 //! diagnostics; type checking against a component model is not yet
 //! implemented (see the v0.1 roadmap design spec).
 
+mod render;
+
+pub use render::render_diagnostic;
+
 /// The result of compiling one MPRX source file: the Semantic IR, if
 /// compilation succeeded, and every diagnostic produced along the way.
 #[derive(Debug, Clone, PartialEq, Eq)]

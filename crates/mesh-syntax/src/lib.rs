@@ -31,6 +31,19 @@ pub enum Severity {
     Warning,
 }
 
+/// The lowercase label renderers print before a diagnostic's message
+/// (`error`, `warning`). Lives here, next to the enum, so the match stays
+/// exhaustive — downstream crates can't match `#[non_exhaustive]`
+/// `Severity` without a wildcard arm.
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Severity::Error => "error",
+            Severity::Warning => "warning",
+        })
+    }
+}
+
 /// A single compile-time diagnostic: a message, its severity, and the
 /// source [`Span`] it applies to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -652,5 +665,11 @@ mod tests {
             Expression::EventValue(event) => assert_eq!(event.name, "event"),
             other => panic!("expected an event value, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn severity_displays_as_its_lowercase_label() {
+        assert_eq!(Severity::Error.to_string(), "error");
+        assert_eq!(Severity::Warning.to_string(), "warning");
     }
 }

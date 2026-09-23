@@ -1,0 +1,78 @@
+//! rustc-style rendering of [`Diagnostic`]s for terminal output.
+//!
+//! This is a presentation adapter: `Diagnostic` stays pure data in
+//! `mesh-syntax`, and this module only formats it. Living in
+//! `mesh-compiler` is a v0.1 placement choice, not a statement that
+//! terminal presentation belongs to the compiler's semantic model.
+
+use mesh_syntax::Diagnostic;
+
+/// Renders `diagnostic` rustc-style: a `severity: message` header, a
+/// `--> path:line:column` location, and the source line the diagnostic
+/// starts on, underlined with carets:
+///
+/// ```text
+/// error: mismatched closing tag: opened with "title", closed with "heading"
+///  --> card.mprx:2:3
+///   |
+/// 2 |   <title>Users</heading>
+///   |   ^^^^^^^^^^^^^^^^^^^^^^
+/// ```
+///
+/// Returns exactly one block with no trailing newline — separating
+/// blocks is the caller's job.
+///
+/// Lines and columns are 1-based. Columns count Unicode scalar values
+/// (`char`s), not bytes, and deliberately ignore terminal display width:
+/// wide characters get no special alignment in v0.1. Tabs before the
+/// span are echoed in the underline so carets stay aligned. A span
+/// covering several lines is underlined only to the end of its first
+/// line, and a trailing `\r` (CRLF sources) is never shown, counted, or
+/// underlined. An out-of-range span, or one that splits a multi-byte
+/// character, is clamped rather than panicking — a bad span should
+/// degrade the snippet, not crash the CLI.
+pub fn render_diagnostic(source: &str, path: &str, diagnostic: &Diagnostic) -> String {
+    let start = source.floor_char_boundary(diagnostic.span.start_byte);
+    let end = source
+        .floor_char_boundary(diagnostic.span.end_byte)
+        .max(start);
+
+    let line_start = source[..start].rfind('\n').map_or(0, |i| i + 1);
+    let line_end = source[start..]
+        .find('\n')
+        .map_or(source.len(), |i| start + i);
+    let line_text = source[line_start..line_end].trim_end_matches('\r');
+    let text_end = line_start + line_text.len();
+    let line_number = source[..line_start].matches('\n').count() + 1;
+    // A span starting inside the line ending (`\r` or `\n`) points just
+    // past the last visible character, never into the line ending itself.
+    let visible_start = start.min(text_end);
+    let column = source[line_start..visible_start].chars().count() + 1;
+
+    let indent: String = source[line_start..visible_start]
+        .chars()
+        .map(|c| if c == '\t' { '\t' } else { ' ' })
+        .collect();
+    let underline_end = end.min(text_end).max(visible_start);
+    let carets = "^".repeat(source[visible_start..underline_end].chars().count().max(1));
+
+    let gutter = " ".repeat(line_number.to_string().len());
+    // Omit the separating space for an empty line so no output line ends
+    // in trailing whitespace (fixture `.stderr` files must survive editors
+    // that strip it, and `git diff --check`).
+    let code = if line_text.is_empty() {
+        String::new()
+    } else {
+        format!(" {line_text}")
+    };
+
+    format!(
+        "{severity}: {message}\n\
+         {gutter}--> {path}:{line_number}:{column}\n\
+         {gutter} |\n\
+         {line_number} |{code}\n\
+         {gutter} | {indent}{carets}",
+        severity = diagnostic.severity,
+        message = diagnostic.message,
+    )
+}
