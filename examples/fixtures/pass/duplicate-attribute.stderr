@@ -1,0 +1,5 @@
+warning: duplicate attribute "class": this occurrence is shadowed by a later one
+ --> fixtures/pass/duplicate-attribute.mprx:1:6
+  |
+1 | <div class="a" class="b" />
+  |      ^^^^^^^^^

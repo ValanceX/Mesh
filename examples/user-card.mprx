@@ -1,0 +1,4 @@
+<user-card
+  user={user}
+  compact={layout.compact}
+  on.select={selectUser($event)} />

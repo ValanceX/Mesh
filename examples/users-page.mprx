@@ -1,0 +1,5 @@
+<page title="Users">
+  <text>{user.name}</text>
+  <avatar src={user.avatar} alt={user.name} size={compact ? "sm" : "md"} />
+  <button disabled={!user.active} on.click={selectUser($event)}>Select</button>
+</page>

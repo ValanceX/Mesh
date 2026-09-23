@@ -1,0 +1,5 @@
+error: syntax error
+ --> fixtures/fail/empty.mprx:1:1
+  |
+1 |
+  | ^

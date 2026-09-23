@@ -1,0 +1,5 @@
+error: syntax error
+ --> fixtures/fail/multiple-roots.mprx:1:1
+  |
+1 | <a />
+  | ^^^^^

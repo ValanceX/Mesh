@@ -1,0 +1,11 @@
+warning: duplicate attribute "class": this occurrence is shadowed by a later one
+ --> fixtures/pass/multiple-warnings.mprx:1:9
+  |
+1 | <button class="a" class="b" on.click={save} on.click={cancel} />
+  |         ^^^^^^^^^
+
+warning: duplicate event binding "click": this occurrence is shadowed by a later one
+ --> fixtures/pass/multiple-warnings.mprx:1:29
+  |
+1 | <button class="a" class="b" on.click={save} on.click={cancel} />
+  |                             ^^^^^^^^^^^^^^^

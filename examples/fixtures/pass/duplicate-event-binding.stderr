@@ -1,0 +1,5 @@
+warning: duplicate event binding "click": this occurrence is shadowed by a later one
+ --> fixtures/pass/duplicate-event-binding.mprx:1:9
+  |
+1 | <button on.click={save} on.click={cancel} />
+  |         ^^^^^^^^^^^^^^^
