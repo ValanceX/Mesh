@@ -24,7 +24,7 @@ fn lowers_a_self_closing_element_with_a_string_attribute() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(ir.name, "page");
     assert_eq!(ir.attributes.len(), 1);
@@ -71,7 +71,7 @@ fn lowers_a_member_access_expression_attribute() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(
         ir.attributes[0].value,
@@ -103,7 +103,7 @@ fn lowers_an_expression_child() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(
         ir.children[0],
@@ -156,7 +156,7 @@ fn lowers_boolean_and_null_literals() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(
         ir.attributes[0].value,
@@ -207,7 +207,7 @@ fn lowers_a_unary_expression() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(
         ir.attributes[0].value,
@@ -280,7 +280,7 @@ fn lowers_a_binary_expression_preserving_nested_precedence() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(
         ir.attributes[0].value,
@@ -350,7 +350,7 @@ fn lowers_a_conditional_expression() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(
         ir.attributes[0].value,
@@ -413,7 +413,7 @@ fn lowers_an_array_expression() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(
         ir.attributes[0].value,
@@ -491,7 +491,7 @@ fn lowers_an_object_expression_flattening_the_key() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(
         ir.attributes[0].value,
@@ -549,7 +549,7 @@ fn lowers_a_command_invocation() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(
         ir.attributes[0].value,
@@ -588,7 +588,7 @@ fn lowers_an_event_value() {
         },
     };
 
-    let ir = mesh_semantic::lower(&ast);
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
 
     assert_eq!(
         ir.attributes[0].value,

@@ -92,12 +92,30 @@ pub enum Expression {
     EventValue(String),
 }
 
+/// The result of lowering one AST [`mesh_syntax::Element`] into Semantic
+/// IR: the IR, if lowering produced one, and every diagnostic reported
+/// along the way.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LowerResult {
+    pub ir: Option<Element>,
+    pub diagnostics: Vec<mesh_syntax::Diagnostic>,
+}
+
 /// Lowers an AST [`mesh_syntax::Element`] into its Semantic IR form.
 ///
 /// For v0.1 this is a structural pass-through (drops source spans, copies
 /// everything else) — it does not yet resolve references against a
-/// component model.
-pub fn lower(ast: &mesh_syntax::Element) -> Element {
+/// component model. `ir` is always `Some(..)`: v0.1 introduces no fatal
+/// semantic validation rule that prevents producing IR for an AST that
+/// exists.
+pub fn lower(ast: &mesh_syntax::Element) -> LowerResult {
+    LowerResult {
+        ir: Some(lower_element(ast)),
+        diagnostics: Vec::new(),
+    }
+}
+
+fn lower_element(ast: &mesh_syntax::Element) -> Element {
     Element {
         name: ast.name.clone(),
         attributes: ast.attributes.iter().map(lower_attribute).collect(),

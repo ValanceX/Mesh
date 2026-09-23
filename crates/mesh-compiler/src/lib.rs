@@ -21,21 +21,25 @@ pub struct CompileResult {
 /// warnings exist (Pass 4) — check `diagnostics.is_empty()` or
 /// `ir.is_some()` depending on what you need.
 pub fn compile(source: &str) -> CompileResult {
-    match mesh_parser::parse(source) {
-        Ok(ast) => {
-            let ir = mesh_semantic::lower(&ast);
-            CompileResult {
-                ir: Some(ir),
-                diagnostics: vec![],
-            }
+    let parsed = mesh_parser::parse(source);
+    let mut diagnostics: Vec<mesh_syntax::Diagnostic> = parsed
+        .errors
+        .into_iter()
+        .map(|err| mesh_syntax::Diagnostic {
+            severity: mesh_syntax::Severity::Error,
+            message: err.message,
+            span: err.span,
+        })
+        .collect();
+
+    let ir = match parsed.ast {
+        Some(ast) => {
+            let lowered = mesh_semantic::lower(&ast);
+            diagnostics.extend(lowered.diagnostics);
+            lowered.ir
         }
-        Err(err) => CompileResult {
-            ir: None,
-            diagnostics: vec![mesh_syntax::Diagnostic {
-                severity: mesh_syntax::Severity::Error,
-                message: err.message,
-                span: err.span,
-            }],
-        },
-    }
+        None => None,
+    };
+
+    CompileResult { ir, diagnostics }
 }
