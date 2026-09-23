@@ -1,6 +1,7 @@
 //! Native CLI entry point for the MESH toolchain.
 
 use clap::{Parser, Subcommand};
+use mesh_syntax::Severity;
 use std::fs;
 use std::process::ExitCode;
 
@@ -40,13 +41,25 @@ fn run_check(file: &str) -> ExitCode {
 
     let result = mesh_compiler::compile(&source);
 
-    if result.diagnostics.is_empty() {
-        println!("no errors");
-        return ExitCode::SUCCESS;
+    // Diagnostics print in `CompileResult` order (never re-sorted). The
+    // renderer returns a block with no trailing newline; this loop owns
+    // the separation: each block is followed by exactly one blank line.
+    for diagnostic in &result.diagnostics {
+        eprintln!(
+            "{}\n",
+            mesh_compiler::render_diagnostic(&source, file, diagnostic)
+        );
     }
 
-    for diagnostic in &result.diagnostics {
-        eprintln!("error: {diagnostic}");
+    // Only errors fail the check — warnings are reported but non-fatal.
+    let has_errors = result
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == Severity::Error);
+    if has_errors {
+        return ExitCode::FAILURE;
     }
-    ExitCode::FAILURE
+
+    println!("no errors");
+    ExitCode::SUCCESS
 }
