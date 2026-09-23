@@ -4,9 +4,10 @@ MPRX (MeshExpr) is the declarative UI language at the heart of [MESH](../README.
 
 - **New to MPRX?** Read the [tour](#mprx-in-five-minutes) below, then skim §3–§5.
 - **Want the "why"?** See the [Architecture doc](./ARCHITECTURE.md).
+- **Want a gentler introduction?** The [Writing MPRX guide](./guides/writing-mprx.md) covers the same ground with examples and common mistakes.
 - **Implementing something?** Write against this spec rather than inventing syntax inline. The plans in `docs/superpowers/plans/` build it out step by step.
 
-This is a **living document**. It's updated as each v0.1 pass ships, and the "Introduced in" column in §8 shows what's real today and what's still planned.
+This is a **living document**. It was updated as each v0.1 pass shipped and now describes MESH v0.1.0, and the "Introduced in" column in §8 shows what's real today and what's still planned.
 
 ---
 
@@ -44,7 +45,7 @@ What's intentionally *missing*: comments, subscripts (`a[0]`), optional chaining
 | 4b | Event bindings (§4); structural validation: duplicate attributes and bindings (warnings), mismatched close tags (errors) | ✅ Shipped |
 | 5 | Canonical example and polished diagnostic rendering | ✅ Shipped |
 
-*Last updated 2026-09-23. v0.1 is complete. Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. Any grammar or semantics work beyond Pass 5 starts a new spec.*
+*Last updated 2026-09-24. v0.1 is complete and released as v0.1.0 (see the [release notes](./releases/v0.1.md)); this spec describes exactly what v0.1.0 accepts. Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. Any grammar or semantics work beyond Pass 5 starts a new spec.*
 
 ---
 

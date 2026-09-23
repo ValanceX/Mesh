@@ -25,17 +25,20 @@ Because MPRX is small, MESH can parse, validate, and compile every UI before it 
 
 ## Try it
 
-MESH ships a native CLI. From the repo root:
+MESH ships a native CLI. Install it from a clone of this repo and check the canonical example:
 
 ```console
-$ cargo run -p mesh-cli -- check examples/page.mprx
+$ cargo install --path crates/mesh-cli
+$ mesh check examples/user-card.mprx
 no errors
 ```
+
+(Or skip installing and run `cargo run -p mesh-cli -- check <file>` from the repo root.)
 
 Mistakes are reported with their location:
 
 ```console
-$ cargo run -p mesh-cli -- check examples/fixtures/fail/mismatched-closing-tag.mprx
+$ mesh check examples/fixtures/fail/mismatched-closing-tag.mprx
 error: mismatched closing tag: opened with "title", closed with "heading"
  --> examples/fixtures/fail/mismatched-closing-tag.mprx:2:3
   |
@@ -44,6 +47,8 @@ error: mismatched closing tag: opened with "title", closed with "heading"
 ```
 
 Warnings (such as a duplicate attribute) are printed the same way but don't fail the check.
+
+New to MESH? The [getting-started guide](./docs/guides/getting-started.md) walks through it step by step.
 
 ## How it works
 
@@ -88,7 +93,7 @@ mesh/
 
 ## Status
 
-**v0.1 complete.** What works today:
+**v0.1.0 released** (2026-09-24). See the [release notes](./docs/releases/v0.1.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - Elements, attributes, strings, and text
 - `{...}` expressions in attributes and content: literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`
@@ -97,12 +102,18 @@ mesh/
 - The `mesh check` CLI
 - rustc-style diagnostics with source snippets; warnings don't fail the check
 
-Known limitation: a syntax error is reported as one `syntax error` spanning the whole document, so its location always points at line 1 rather than at the mistake. Narrowing syntax-error spans is the first post-v0.1 follow-up.
+Known limitations: a syntax error is reported as one `syntax error` spanning the whole document, so its location always points at line 1 rather than at the mistake. References, components and props aren't type-checked yet. The language server and npm packages are placeholders.
 
-Next up: component-aware type checking.
+Next up: pointing syntax errors at the actual mistake, then component-aware type checking.
 
 ## Learn more
 
+The [documentation index](./docs/README.md) lists everything. The most useful places to start:
+
+- [**Getting started**](./docs/guides/getting-started.md): install `mesh` and check your first file
+- [**Writing MPRX**](./docs/guides/writing-mprx.md): the v0.1 language, with examples and common mistakes
+- [**`mesh` CLI manual**](./docs/manual/mesh-cli.md) and [**Diagnostics reference**](./docs/manual/diagnostics.md)
+- [**Embedding the compiler**](./docs/guides/embedding-the-compiler.md): use MESH from Rust
 - [**MPRX Language Spec**](./docs/MPRX-SPEC.md): the exact syntax, with what's shipped and what's planned
 - [**Architecture**](./docs/ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance
 
