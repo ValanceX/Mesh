@@ -1,0 +1,5 @@
+error[manifest-invalid-value]: "required" must be true or false, found a string
+  --> fixtures/manifest/fail/invalid-value.json:15:65
+   |
+15 |         "compact": { "type": { "kind": "boolean" }, "required": "no" }
+   |                                                                 ^^^^

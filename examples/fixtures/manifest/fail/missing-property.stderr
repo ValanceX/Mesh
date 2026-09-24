@@ -1,0 +1,5 @@
+error[manifest-missing-property]: prop "size" is missing the property "required"
+  --> fixtures/manifest/fail/missing-property.json:15:17
+   |
+15 |         "size": { "type": { "kind": "string" } }
+   |                 ^

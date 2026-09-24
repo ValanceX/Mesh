@@ -1,0 +1,5 @@
+error[manifest-unsupported-version]: unsupported manifest version 2; this MESH reads version 1
+ --> fixtures/manifest/fail/unsupported-version.json:2:14
+  |
+2 |   "version": 2,
+  |              ^

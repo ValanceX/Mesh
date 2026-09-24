@@ -1,0 +1,5 @@
+error[manifest-invalid-name]: prop name "aria-label" isn't a valid MPRX identifier: start with a letter or `_`, then use letters, digits or `_`
+  --> fixtures/manifest/fail/invalid-name.json:15:9
+   |
+15 |         "aria-label": { "type": { "kind": "string" }, "required": false }
+   |         ^^^^^^^^^^^^

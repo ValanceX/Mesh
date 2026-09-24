@@ -256,6 +256,14 @@ Manifest errors point into the manifest, with the manifest's path, line and colu
 
 The manifest isn't valid JSON. The message is the JSON parser's, and the location is where it stopped.
 
+```text
+error[manifest-syntax-error]: the manifest isn't valid JSON: trailing comma
+ --> examples/fixtures/manifest/fail/syntax-error.json:6:3
+  |
+6 |   }
+  |   ^
+```
+
 Only the first JSON syntax error is reported. A leading byte-order mark is allowed.
 
 **Fix:** correct the JSON. Trailing commas and comments aren't allowed.
@@ -264,17 +272,41 @@ Only the first JSON syntax error is reported. A leading byte-order mark is allow
 
 The manifest's `"version"` is missing, or isn't `1`, the only version this MESH reads. Another version has another format, so nothing else in the manifest is checked.
 
+```text
+error[manifest-unsupported-version]: unsupported manifest version 2; this MESH reads version 1
+ --> examples/fixtures/manifest/fail/unsupported-version.json:2:14
+  |
+2 |   "version": 2,
+  |              ^
+```
+
 **Fix:** write `"version": 1`, and the rest of the manifest in version 1's format.
 
 ### `manifest-invalid-value`
 
 A value has the wrong JSON type: an array where an object belongs, a string for `"required"`, a type that isn't an object, and so on.
 
+```text
+error[manifest-invalid-value]: "required" must be true or false, found a string
+  --> examples/fixtures/manifest/fail/invalid-value.json:15:65
+   |
+15 |         "compact": { "type": { "kind": "boolean" }, "required": "no" }
+   |                                                                 ^^^^
+```
+
 **Fix:** use the JSON type the message names.
 
 ### `manifest-missing-property`
 
 An object is missing a property it must have. Points at the object's opening `{`.
+
+```text
+error[manifest-missing-property]: prop "size" is missing the property "required"
+  --> examples/fixtures/manifest/fail/missing-property.json:15:17
+   |
+15 |         "size": { "type": { "kind": "string" } }
+   |                 ^
+```
 
 - The manifest needs `"version"`, `"types"` and `"components"`.
 - A component needs all of `"props"`, `"events"`, `"commands"` and `"scope"`, even when they're empty.
@@ -287,11 +319,27 @@ An object is missing a property it must have. Points at the object's opening `{`
 
 An object has a property its format doesn't allow. Points at the property's key.
 
+```text
+error[manifest-unknown-property]: prop "size" can't have the property "default"
+  --> examples/fixtures/manifest/fail/unknown-property.json:15:68
+   |
+15 |         "size": { "type": { "kind": "string" }, "required": false, "default": "md" }
+   |                                                                    ^^^^^^^^^
+```
+
 **Fix:** remove the property. The manifest describes interfaces only: there are no default values, and a type has only the properties of its kind.
 
 ### `manifest-duplicate-key`
 
 A key appears twice in one object. Most JSON tools silently keep the last one; MESH reports the repeat instead, and uses the first occurrence. Points at the second occurrence.
+
+```text
+error[manifest-duplicate-key]: component "template" declares the prop "size" twice
+  --> examples/fixtures/manifest/fail/duplicate-key.json:16:9
+   |
+16 |         "size": { "type": { "kind": "number" }, "required": false }
+   |         ^^^^^^
+```
 
 This covers every level: component names, props, events, commands, scope names, named types, record fields, and properties such as `"type"`.
 
@@ -301,6 +349,14 @@ This covers every level: component names, props, events, commands, scope names, 
 
 A type's `"kind"` isn't one of `string`, `number`, `boolean`, `null`, `any`, `list`, `record`, `named` or `optional`.
 
+```text
+error[manifest-unknown-kind]: unknown type kind "integer"; expected string, number, boolean, null, any, list, record, named or optional
+  --> examples/fixtures/manifest/fail/unknown-kind.json:18:28
+   |
+18 |         "count": { "kind": "integer" }
+   |                            ^^^^^^^^^
+```
+
 `void` and `nothing` are types MESH uses internally, and a manifest can't write them either.
 
 **Fix:** use one of the kinds above. For a number, use `number`: there's no separate integer type.
@@ -308,6 +364,14 @@ A type's `"kind"` isn't one of `string`, `number`, `boolean`, `null`, `any`, `li
 ### `manifest-invalid-name`
 
 A declared name can't be written in MPRX where it would be used.
+
+```text
+error[manifest-invalid-name]: prop name "aria-label" isn't a valid MPRX identifier: start with a letter or `_`, then use letters, digits or `_`
+  --> examples/fixtures/manifest/fail/invalid-name.json:15:9
+   |
+15 |         "aria-label": { "type": { "kind": "string" }, "required": false }
+   |         ^^^^^^^^^^^^
+```
 
 - A component name must be a valid tag name: a letter or `_`, then letters, digits, `_` or `-`.
 - Every other name (props, events, commands, command parameters, scope names, named types, record fields) must be a valid identifier: a letter or `_`, then letters, digits or `_`. No `-`, because MPRX reads `-` as minus.
@@ -319,17 +383,41 @@ A declared name can't be written in MPRX where it would be used.
 
 A command declares two parameters with the same name. Points at the second one's name.
 
+```text
+error[manifest-duplicate-parameter]: command "move" has two parameters named "item"
+  --> examples/fixtures/manifest/fail/duplicate-parameter.json:20:23
+   |
+20 |             { "name": "item", "type": { "kind": "number" } }
+   |                       ^^^^^^
+```
+
 **Fix:** rename one of them.
 
 ### `manifest-unknown-type`
 
 A `named` type refers to a name that `"types"` doesn't declare. Points at the name.
 
+```text
+error[manifest-unknown-type]: unknown type "Usr": the manifest's "types" doesn't declare it
+  --> examples/fixtures/manifest/fail/unknown-type.json:25:44
+   |
+25 |         "user": { "kind": "named", "name": "Usr" }
+   |                                            ^^^^^
+```
+
 **Fix:** declare the type in `"types"`, or correct the name. Names are case-sensitive.
 
 ### `manifest-recursive-type`
 
 A named type refers to itself, directly or through other named types. Each cycle is reported once, at the first of its types in the manifest.
+
+```text
+error[manifest-recursive-type]: type "Folder" refers to itself: Folder -> Folders -> Folder
+ --> examples/fixtures/manifest/fail/recursive-type.json:4:5
+  |
+4 |     "Folder": {
+  |     ^^^^^^^^
+```
 
 Recursive types aren't supported in version 1.
 
@@ -339,11 +427,27 @@ Recursive types aren't supported in version 1.
 
 An `optional` type wraps a type that is already optional: another `optional`, or a named type that is one. Points at the inner type.
 
+```text
+error[manifest-nested-optional]: an optional type can't wrap "MaybeName", which is already optional
+  --> examples/fixtures/manifest/fail/nested-optional.json:20:74
+   |
+20 |         "name": { "kind": "optional", "type": { "kind": "named", "name": "MaybeName" } }
+   |                                                                          ^^^^^^^^^^^
+```
+
 **Fix:** remove one of the two. "Optional optional" means the same as "optional".
 
 ### `manifest-missing-component`
 
 The manifest loaded, but it doesn't declare the component the file is the template of. That component is the file's name without its extension (`users-page.mprx` is `users-page`), unless `--component` names another. Points at the manifest's `"components"` key.
+
+```text
+error[manifest-missing-component]: the manifest declares no component "template", which this file is the template of
+ --> examples/fixtures/manifest/fail/missing-component.json:4:3
+  |
+4 |   "components": {
+  |   ^^^^^^^^^^^^
+```
 
 **Fix:** declare the component, or pass `--component <NAME>`.
 

@@ -275,6 +275,7 @@ dependencies = [
  "clap",
  "mesh-compiler",
  "mesh-manifest",
+ "mesh-semantic",
  "mesh-syntax",
  "predicates",
  "tempfile",

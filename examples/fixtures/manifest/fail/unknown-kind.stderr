@@ -1,0 +1,5 @@
+error[manifest-unknown-kind]: unknown type kind "integer"; expected string, number, boolean, null, any, list, record, named or optional
+  --> fixtures/manifest/fail/unknown-kind.json:18:28
+   |
+18 |         "count": { "kind": "integer" }
+   |                            ^^^^^^^^^

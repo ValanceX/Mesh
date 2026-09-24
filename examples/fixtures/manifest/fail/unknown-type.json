@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "types": {
+    "User": {
+      "kind": "record",
+      "fields": {
+        "name": { "type": { "kind": "string" }, "required": true }
+      }
+    }
+  },
+  "components": {
+    "page": {
+      "props": {
+        "title": { "type": { "kind": "string" }, "required": true }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "template": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {
+        "user": { "kind": "named", "name": "Usr" }
+      }
+    }
+  }
+}

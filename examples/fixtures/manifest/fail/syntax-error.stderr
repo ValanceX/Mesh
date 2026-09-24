@@ -1,0 +1,5 @@
+error[manifest-syntax-error]: the manifest isn't valid JSON: trailing comma
+ --> fixtures/manifest/fail/syntax-error.json:6:3
+  |
+6 |   }
+  |   ^

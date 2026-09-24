@@ -1,0 +1,5 @@
+error[manifest-missing-component]: the manifest declares no component "template", which this file is the template of
+ --> fixtures/manifest/fail/missing-component.json:4:3
+  |
+4 |   "components": {
+  |   ^^^^^^^^^^^^

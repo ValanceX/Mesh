@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "types": {},
+  "components": {
+    "page": {
+      "props": {
+        "title": { "type": { "kind": "string" }, "required": true }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "template": {
+      "props": {
+        "size": { "type": { "kind": "string" }, "required": false, "default": "md" }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    }
+  }
+}

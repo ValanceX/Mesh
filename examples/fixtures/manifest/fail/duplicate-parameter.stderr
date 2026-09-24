@@ -1,0 +1,5 @@
+error[manifest-duplicate-parameter]: command "move" has two parameters named "item"
+  --> fixtures/manifest/fail/duplicate-parameter.json:20:23
+   |
+20 |             { "name": "item", "type": { "kind": "number" } }
+   |                       ^^^^^^

@@ -1,0 +1,5 @@
+error[manifest-nested-optional]: an optional type can't wrap "MaybeName", which is already optional
+  --> fixtures/manifest/fail/nested-optional.json:20:74
+   |
+20 |         "name": { "kind": "optional", "type": { "kind": "named", "name": "MaybeName" } }
+   |                                                                          ^^^^^^^^^^^

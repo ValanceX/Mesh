@@ -1,0 +1,5 @@
+error[manifest-unknown-property]: prop "size" can't have the property "default"
+  --> fixtures/manifest/fail/unknown-property.json:15:68
+   |
+15 |         "size": { "type": { "kind": "string" }, "required": false, "default": "md" }
+   |                                                                    ^^^^^^^^^

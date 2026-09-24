@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "types": {},
+  "components": {
+    "template": { "props": {}, "events": {}, "commands": {}, "scope": {} },
+  }
+}

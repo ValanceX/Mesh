@@ -1,0 +1,5 @@
+error[manifest-duplicate-key]: component "template" declares the prop "size" twice
+  --> fixtures/manifest/fail/duplicate-key.json:16:9
+   |
+16 |         "size": { "type": { "kind": "number" }, "required": false }
+   |         ^^^^^^

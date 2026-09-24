@@ -1,0 +1,5 @@
+error[manifest-recursive-type]: type "Folder" refers to itself: Folder -> Folders -> Folder
+ --> fixtures/manifest/fail/recursive-type.json:4:5
+  |
+4 |     "Folder": {
+  |     ^^^^^^^^

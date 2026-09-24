@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "types": {
+    "Folder": {
+      "kind": "record",
+      "fields": {
+        "name": { "type": { "kind": "string" }, "required": true },
+        "children": { "type": { "kind": "named", "name": "Folders" }, "required": true }
+      }
+    },
+    "Folders": { "kind": "list", "element": { "kind": "named", "name": "Folder" } }
+  },
+  "components": {
+    "page": {
+      "props": {
+        "title": { "type": { "kind": "string" }, "required": true }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "template": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {
+        "root": { "kind": "named", "name": "Folder" }
+      }
+    }
+  }
+}

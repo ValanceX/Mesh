@@ -1,0 +1,5 @@
+error[manifest-unknown-type]: unknown type "Usr": the manifest's "types" doesn't declare it
+  --> fixtures/manifest/fail/unknown-type.json:25:44
+   |
+25 |         "user": { "kind": "named", "name": "Usr" }
+   |                                            ^^^^^
