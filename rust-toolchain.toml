@@ -1,0 +1,7 @@
+# The exact toolchain MESH is developed, linted and tested with. Pinning it
+# keeps `cargo fmt` and `cargo clippy` from drifting between machines and
+# CI. The oldest supported toolchain is the workspace `rust-version`.
+[toolchain]
+channel = "1.98.1"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

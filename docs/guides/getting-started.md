@@ -2,7 +2,7 @@
 
 This guide covers installing the `mesh` command, writing your first MPRX file, and reading the diagnostics MESH prints. It takes about ten minutes.
 
-**You'll need:** a recent stable Rust toolchain (install it from [rustup.rs](https://rustup.rs)) and `git`. You don't need Node.js unless you plan to work on the Tree-sitter grammar.
+**You'll need:** Rust 1.91 or newer (install it from [rustup.rs](https://rustup.rs)) and `git`. Inside the repo, rustup picks the exact toolchain named in `rust-toolchain.toml`. You don't need Node.js unless you plan to work on the Tree-sitter grammar.
 
 ## 1. Install the CLI
 

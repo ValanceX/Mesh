@@ -2,6 +2,7 @@
 name = "mesh-syntax"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 description = "Syntax nodes, AST types, and source locations for MPRX."

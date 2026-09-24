@@ -5,21 +5,28 @@ on:
     branches: [main]
   pull_request:
 
+# The `@v7` actions run on the runner's Node 24 runtime, not the deprecated
+# Node 20 one. That is separate from `node-version: 22` below, which only
+# installs the Node used by the grammar's own npm tests.
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+      - uses: actions/checkout@v7
+      # With no arguments, rustup installs the toolchain (and components)
+      # pinned in rust-toolchain.toml, so CI lints with exactly the
+      # compiler used locally.
+      - name: Install Rust
+        run: rustup toolchain install
       - name: Format check
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
         run: cargo test --workspace
-      - uses: actions/setup-node@v4
+      # Installs Node 22 for the grammar tests; the action itself runs on
+      # the runner's Node 24.
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Grammar tests
@@ -29,3 +36,15 @@ jobs:
           npm ci --ignore-scripts
           npm rebuild tree-sitter-cli
           npm test
+
+  # Checks the declared `rust-version`: the workspace, with its committed
+  # Cargo.lock, still compiles on 1.91. (This shows 1.91 works; it doesn't
+  # show that nothing older would.)
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the MSRV toolchain
+        run: rustup toolchain install 1.91.0 --profile minimal
+      - name: Check on the MSRV
+        run: cargo +1.91.0 check --locked --workspace --all-targets

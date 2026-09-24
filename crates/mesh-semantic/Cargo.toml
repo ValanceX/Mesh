@@ -2,6 +2,7 @@
 name = "mesh-semantic"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 description = "Semantic model for MPRX: AST lowering, structural validation, and the Semantic IR."

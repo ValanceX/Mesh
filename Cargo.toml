@@ -13,6 +13,8 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+# `str::floor_char_boundary` (mesh-compiler's renderer) was stabilized in 1.91.
+rust-version = "1.91"
 license = "MIT"
 authors = ["Jack Miller <jackmiller0899@gmail.com>"]
 repository = "https://github.com/ValanceX/Mesh"
