@@ -8,6 +8,7 @@
 mesh check <FILE>
 mesh help [COMMAND]
 mesh --help
+mesh --version
 ```
 
 ## Installing
@@ -118,9 +119,9 @@ out=$(mesh check "$f" 2>&1 >/dev/null)
 [ -z "$out" ] || { printf '%s\n' "$out"; exit 1; }
 ```
 
-## `mesh help` and `--help`
+## `mesh help`, `--help` and `--version`
 
-These print usage for `mesh` or for a single command. v0.1 has no `--version` flag.
+`mesh help` and `--help` print usage for `mesh` or for a single command. `mesh --version` (or `-V`) prints the version, such as `mesh 0.1.0`, and exits `0`.
 
 ## Limitations in v0.1
 

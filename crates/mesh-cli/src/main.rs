@@ -8,7 +8,7 @@ use std::process::ExitCode;
 /// The MESH command-line toolchain: parse, check, and (eventually) compile
 /// MPRX source files.
 #[derive(Parser)]
-#[command(name = "mesh")]
+#[command(name = "mesh", version)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
