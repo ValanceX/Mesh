@@ -1,5 +1,5 @@
-error[syntax-error]: syntax error
- --> fixtures/fail/multiple-roots.mprx:1:1
+error[syntax-error]: expected a single root element, found another one here
+ --> fixtures/fail/multiple-roots.mprx:2:1
   |
-1 | <a />
+2 | <b />
   | ^^^^^

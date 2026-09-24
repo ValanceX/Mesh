@@ -12,6 +12,8 @@ use mesh_syntax::{
 };
 use tree_sitter::Node;
 
+mod syntax_errors;
+
 /// An error produced while parsing MPRX source text.
 ///
 /// Carries its stable [`DiagnosticCode`], a message, and the source
@@ -37,9 +39,10 @@ pub struct ParseResult {
 /// into the [`mesh_syntax`] AST.
 ///
 /// `ast` is `None` if the source fails to parse outright, if the
-/// resulting tree contains a syntax error, or if the tree does not
-/// contain exactly one root element — in each case `errors` holds the
-/// corresponding [`ParseError`].
+/// resulting tree contains syntax errors, or if the tree does not
+/// contain exactly one root element. Syntax errors are located: `errors`
+/// holds one [`ParseError`] per error region, in source order, each with
+/// the narrowest useful span.
 pub fn parse(source: &str) -> ParseResult {
     let mut parser = tree_sitter::Parser::new();
     parser
@@ -64,11 +67,7 @@ pub fn parse(source: &str) -> ParseResult {
     if root.has_error() {
         return ParseResult {
             ast: None,
-            errors: vec![ParseError {
-                code: DiagnosticCode::SYNTAX_ERROR,
-                message: "syntax error".to_string(),
-                span: span_of(root),
-            }],
+            errors: syntax_errors::collect(root, source),
         };
     }
 

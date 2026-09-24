@@ -1,0 +1,5 @@
+error[command-trailing-comma]: trailing comma in command arguments; remove the `,`
+ --> fixtures/fail/command-trailing-comma.mprx:1:35
+  |
+1 | <button on.click={save(user, draft,)} />
+  |                                   ^

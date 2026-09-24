@@ -1,0 +1,5 @@
+error[hyphenated-attribute-name]: attribute name `data-id` can't contain `-`; use camelCase or `_` instead
+ --> fixtures/fail/hyphenated-attribute-name.mprx:1:7
+  |
+1 | <card data-id="1" />
+  |       ^^^^^^^

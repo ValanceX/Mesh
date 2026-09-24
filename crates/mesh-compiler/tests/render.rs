@@ -337,3 +337,72 @@ fn never_panics_for_any_span_over_bom_crlf_and_multi_byte_sources() {
         }
     }
 }
+
+/// Pass 1's located spans through Pass 0's renderer. Each source has a
+/// byte-order mark, and most have CRLF line endings and multi-byte text;
+/// the empty-file and missing-operand spans are zero-width. Every span
+/// the compiler emits lies on character boundaries inside the source, and
+/// renders at the line and column an editor shows.
+#[test]
+fn renders_located_syntax_errors_in_bom_crlf_and_multi_byte_sources() {
+    let cases = [
+        (
+            "\u{feff}",
+            "error[syntax-error]: expected a root element, but the file is empty\n \
+             --> x.mprx:1:1\n  \
+             |\n\
+             1 |\n  \
+             | ^",
+        ),
+        (
+            "\u{feff}<page",
+            "error[unterminated-tag]: unterminated tag `<page`: expected `>` or `/>`\n \
+             --> x.mprx:1:1\n  \
+             |\n\
+             1 | <page\n  \
+             | ^^^^^",
+        ),
+        (
+            "\u{feff}<page>\r\n  <text>Größe < 10</text>\r\n</page>\r\n",
+            "error[less-than-in-text]: `<` in text starts a tag; to show a literal `<`, put the text in a string expression, like `{\"a < b\"}`\n \
+             --> x.mprx:2:15\n  \
+             |\n\
+             2 |   <text>Größe < 10</text>\n  \
+             |               ^",
+        ),
+        (
+            "\u{feff}<page title=\"é\" data-id=\"ü\" />\r\n",
+            "error[hyphenated-attribute-name]: attribute name `data-id` can't contain `-`; use camelCase or `_` instead\n \
+             --> x.mprx:1:17\n  \
+             |\n\
+             1 | <page title=\"é\" data-id=\"ü\" />\n  \
+             |                 ^^^^^^^",
+        ),
+        (
+            "\u{feff}<page>{\"é\" +}</page>\r\n",
+            "error[syntax-error]: expected an expression\n \
+             --> x.mprx:1:13\n  \
+             |\n\
+             1 | <page>{\"é\" +}</page>\n  \
+             |             ^",
+        ),
+    ];
+    for (source, expected) in cases {
+        let result = mesh_compiler::compile(source);
+        assert_eq!(result.diagnostics.len(), 1, "source: {source:?}");
+        let diagnostic = &result.diagnostics[0];
+        let span = diagnostic.span;
+        assert!(
+            span.start_byte <= span.end_byte
+                && span.end_byte <= source.len()
+                && source.is_char_boundary(span.start_byte)
+                && source.is_char_boundary(span.end_byte),
+            "span {span:?} of {source:?}"
+        );
+        assert_eq!(
+            render_diagnostic(source, "x.mprx", diagnostic),
+            expected,
+            "source: {source:?}"
+        );
+    }
+}

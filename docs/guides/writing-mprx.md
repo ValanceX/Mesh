@@ -145,11 +145,11 @@ Also out of scope for v0.1: checking references against a component model. `mesh
 
 | You wrote | What happens | Fix |
 |---|---|---|
-| `<item>Two</itme>` | error: mismatched closing tag | Make the closing tag match |
-| `<a /><b />` at top level | error: syntax error | Wrap them in one root element |
-| `data={ k: "v" }` | error: syntax error | `data={{ k: "v" }}` |
-| `<text>a < b</text>` | error: syntax error | `<text>{"a < b"}</text>` |
-| `data-id="1"` | error: syntax error | `dataId="1"` |
-| `label="A" label="B"` | warning: duplicate attribute | Remove the one you don't mean |
+| `<item>Two</itme>` | `error[mismatched-closing-tag]` | Make the closing tag match |
+| `<a /><b />` at top level | `error[syntax-error]` | Wrap them in one root element |
+| `data={ k: "v" }` | `error[single-brace-object]` | `data={{ k: "v" }}` |
+| `<text>a < b</text>` | `error[less-than-in-text]` | `<text>{"a < b"}</text>` |
+| `data-id="1"` | `error[hyphenated-attribute-name]` | `dataId="1"` |
+| `label="A" label="B"` | `warning[duplicate-attribute]` | Remove the one you don't mean |
 
-> **v0.1 limitation:** every syntax error is reported at line 1, column 1 with the message `syntax error`. The parser doesn't narrow the location yet. If you get a syntax error in a large file, check the constructs in the tables above. See the [diagnostics reference](../manual/diagnostics.md#syntax-error) for details.
+Every diagnostic has a code in brackets, like `less-than-in-text`. Look it up in the [diagnostics reference](../manual/diagnostics.md) for the full explanation and fix.

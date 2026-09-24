@@ -1,4 +1,4 @@
-error[syntax-error]: syntax error
+error[unterminated-tag]: unterminated tag `<page`: expected `>` or `/>`
  --> fixtures/fail/unclosed-tag.mprx:1:1
   |
 1 | <page

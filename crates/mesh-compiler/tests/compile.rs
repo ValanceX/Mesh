@@ -120,7 +120,10 @@ fn diagnostic_display_includes_message_and_span() {
     let result = mesh_compiler::compile("<page");
     let diagnostic = &result.diagnostics[0];
 
-    assert_eq!(diagnostic.to_string(), "syntax error (0..5)");
+    assert_eq!(
+        diagnostic.to_string(),
+        "unterminated tag `<page`: expected `>` or `/>` (0..5)"
+    );
 }
 
 #[test]
@@ -337,5 +340,5 @@ fn every_diagnostic_carries_its_code() {
     );
 
     let result = mesh_compiler::compile("<page");
-    assert_eq!(result.diagnostics[0].code, DiagnosticCode::SYNTAX_ERROR);
+    assert_eq!(result.diagnostics[0].code, DiagnosticCode::UNTERMINATED_TAG);
 }

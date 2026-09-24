@@ -1,4 +1,4 @@
-error[syntax-error]: syntax error
+error[syntax-error]: expected a root element, but the file is empty
  --> fixtures/fail/empty.mprx:1:1
   |
 1 |

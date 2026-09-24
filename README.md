@@ -102,9 +102,9 @@ mesh/
 - The `mesh check` CLI
 - rustc-style diagnostics with source snippets; warnings don't fail the check
 
-Known limitations: a syntax error is reported as one `syntax error` spanning the whole document, so its location always points at line 1 rather than at the mistake. References, components and props aren't type-checked yet. The language server and npm packages are placeholders.
+Known limitations: references, components and props aren't type-checked yet. The language server and npm packages are placeholders.
 
-Next up: pointing syntax errors at the actual mistake, then component-aware type checking.
+Next up: component-aware type checking. Unreleased on `main` so far: syntax errors point at the actual mistake, and every diagnostic has a stable code (see the [CHANGELOG](./CHANGELOG.md)).
 
 ## Learn more
 

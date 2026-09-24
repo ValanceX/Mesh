@@ -1,0 +1,5 @@
+<card>
+  <text>a < b</text>
+  <badge data-id="1" />
+  <list items={ first: 1 } />
+</card>

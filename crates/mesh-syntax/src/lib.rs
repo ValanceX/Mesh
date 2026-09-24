@@ -66,6 +66,22 @@ impl DiagnosticCode {
     pub const DUPLICATE_ATTRIBUTE: DiagnosticCode = DiagnosticCode("duplicate-attribute");
     /// An element repeats an event binding; the last occurrence wins.
     pub const DUPLICATE_EVENT_BINDING: DiagnosticCode = DiagnosticCode("duplicate-event-binding");
+    /// A tag was opened (`<page`) but never finished with `>` or `/>`.
+    pub const UNTERMINATED_TAG: DiagnosticCode = DiagnosticCode("unterminated-tag");
+    /// A container element's opening tag has no matching closing tag.
+    pub const MISSING_CLOSING_TAG: DiagnosticCode = DiagnosticCode("missing-closing-tag");
+    /// A literal `<` in text, which MPRX reads as the start of a tag.
+    pub const LESS_THAN_IN_TEXT: DiagnosticCode = DiagnosticCode("less-than-in-text");
+    /// An attribute name containing `-`, such as `data-id`.
+    pub const HYPHENATED_ATTRIBUTE_NAME: DiagnosticCode =
+        DiagnosticCode("hyphenated-attribute-name");
+    /// An object literal written with one pair of braces: `data={ k: 1 }`.
+    pub const SINGLE_BRACE_OBJECT: DiagnosticCode = DiagnosticCode("single-brace-object");
+    /// A trailing comma in command arguments: `save(a, b,)`.
+    pub const COMMAND_TRAILING_COMMA: DiagnosticCode = DiagnosticCode("command-trailing-comma");
+    /// An `on.` event binding with a missing, dotted, or hyphenated event
+    /// name, or a value that isn't `{...}`.
+    pub const MALFORMED_EVENT_BINDING: DiagnosticCode = DiagnosticCode("malformed-event-binding");
 
     /// Every code MESH can emit, in catalogue order. The diagnostics
     /// reference (`docs/manual/diagnostics.md`) documents each one, and a
@@ -75,6 +91,13 @@ impl DiagnosticCode {
         DiagnosticCode::MISMATCHED_CLOSING_TAG,
         DiagnosticCode::DUPLICATE_ATTRIBUTE,
         DiagnosticCode::DUPLICATE_EVENT_BINDING,
+        DiagnosticCode::UNTERMINATED_TAG,
+        DiagnosticCode::MISSING_CLOSING_TAG,
+        DiagnosticCode::LESS_THAN_IN_TEXT,
+        DiagnosticCode::HYPHENATED_ATTRIBUTE_NAME,
+        DiagnosticCode::SINGLE_BRACE_OBJECT,
+        DiagnosticCode::COMMAND_TRAILING_COMMA,
+        DiagnosticCode::MALFORMED_EVENT_BINDING,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -757,6 +780,13 @@ mod tests {
                 "mismatched-closing-tag",
                 "duplicate-attribute",
                 "duplicate-event-binding",
+                "unterminated-tag",
+                "missing-closing-tag",
+                "less-than-in-text",
+                "hyphenated-attribute-name",
+                "single-brace-object",
+                "command-trailing-comma",
+                "malformed-event-binding",
             ]
         );
     }

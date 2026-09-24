@@ -127,5 +127,4 @@ out=$(mesh check "$f" 2>&1 >/dev/null)
 ## Limitations in v0.1
 
 - **One file per invocation.** To check several files, loop over them.
-- **Syntax errors aren't located.** Every syntax error is reported as `syntax error` at `1:1`, underlining the first line. See the [diagnostics reference](./diagnostics.md#syntax-error).
 - **No `compile` command yet.** The compiler produces the Semantic IR, but the CLI doesn't write it out. Use the [Rust API](../guides/embedding-the-compiler.md) to get at it.

@@ -276,7 +276,10 @@ fn parse_error_implements_display_and_std_error() {
         .next()
         .expect("should fail to parse");
 
-    assert_eq!(error.to_string(), "syntax error");
+    assert_eq!(
+        error.to_string(),
+        "unterminated tag `<page`: expected `>` or `/>`"
+    );
 
     fn assert_is_std_error<E: std::error::Error>(_: &E) {}
     assert_is_std_error(&error);

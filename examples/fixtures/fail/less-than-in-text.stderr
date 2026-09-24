@@ -1,0 +1,5 @@
+error[less-than-in-text]: `<` in text starts a tag; to show a literal `<`, put the text in a string expression, like `{"a < b"}`
+ --> fixtures/fail/less-than-in-text.mprx:2:15
+  |
+2 |   <text>Total < 10</text>
+  |               ^

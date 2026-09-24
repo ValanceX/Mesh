@@ -1,0 +1,5 @@
+error[syntax-error]: expected an expression
+ --> fixtures/fail/expected-expression.mprx:1:18
+  |
+1 | <counter>{count +}</counter>
+  |                  ^

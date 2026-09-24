@@ -1,5 +1,5 @@
-error[syntax-error]: syntax error
- --> fixtures/fail/single-brace-object.mprx:1:1
+error[single-brace-object]: an object needs its own braces inside `{...}`: write `{{ key: value }}`
+ --> fixtures/fail/single-brace-object.mprx:1:12
   |
 1 | <page data={ k: "v" } />
-  | ^^^^^^^^^^^^^^^^^^^^^^^^
+  |            ^^^^^^^^^^

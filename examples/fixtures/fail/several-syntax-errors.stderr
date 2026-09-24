@@ -1,0 +1,17 @@
+error[less-than-in-text]: `<` in text starts a tag; to show a literal `<`, put the text in a string expression, like `{"a < b"}`
+ --> fixtures/fail/several-syntax-errors.mprx:2:11
+  |
+2 |   <text>a < b</text>
+  |           ^
+
+error[hyphenated-attribute-name]: attribute name `data-id` can't contain `-`; use camelCase or `_` instead
+ --> fixtures/fail/several-syntax-errors.mprx:3:10
+  |
+3 |   <badge data-id="1" />
+  |          ^^^^^^^
+
+error[single-brace-object]: an object needs its own braces inside `{...}`: write `{{ key: value }}`
+ --> fixtures/fail/several-syntax-errors.mprx:4:15
+  |
+4 |   <list items={ first: 1 } />
+  |               ^^^^^^^^^^^^

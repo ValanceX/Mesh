@@ -1,0 +1,5 @@
+error[malformed-event-binding]: malformed event binding `on.`: expected `on.<event>={handler}`
+ --> fixtures/fail/malformed-event-binding-empty-name.mprx:1:9
+  |
+1 | <button on.={save} />
+  |         ^^^

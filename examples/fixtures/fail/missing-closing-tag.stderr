@@ -1,0 +1,5 @@
+error[missing-closing-tag]: `<card>` is never closed: expected `</card>`
+ --> fixtures/fail/missing-closing-tag.mprx:1:1
+  |
+1 | <card>
+  | ^^^^^^

@@ -1,0 +1,5 @@
+error[unterminated-tag]: unterminated tag `<badge`: expected `>` or `/>`
+ --> fixtures/fail/unterminated-nested-tag.mprx:3:3
+  |
+3 |   <badge count={3}
+  |   ^^^^^^

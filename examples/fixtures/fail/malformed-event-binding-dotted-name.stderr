@@ -1,0 +1,5 @@
+error[malformed-event-binding]: malformed event binding `on.click.once`: expected `on.<event>={handler}`
+ --> fixtures/fail/malformed-event-binding-dotted-name.mprx:1:9
+  |
+1 | <button on.click.once={save} />
+  |         ^^^^^^^^^^^^^
