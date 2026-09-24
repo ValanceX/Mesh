@@ -22,7 +22,7 @@
 //! nothing was reported.
 
 use crate::json::{Json, Member, Value};
-use crate::{Command, Component, Event, Field, Manifest, Parameter, Type, VERSION};
+use crate::{Command, Component, DeclarationKey, Event, Field, Manifest, Parameter, Type, VERSION};
 use mesh_syntax::{Diagnostic, DiagnosticCode, Severity, Span};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -73,6 +73,9 @@ struct Validator {
     refs: Vec<NamedRef>,
     /// The named type being defined while its definition is checked.
     in_definition: Option<String>,
+    /// Where each declaration's key is. Only complete if nothing was
+    /// reported, which is the only case a `Manifest` is built in.
+    spans: BTreeMap<DeclarationKey, Span>,
 }
 
 /// An object's properties by key, first occurrence only.
@@ -177,6 +180,11 @@ impl Validator {
             ) {
                 self.declared_types
                     .push((member.key.clone(), member.key_span));
+                self.declare(
+                    DeclarationKey::NamedType(member.key.clone()),
+                    member.key_span,
+                );
+                self.declare_fields(&member.key, &member.value);
                 self.in_definition = Some(member.key.clone());
                 if let Some(ty) = self.ty(&member.value) {
                     self.types.insert(member.key.clone(), ty);
@@ -194,6 +202,10 @@ impl Validator {
                 "\"components\"",
                 NameRule::Tag,
             ) {
+                self.declare(
+                    DeclarationKey::Component(member.key.clone()),
+                    member.key_span,
+                );
                 let component = self.component(&member.key, &member.value);
                 insert(&mut components, &member.key, component);
             }
@@ -209,6 +221,7 @@ impl Validator {
             types: std::mem::take(&mut self.types),
             components: components?,
             components_span,
+            spans: std::mem::take(&mut self.spans),
         })
     }
 
@@ -221,6 +234,8 @@ impl Validator {
         let mut props = Some(BTreeMap::new());
         if let Some(json) = properties.get("props") {
             for member in self.names(json, "props", "prop", &owner, NameRule::Identifier) {
+                let key = DeclarationKey::Prop(name.to_string(), member.key.clone());
+                self.declare(key, member.key_span);
                 let field = self.field(&member.value, &format!("prop {:?}", member.key));
                 insert(&mut props, &member.key, field);
             }
@@ -229,6 +244,8 @@ impl Validator {
         let mut events = Some(BTreeMap::new());
         if let Some(json) = properties.get("events") {
             for member in self.names(json, "events", "event", &owner, NameRule::Identifier) {
+                let key = DeclarationKey::Event(name.to_string(), member.key.clone());
+                self.declare(key, member.key_span);
                 let event = self.event(&member.value, &member.key);
                 insert(&mut events, &member.key, event);
             }
@@ -237,7 +254,9 @@ impl Validator {
         let mut commands = Some(BTreeMap::new());
         if let Some(json) = properties.get("commands") {
             for member in self.names(json, "commands", "command", &owner, NameRule::Identifier) {
-                let command = self.command(&member.value, &member.key);
+                let key = DeclarationKey::Command(name.to_string(), member.key.clone());
+                self.declare(key, member.key_span);
+                let command = self.command(&member.value, name, &member.key);
                 insert(&mut commands, &member.key, command);
             }
         }
@@ -245,6 +264,8 @@ impl Validator {
         let mut scope = Some(BTreeMap::new());
         if let Some(json) = properties.get("scope") {
             for member in self.names(json, "scope", "scope name", &owner, NameRule::Identifier) {
+                let key = DeclarationKey::Scope(name.to_string(), member.key.clone());
+                self.declare(key, member.key_span);
                 let ty = self.ty(&member.value);
                 insert(&mut scope, &member.key, ty);
             }
@@ -267,7 +288,7 @@ impl Validator {
         Some(Event { payload })
     }
 
-    fn command(&mut self, json: &Json, name: &str) -> Option<Command> {
+    fn command(&mut self, json: &Json, component: &str, name: &str) -> Option<Command> {
         let properties = self.object(json, &format!("command {name:?}"), &["parameters"], &[])?;
         let json = properties.get("parameters")?;
         let Value::Array(items) = &json.value else {
@@ -284,7 +305,11 @@ impl Validator {
 
         let mut parameters = Some(Vec::new());
         let mut seen = HashSet::new();
-        for item in items {
+        for (index, item) in items.iter().enumerate() {
+            if let Some(name_json) = item_name(item) {
+                let key = DeclarationKey::Parameter(component.to_string(), name.to_string(), index);
+                self.declare(key, name_json.span);
+            }
             let parameter = self.parameter(item, name, &mut seen);
             match (&mut parameters, parameter) {
                 (Some(parameters), Some(parameter)) => parameters.push(parameter),
@@ -348,6 +373,34 @@ impl Validator {
             ty: ty?,
             required: required?,
         })
+    }
+
+    /// Records where a declaration is, keeping the first occurrence. A
+    /// repeated key is an error anyway, so no manifest is built from it.
+    fn declare(&mut self, key: DeclarationKey, span: Span) {
+        self.spans.entry(key).or_insert(span);
+    }
+
+    /// Records the fields of named type `name`, if its definition `json`
+    /// is a record. Only the definition's own fields are addressable: a
+    /// record nested deeper has no name to find it by.
+    fn declare_fields(&mut self, name: &str, json: &Json) {
+        let Value::Object(members) = &json.value else {
+            return;
+        };
+        let is_record = members.iter().any(|member| {
+            member.key == "kind"
+                && matches!(&member.value.value, Value::String(kind) if kind == "record")
+        });
+        let fields = members.iter().find(|member| member.key == "fields");
+        if let (true, Some(fields)) = (is_record, fields) {
+            if let Value::Object(fields) = &fields.value.value {
+                for field in fields {
+                    let key = DeclarationKey::Field(name.to_string(), field.key.clone());
+                    self.declare(key, field.key_span);
+                }
+            }
+        }
     }
 
     fn ty(&mut self, json: &Json) -> Option<Type> {
@@ -737,6 +790,18 @@ fn find_cycle(start: &str, refs: &[NamedRef]) -> Option<Vec<String>> {
 /// Adds a checked declaration to a map being built. A declaration with
 /// errors (`None`) poisons the whole map, since the manifest won't be
 /// built anyway.
+/// A parameter's `"name"` value, if the parameter is an object that has
+/// one, whatever its type: its span is where the parameter is declared.
+fn item_name(item: &Json) -> Option<&Json> {
+    let Value::Object(members) = &item.value else {
+        return None;
+    };
+    members
+        .iter()
+        .find(|member| member.key == "name")
+        .map(|member| &member.value)
+}
+
 fn insert<T>(map: &mut Option<BTreeMap<String, T>>, name: &str, value: Option<T>) {
     match (map.as_mut(), value) {
         (Some(map), Some(value)) => {

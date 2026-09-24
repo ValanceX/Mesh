@@ -102,6 +102,78 @@ pub struct Component {
     pub scope: BTreeMap<String, Type>,
 }
 
+/// A declaration a template can name, to look its span up with
+/// [`Manifest::span_of`].
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Declaration<'a> {
+    /// A component, by tag name.
+    Component(&'a str),
+    /// A prop of a component.
+    Prop { component: &'a str, prop: &'a str },
+    /// An event of a component.
+    Event { component: &'a str, event: &'a str },
+    /// A command of a component.
+    Command {
+        component: &'a str,
+        command: &'a str,
+    },
+    /// The parameter at `index` (0-based) of a component's command.
+    Parameter {
+        component: &'a str,
+        command: &'a str,
+        index: usize,
+    },
+    /// A name in a component's scope.
+    Scope { component: &'a str, name: &'a str },
+    /// A named type.
+    NamedType(&'a str),
+    /// A field of a named type that is a record. The fields of a record
+    /// nested inside another type have no name to find them by.
+    Field { ty: &'a str, field: &'a str },
+}
+
+/// [`Declaration`], owned, as the key of a manifest's span table.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum DeclarationKey {
+    Component(String),
+    Prop(String, String),
+    Event(String, String),
+    Command(String, String),
+    Parameter(String, String, usize),
+    Scope(String, String),
+    NamedType(String),
+    Field(String, String),
+}
+
+impl From<Declaration<'_>> for DeclarationKey {
+    fn from(declaration: Declaration<'_>) -> Self {
+        let own = str::to_string;
+        match declaration {
+            Declaration::Component(name) => DeclarationKey::Component(own(name)),
+            Declaration::Prop { component, prop } => {
+                DeclarationKey::Prop(own(component), own(prop))
+            }
+            Declaration::Event { component, event } => {
+                DeclarationKey::Event(own(component), own(event))
+            }
+            Declaration::Command { component, command } => {
+                DeclarationKey::Command(own(component), own(command))
+            }
+            Declaration::Parameter {
+                component,
+                command,
+                index,
+            } => DeclarationKey::Parameter(own(component), own(command), index),
+            Declaration::Scope { component, name } => {
+                DeclarationKey::Scope(own(component), own(name))
+            }
+            Declaration::NamedType(name) => DeclarationKey::NamedType(own(name)),
+            Declaration::Field { ty, field } => DeclarationKey::Field(own(ty), own(field)),
+        }
+    }
+}
+
 /// A loaded, fully validated manifest. It owns all of its data.
 ///
 /// Only [`load`] creates one, so every named reference resolves, no named
@@ -115,6 +187,10 @@ pub struct Manifest {
     components: BTreeMap<String, Component>,
     /// The `"components"` key, where a missing component is reported.
     components_span: Span,
+    /// Where each declaration's key is. Kept beside the model rather than
+    /// in it, so that two types mean the same whether or not they were
+    /// written in the same place.
+    spans: BTreeMap<DeclarationKey, Span>,
 }
 
 impl Manifest {
@@ -126,6 +202,13 @@ impl Manifest {
     /// The components, by tag name.
     pub fn components(&self) -> &BTreeMap<String, Component> {
         &self.components
+    }
+
+    /// Where `declaration` is declared: the span of its key, quotes
+    /// included, such as `"avatar"`. A parameter has no key, so its span
+    /// is its `"name"` value. `None` if the manifest doesn't declare it.
+    pub fn span_of(&self, declaration: Declaration<'_>) -> Option<Span> {
+        self.spans.get(&DeclarationKey::from(declaration)).copied()
     }
 
     /// `ty` with any named references at its top level followed to their
