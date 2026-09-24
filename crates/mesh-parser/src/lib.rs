@@ -92,10 +92,7 @@ pub fn parse(source: &str) -> ParseResult {
 }
 
 fn lower_element(node: Node, source: &str) -> Element {
-    let name = node
-        .child_by_field_name("name")
-        .map(|n| text_of(n, source))
-        .unwrap_or_default();
+    let (name, name_span) = field_text(node, "name", source);
 
     // `tag_name` appears once for a self-closing element (the fielded
     // open-tag name, already captured above) and twice for a container
@@ -132,6 +129,7 @@ fn lower_element(node: Node, source: &str) -> Element {
 
     Element {
         name,
+        name_span,
         closing_name,
         attributes,
         event_bindings,
@@ -169,10 +167,7 @@ fn lower_child(node: Node, source: &str) -> Child {
 }
 
 fn lower_attribute(node: Node, source: &str) -> Attribute {
-    let name = node
-        .child_by_field_name("name")
-        .map(|n| text_of(n, source))
-        .unwrap_or_default();
+    let (name, name_span) = field_text(node, "name", source);
 
     let value_node = node.child_by_field_name("value");
     let value = match value_node {
@@ -188,16 +183,14 @@ fn lower_attribute(node: Node, source: &str) -> Attribute {
 
     Attribute {
         name,
+        name_span,
         value,
         span: span_of(node),
     }
 }
 
 fn lower_event_binding(node: Node, source: &str) -> EventBinding {
-    let name = node
-        .child_by_field_name("name")
-        .map(|n| text_of(n, source))
-        .unwrap_or_default();
+    let (name, name_span) = field_text(node, "name", source);
 
     let handler = node
         .child_by_field_name("handler")
@@ -206,6 +199,7 @@ fn lower_event_binding(node: Node, source: &str) -> EventBinding {
 
     EventBinding {
         name,
+        name_span,
         handler,
         span: span_of(node),
     }
@@ -426,12 +420,10 @@ fn lower_object_expression(node: Node, source: &str) -> ObjectExpression {
 }
 
 fn lower_object_member(node: Node, source: &str) -> ObjectMember {
-    let key = match node.child_by_field_name("key") {
-        Some(n) => lower_object_key(n, source),
-        None => unreachable!(
-            "object_member node missing its key field inside a successfully-parsed tree"
-        ),
+    let Some(key_node) = node.child_by_field_name("key") else {
+        unreachable!("object_member node missing its key field inside a successfully-parsed tree")
     };
+    let key = lower_object_key(key_node, source);
 
     let value = node
         .child_by_field_name("value")
@@ -440,6 +432,7 @@ fn lower_object_member(node: Node, source: &str) -> ObjectMember {
 
     ObjectMember {
         key,
+        key_span: span_of(key_node),
         value,
         span: span_of(node),
     }
@@ -456,10 +449,7 @@ fn lower_object_key(node: Node, source: &str) -> ObjectKey {
 }
 
 fn lower_command_invocation(node: Node, source: &str) -> CommandInvocation {
-    let command = node
-        .child_by_field_name("command")
-        .map(|n| text_of(n, source))
-        .unwrap_or_default();
+    let (command, command_span) = field_text(node, "command", source);
 
     let mut cursor = node.walk();
     let arguments = node
@@ -470,6 +460,7 @@ fn lower_command_invocation(node: Node, source: &str) -> CommandInvocation {
 
     CommandInvocation {
         command,
+        command_span,
         arguments,
         span: span_of(node),
     }
@@ -525,15 +516,30 @@ fn lower_member_access(node: Node, source: &str) -> MemberAccess {
         })
         .unwrap_or_else(|| Expression::Reference(lower_reference(node, source)));
 
-    let property = node
-        .child_by_field_name("property")
-        .map(|p| text_of(p, source))
-        .unwrap_or_default();
+    let (property, property_span) = field_text(node, "property", source);
 
     MemberAccess {
         object: Box::new(object),
         property,
+        property_span,
         span: span_of(node),
+    }
+}
+
+/// The text and span of `node`'s `field` child. A missing field (which
+/// the grammar rules out for any successfully-parsed tree) gives an empty
+/// name with a zero-width span at the start of `node`, the same
+/// visible-but-harmless fallback as `missing_expression`.
+fn field_text(node: Node, field: &str, source: &str) -> (String, Span) {
+    match node.child_by_field_name(field) {
+        Some(n) => (text_of(n, source), span_of(n)),
+        None => (
+            String::new(),
+            Span {
+                start_byte: node.start_byte(),
+                end_byte: node.start_byte(),
+            },
+        ),
     }
 }
 

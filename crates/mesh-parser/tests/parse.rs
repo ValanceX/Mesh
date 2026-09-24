@@ -925,3 +925,70 @@ fn parses_nested_event_bindings_independently() {
         other => panic!("expected a reference expression handler, got {other:?}"),
     }
 }
+
+/// The source text a span covers.
+fn slice(source: &str, span: Span) -> &str {
+    &source[span.start_byte..span.end_byte]
+}
+
+#[test]
+fn records_a_span_for_every_name() {
+    let source =
+        r#"<user-card user={a.b} data={{ k: 1, "q-r": 2 }} on.select={pick($event)}></user-card>"#;
+    let element = mesh_parser::parse(source).ast.expect("should parse");
+
+    assert_eq!(slice(source, element.name_span), "user-card");
+    assert_eq!(
+        element.name_span.start_byte, 1,
+        "the opening tag's name, not the closing tag's"
+    );
+
+    let user = &element.attributes[0];
+    assert_eq!(slice(source, user.name_span), "user");
+    assert_eq!(slice(source, user.span), "user={a.b}");
+    let mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::MemberAccess(member)) =
+        &user.value
+    else {
+        panic!("expected a member access, got {:?}", user.value);
+    };
+    assert_eq!(slice(source, member.property_span), "b");
+    assert_eq!(slice(source, member.span), "a.b");
+
+    let mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(object)) =
+        &element.attributes[1].value
+    else {
+        panic!("expected an object, got {:?}", element.attributes[1].value);
+    };
+    assert_eq!(slice(source, object.members[0].key_span), "k");
+    assert_eq!(slice(source, object.members[1].key_span), r#""q-r""#);
+
+    let binding = &element.event_bindings[0];
+    assert_eq!(slice(source, binding.name_span), "select");
+    let mesh_syntax::Expression::Command(command) = &binding.handler else {
+        panic!("expected a command, got {:?}", binding.handler);
+    };
+    assert_eq!(slice(source, command.command_span), "pick");
+    assert_eq!(slice(source, command.span), "pick($event)");
+}
+
+#[test]
+fn name_spans_are_raw_byte_offsets_in_bom_and_multi_byte_sources() {
+    // Names are ASCII, but a BOM and multi-byte text come before them.
+    let source = "\u{feff}<my-card label=\"é\" user={a.b} on.go={f()} />";
+    let element = mesh_parser::parse(source).ast.expect("should parse");
+
+    // Not shifted for the 3-byte BOM: spans index the source as read.
+    assert_eq!(element.name_span.start_byte, 4);
+    assert_eq!(slice(source, element.name_span), "my-card");
+    assert_eq!(slice(source, element.attributes[1].name_span), "user");
+    let mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::MemberAccess(member)) =
+        &element.attributes[1].value
+    else {
+        panic!(
+            "expected a member access, got {:?}",
+            element.attributes[1].value
+        );
+    };
+    assert_eq!(slice(source, member.property_span), "b");
+    assert_eq!(slice(source, element.event_bindings[0].name_span), "go");
+}

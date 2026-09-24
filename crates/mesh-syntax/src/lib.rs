@@ -138,6 +138,8 @@ impl fmt::Display for Diagnostic {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
     pub name: String,
+    /// The opening tag's name, e.g. `user-card` in `<user-card ...>`.
+    pub name_span: Span,
     /// The close tag's text, verbatim as written in source. `None` for a
     /// self-closing element (no close tag exists); `Some(..)` for a
     /// container element. AST-only — the Semantic IR does not retain
@@ -154,6 +156,8 @@ pub struct Element {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Attribute {
     pub name: String,
+    /// The attribute's name, without `=` or the value.
+    pub name_span: Span,
     pub value: AttributeValue,
     pub span: Span,
 }
@@ -162,6 +166,8 @@ pub struct Attribute {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventBinding {
     pub name: String,
+    /// The event name after `on.`, e.g. `click` in `on.click={...}`.
+    pub name_span: Span,
     pub handler: Expression,
     pub span: Span,
 }
@@ -227,6 +233,8 @@ pub struct Reference {
 pub struct MemberAccess {
     pub object: Box<Expression>,
     pub property: String,
+    /// The property name after the `.`.
+    pub property_span: Span,
     pub span: Span,
 }
 
@@ -306,6 +314,9 @@ pub enum ObjectKey {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjectMember {
     pub key: ObjectKey,
+    /// The key as written: the bare identifier, or the quoted string
+    /// including its quotes.
+    pub key_span: Span,
     pub value: Expression,
     pub span: Span,
 }
@@ -325,6 +336,8 @@ pub struct ObjectExpression {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandInvocation {
     pub command: String,
+    /// The command's name, without the parentheses or arguments.
+    pub command_span: Span,
     pub arguments: Vec<Expression>,
     pub span: Span,
 }
@@ -383,8 +396,16 @@ mod tests {
         let element = Element {
             name: "page".to_string(),
             closing_name: None,
+            name_span: Span {
+                start_byte: 1,
+                end_byte: 5,
+            },
             attributes: vec![Attribute {
                 name: "title".to_string(),
+                name_span: Span {
+                    start_byte: 6,
+                    end_byte: 11,
+                },
                 value: AttributeValue::String(StringLiteral {
                     value: "Users".to_string(),
                     span: Span {
@@ -418,8 +439,16 @@ mod tests {
         let element = Element {
             name: "page".to_string(),
             closing_name: None,
+            name_span: Span {
+                start_byte: 1,
+                end_byte: 5,
+            },
             attributes: vec![Attribute {
                 name: "title".to_string(),
+                name_span: Span {
+                    start_byte: 6,
+                    end_byte: 11,
+                },
                 value: AttributeValue::Expression(Expression::MemberAccess(MemberAccess {
                     object: Box::new(Expression::Reference(Reference {
                         name: "user".to_string(),
@@ -429,6 +458,10 @@ mod tests {
                         },
                     })),
                     property: "name".to_string(),
+                    property_span: Span {
+                        start_byte: 5,
+                        end_byte: 9,
+                    },
                     span: Span {
                         start_byte: 0,
                         end_byte: 9,
@@ -464,6 +497,10 @@ mod tests {
         let element = Element {
             name: "title".to_string(),
             closing_name: None,
+            name_span: Span {
+                start_byte: 1,
+                end_byte: 5,
+            },
             attributes: vec![],
             event_bindings: vec![],
             children: vec![Child::Expression(Expression::Reference(Reference {
@@ -636,6 +673,10 @@ mod tests {
         let expression = Expression::Object(ObjectExpression {
             members: vec![ObjectMember {
                 key: ObjectKey::Identifier("name".to_string()),
+                key_span: Span {
+                    start_byte: 0,
+                    end_byte: 4,
+                },
                 value: Expression::Literal(Literal::String(StringLiteral {
                     value: "Users".to_string(),
                     span: Span {
@@ -676,6 +717,10 @@ mod tests {
                     end_byte: 5,
                 },
             }),
+            key_span: Span {
+                start_byte: 0,
+                end_byte: 5,
+            },
             value: Expression::Literal(Literal::Number(NumberLiteral {
                 value: "1".to_string(),
                 span: Span {
@@ -699,6 +744,10 @@ mod tests {
     fn constructs_a_command_invocation() {
         let expression = Expression::Command(CommandInvocation {
             command: "selectUser".to_string(),
+            command_span: Span {
+                start_byte: 0,
+                end_byte: 10,
+            },
             arguments: vec![Expression::EventValue(EventValue {
                 name: "event".to_string(),
                 span: Span {
