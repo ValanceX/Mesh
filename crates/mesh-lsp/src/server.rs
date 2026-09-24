@@ -19,7 +19,7 @@ use crate::convert::{self, Text};
 use crate::worker::{self, Finished, Worker};
 use crate::{uri, Options, Outcome};
 use crossbeam_channel::{after, never, select, Receiver, Sender};
-use documents::Document;
+use documents::{Buffer, Document};
 use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CompletionParams,
@@ -58,7 +58,11 @@ enum Protocol {
 
 /// A request the server sent the client, awaiting its response.
 enum Outgoing {
-    Configuration,
+    /// `initial`: the pull at `initialized`, whose `null` answer keeps
+    /// `initializationOptions` (C4).
+    Configuration {
+        initial: bool,
+    },
     Registration,
 }
 
@@ -69,6 +73,8 @@ struct Client {
     configuration: bool,
     /// Registering `workspace/didChangeWatchedFiles` dynamically.
     watch: bool,
+    /// `RelativePattern`s in file watchers.
+    relative_patterns: bool,
     /// Markdown in hovers.
     markdown: bool,
 }
@@ -83,6 +89,9 @@ struct Server {
     config: Config,
     config_generation: u64,
     manifest: ManifestState,
+    /// Every open text, whatever it is, by URI.
+    buffers: BTreeMap<String, Buffer>,
+    /// The open buffers that are MPRX documents.
     documents: BTreeMap<String, Document>,
     next_generation: u64,
     /// Documents whose compile waits out the debounce, and until when.
@@ -120,6 +129,7 @@ pub(crate) fn run(connection: lsp_server::Connection, options: Options) -> Outco
         config: Config::default(),
         config_generation: 0,
         manifest: ManifestState::default(),
+        buffers: BTreeMap::new(),
         documents: BTreeMap::new(),
         next_generation: 0,
         due: BTreeMap::new(),
@@ -370,10 +380,14 @@ impl Server {
 
     fn response(&mut self, response: Response) -> Sent {
         match self.outgoing.remove(&response.id) {
-            Some(Outgoing::Configuration) => match response.response_result {
+            Some(Outgoing::Configuration { initial }) => match response.response_result {
                 // One item was asked for: section "mesh".
                 Ok(result) => {
                     let settings = result.get(0).cloned().unwrap_or(Value::Null);
+                    if initial && settings.is_null() {
+                        // Nothing to add to `initializationOptions`.
+                        return Ok(());
+                    }
                     self.apply_settings(&settings)
                 }
                 Err(error) => self.log(
@@ -413,6 +427,9 @@ impl Server {
         self.client = Client {
             configuration: flag("/capabilities/workspace/configuration"),
             watch: flag("/capabilities/workspace/didChangeWatchedFiles/dynamicRegistration"),
+            relative_patterns: flag(
+                "/capabilities/workspace/didChangeWatchedFiles/relativePatternSupport",
+            ),
             markdown: params
                 .pointer("/capabilities/textDocument/hover/contentFormat")
                 .and_then(Value::as_array)
@@ -452,12 +469,22 @@ impl Server {
         Ok(())
     }
 
-    /// Flushes held-back logs, then loads the manifest (D9).
+    /// Flushes held-back logs, then loads the manifest (D9) under
+    /// `initializationOptions`, and asks the client for its settings if
+    /// it can answer (C4); they replace the options when they arrive.
     fn initialized(&mut self) -> Sent {
         for (kind, message) in std::mem::take(&mut self.pending_logs) {
             self.log(kind, message)?;
         }
-        self.configure()
+        self.configure()?;
+        if self.client.configuration {
+            self.request_client(
+                "workspace/configuration",
+                json!({ "items": [{ "section": "mesh" }] }),
+                Outgoing::Configuration { initial: true },
+            )?;
+        }
+        Ok(())
     }
 
     fn did_change_configuration(&mut self, params: &Value) -> Sent {
@@ -465,7 +492,7 @@ impl Server {
             return self.request_client(
                 "workspace/configuration",
                 json!({ "items": [{ "section": "mesh" }] }),
-                Outgoing::Configuration,
+                Outgoing::Configuration { initial: false },
             );
         }
         match params.pointer("/settings/mesh") {
@@ -486,8 +513,9 @@ impl Server {
         self.configure()
     }
 
-    /// Resolves the manifest's path from the configuration, watches it,
-    /// and loads it, which recompiles every open document.
+    /// Resolves the manifest's path from the configuration, decides again
+    /// what every open buffer is, watches the manifest, and loads it,
+    /// which recompiles every open document.
     fn configure(&mut self) -> Sent {
         let path = match (&self.config.model, &self.root) {
             (Some(model), Some(root)) => uri::resolve(root, model),
@@ -504,6 +532,7 @@ impl Server {
             (None, _) => None,
         };
         self.manifest.path = path;
+        self.reclassify()?;
         self.watch_manifest()?;
         self.reload_manifest()
     }
@@ -523,7 +552,7 @@ impl Server {
             return Ok(());
         };
         let id = format!("mesh-manifest-{}", self.config_generation);
-        let pattern = path.to_string_lossy().into_owned();
+        let pattern = watch_pattern(path, self.client.relative_patterns);
         self.request_client(
             "client/registerCapability",
             json!({ "registrations": [{
@@ -549,7 +578,8 @@ impl Server {
             .filter_map(|change| change.get("uri").and_then(Value::as_str))
             .any(|changed| uri::to_path(changed).as_ref() == Some(path));
         // While the manifest is open, its buffer is the truth, not disk.
-        if touched && self.manifest.open.is_none() {
+        let open = self.buffers.keys().any(|key| self.is_manifest(key));
+        if touched && !open {
             return self.reload_manifest();
         }
         Ok(())
@@ -617,6 +647,42 @@ impl Server {
     }
 }
 
+/// The file watcher's pattern for the manifest at `path` (B4). LSP globs
+/// have no escape, so the file name's metacharacters become
+/// one-character classes. With `relative`, the pattern is relative to the
+/// manifest's directory; otherwise it's the file name in any directory.
+/// Either may match more than the one file, which costs nothing: a change
+/// reloads the manifest only if its path is the manifest's.
+fn watch_pattern(path: &std::path::Path, relative: bool) -> Value {
+    let name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let escaped = escape_glob(&name);
+    match path.parent() {
+        Some(directory) if relative => json!({
+            "baseUri": uri::from_path(directory),
+            "pattern": escaped,
+        }),
+        _ => json!(format!("**/{escaped}")),
+    }
+}
+
+/// `text` as an LSP glob that matches it literally.
+fn escape_glob(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for c in text.chars() {
+        if matches!(c, '*' | '?' | '[' | ']' | '{' | '}') {
+            escaped.push('[');
+            escaped.push(c);
+            escaped.push(']');
+        } else {
+            escaped.push(c);
+        }
+    }
+    escaped
+}
+
 /// Decodes a message's parameters, or says why they don't decode.
 fn decode<T: DeserializeOwned>(method: &str, params: Value) -> Result<T, String> {
     serde_json::from_value(params).map_err(|err| format!("invalid parameters for {method}: {err}"))
@@ -646,4 +712,41 @@ fn apply_changes(
         }
     }
     text
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{escape_glob, watch_pattern};
+    use serde_json::json;
+    use std::path::Path;
+
+    #[test]
+    fn plain_names_are_unchanged() {
+        assert_eq!(escape_glob("components.json"), "components.json");
+    }
+
+    #[test]
+    fn metacharacters_become_classes() {
+        assert_eq!(
+            escape_glob("a*b?c[d]e{f}.json"),
+            "a[*]b[?]c[[]d[]]e[{]f[}].json"
+        );
+    }
+
+    #[test]
+    fn without_relative_patterns_the_name_is_matched_anywhere() {
+        let path = Path::new("/work/[x]/m{1}.json");
+        assert_eq!(watch_pattern(path, false), json!("**/m[{]1[}].json"));
+    }
+
+    // `from_path` spells a Unix path; Windows paths have drive letters.
+    #[cfg(unix)]
+    #[test]
+    fn with_relative_patterns_the_base_is_the_directory() {
+        let path = Path::new("/work/[x]/m{1}.json");
+        assert_eq!(
+            watch_pattern(path, true),
+            json!({ "baseUri": "file:///work/%5Bx%5D", "pattern": "m[{]1[}].json" })
+        );
+    }
 }

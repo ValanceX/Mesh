@@ -40,6 +40,10 @@ pub struct Client {
     pub configuration: Value,
     /// Every `client/registerCapability` the server sent, in order.
     pub registrations: Vec<Value>,
+    /// While true, `workspace/configuration` requests are held, not
+    /// answered, until [`Client::answer_configuration`].
+    pub hold_configuration: bool,
+    held_configuration: Vec<RequestId>,
     logs: Vec<String>,
 }
 
@@ -55,6 +59,8 @@ impl Client {
             inbox: VecDeque::new(),
             configuration: Value::Null,
             registrations: Vec::new(),
+            hold_configuration: false,
+            held_configuration: Vec::new(),
             logs: Vec::new(),
         }
     }
@@ -141,13 +147,48 @@ impl Client {
             .unwrap_or_else(|error| panic!("{method} failed: {error:?}"))
     }
 
+    /// Opens an MPRX document (`languageId` `mprx`).
     pub fn open(&self, uri: &str, version: i32, text: &str) {
+        self.open_as(uri, "mprx", version, text);
+    }
+
+    /// Opens a document with any `languageId`.
+    pub fn open_as(&self, uri: &str, language_id: &str, version: i32, text: &str) {
         self.notify(
             "textDocument/didOpen",
             json!({ "textDocument": {
-                "uri": uri, "languageId": "mprx", "version": version, "text": text
+                "uri": uri, "languageId": language_id, "version": version, "text": text
             } }),
         );
+    }
+
+    /// Waits for a `workspace/configuration` request while
+    /// [`Client::hold_configuration`] is set, and returns how many are
+    /// held.
+    pub fn wait_for_configuration_request(&mut self) -> usize {
+        let deadline = Instant::now() + WAIT;
+        while self.held_configuration.is_empty() {
+            assert!(
+                Instant::now() < deadline,
+                "no workspace/configuration request within {WAIT:?}"
+            );
+            if let Some(message) = self.receive(Instant::now() + Duration::from_millis(10)) {
+                self.inbox.push_back(message);
+            }
+        }
+        self.held_configuration.len()
+    }
+
+    /// Answers every held `workspace/configuration` request with
+    /// [`Client::configuration`], and stops holding them.
+    pub fn answer_configuration(&mut self) {
+        self.hold_configuration = false;
+        for id in std::mem::take(&mut self.held_configuration) {
+            let _ = self
+                .connection
+                .sender
+                .send(Response::new_ok(id, json!([self.configuration])).into());
+        }
     }
 
     pub fn change(&self, uri: &str, version: i32, text: &str) {
@@ -274,6 +315,10 @@ impl Client {
 
     fn answer(&mut self, request: Request) {
         let result = match request.method.as_str() {
+            "workspace/configuration" if self.hold_configuration => {
+                self.held_configuration.push(request.id);
+                return;
+            }
             "workspace/configuration" => json!([self.configuration]),
             "client/registerCapability" => {
                 self.registrations.push(request.params.clone());

@@ -99,10 +99,11 @@ fn pulled_settings_are_applied() {
     let workspace = Workspace::with_example_manifest();
     let capabilities = json!({ "workspace": { "configuration": true } });
     let (mut client, _) = Client::initialized(workspace.init(json!(null), capabilities));
-    client.configuration = settings();
     let uri = workspace.uri("users-page.mprx");
     client.open(&uri, 1, BAD);
     assert!(client.next_publication(&uri).diagnostics.is_empty());
+    // Set after the startup pull has been answered (with nothing).
+    client.configuration = settings();
     // The notification's own settings are ignored: the server asks.
     client.notify(
         "workspace/didChangeConfiguration",
@@ -149,4 +150,71 @@ fn without_a_root_the_model_is_logged_and_unused() {
     let uri = workspace.uri("users-page.mprx");
     client.open(&uri, 1, BAD);
     assert!(client.next_publication(&uri).diagnostics.is_empty());
+}
+
+fn pulling() -> serde_json::Value {
+    json!({ "workspace": { "configuration": true } })
+}
+
+/// Starts a server and sends `initialized` without waiting for anything,
+/// so a test can arrange how the configuration pull is answered first.
+fn start(workspace: &Workspace, options: serde_json::Value) -> Client {
+    let mut client = Client::start(test_options());
+    let response = client.request("initialize", workspace.init(options, pulling()));
+    assert!(response.response_result.is_ok(), "{response:?}");
+    client
+}
+
+#[test]
+fn settings_are_pulled_at_initialized() {
+    let workspace = Workspace::with_example_manifest();
+    let mut client = start(&workspace, json!(null));
+    client.configuration = settings();
+    client.notify("initialized", json!({}));
+    let uri = workspace.uri("users-page.mprx");
+    client.open(&uri, 1, BAD);
+    assert_eq!(
+        codes(
+            &client
+                .latest_publication(&uri, Duration::from_millis(300))
+                .diagnostics
+        ),
+        ["unknown-reference"]
+    );
+}
+
+#[test]
+fn initialization_options_apply_until_the_pull_answers() {
+    let workspace = Workspace::with_example_manifest();
+    let mut client = start(&workspace, settings());
+    client.hold_configuration = true;
+    client.notify("initialized", json!({}));
+    assert_eq!(client.wait_for_configuration_request(), 1);
+    let uri = workspace.uri("users-page.mprx");
+    client.open(&uri, 1, BAD);
+    assert_eq!(
+        codes(&client.next_publication(&uri).diagnostics),
+        ["unknown-reference"]
+    );
+    // The answer replaces them: no component, so no model.
+    client.configuration = json!({ "model": "components.json", "components": {} });
+    client.answer_configuration();
+    assert!(client.next_publication(&uri).diagnostics.is_empty());
+}
+
+#[test]
+fn a_null_pull_keeps_initialization_options() {
+    let workspace = Workspace::with_example_manifest();
+    let mut client = start(&workspace, settings());
+    client.notify("initialized", json!({}));
+    let uri = workspace.uri("users-page.mprx");
+    client.open(&uri, 1, BAD);
+    assert_eq!(
+        codes(
+            &client
+                .latest_publication(&uri, Duration::from_millis(300))
+                .diagnostics
+        ),
+        ["unknown-reference"]
+    );
 }

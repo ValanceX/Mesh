@@ -17,6 +17,9 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ### Fixed
 
+- **`mesh-lsp` follows the manifest when the settings change.** Changing `mesh.model` while the old manifest was open kept checking documents against the old file's text, and never published the new one's errors. A manifest opened before the settings named it stayed an MPRX document: it showed MPRX syntax errors, and its unsaved edits never reached the checks. Now every open file's text is kept, and what each one is gets decided again whenever the settings change.
+- **`mesh-lsp` no longer checks every open file as MPRX.** An editor attached to JSON files, so that the manifest gets its diagnostics, showed MPRX syntax errors on every other JSON file it opened.
+- **The manifest's file watcher works for any path.** It used the manifest's absolute path as a glob, so a path containing `[`, `{`, `*` or `?`, or Windows backslashes, matched the wrong files or none. It now watches the file's name, relative to its directory when the client supports relative patterns.
 - **A closed pipe no longer crashes `mesh check`.** When whatever reads its output stops early, as in `mesh check --format json big.mprx | head -c 100`, `mesh check` used to panic with exit status 101. It now stops printing and exits with the check's own status.
 - **JSON rendering is linear.** `render_json` located every span by scanning the source from the start, so a file with many diagnostics took time proportional to their number times the file's size.
 
@@ -24,6 +27,8 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ### Changed
 
+- **`mesh-lsp` checks only documents whose `languageId` is `mprx`.** The configured manifest is recognized by its path, whatever its `languageId`; any other file is ignored. A client that sends another `languageId` for `.mprx` files must be configured to send `mprx`.
+- **`mesh-lsp` asks for its settings at startup** (`workspace/configuration`) when the client supports it. `initializationOptions` apply until the answer arrives, and an empty answer keeps them.
 - **Breaking, Rust API: `CompileResult` keeps its analysis, and is `#[non_exhaustive]`.** `compile_with` used to analyze a file against its template and keep only the diagnostics. Its `CompileResult` now also has `analysis: Option<mesh_analysis::Analysis>`: the resolutions, types and facts the analysis diagnostics came from. It's `None` from `compile` and for a file with a syntax error. Code that builds a `CompileResult` or destructures every field must change; code that reads its fields by name doesn't. Being `#[non_exhaustive]`, the next field won't break anyone.
 - **The npm packages are renamed to the `@valance` scope:** `@valance/mesh-language`, `@valance/mesh-compiler` and `@valance/mesh-lsp`, with the Valance spelling. They are still unpublished placeholders. `@valance/mesh-lsp` no longer depends on a Node language server: it will only launch the Rust `mesh-lsp` binary.
 - **Breaking, in principle: the nesting limits.** A file or manifest nested more than 128 levels deep, which v0.2 accepted if it was shallow enough not to crash, is now rejected. These are MESH's supported limits, resource limits of this implementation: neither MPRX nor manifest version 1 limits nesting, so the manifest's version doesn't change. No handwritten UI or manifest comes near the limit; to stay under it, flatten the file, or write deeply nested manifest types as named types.

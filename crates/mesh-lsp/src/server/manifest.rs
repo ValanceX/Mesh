@@ -25,8 +25,6 @@ pub(super) struct ManifestState {
     pub(super) generation: u64,
     /// Where the configuration says the manifest is.
     pub(super) path: Option<PathBuf>,
-    /// The client's URI and text while the manifest is open in it.
-    pub(super) open: Option<(String, String)>,
     /// `None` without a configured, readable manifest.
     pub(super) snapshot: Option<Arc<ManifestSnapshot>>,
 }
@@ -36,14 +34,23 @@ impl Server {
         self.manifest.path.is_some() && uri::to_path(document) == self.manifest.path
     }
 
+    /// The client's URI and text for the manifest, while it's open there.
+    fn open_manifest(&self) -> Option<(String, String)> {
+        self.buffers
+            .iter()
+            .find(|(key, _)| self.is_manifest(key))
+            .map(|(key, buffer)| (key.clone(), buffer.text.clone()))
+    }
+
     /// Starts a new manifest generation from the open buffer or the disk,
     /// then recompiles every open document against it.
     pub(super) fn reload_manifest(&mut self) -> Sent {
         self.manifest.generation += 1;
         self.manifest.snapshot = None;
         if let Some(path) = self.manifest.path.clone() {
-            let (document_uri, text) = match &self.manifest.open {
-                Some((open_uri, text)) => (open_uri.clone(), Ok(text.clone())),
+            // While it's open, its buffer is the truth, not disk.
+            let (document_uri, text) = match self.open_manifest() {
+                Some((open_uri, text)) => (open_uri, Ok(text)),
                 None => (uri::from_path(&path), fs::read_to_string(&path)),
             };
             match text {
