@@ -8,6 +8,7 @@
 //! layer turns what analysis found into diagnostics.
 
 mod diagnose;
+mod position;
 mod render;
 
 pub use render::render_diagnostic;

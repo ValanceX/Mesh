@@ -5,11 +5,8 @@
 //! `mesh-compiler` is a v0.1 placement choice, not a statement that
 //! terminal presentation belongs to the compiler's semantic model.
 
+use crate::position::locate;
 use mesh_syntax::Diagnostic;
-
-/// The UTF-8 byte-order mark, as `fs::read_to_string` leaves it at the
-/// start of a file saved "with BOM".
-const BOM: char = '\u{feff}';
 
 /// Renders `diagnostic` rustc-style: a `severity[code]: message` header, a
 /// `--> path:line:column` location, the source line the diagnostic
@@ -48,41 +45,28 @@ const BOM: char = '\u{feff}';
 /// the CLI.
 pub fn render_diagnostic(source: &str, path: &str, diagnostic: &Diagnostic) -> String {
     // Normalize the span before anything else. Every slice below uses
-    // `start` and `end`, never the raw span offsets, so no span can make
-    // this function slice mid-character or out of range.
+    // `start` and `end`, or offsets `locate` normalized, never the raw
+    // span offsets, so no span can make this function slice mid-character
+    // or out of range.
     let start = source.floor_char_boundary(diagnostic.span.start_byte);
     let end = source
         .floor_char_boundary(diagnostic.span.end_byte)
         .max(start);
+    // `at.offset` is where the carets start: a span starting inside the
+    // line ending (`\r` or `\n`) points just past the last visible
+    // character, and one starting on the byte-order mark points at the
+    // first character.
+    let at = locate(source, start);
+    let line_number = at.line;
+    let column = at.column;
+    let line_text = &source[at.text.clone()];
 
-    let line_start = source[..start].rfind('\n').map_or(0, |i| i + 1);
-    let line_end = source[start..]
-        .find('\n')
-        .map_or(source.len(), |i| start + i);
-    // A leading byte-order mark is an encoding marker, not text: it is
-    // never shown, counted as a column, or underlined. This only moves
-    // where line 1's text starts; it works on the normalized `line_start`
-    // and never replaces the normalization above.
-    let text_start = if line_start == 0 && source.starts_with(BOM) {
-        BOM.len_utf8()
-    } else {
-        line_start
-    };
-    let line_text = source[text_start..line_end].trim_end_matches('\r');
-    let text_end = text_start + line_text.len();
-    let line_number = source[..line_start].matches('\n').count() + 1;
-    // A span starting inside the line ending (`\r` or `\n`) points just
-    // past the last visible character, never into the line ending itself;
-    // one starting on the byte-order mark points at the first character.
-    let visible_start = start.clamp(text_start, text_end);
-    let column = source[text_start..visible_start].chars().count() + 1;
-
-    let indent: String = source[text_start..visible_start]
+    let indent: String = source[at.text.start..at.offset]
         .chars()
         .map(|c| if c == '\t' { '\t' } else { ' ' })
         .collect();
-    let underline_end = end.min(text_end).max(visible_start);
-    let carets = "^".repeat(source[visible_start..underline_end].chars().count().max(1));
+    let underline_end = end.min(at.text.end).max(at.offset);
+    let carets = "^".repeat(source[at.offset..underline_end].chars().count().max(1));
 
     let gutter = " ".repeat(line_number.to_string().len());
     // Omit the separating space for an empty line so no output line ends
