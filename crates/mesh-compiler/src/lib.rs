@@ -30,6 +30,7 @@ pub fn compile(source: &str) -> CompileResult {
         .into_iter()
         .map(|err| mesh_syntax::Diagnostic {
             severity: mesh_syntax::Severity::Error,
+            code: err.code,
             message: err.message,
             span: err.span,
         })

@@ -20,7 +20,7 @@ The crates you'll use:
 | Crate | What you get from it |
 |---|---|
 | `mesh-compiler` | `compile`, `CompileResult`, `render_diagnostic` |
-| `mesh-syntax` | `Diagnostic`, `Severity`, `Span` |
+| `mesh-syntax` | `Diagnostic`, `DiagnosticCode`, `Severity`, `Span` |
 | `mesh-semantic` | The Semantic IR types: `Element`, `Attribute`, `EventBinding`, `Child`, `Expression`, ... |
 
 ## Compiling a source string
@@ -68,6 +68,7 @@ pub struct CompileResult {
 ```rust
 pub struct Diagnostic {
     pub severity: Severity,   // Severity::Error or Severity::Warning
+    pub code: DiagnosticCode, // stable, e.g. DiagnosticCode::MISMATCHED_CLOSING_TAG
     pub message: String,
     pub span: Span,           // byte offsets into the source
 }
@@ -80,7 +81,8 @@ pub struct Span {
 
 - `Severity` is `#[non_exhaustive]`. Match it with a wildcard arm, because later versions may add levels.
 - It implements `Display` as `error` / `warning`.
-- `Diagnostic` is plain data. Printing it with `{}` gives a compact `message (start..end)` form, with no severity and no snippet.
+- `DiagnosticCode` is the diagnostic's stable code. Compare it with the associated constants, such as `DiagnosticCode::SYNTAX_ERROR`, or get the kebab-case string with `as_str()` or `{}`. `DiagnosticCode::ALL` lists every code. A code is never renamed or reused for a different meaning, so it's safe to match on; messages may change. The [diagnostics reference](../manual/diagnostics.md) documents each one.
+- `Diagnostic` is plain data. Printing it with `{}` gives a compact `message (start..end)` form, with no severity, no code and no snippet.
 
 For the same output the CLI prints, use `render_diagnostic`:
 

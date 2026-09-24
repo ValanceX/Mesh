@@ -319,3 +319,23 @@ fn compiling_a_mismatched_closing_tag_produces_a_non_fatal_error_diagnostic() {
     assert_eq!(result.diagnostics.len(), 1);
     assert_eq!(result.diagnostics[0].severity, mesh_syntax::Severity::Error);
 }
+
+#[test]
+fn every_diagnostic_carries_its_code() {
+    use mesh_syntax::DiagnosticCode;
+
+    let result =
+        mesh_compiler::compile(r#"<div class="a" class="b" on.click={x} on.click={y}></span>"#);
+    let codes: Vec<DiagnosticCode> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(
+        codes,
+        [
+            DiagnosticCode::DUPLICATE_ATTRIBUTE,
+            DiagnosticCode::DUPLICATE_EVENT_BINDING,
+            DiagnosticCode::MISMATCHED_CLOSING_TAG,
+        ]
+    );
+
+    let result = mesh_compiler::compile("<page");
+    assert_eq!(result.diagnostics[0].code, DiagnosticCode::SYNTAX_ERROR);
+}

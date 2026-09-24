@@ -11,6 +11,7 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 ### Changed
 
 - **Toolchain.** The repo pins its Rust toolchain in `rust-toolchain.toml`, and the minimum supported Rust version is 1.91. CI checks both.
+- **Rust API.** Code that builds a `Diagnostic` or `ParseError` with a struct literal must set the new `code` field.
 
 ### Fixed
 

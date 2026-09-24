@@ -44,11 +44,58 @@ impl fmt::Display for Severity {
     }
 }
 
-/// A single compile-time diagnostic: a message, its severity, and the
-/// source [`Span`] it applies to.
+/// A diagnostic's stable, machine-readable code, such as
+/// `mismatched-closing-tag`.
+///
+/// Codes are API, under a fixed stability policy: they are kebab-case,
+/// a code is never renamed, and a retired code is never reused for a
+/// different meaning. Messages may change freely; codes may not.
+/// `syntax-error` is the permanent fallback for a syntax problem MESH
+/// can't classify more precisely. The field is private, so every code is
+/// one of the associated constants below, and [`DiagnosticCode::ALL`]
+/// lists them all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DiagnosticCode(&'static str);
+
+impl DiagnosticCode {
+    /// A syntax problem with no more specific code. Permanent fallback.
+    pub const SYNTAX_ERROR: DiagnosticCode = DiagnosticCode("syntax-error");
+    /// A closing tag names a different element than its opening tag.
+    pub const MISMATCHED_CLOSING_TAG: DiagnosticCode = DiagnosticCode("mismatched-closing-tag");
+    /// An element repeats an attribute; the last occurrence wins.
+    pub const DUPLICATE_ATTRIBUTE: DiagnosticCode = DiagnosticCode("duplicate-attribute");
+    /// An element repeats an event binding; the last occurrence wins.
+    pub const DUPLICATE_EVENT_BINDING: DiagnosticCode = DiagnosticCode("duplicate-event-binding");
+
+    /// Every code MESH can emit, in catalogue order. The diagnostics
+    /// reference (`docs/manual/diagnostics.md`) documents each one, and a
+    /// test keeps the two in step.
+    pub const ALL: &'static [DiagnosticCode] = &[
+        DiagnosticCode::SYNTAX_ERROR,
+        DiagnosticCode::MISMATCHED_CLOSING_TAG,
+        DiagnosticCode::DUPLICATE_ATTRIBUTE,
+        DiagnosticCode::DUPLICATE_EVENT_BINDING,
+    ];
+
+    /// The code as a string, e.g. `"mismatched-closing-tag"`.
+    pub const fn as_str(self) -> &'static str {
+        self.0
+    }
+}
+
+impl fmt::Display for DiagnosticCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+/// A single compile-time diagnostic: its severity, its stable
+/// [`DiagnosticCode`], a human-readable message, and the source [`Span`]
+/// it applies to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
     pub severity: Severity,
+    pub code: DiagnosticCode,
     pub message: String,
     pub span: Span,
 }
@@ -671,5 +718,46 @@ mod tests {
     fn severity_displays_as_its_lowercase_label() {
         assert_eq!(Severity::Error.to_string(), "error");
         assert_eq!(Severity::Warning.to_string(), "warning");
+    }
+
+    #[test]
+    fn diagnostic_code_displays_as_its_string() {
+        let code = DiagnosticCode::MISMATCHED_CLOSING_TAG;
+        assert_eq!(code.to_string(), "mismatched-closing-tag");
+        assert_eq!(code.as_str(), "mismatched-closing-tag");
+    }
+
+    #[test]
+    fn diagnostic_codes_are_unique_kebab_case() {
+        let mut seen = std::collections::HashSet::new();
+        for code in DiagnosticCode::ALL {
+            let code = code.as_str();
+            let is_kebab_case = !code.is_empty()
+                && !code.starts_with('-')
+                && !code.ends_with('-')
+                && !code.contains("--")
+                && code
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+            assert!(is_kebab_case, "{code:?} is not kebab-case");
+            assert!(seen.insert(code), "{code:?} is listed twice");
+        }
+    }
+
+    /// Codes are never renamed or removed. If this fails because a code
+    /// was added, append it here; if it fails for any other reason, the
+    /// change breaks the stability policy.
+    #[test]
+    fn diagnostic_codes_never_change() {
+        let codes: Vec<&str> = DiagnosticCode::ALL.iter().map(|c| c.as_str()).collect();
+        assert_eq!(
+            codes,
+            [
+                "syntax-error",
+                "mismatched-closing-tag",
+                "duplicate-attribute",
+                "duplicate-event-binding",
+            ]
+        );
     }
 }

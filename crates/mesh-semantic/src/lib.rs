@@ -118,6 +118,7 @@ fn dedupe_last_wins<'a, T>(
     name: fn(&T) -> &str,
     span: fn(&T) -> mesh_syntax::Span,
     kind: &str,
+    code: mesh_syntax::DiagnosticCode,
 ) -> (Vec<&'a T>, Vec<mesh_syntax::Diagnostic>) {
     let mut last_index_for_name: std::collections::HashMap<&str, usize> =
         std::collections::HashMap::new();
@@ -134,6 +135,7 @@ fn dedupe_last_wins<'a, T>(
         } else {
             diagnostics.push(mesh_syntax::Diagnostic {
                 severity: mesh_syntax::Severity::Warning,
+                code,
                 message: format!(
                     "duplicate {kind} {:?}: this occurrence is shadowed by a later one",
                     name(item)
@@ -169,6 +171,7 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
         |a| a.name.as_str(),
         |a| a.span,
         "attribute",
+        mesh_syntax::DiagnosticCode::DUPLICATE_ATTRIBUTE,
     );
     diagnostics.extend(attribute_diagnostics);
 
@@ -177,6 +180,7 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
         |e| e.name.as_str(),
         |e| e.span,
         "event binding",
+        mesh_syntax::DiagnosticCode::DUPLICATE_EVENT_BINDING,
     );
     diagnostics.extend(event_binding_diagnostics);
 
@@ -184,6 +188,7 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
         if closing_name != &ast.name {
             diagnostics.push(mesh_syntax::Diagnostic {
                 severity: mesh_syntax::Severity::Error,
+                code: mesh_syntax::DiagnosticCode::MISMATCHED_CLOSING_TAG,
                 message: format!(
                     "mismatched closing tag: opened with {:?}, closed with {:?}",
                     ast.name, closing_name

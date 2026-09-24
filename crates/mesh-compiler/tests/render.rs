@@ -1,9 +1,10 @@
 use mesh_compiler::render_diagnostic;
-use mesh_syntax::{Diagnostic, Severity, Span};
+use mesh_syntax::{Diagnostic, DiagnosticCode, Severity, Span};
 
 fn diagnostic(severity: Severity, message: &str, start_byte: usize, end_byte: usize) -> Diagnostic {
     Diagnostic {
         severity,
+        code: DiagnosticCode::SYNTAX_ERROR,
         message: message.to_string(),
         span: Span {
             start_byte,

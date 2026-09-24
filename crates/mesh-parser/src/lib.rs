@@ -6,18 +6,20 @@
 
 use mesh_syntax::{
     ArrayExpression, Attribute, AttributeValue, BinaryExpression, BinaryOperator, BooleanLiteral,
-    Child, CommandInvocation, ConditionalExpression, Element, EventBinding, EventValue, Expression,
-    Literal, MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember,
-    Reference, Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
+    Child, CommandInvocation, ConditionalExpression, DiagnosticCode, Element, EventBinding,
+    EventValue, Expression, Literal, MemberAccess, NullLiteral, NumberLiteral, ObjectExpression,
+    ObjectKey, ObjectMember, Reference, Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
 };
 use tree_sitter::Node;
 
 /// An error produced while parsing MPRX source text.
 ///
-/// Carries a single message and the source [`Span`] it applies to.
+/// Carries its stable [`DiagnosticCode`], a message, and the source
+/// [`Span`] it applies to. `Display` shows the message only.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{message}")]
 pub struct ParseError {
+    pub code: DiagnosticCode,
     pub message: String,
     pub span: Span,
 }
@@ -48,6 +50,7 @@ pub fn parse(source: &str) -> ParseResult {
         return ParseResult {
             ast: None,
             errors: vec![ParseError {
+                code: DiagnosticCode::SYNTAX_ERROR,
                 message: "failed to parse source".to_string(),
                 span: Span {
                     start_byte: 0,
@@ -62,6 +65,7 @@ pub fn parse(source: &str) -> ParseResult {
         return ParseResult {
             ast: None,
             errors: vec![ParseError {
+                code: DiagnosticCode::SYNTAX_ERROR,
                 message: "syntax error".to_string(),
                 span: span_of(root),
             }],
@@ -72,6 +76,7 @@ pub fn parse(source: &str) -> ParseResult {
         return ParseResult {
             ast: None,
             errors: vec![ParseError {
+                code: DiagnosticCode::SYNTAX_ERROR,
                 message: "expected a single root element".to_string(),
                 span: Span {
                     start_byte: 0,
