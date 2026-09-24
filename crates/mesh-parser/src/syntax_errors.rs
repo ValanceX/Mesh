@@ -283,6 +283,14 @@ fn hyphenated_attribute_name(error: Node, source: &str) -> Option<ParseError> {
         .rev()
         .find(|&(_, c)| !is_name_char(c))
         .map_or(0, |(i, c)| i + c.len_utf8());
+    // An attribute name starts after whitespace or right after the
+    // previous attribute's value (`b="x"c-d=`, `b={x}c-d=`). Anything else
+    // just before the word (`é-id`, where `é` can't be in a name either)
+    // is a second mistake in the same name, and the specific code would
+    // underline only part of it.
+    if !source[..start].ends_with(|c: char| c.is_whitespace() || matches!(c, '"' | '}')) {
+        return None;
+    }
     let end = hyphen.start_byte()
         + source[hyphen.start_byte()..]
             .find(|c: char| !is_name_char(c))

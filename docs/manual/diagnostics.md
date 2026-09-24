@@ -140,6 +140,8 @@ error[hyphenated-attribute-name]: attribute name `data-id` can't contain `-`; us
 
 Tag names can contain `-` (`<my-card>`); attribute names can't.
 
+If the name also has a character that no name can contain, as in `é-id`, you get a `syntax-error` at that character instead: this code would cover only part of the mistake.
+
 **Fix:** rename the attribute: `dataId="1"` or `data_id="1"`.
 
 ### `single-brace-object`
