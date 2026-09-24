@@ -1,0 +1,93 @@
+{
+  "$schema": "../schemas/manifest-v1.schema.json",
+  "version": 1,
+  "types": {
+    "User": {
+      "kind": "record",
+      "fields": {
+        "name": { "type": { "kind": "string" }, "required": true },
+        "avatar": { "type": { "kind": "string" }, "required": false },
+        "active": { "type": { "kind": "boolean" }, "required": true }
+      }
+    },
+    "Layout": {
+      "kind": "record",
+      "fields": {
+        "compact": { "type": { "kind": "boolean" }, "required": false }
+      }
+    }
+  },
+  "components": {
+    "page": {
+      "props": {
+        "title": { "type": { "kind": "string" }, "required": true }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "text": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "avatar": {
+      "props": {
+        "src": { "type": { "kind": "optional", "type": { "kind": "string" } }, "required": true },
+        "alt": { "type": { "kind": "string" }, "required": true },
+        "size": { "type": { "kind": "string" }, "required": false }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "button": {
+      "props": {
+        "disabled": { "type": { "kind": "boolean" }, "required": false }
+      },
+      "events": {
+        "click": { "payload": { "kind": "any" } }
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "user-card": {
+      "props": {
+        "user": { "type": { "kind": "named", "name": "User" }, "required": true },
+        "compact": { "type": { "kind": "optional", "type": { "kind": "boolean" } }, "required": false }
+      },
+      "events": {
+        "select": { "payload": { "kind": "named", "name": "User" } }
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "users-page": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "selectUser": {
+          "parameters": [{ "name": "user", "type": { "kind": "named", "name": "User" } }]
+        }
+      },
+      "scope": {
+        "user": { "kind": "named", "name": "User" },
+        "compact": { "kind": "boolean" }
+      }
+    },
+    "user-card-example": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "selectUser": {
+          "parameters": [{ "name": "user", "type": { "kind": "named", "name": "User" } }]
+        }
+      },
+      "scope": {
+        "user": { "kind": "named", "name": "User" },
+        "layout": { "kind": "named", "name": "Layout" }
+      }
+    }
+  }
+}

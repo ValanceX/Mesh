@@ -297,6 +297,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mesh-manifest"
+version = "0.1.0"
+dependencies = [
+ "mesh-syntax",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "mesh-parser"
 version = "0.1.0"
 dependencies = [

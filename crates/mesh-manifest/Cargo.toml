@@ -1,0 +1,16 @@
+[package]
+name = "mesh-manifest"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "The MESH component manifest: loads and validates the JSON model that MPRX is checked against."
+
+[lints]
+workspace = true
+
+[dependencies]
+mesh-syntax.workspace = true
+serde = "1"
+serde_json = { version = "1", features = ["raw_value"] }

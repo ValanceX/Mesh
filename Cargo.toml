@@ -4,6 +4,7 @@ members = [
     "crates/mesh-syntax",
     "crates/mesh-parser",
     "crates/mesh-semantic",
+    "crates/mesh-manifest",
     "crates/mesh-compiler",
     "crates/mesh-lsp",
     "crates/mesh-cli",
@@ -23,6 +24,7 @@ repository = "https://github.com/ValanceX/Mesh"
 mesh-syntax = { path = "crates/mesh-syntax" }
 mesh-parser = { path = "crates/mesh-parser" }
 mesh-semantic = { path = "crates/mesh-semantic" }
+mesh-manifest = { path = "crates/mesh-manifest" }
 mesh-compiler = { path = "crates/mesh-compiler" }
 
 [workspace.lints.rust]
