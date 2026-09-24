@@ -24,6 +24,12 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
         run: cargo test --workspace
+      # Broken intra-doc links and malformed doc comments fail the build,
+      # as warnings do everywhere else.
+      - name: Docs
+        run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
       # Installs Node 22 for the grammar tests; the action itself runs on
       # the runner's Node 24.
       - uses: actions/setup-node@v7
@@ -36,6 +42,13 @@ jobs:
           npm ci --ignore-scripts
           npm rebuild tree-sitter-cli
           npm test
+      # The generated parser is committed; it must be exactly what
+      # grammar.js generates, with the pinned tree-sitter CLI.
+      - name: Generated parser is up to date
+        working-directory: grammar/tree-sitter-mprx
+        run: |
+          npx tree-sitter generate
+          git diff --exit-code -- src/
 
   # Checks the declared `rust-version`: the workspace, with its committed
   # Cargo.lock, still compiles on 1.91. (This shows 1.91 works; it doesn't

@@ -36,6 +36,9 @@ Before opening a pull request, run the same checks as CI:
 $ cargo fmt --all -- --check
 $ cargo clippy --workspace --all-targets -- -D warnings
 $ cargo test --workspace
+$ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 ```
+
+If you change `grammar/tree-sitter-mprx/grammar.js`, regenerate the parser with `npx tree-sitter generate` in that directory and commit `src/`; CI checks that it's up to date.
 
 Expected CLI output lives next to each file in `examples/fixtures/`. If you change a diagnostic, update the matching `.stderr` file.
