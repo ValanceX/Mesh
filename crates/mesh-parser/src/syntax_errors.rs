@@ -228,8 +228,10 @@ fn hyphenated_attribute_name(error: Node, source: &str) -> Option<ParseError> {
     // Widen from the `-` to the whole hyphenated word, e.g. `data-id`.
     let is_name_char = |c: char| c.is_ascii_alphanumeric() || matches!(c, '_' | '-');
     let start = source[..hyphen.start_byte()]
-        .rfind(|c: char| !is_name_char(c))
-        .map_or(0, |i| i + 1);
+        .char_indices()
+        .rev()
+        .find(|&(_, c)| !is_name_char(c))
+        .map_or(0, |(i, c)| i + c.len_utf8());
     let end = hyphen.start_byte()
         + source[hyphen.start_byte()..]
             .find(|c: char| !is_name_char(c))

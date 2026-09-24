@@ -161,6 +161,29 @@ fn locates_a_hyphenated_attribute_name() {
     );
 }
 
+/// A multi-byte character (or a non-ASCII space like U+00A0) right before
+/// the hyphenated word must not be swallowed into the reported span: doing
+/// so by one byte would land the span's start mid-character. The character
+/// itself isn't a name character, so it's excluded from the located word;
+/// widening stops at its next character boundary, not one byte in.
+#[test]
+fn hyphenated_attribute_name_after_a_multi_byte_character() {
+    assert_located(&[
+        (
+            "<page é-id=\"x\" />\n",
+            &[("hyphenated-attribute-name", 8, "-id")],
+        ),
+        (
+            "<page ü-a=\"x\" />\n",
+            &[("hyphenated-attribute-name", 8, "-a")],
+        ),
+        (
+            "<page\u{a0}data-id=\"x\" />\n",
+            &[("hyphenated-attribute-name", 7, "data-id")],
+        ),
+    ]);
+}
+
 #[test]
 fn locates_a_single_brace_object() {
     assert_located(&[
