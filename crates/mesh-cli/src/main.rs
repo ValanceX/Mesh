@@ -1,6 +1,6 @@
 //! Native CLI entry point for the MESH toolchain.
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use mesh_compiler::CompileOptions;
 use mesh_syntax::{Diagnostic, Severity};
 use std::fs;
@@ -29,7 +29,20 @@ enum Command {
         /// the file's name without its extension.
         #[arg(long, value_name = "NAME", requires = "model")]
         component: Option<String>,
+        /// How to print diagnostics.
+        #[arg(long, value_enum, default_value_t = Format::Human)]
+        format: Format,
     },
+}
+
+/// How `mesh check` prints what it found. (The `///` lines on the
+/// variants are their `--help` text.)
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum Format {
+    /// rustc-style blocks on stderr, and `no errors` on stdout if there are none
+    Human,
+    /// one JSON document on stdout (see `schemas/diagnostics-v1.schema.json`)
+    Json,
 }
 
 fn main() -> ExitCode {
@@ -39,11 +52,12 @@ fn main() -> ExitCode {
             file,
             model,
             component,
-        } => run_check(&file, model.as_deref(), component.as_deref()),
+            format,
+        } => run_check(&file, model.as_deref(), component.as_deref(), format),
     }
 }
 
-fn run_check(file: &str, model: Option<&str>, component: Option<&str>) -> ExitCode {
+fn run_check(file: &str, model: Option<&str>, component: Option<&str>, format: Format) -> ExitCode {
     // The manifest is loaded and validated completely before the file is
     // read or checked. If it has errors, they are the only ones reported.
     let manifest = match model {
@@ -54,7 +68,7 @@ fn run_check(file: &str, model: Option<&str>, component: Option<&str>) -> ExitCo
             match mesh_manifest::load(&text) {
                 Ok(manifest) => Some((manifest, text, path)),
                 Err(diagnostics) => {
-                    print_diagnostics(&text, path, &diagnostics);
+                    print_diagnostics(format, &text, path, &diagnostics);
                     return ExitCode::FAILURE;
                 }
             }
@@ -68,7 +82,7 @@ fn run_check(file: &str, model: Option<&str>, component: Option<&str>) -> ExitCo
             match manifest.template(&name) {
                 Ok(template) => CompileOptions::with_template(template),
                 Err(diagnostic) => {
-                    print_diagnostics(text, path, &[diagnostic]);
+                    print_diagnostics(format, text, path, &[diagnostic]);
                     return ExitCode::FAILURE;
                 }
             }
@@ -80,7 +94,7 @@ fn run_check(file: &str, model: Option<&str>, component: Option<&str>) -> ExitCo
         return ExitCode::FAILURE;
     };
     let result = mesh_compiler::compile_with(&source, &options);
-    print_diagnostics(&source, file, &result.diagnostics);
+    print_diagnostics(format, &source, file, &result.diagnostics);
 
     // Only errors fail the check — warnings are reported but non-fatal.
     let has_errors = result
@@ -91,7 +105,11 @@ fn run_check(file: &str, model: Option<&str>, component: Option<&str>) -> ExitCo
         return ExitCode::FAILURE;
     }
 
-    println!("no errors");
+    // In JSON, the document is the whole answer: an empty (or
+    // warnings-only) list and exit status 0 already say "no errors".
+    if format == Format::Human {
+        println!("no errors");
+    }
     ExitCode::SUCCESS
 }
 
@@ -116,10 +134,21 @@ fn file_stem(file: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Prints diagnostics in the order given (never re-sorted). The renderer
-/// returns a block with no trailing newline; this loop owns the
-/// separation: each block is followed by exactly one blank line.
-fn print_diagnostics(source: &str, path: &str, diagnostics: &[Diagnostic]) {
+/// Prints diagnostics in the order given (never re-sorted), all reported
+/// against `source` at `path`.
+///
+/// Human: on stderr. The renderer returns a block with no trailing
+/// newline; this loop owns the separation: each block is followed by
+/// exactly one blank line.
+///
+/// JSON: one document on stdout, ending in a newline, even when there are
+/// no diagnostics. Every run that checks anything prints exactly one, so
+/// several runs' output is JSON Lines.
+fn print_diagnostics(format: Format, source: &str, path: &str, diagnostics: &[Diagnostic]) {
+    if format == Format::Json {
+        println!("{}", mesh_compiler::render_json(source, path, diagnostics));
+        return;
+    }
     for diagnostic in diagnostics {
         eprintln!(
             "{}\n",

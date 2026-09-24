@@ -319,3 +319,145 @@ fn every_model_code_has_its_own_fail_fixture() {
     }
     assert!(missing.is_empty(), "{missing:#?}");
 }
+
+/// Every run in every corpus above, as `(file, extra args)`, each file
+/// relative to `examples/`.
+fn every_corpus_run() -> Vec<(PathBuf, Vec<String>)> {
+    let args = |args: &[&str]| args.iter().map(|arg| arg.to_string()).collect::<Vec<_>>();
+    let mut runs = Vec::new();
+    for dir in ["", "fixtures/pass", "fixtures/fail"] {
+        runs.extend(mprx_files(dir).into_iter().map(|file| (file, Vec::new())));
+    }
+    for dir in ["fixtures/check/pass", "fixtures/check/fail"] {
+        runs.extend(
+            mprx_files(dir)
+                .into_iter()
+                .map(|file| (file, args(&CHECK_ARGS))),
+        );
+    }
+    for file in mprx_files("") {
+        let name = file.to_str().expect("a UTF-8 path");
+        let mut extra = args(&["--model", EXAMPLE_MODEL]);
+        if let Some((_, component)) = EXAMPLE_COMPONENTS.iter().find(|(f, _)| *f == name) {
+            extra.extend(args(&["--component", component]));
+        }
+        runs.push((file, extra));
+    }
+    for manifest in files("fixtures/manifest/fail", "json") {
+        let model = manifest.to_str().expect("a UTF-8 path");
+        runs.push((PathBuf::from(MANIFEST_TEMPLATE), args(&["--model", model])));
+    }
+    runs
+}
+
+/// The lines of human output that carry data: each diagnostic's header,
+/// its `-->` location, and its `= help:` lines, in order.
+fn human_lines(stderr: &str) -> Vec<String> {
+    stderr
+        .lines()
+        .map(str::trim_start)
+        .filter(|line| {
+            line.starts_with("error[")
+                || line.starts_with("warning[")
+                || line.starts_with("--> ")
+                || line.starts_with("= help: ")
+        })
+        .map(str::to_string)
+        .collect()
+}
+
+/// The same lines, rebuilt from a JSON document.
+fn json_lines(document: &serde_json::Value) -> Vec<String> {
+    let text = |value: &serde_json::Value| value.as_str().expect("a string").to_string();
+    let mut lines = Vec::new();
+    for diagnostic in document["diagnostics"].as_array().expect("a list") {
+        lines.push(format!(
+            "{}[{}]: {}",
+            text(&diagnostic["severity"]),
+            text(&diagnostic["code"]),
+            text(&diagnostic["message"])
+        ));
+        let start = &diagnostic["span"]["start"];
+        lines.push(format!(
+            "--> {}:{}:{}",
+            text(&diagnostic["path"]),
+            start["line"],
+            start["column"]
+        ));
+        for suggestion in diagnostic["suggestions"].as_array().expect("a list") {
+            lines.push(format!(
+                "= help: did you mean {:?}?",
+                text(&suggestion["replacement"])
+            ));
+        }
+    }
+    lines
+}
+
+/// `--format json` reports exactly what the human output does, for every
+/// run in every corpus: the same exit status, and the same diagnostics,
+/// codes, messages, locations and suggestions, in the same order. Its
+/// document is one line on stdout that the published schema accepts, and
+/// stderr is empty.
+#[test]
+fn json_output_agrees_with_human_output_for_every_corpus_run() {
+    let schema_path = examples_dir().join("../schemas/diagnostics-v1.schema.json");
+    let schema = fs::read_to_string(&schema_path).expect("should read the diagnostics schema");
+    let schema = serde_json::from_str(&schema).expect("the schema is JSON");
+    let validator =
+        jsonschema::draft202012::new(&schema).expect("the schema is a valid 2020-12 schema");
+
+    let runs = every_corpus_run();
+    let mut failures = Vec::new();
+    for (file, extra) in &runs {
+        let extra: Vec<&str> = extra.iter().map(String::as_str).collect();
+        let human = check(file, &extra);
+        let mut json_args = extra.clone();
+        json_args.extend(["--format", "json"]);
+        let json = check(file, &json_args);
+        let name = format!("{} {}", extra.join(" "), file.display());
+
+        if json.status.code() != human.status.code() {
+            failures.push(format!(
+                "{name}: exit {:?} in JSON, {:?} in human",
+                json.status.code(),
+                human.status.code()
+            ));
+        }
+        if !json.stderr.is_empty() {
+            failures.push(format!(
+                "{name}: JSON stderr isn't empty: {}",
+                String::from_utf8_lossy(&json.stderr)
+            ));
+        }
+        let stdout = String::from_utf8(json.stdout).expect("UTF-8 stdout");
+        let Some(line) = stdout
+            .strip_suffix('\n')
+            .filter(|line| !line.contains('\n'))
+        else {
+            failures.push(format!("{name}: stdout isn't one line: {stdout:?}"));
+            continue;
+        };
+        let document: serde_json::Value = match serde_json::from_str(line) {
+            Ok(document) => document,
+            Err(err) => {
+                failures.push(format!("{name}: stdout isn't JSON ({err}): {line}"));
+                continue;
+            }
+        };
+        for error in validator.iter_errors(&document) {
+            failures.push(format!("{name}: the schema rejects the output: {error}"));
+        }
+        let human = human_lines(&String::from_utf8_lossy(&human.stderr));
+        if json_lines(&document) != human {
+            failures.push(format!(
+                "{name}: JSON doesn't match human output\n--- human ---\n{}\n--- JSON ---\n{}",
+                human.join("\n"),
+                json_lines(&document).join("\n")
+            ));
+        }
+    }
+    // Guards against a corpus going missing and the test passing vacuously.
+    assert!(runs.len() >= 90, "only {} runs", runs.len());
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}

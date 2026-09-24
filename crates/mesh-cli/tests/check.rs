@@ -273,3 +273,111 @@ fn component_needs_a_model() {
         .code(2)
         .stderr(predicate::str::contains("--model <FILE>"));
 }
+
+#[test]
+fn json_prints_one_document_on_stdout_and_exits_as_human_output_does() {
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .current_dir("../../examples")
+        .args([
+            "check",
+            "--format",
+            "json",
+            "--model",
+            "fixtures/check/components.json",
+            "--component",
+            "template",
+            "fixtures/check/fail/unknown-reference.mprx",
+        ])
+        .assert()
+        .code(1)
+        .stderr("")
+        .stdout(concat!(
+            r#"{"version":1,"diagnostics":[{"severity":"error","code":"unknown-reference","#,
+            r#""message":"unknown reference \"usr\": it isn't in the template's scope","#,
+            r#""path":"fixtures/check/fail/unknown-reference.mprx","#,
+            r#""span":{"start":{"byte":13,"line":1,"column":14},"end":{"byte":16,"line":1,"column":17}},"#,
+            r#""suggestions":[{"replacement":"user","#,
+            r#""span":{"start":{"byte":13,"line":1,"column":14},"end":{"byte":16,"line":1,"column":17}}}]}]}"#,
+            "\n"
+        ));
+}
+
+#[test]
+fn json_prints_an_empty_list_instead_of_no_errors() {
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .args(["check", "--format", "json", "../../examples/page.mprx"])
+        .assert()
+        .success()
+        .stderr("")
+        .stdout("{\"version\":1,\"diagnostics\":[]}\n");
+}
+
+#[test]
+fn json_keeps_warnings_and_exit_status_zero() {
+    let file = temp_mprx(r#"<div class="a" class="b" />"#);
+
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .args(["--format", "json"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stderr("")
+        .stdout(predicate::str::contains(
+            r#"{"severity":"warning","code":"duplicate-attribute","#,
+        ))
+        .stdout(predicate::str::contains("no errors").not());
+}
+
+#[test]
+fn json_reports_manifest_errors_against_the_manifest() {
+    let manifest = temp_manifest(r#"{ "version": 1, "types": {}, "components": [] }"#);
+    let file = temp_mprx("<page");
+
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .args(["--format", "json", "--model"])
+        .arg(manifest.path())
+        .arg(file.path())
+        .assert()
+        .code(1)
+        .stderr("")
+        .stdout(predicate::str::contains(
+            r#""code":"manifest-invalid-value""#,
+        ))
+        .stdout(predicate::str::contains(format!(
+            r#""path":{}"#,
+            // As JSON escapes it (a Windows path's `\` is doubled).
+            serde_json::to_string(&manifest.path().display().to_string())
+                .expect("a string serializes")
+        )))
+        .stdout(predicate::str::contains("syntax-error").not());
+}
+
+#[test]
+fn json_leaves_an_unreadable_file_on_stderr() {
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .args(["check", "--format", "json", "does-not-exist.mprx"])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::starts_with(
+            "error: could not read does-not-exist.mprx: ",
+        ));
+}
+
+#[test]
+fn rejects_an_unknown_format() {
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .args(["check", "--format", "xml", "../../examples/page.mprx"])
+        .assert()
+        .code(2)
+        .stdout("")
+        .stderr(predicate::str::contains("[possible values: human, json]"));
+}
