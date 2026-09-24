@@ -89,9 +89,9 @@ mesh/
 ├── grammar/
 │   └── tree-sitter-mprx/     the MPRX Tree-sitter grammar
 └── packages/               npm wrappers for the Rust/WASM build (placeholders)
-    ├── mesh-language/        @valence/mesh-language
-    ├── mesh-compiler/        @valence/mesh-compiler
-    └── mesh-lsp/             @valence/mesh-lsp
+    ├── mesh-language/        @valance/mesh-language
+    ├── mesh-compiler/        @valance/mesh-compiler
+    └── mesh-lsp/             @valance/mesh-lsp
 ```
 
 ## Boundaries

@@ -1,5 +1,5 @@
 {
-  "name": "@valence/mesh-compiler",
+  "name": "@valance/mesh-compiler",
   "version": "0.0.1",
   "description": "Semantic analysis, type checking, diagnostics, and compilation for MPRX (thin wrapper over the mesh-compiler Rust crate, native or WASM).",
   "type": "module",
@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@valence/mesh-language": "0.0.1"
+    "@valance/mesh-language": "0.0.1"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

@@ -1,7 +1,7 @@
 {
-  "name": "@valence/mesh-lsp",
+  "name": "@valance/mesh-lsp",
   "version": "0.0.1",
-  "description": "LSP server for MPRX (thin wrapper over the mesh-lsp Rust crate), reusing mesh-compiler.",
+  "description": "Launcher for the mesh-lsp language server. It starts the Rust mesh-lsp binary; all language semantics live there, in mesh-compiler.",
   "type": "module",
   "license": "MIT",
   "author": "Jack Miller <jackmiller0899@gmail.com>",
@@ -16,10 +16,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@valence/mesh-compiler": "0.0.1",
-    "vscode-languageserver": "^9.0.0"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

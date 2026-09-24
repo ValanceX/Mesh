@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "LSP server for MPRX (a placeholder). Reuses mesh-parser/mesh-compiler; does not reimplement them."
+description = "The MESH language server for MPRX (a placeholder): a client of mesh-compiler, with no semantics of its own."
 
 [lints]
 workspace = true

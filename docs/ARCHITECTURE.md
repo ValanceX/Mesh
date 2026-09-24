@@ -140,7 +140,7 @@ Crate boundaries can change as we learn more.
 
 - **mesh-language**: the MPRX grammar, Tree-sitter parser, syntax nodes, AST types, source locations, expression grammar, basic semantic model, and AST traversal.
 - **mesh-compiler**: semantic analysis, type checking, component and binding resolution, template compilation, diagnostics, transformation, optimization, and code generation.
-- **mesh-lsp**: completion, hover, diagnostics, go-to-definition, references, rename, document symbols, and formatting. It **reuses the compiler's own parser and type system**. There is never a second implementation for editor tooling, so the editor and the build can't disagree.
+- **mesh-lsp**: diagnostics and quick fixes, hover, go-to-definition, and completion. It is **a client of the compiler**, which stays the single semantic authority: its diagnostics are the compiler's own, and it has no parser or type system of its own, so the editor and the build can't disagree. Its npm package only launches it.
 
 ### A language-neutral IR (long-term)
 
