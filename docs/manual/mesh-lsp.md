@@ -44,7 +44,7 @@ The settings are one object, the `"mesh"` section:
 
 The server reads the settings from the client's `initializationOptions`. When they change (`workspace/didChangeConfiguration`), it asks the client for section `"mesh"` if the client supports `workspace/configuration`, and otherwise reads `settings.mesh` from the notification. A setting of the wrong type is logged and left out; it never stops the server.
 
-For example, in Neovim 0.10 or later:
+For example, in Neovim 0.10 or later. This example hasn't been tried in a running editor yet; the editor setup guide planned for v0.3 will verify it:
 
 ```lua
 vim.filetype.add({ extension = { mprx = "mprx" } })
@@ -80,7 +80,9 @@ vim.api.nvim_create_autocmd("FileType", {
 
 ## Exit status
 
-`0` if the client sent `shutdown` and then `exit`, as the protocol requires; `1` otherwise, including when stdin or stdout closes, or a message isn't valid JSON-RPC. The server stops cleanly in each case; it never panics on input.
+`0` if the client sent `shutdown` and then `exit`, as the protocol requires; `1` otherwise, including when stdin or stdout closes. The server stops cleanly in each case; it never panics on input.
+
+A message that isn't JSON-RPC at all (not JSON, or JSON without a method or id) also stops the server with status `1`. The transport can't read past it, and without an id there's no request to answer. A well-formed request whose parameters are wrong gets an `InvalidParams` error, and the server keeps running.
 
 ## Limitations
 
