@@ -14,3 +14,4 @@ workspace = true
 mesh-syntax.workspace = true
 mesh-semantic.workspace = true
 mesh-parser.workspace = true
+mesh-manifest.workspace = true

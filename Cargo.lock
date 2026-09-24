@@ -274,6 +274,7 @@ dependencies = [
  "assert_cmd",
  "clap",
  "mesh-compiler",
+ "mesh-manifest",
  "mesh-syntax",
  "predicates",
  "tempfile",
@@ -283,6 +284,7 @@ dependencies = [
 name = "mesh-compiler"
 version = "0.1.0"
 dependencies = [
+ "mesh-manifest",
  "mesh-parser",
  "mesh-semantic",
  "mesh-syntax",

@@ -126,3 +126,142 @@ fn check_rejects_a_deeply_nested_syntax_error_without_crashing() {
             depth + 1
         )));
 }
+
+fn temp_manifest(contents: &str) -> tempfile::NamedTempFile {
+    let mut file = tempfile::Builder::new()
+        .suffix(".json")
+        .tempfile()
+        .expect("should create a temp file");
+    write!(file, "{contents}").expect("should write to the temp file");
+    file
+}
+
+/// A valid manifest declaring one component, `page`.
+const PAGE_MANIFEST: &str = r#"{
+  "version": 1,
+  "types": {},
+  "components": {
+    "page": { "props": {}, "events": {}, "commands": {}, "scope": {} }
+  }
+}"#;
+
+#[test]
+fn check_with_a_broken_manifest_reports_only_the_manifest_errors() {
+    let manifest = temp_manifest(r#"{ "version": 1, "types": {}, "components": [] }"#);
+    // The file has a syntax error, but a broken manifest stops the check
+    // before the file is read.
+    let file = temp_mprx("<page");
+
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .arg("--model")
+        .arg(manifest.path())
+        .arg(file.path())
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::starts_with(
+            "error[manifest-invalid-value]: \"components\" must be an object, found an array\n",
+        ))
+        .stderr(predicate::str::contains(".json:1:"))
+        .stderr(predicate::str::contains("syntax-error").not());
+}
+
+#[test]
+fn check_reports_an_unreadable_manifest() {
+    let file = temp_mprx("<page />");
+
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .arg("--model")
+        .arg("does-not-exist.json")
+        .arg(file.path())
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::starts_with(
+            "error: could not read does-not-exist.json: ",
+        ));
+}
+
+#[test]
+fn check_takes_the_component_from_the_file_name_unless_given() {
+    let manifest = temp_manifest(PAGE_MANIFEST);
+    let file = temp_mprx("<page />");
+    let stem = file
+        .path()
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .expect("a UTF-8 file stem")
+        .to_string();
+
+    // The temp file's stem isn't a declared component.
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .arg("--model")
+        .arg(manifest.path())
+        .arg(file.path())
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::starts_with(format!(
+            "error[manifest-missing-component]: the manifest declares no component {stem:?}, which this file is the template of\n"
+        )));
+
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .arg("--model")
+        .arg(manifest.path())
+        .arg("--component")
+        .arg("page")
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout("no errors\n")
+        .stderr("");
+}
+
+#[test]
+fn check_with_a_model_reports_the_same_mprx_diagnostics() {
+    let manifest = temp_manifest(PAGE_MANIFEST);
+    let file = temp_mprx(r#"<page a="1" a="2"></pages>"#);
+
+    let without = Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .arg(file.path())
+        .output()
+        .expect("should run mesh check");
+    let with = Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .arg("--model")
+        .arg(manifest.path())
+        .arg("--component")
+        .arg("page")
+        .arg(file.path())
+        .output()
+        .expect("should run mesh check");
+
+    assert_eq!(with.status.code(), Some(1));
+    assert_eq!(with.status.code(), without.status.code());
+    assert_eq!(with.stdout, without.stdout);
+    assert_eq!(with.stderr, without.stderr);
+}
+
+#[test]
+fn component_needs_a_model() {
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .arg("--component")
+        .arg("page")
+        .arg("../../examples/page.mprx")
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("--model <FILE>"));
+}

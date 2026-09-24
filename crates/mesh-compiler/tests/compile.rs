@@ -766,3 +766,27 @@ fn d11_child_text_and_expression() {
         .collect();
     assert_eq!(children, ["héllo ", "user.name", " 日本"]);
 }
+
+#[test]
+fn compiling_against_a_template_gives_the_same_result_for_now() {
+    let manifest = mesh_manifest::load(
+        r#"{ "version": 1, "types": {}, "components": {
+            "page": { "props": {}, "events": {}, "commands": {}, "scope": {} }
+        } }"#,
+    )
+    .expect("a valid manifest");
+    let template = manifest.template("page").expect("a declared component");
+    let options = mesh_compiler::CompileOptions::with_template(template);
+
+    for source in [
+        r#"<page title={user} a="1" a="2" />"#,
+        "<page",
+        "<page></pages>",
+    ] {
+        assert_eq!(
+            mesh_compiler::compile_with(source, &options),
+            mesh_compiler::compile(source),
+            "{source}"
+        );
+    }
+}
