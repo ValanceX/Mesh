@@ -82,20 +82,58 @@ impl Client {
 
     /// Sends a request and waits for its response.
     pub fn request(&mut self, method: &str, params: Value) -> Response {
+        let id = self.send(method, params);
+        self.response(&id, WAIT)
+            .unwrap_or_else(|| panic!("no response to {method} within {WAIT:?}"))
+    }
+
+    /// Sends a request without waiting for its response; read it later
+    /// with [`Client::response`].
+    pub fn send(&mut self, method: &str, params: Value) -> RequestId {
         self.next_id += 1;
         let id = RequestId::from(self.next_id);
         self.connection
             .sender
             .send(Request::new(id.clone(), method.to_string(), params).into())
             .expect("the server is listening");
-        let deadline = Instant::now() + WAIT;
-        loop {
-            match self.receive(deadline) {
-                Some(Message::Response(response)) if response.id == id => return response,
-                Some(other) => self.inbox.push_back(other),
-                None => panic!("no response to {method} within {WAIT:?}"),
+        id
+    }
+
+    /// The response to request `id`, if it comes within `within`.
+    pub fn response(&mut self, id: &RequestId, within: Duration) -> Option<Response> {
+        let is_it = |message: &Message| matches!(message, Message::Response(r) if &r.id == id);
+        if let Some(index) = self.inbox.iter().position(is_it) {
+            match self.inbox.remove(index) {
+                Some(Message::Response(response)) => return Some(response),
+                _ => unreachable!("the position found a response"),
             }
         }
+        let deadline = Instant::now() + within;
+        loop {
+            match self.receive(deadline) {
+                Some(Message::Response(response)) if &response.id == id => return Some(response),
+                Some(other) => self.inbox.push_back(other),
+                None => return None,
+            }
+        }
+    }
+
+    /// The result of `textDocument/hover` at `line`/`character` (in the
+    /// negotiated unit), or `Value::Null`.
+    pub fn hover(&mut self, uri: &str, line: u32, character: u32) -> Value {
+        self.position_request("textDocument/hover", uri, line, character)
+    }
+
+    /// The result of `textDocument/definition`, or `Value::Null`.
+    pub fn definition(&mut self, uri: &str, line: u32, character: u32) -> Value {
+        self.position_request("textDocument/definition", uri, line, character)
+    }
+
+    fn position_request(&mut self, method: &str, uri: &str, line: u32, character: u32) -> Value {
+        let response = self.request(method, position_params(uri, line, character));
+        response
+            .response_result
+            .unwrap_or_else(|error| panic!("{method} failed: {error:?}"))
     }
 
     pub fn open(&self, uri: &str, version: i32, text: &str) {
@@ -243,6 +281,14 @@ impl Client {
             .sender
             .send(Response::new_ok(request.id, result).into());
     }
+}
+
+/// The parameters of a request at a position in a document.
+pub fn position_params(uri: &str, line: u32, character: u32) -> Value {
+    json!({
+        "textDocument": { "uri": uri },
+        "position": { "line": line, "character": character }
+    })
 }
 
 /// Options for tests: compile on every change, with no debounce.

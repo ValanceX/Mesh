@@ -1,6 +1,7 @@
 //! Open documents: their snapshots, compiles and publications (outline
 //! D10).
 
+use super::manifest::ManifestSnapshot;
 use super::{apply_changes, Disconnected, Sent, Server};
 use crate::convert::Text;
 use crate::uri;
@@ -9,8 +10,7 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     MessageType, PublishDiagnosticsParams, Uri,
 };
-use mesh_compiler::SourceMap;
-use mesh_syntax::Diagnostic;
+use mesh_compiler::{CompileResult, SourceMap};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
@@ -26,6 +26,8 @@ pub(super) struct Document {
     pub(super) missing: Option<String>,
     /// The canonical state of the latest snapshot compiled and published.
     pub(super) compiled: Option<Compiled>,
+    /// The snapshot whose compile panicked, if the latest one did.
+    pub(super) failed: Option<Identity>,
 }
 
 /// A snapshot's canonical state: what the compiler said about its text.
@@ -34,7 +36,11 @@ pub(super) struct Compiled {
     pub(super) version: i32,
     pub(super) text: Arc<str>,
     pub(super) map: SourceMap,
-    pub(super) diagnostics: Vec<Diagnostic>,
+    /// Exactly what `compile_with` (or `compile`) returned.
+    pub(super) result: Arc<CompileResult>,
+    /// The component the text was checked as, and the manifest snapshot
+    /// that declares it; `None` when it was checked without a model.
+    pub(super) template: Option<(String, Arc<ManifestSnapshot>)>,
 }
 
 impl Server {
@@ -55,6 +61,7 @@ impl Server {
                 generation: self.next_generation,
                 missing: None,
                 compiled: None,
+                failed: None,
             },
         );
         self.compile(&key)?;
@@ -91,6 +98,8 @@ impl Server {
         document.text = Arc::from(text);
         document.version = version;
         document.generation = self.next_generation;
+        // Requests made against the replaced snapshot can't be answered.
+        self.release(&key)?;
 
         if self.options.debounce.is_zero() {
             self.compile(&key)
@@ -112,6 +121,7 @@ impl Server {
             self.publish(document.uri.as_str(), Vec::new(), None)?;
         }
         self.unconfigured_logged.remove(&key);
+        self.release(&key)?;
         self.publish_manifest()
     }
 
@@ -162,7 +172,8 @@ impl Server {
                 "mesh-lsp: the compile thread has stopped".to_string(),
             );
         }
-        Ok(())
+        // A manifest or configuration change starts a new snapshot here.
+        self.release(key)
     }
 
     /// What the document at `key` is checked against, and the component
@@ -213,16 +224,20 @@ impl Server {
         if self.identity(document) != done.identity || self.due.contains_key(&done.uri) {
             return Ok(());
         }
-        let diagnostics = match done.result {
-            Ok(diagnostics) => diagnostics,
+        let result = match done.result {
+            Ok(result) => result,
             Err(message) => {
-                return self.log(
+                if let Some(document) = self.documents.get_mut(&done.uri) {
+                    document.failed = Some(done.identity);
+                }
+                self.log(
                     MessageType::ERROR,
                     format!(
                         "mesh-lsp: internal error checking {} version {}: {message}",
                         done.uri, done.version
                     ),
-                );
+                )?;
+                return self.release(&done.uri);
             }
         };
         let map = SourceMap::new(&done.text);
@@ -231,18 +246,30 @@ impl Server {
             map: &map,
             unit: self.unit,
         }
-        .diagnostics(&diagnostics);
+        .diagnostics(&result.diagnostics);
         let uri = document.uri.as_str().to_string();
+        // The identity matched, so the manifest snapshot in force is the
+        // one this compile used.
+        let template = match done.model {
+            Model::Template { component, .. } => self
+                .manifest
+                .snapshot
+                .clone()
+                .map(|snapshot| (component, snapshot)),
+            Model::None => None,
+        };
         if let Some(document) = self.documents.get_mut(&done.uri) {
             document.compiled = Some(Compiled {
                 identity: done.identity,
                 version: done.version,
                 text: done.text,
                 map,
-                diagnostics,
+                result,
+                template,
             });
         }
-        self.publish(&uri, published, Some(done.version))
+        self.publish(&uri, published, Some(done.version))?;
+        self.release(&done.uri)
     }
 
     pub(super) fn publish(

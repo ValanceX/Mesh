@@ -110,11 +110,11 @@ mesh/
 - rustc-style diagnostics with stable codes, located syntax errors, and did-you-mean suggestions; warnings don't fail the check
 - JSON diagnostics (`mesh check --format json`)
 
-In development for v0.3: the `mesh-lsp` language server, which already publishes the compiler's diagnostics and quick fixes (see its [manual](./docs/manual/mesh-lsp.md)).
+In development for v0.3: the `mesh-lsp` language server, which already publishes the compiler's diagnostics and quick fixes, and answers hover and go to definition (see its [manual](./docs/manual/mesh-lsp.md)).
 
 Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. The npm packages are placeholders.
 
-Next up: hover, go-to-definition and completion in `mesh-lsp`.
+Next up: completion in `mesh-lsp`, and hover and go-to-definition on files with syntax errors.
 
 ## Learn more
 

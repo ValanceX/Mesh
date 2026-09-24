@@ -8,8 +8,10 @@ What it does today:
 
 - **Diagnostics** for `.mprx` documents, and for the component manifest itself, kept current as you type.
 - **Quick fixes** from suggestions: `did you mean "user"?` becomes a one-click replacement.
+- **Hover:** the type of the expression under the cursor, and what a name is declared as in the manifest.
+- **Go to definition:** from a tag, prop, event, command or scope name to where the manifest declares it.
 
-Hover, go-to-definition, completion, and highlighting queries for the grammar are coming in later v0.3 passes.
+Completion, and highlighting queries for the grammar, are coming in later v0.3 passes.
 
 ## Installing
 
@@ -76,6 +78,24 @@ vim.api.nvim_create_autocmd("FileType", {
 
 **Quick fixes.** Each suggestion is offered as a `quickfix` code action that replaces the suggestion's range. It's offered only for the version of the text the diagnostics were computed for, so an edit never lands in the wrong place.
 
+## Hover and go to definition
+
+Both answer from the same check that produced the diagnostics, so they need a model: a document checked without one (no `model` setting, a manifest with errors, or no entry in `components`) has no hover and no definitions. They work on a file that parses; on a file with a syntax error they answer nothing yet.
+
+**Hover** shows what the cursor is on:
+
+- **A tag name:** the component, with each prop and its type (`size?: string` marks a prop that isn't required) and each event (`on.click: any`, or `on.close` if it carries no value).
+- **A prop or event name:** its type, and whether the prop is required.
+- **A scope name**, such as `user`: its type, and what a named type is defined as (`type User = { active: boolean, avatar?: string, name: string }`).
+- **A command:** its parameters, such as `selectUser(user: User)`.
+- **Any other expression**, such as the `name` of `user.name`: its type, such as `string`. An expression that has a mistake in it has no type, so it has no hover.
+
+Types are written the way diagnostics write them. Hovers are Markdown if the client accepts it, and plain text otherwise.
+
+**Go to definition** jumps to the name's key in the manifest, such as `"avatar"` under `"components"`. If the manifest is open in the editor, that's its current text.
+
+**Right after typing.** A request made before the new text has been checked waits for that check, which then runs at once instead of after the usual 150 ms. If you change the text again before it's answered, it's answered with `ContentModified`, which editors treat as "ask again".
+
 **Positions** are counted in the unit the client prefers: UTF-8 if it offers that, then UTF-32, and UTF-16 otherwise.
 
 ## Exit status
@@ -89,4 +109,5 @@ A message that isn't JSON-RPC at all (not JSON, or JSON without a method or id) 
 - **One workspace root:** the first workspace folder, or `rootUri`. Multi-root workspaces aren't supported.
 - **Paths compare exactly.** On a case-insensitive file system, write `components` keys with the same case the editor uses.
 - **Disk changes to the manifest** are seen automatically only if the client supports registering file watchers dynamically. Otherwise they're seen when you reopen the manifest or change the settings.
+- **Closing tags and members have no definition.** Go to definition works from an opening tag's name, not a closing tag's, and from `user` in `user.name` but not from `name`, which hover still shows the type of.
 - **A lone `\r`** (a classic Mac line ending) isn't a line break to MESH, so positions in such a file disagree with the editor's.

@@ -5,9 +5,8 @@
 //! (invariant I1): the diagnostics it returns are exactly the compiler's.
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use mesh_compiler::CompileOptions;
+use mesh_compiler::{CompileOptions, CompileResult};
 use mesh_manifest::Manifest;
-use mesh_syntax::Diagnostic;
 use std::any::Any;
 use std::io;
 use std::panic::{self, AssertUnwindSafe};
@@ -31,6 +30,7 @@ pub(crate) struct Identity {
 }
 
 /// What a document is checked against.
+#[derive(Clone)]
 pub(crate) enum Model {
     /// Nothing: syntax and structure only, as `mesh check` without
     /// `--model`.
@@ -56,8 +56,11 @@ pub(crate) struct Done {
     pub(crate) identity: Identity,
     pub(crate) version: i32,
     pub(crate) text: Arc<str>,
-    /// The diagnostics, or the message of a panic while compiling.
-    pub(crate) result: Result<Vec<Diagnostic>, String>,
+    /// What the snapshot was checked against.
+    pub(crate) model: Model,
+    /// The canonical compile's result, or the message of a panic while
+    /// compiling.
+    pub(crate) result: Result<Arc<CompileResult>, String>,
 }
 
 pub(crate) struct Worker {
@@ -88,12 +91,14 @@ pub(crate) fn spawn(gate: Option<Receiver<()>>) -> io::Result<Worker> {
                     let _ = gate.recv();
                 }
                 let result = panic::catch_unwind(AssertUnwindSafe(|| compile(&job)))
+                    .map(Arc::new)
                     .map_err(|payload| panic_message(payload.as_ref()));
                 let done = Done {
                     uri: job.uri,
                     identity: job.identity,
                     version: job.version,
                     text: job.text,
+                    model: job.model,
                     result,
                 };
                 if result_sender.send(done).is_err() {
@@ -106,8 +111,8 @@ pub(crate) fn spawn(gate: Option<Receiver<()>>) -> io::Result<Worker> {
 }
 
 /// The canonical compile of `job`'s snapshot.
-fn compile(job: &Job) -> Vec<Diagnostic> {
-    let result = match &job.model {
+fn compile(job: &Job) -> CompileResult {
+    match &job.model {
         Model::None => mesh_compiler::compile(&job.text),
         Model::Template {
             manifest,
@@ -120,8 +125,7 @@ fn compile(job: &Job) -> Vec<Diagnostic> {
             // isn't, the model-less compile is what D9 prescribes.
             Err(_) => mesh_compiler::compile(&job.text),
         },
-    };
-    result.diagnostics
+    }
 }
 
 pub(crate) fn panic_message(payload: &(dyn Any + Send)) -> String {

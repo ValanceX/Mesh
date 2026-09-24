@@ -10,6 +10,8 @@
 
 mod documents;
 mod manifest;
+mod navigate;
+mod requests;
 
 use crate::config::Config;
 use crate::convert::{self, Text};
@@ -20,11 +22,12 @@ use documents::Document;
 use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, DocumentChanges,
-    MessageType, OneOf, OptionalVersionedTextDocumentIdentifier, TextDocumentEdit, TextEdit,
-    WorkspaceEdit,
+    GotoDefinitionParams, HoverParams, MessageType, OneOf, OptionalVersionedTextDocumentIdentifier,
+    TextDocumentEdit, TextEdit, WorkspaceEdit,
 };
 use manifest::ManifestState;
 use mesh_compiler::{ColumnUnit, SourceMap};
+use requests::{Held, Query};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -65,6 +68,8 @@ struct Client {
     configuration: bool,
     /// Registering `workspace/didChangeWatchedFiles` dynamically.
     watch: bool,
+    /// Markdown in hovers.
+    markdown: bool,
 }
 
 struct Server {
@@ -91,6 +96,8 @@ struct Server {
     unconfigured_logged: BTreeSet<String>,
     /// Logs held back until `initialized`.
     pending_logs: Vec<(MessageType, String)>,
+    /// Requests waiting for their snapshot to be compiled.
+    held: Vec<Held>,
 }
 
 pub(crate) fn run(connection: lsp_server::Connection, options: Options) -> Outcome {
@@ -120,6 +127,7 @@ pub(crate) fn run(connection: lsp_server::Connection, options: Options) -> Outco
         watcher: None,
         unconfigured_logged: BTreeSet::new(),
         pending_logs: Vec::new(),
+        held: Vec::new(),
     };
     drop(connection);
 
@@ -246,6 +254,7 @@ impl Server {
                 "the server is already initialized".to_string(),
             )?,
             (Protocol::Running, "shutdown") => {
+                self.drain_held()?;
                 self.protocol = Protocol::ShutDown;
                 self.respond(id, Value::Null)?;
             }
@@ -254,6 +263,26 @@ impl Server {
                     Ok(params) => {
                         let actions = self.code_actions(&params);
                         self.respond(id, json!(actions))?;
+                    }
+                    Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
+                }
+            }
+            (Protocol::Running, "textDocument/hover") => {
+                match decode::<HoverParams>(&method, params) {
+                    Ok(params) => {
+                        let position = params.text_document_position_params;
+                        let document = position.text_document.uri.as_str().to_string();
+                        self.answer_or_hold(id, &document, Query::Hover(position.position))?;
+                    }
+                    Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
+                }
+            }
+            (Protocol::Running, "textDocument/definition") => {
+                match decode::<GotoDefinitionParams>(&method, params) {
+                    Ok(params) => {
+                        let position = params.text_document_position_params;
+                        let document = position.text_document.uri.as_str().to_string();
+                        self.answer_or_hold(id, &document, Query::Definition(position.position))?;
                     }
                     Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
                 }
@@ -311,9 +340,10 @@ impl Server {
             },
             "workspace/didChangeConfiguration" => self.did_change_configuration(&params),
             "workspace/didChangeWatchedFiles" => self.did_change_watched_files(&params),
-            // Every request this server answers is answered at once, so
-            // there is nothing to cancel.
-            "$/cancelRequest" | "textDocument/didSave" | "$/setTrace" => Ok(()),
+            // Only a request waiting for its snapshot can be cancelled;
+            // every other one is answered at once.
+            "$/cancelRequest" => self.cancel(&params),
+            "textDocument/didSave" | "$/setTrace" => Ok(()),
             _ => {
                 eprintln!("mesh-lsp: ignoring the notification {method}");
                 Ok(())
@@ -366,6 +396,10 @@ impl Server {
         self.client = Client {
             configuration: flag("/capabilities/workspace/configuration"),
             watch: flag("/capabilities/workspace/didChangeWatchedFiles/dynamicRegistration"),
+            markdown: params
+                .pointer("/capabilities/textDocument/hover/contentFormat")
+                .and_then(Value::as_array)
+                .is_some_and(|formats| formats.iter().any(|format| format == "markdown")),
         };
 
         // Multi-root is a non-goal: the first folder, or `rootUri`.
@@ -389,6 +423,8 @@ impl Server {
                     "positionEncoding": encoding,
                     "textDocumentSync": { "openClose": true, "change": 1 },
                     "codeActionProvider": { "codeActionKinds": ["quickfix"] },
+                    "hoverProvider": true,
+                    "definitionProvider": true,
                     "workspace": { "workspaceFolders": { "supported": false } }
                 },
                 "serverInfo": { "name": "mesh-lsp", "version": env!("CARGO_PKG_VERSION") }
@@ -525,7 +561,7 @@ impl Server {
         };
         let wanted = text.span(params.range);
         let mut actions = Vec::new();
-        for diagnostic in &compiled.diagnostics {
+        for diagnostic in &compiled.result.diagnostics {
             let span = diagnostic.span;
             let touches = span.start_byte <= wanted.end_byte && wanted.start_byte <= span.end_byte;
             if !touches {
