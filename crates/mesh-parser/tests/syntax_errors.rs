@@ -193,23 +193,29 @@ fn locates_a_hyphenated_attribute_name() {
 }
 
 /// A hyphenated name only gets its specific code when it starts where an
-/// attribute can: after whitespace, or straight after the previous
-/// attribute's value, since `b="x"c="y"` is valid. A non-ASCII space like
-/// U+00A0 counts as whitespace, so the word after it is still located. A
-/// non-ASCII letter glued to the word (`é-id`) is a second mistake in the
-/// same name: `hyphenated-attribute-name` would underline only `-id`, so
-/// the `syntax-error` fallback reports the characters the parser actually
-/// rejected instead. None of these may land a span mid-character.
+/// attribute can: after the ASCII whitespace the grammar skips (including
+/// `\x0b` and `\x0c`), or straight after the previous attribute's value,
+/// since `b="x"c="y"` is valid. Anything else just before the word is a
+/// second mistake the rename wouldn't fix, so the `syntax-error` fallback
+/// reports it instead: a non-ASCII space like U+00A0 isn't whitespace to
+/// the grammar (`<page\u{a0}dataId="x" />` is rejected too), and a
+/// non-ASCII letter glued to the word (`é-id`) would leave
+/// `hyphenated-attribute-name` underlining only `-id`. None of these may
+/// land a span mid-character.
 #[test]
 fn hyphenated_attribute_name_after_a_multi_byte_character() {
     assert_located(&[
         (
+            "<page\u{b}data-id=\"x\" />\n",
+            &[("hyphenated-attribute-name", 6, "data-id")],
+        ),
+        (
             "<page\u{a0}data-id=\"x\" />\n",
-            &[("hyphenated-attribute-name", 7, "data-id")],
+            &[("syntax-error", 5, "\u{a0}data-")],
         ),
         (
             "<page\u{a0}-a=\"x\" />\n",
-            &[("hyphenated-attribute-name", 7, "-a")],
+            &[("syntax-error", 5, "\u{a0}-")],
         ),
         (
             "<a b=\"x\"c-d=\"y\" />\n",
