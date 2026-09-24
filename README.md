@@ -39,7 +39,7 @@ Mistakes are reported with their location:
 
 ```console
 $ mesh check examples/fixtures/fail/mismatched-closing-tag.mprx
-error: mismatched closing tag: opened with "title", closed with "heading"
+error[mismatched-closing-tag]: mismatched closing tag: opened with "title", closed with "heading"
  --> examples/fixtures/fail/mismatched-closing-tag.mprx:2:3
   |
 2 |   <title>Users</heading>

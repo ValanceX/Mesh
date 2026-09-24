@@ -19,11 +19,14 @@ fn renders_a_single_line_error_with_snippet_and_carets() {
     let rendered = render_diagnostic(
         source,
         "page.mprx",
-        &diagnostic(Severity::Error, "mismatched closing tag", 0, 12),
+        &Diagnostic {
+            code: DiagnosticCode::MISMATCHED_CLOSING_TAG,
+            ..diagnostic(Severity::Error, "mismatched closing tag", 0, 12)
+        },
     );
     assert_eq!(
         rendered,
-        "error: mismatched closing tag\n \
+        "error[mismatched-closing-tag]: mismatched closing tag\n \
          --> page.mprx:1:1\n  \
          |\n\
          1 | <div></span>\n  \
@@ -37,11 +40,14 @@ fn labels_warnings_as_warnings() {
     let rendered = render_diagnostic(
         source,
         "page.mprx",
-        &diagnostic(Severity::Warning, "duplicate attribute", 5, 14),
+        &Diagnostic {
+            code: DiagnosticCode::DUPLICATE_ATTRIBUTE,
+            ..diagnostic(Severity::Warning, "duplicate attribute", 5, 14)
+        },
     );
     assert_eq!(
         rendered,
-        "warning: duplicate attribute\n \
+        "warning[duplicate-attribute]: duplicate attribute\n \
          --> page.mprx:1:6\n  \
          |\n\
          1 | <div class=\"a\" class=\"b\" />\n  \
@@ -59,7 +65,7 @@ fn reports_line_and_column_for_a_span_on_a_later_line() {
     );
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> card.mprx:2:3\n  \
          |\n\
          2 |   <title>Users</heading>\n  \
@@ -73,7 +79,7 @@ fn underlines_only_the_first_line_of_a_multi_line_span() {
     let rendered = render_diagnostic(source, "x.mprx", &diagnostic(Severity::Error, "m", 0, 12));
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> x.mprx:1:1\n  \
          |\n\
          1 | <a />\n  \
@@ -90,7 +96,7 @@ fn renders_a_single_caret_for_a_zero_length_span_in_empty_source() {
     );
     assert_eq!(
         rendered,
-        "error: syntax error\n \
+        "error[syntax-error]: syntax error\n \
          --> empty.mprx:1:1\n  \
          |\n\
          1 |\n  \
@@ -105,7 +111,7 @@ fn counts_columns_in_characters_not_bytes() {
     let rendered = render_diagnostic(source, "u.mprx", &diagnostic(Severity::Error, "m", 7, 13));
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> u.mprx:1:7\n  \
          |\n\
          1 | héllo wörld\n  \
@@ -119,7 +125,7 @@ fn underline_preserves_tabs_so_carets_stay_aligned() {
     let rendered = render_diagnostic(source, "t.mprx", &diagnostic(Severity::Error, "m", 5, 10));
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> t.mprx:2:2\n  \
          |\n\
          2 | \t<b />\n  \
@@ -134,7 +140,7 @@ fn strips_carriage_returns_from_crlf_sources() {
     let rendered = render_diagnostic(source, "w.mprx", &diagnostic(Severity::Error, "m", 5, 12));
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> w.mprx:2:1\n  \
          |\n\
          2 | <b />\n  \
@@ -146,7 +152,7 @@ fn strips_carriage_returns_from_crlf_sources() {
 fn span_starting_in_a_crlf_line_ending_points_just_past_the_visible_line() {
     // Byte 3 is the `\r`, byte 4 the `\n`: both render as column 4 with one caret.
     let source = "<a>\r\n<b />";
-    let expected = "error: m\n \
+    let expected = "error[syntax-error]: m\n \
          --> c.mprx:1:4\n  \
          |\n\
          1 | <a>\n  \
@@ -167,7 +173,7 @@ fn span_ending_inside_a_crlf_line_ending_underlines_only_visible_text() {
     let rendered = render_diagnostic(source, "c.mprx", &diagnostic(Severity::Error, "m", 0, 4));
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> c.mprx:1:1\n  \
          |\n\
          1 | <a>\n  \
@@ -181,7 +187,7 @@ fn widens_the_gutter_for_multi_digit_line_numbers() {
     let rendered = render_diagnostic(source, "l.mprx", &diagnostic(Severity::Error, "m", 9, 12));
     assert_eq!(
         rendered,
-        "error: m\n  \
+        "error[syntax-error]: m\n  \
          --> l.mprx:10:1\n   \
          |\n\
          10 | <a>\n   \
@@ -194,7 +200,7 @@ fn clamps_an_out_of_range_span_instead_of_panicking() {
     let rendered = render_diagnostic("<a>", "o.mprx", &diagnostic(Severity::Error, "m", 10, 20));
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> o.mprx:1:4\n  \
          |\n\
          1 | <a>\n  \
@@ -208,7 +214,7 @@ fn floors_a_span_that_splits_a_multi_byte_character() {
     let rendered = render_diagnostic("é", "b.mprx", &diagnostic(Severity::Error, "m", 1, 2));
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> b.mprx:1:1\n  \
          |\n\
          1 | é\n  \
@@ -223,7 +229,7 @@ fn skips_a_leading_byte_order_mark() {
     let rendered = render_diagnostic(source, "bom.mprx", &diagnostic(Severity::Error, "m", 3, 15));
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> bom.mprx:1:1\n  \
          |\n\
          1 | <div></span>\n  \
@@ -244,7 +250,7 @@ fn a_span_starting_on_the_byte_order_mark_points_at_the_first_character() {
         );
         assert_eq!(
             rendered,
-            format!("error: m\n --> bom.mprx:1:1\n  |\n1 | <a>\n  | {carets}"),
+            format!("error[syntax-error]: m\n --> bom.mprx:1:1\n  |\n1 | <a>\n  | {carets}"),
             "span {start}..{end}"
         );
     }
@@ -259,7 +265,7 @@ fn renders_a_file_holding_only_a_byte_order_mark_like_an_empty_file() {
     );
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> bom.mprx:1:1\n  \
          |\n\
          1 |\n  \
@@ -274,7 +280,7 @@ fn skips_a_byte_order_mark_in_a_crlf_source() {
     let rendered = render_diagnostic(source, "bom.mprx", &diagnostic(Severity::Error, "m", 3, 8));
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> bom.mprx:1:1\n  \
          |\n\
          1 | <a>\n  \
@@ -290,7 +296,7 @@ fn a_byte_order_mark_does_not_shift_later_lines() {
     let rendered = render_diagnostic(source, "bom.mprx", &diagnostic(Severity::Error, "m", 7, 12));
     assert_eq!(
         rendered,
-        "error: m\n \
+        "error[syntax-error]: m\n \
          --> bom.mprx:2:1\n  \
          |\n\
          2 | <b />\n  \

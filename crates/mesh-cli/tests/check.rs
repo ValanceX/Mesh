@@ -27,7 +27,7 @@ fn check_reports_an_error_for_invalid_source() {
         .arg(file.path())
         .assert()
         .failure()
-        .stderr(predicate::str::contains("error:"));
+        .stderr(predicate::str::contains("error["));
 }
 
 fn temp_mprx(contents: &str) -> tempfile::NamedTempFile {
@@ -51,9 +51,9 @@ fn check_exits_successfully_when_only_warnings_are_reported() {
         .success()
         .stdout("no errors\n")
         .stderr(predicate::str::contains(
-            "warning: duplicate attribute \"class\"",
+            "warning[duplicate-attribute]: duplicate attribute \"class\"",
         ))
-        .stderr(predicate::str::contains("error:").not());
+        .stderr(predicate::str::contains("error[").not());
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn check_renders_errors_with_a_source_snippet_and_fails() {
         .code(1)
         .stdout("")
         .stderr(predicate::str::contains(
-            "error: mismatched closing tag: opened with \"div\", closed with \"span\"\n",
+            "error[mismatched-closing-tag]: mismatched closing tag: opened with \"div\", closed with \"span\"\n",
         ))
         .stderr(predicate::str::contains(format!(
             " --> {}:1:1\n",

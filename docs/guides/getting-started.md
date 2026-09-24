@@ -58,7 +58,7 @@ Change the closing `</heading>` to `</title>` and check again:
 
 ```console
 $ mesh check hello.mprx
-error: mismatched closing tag: opened with "heading", closed with "title"
+error[mismatched-closing-tag]: mismatched closing tag: opened with "heading", closed with "title"
  --> hello.mprx:2:3
   |
 2 |   <heading>Users</title>
@@ -67,7 +67,7 @@ error: mismatched closing tag: opened with "heading", closed with "title"
 
 Each diagnostic is a block in the style of the Rust compiler:
 
-- The first line gives the **severity** (`error` or `warning`) and a message.
+- The first line gives the **severity** (`error` or `warning`), the diagnostic's **code** in brackets, and a message. The [diagnostics reference](../manual/diagnostics.md) explains every code.
 - `-->` gives the **location** as `file:line:column`. Lines and columns start at 1.
 - The source line is echoed, and carets (`^`) underline the problem.
 
@@ -81,7 +81,7 @@ Now undo that change and repeat an attribute:
 
 ```console
 $ mesh check hello.mprx
-warning: duplicate attribute "level": this occurrence is shadowed by a later one
+warning[duplicate-attribute]: duplicate attribute "level": this occurrence is shadowed by a later one
  --> hello.mprx:2:12
   |
 2 |   <heading level="1" level="2">Users</heading>

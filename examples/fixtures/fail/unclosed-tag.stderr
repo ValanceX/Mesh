@@ -1,4 +1,4 @@
-error: syntax error
+error[syntax-error]: syntax error
  --> fixtures/fail/unclosed-tag.mprx:1:1
   |
 1 | <page

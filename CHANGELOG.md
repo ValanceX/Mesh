@@ -7,10 +7,12 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 ### Added
 
 - **`mesh --version`** (and `-V`) prints the installed version.
+- **Diagnostic codes.** Every diagnostic has a stable, kebab-case code, shown in brackets after its severity: `error[mismatched-closing-tag]: …`. A code is never renamed or reused for a different meaning. The [diagnostics reference](./docs/manual/diagnostics.md) lists every code. In the Rust API, `Diagnostic` and `ParseError` have a new `code: DiagnosticCode` field.
 
 ### Changed
 
 - **Toolchain.** The repo pins its Rust toolchain in `rust-toolchain.toml`, and the minimum supported Rust version is 1.91. CI checks both.
+- **Diagnostic header.** The first line of a diagnostic is now `<severity>[<code>]: <message>` instead of `<severity>: <message>`. Which files pass or fail, and the exit statuses, are unchanged.
 - **Rust API.** Code that builds a `Diagnostic` or `ParseError` with a struct literal must set the new `code` field.
 
 ### Fixed

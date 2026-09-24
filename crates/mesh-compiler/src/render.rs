@@ -11,12 +11,12 @@ use mesh_syntax::Diagnostic;
 /// start of a file saved "with BOM".
 const BOM: char = '\u{feff}';
 
-/// Renders `diagnostic` rustc-style: a `severity: message` header, a
+/// Renders `diagnostic` rustc-style: a `severity[code]: message` header, a
 /// `--> path:line:column` location, and the source line the diagnostic
 /// starts on, underlined with carets:
 ///
 /// ```text
-/// error: mismatched closing tag: opened with "title", closed with "heading"
+/// error[mismatched-closing-tag]: mismatched closing tag: opened with "title", closed with "heading"
 ///  --> card.mprx:2:3
 ///   |
 /// 2 |   <title>Users</heading>
@@ -78,19 +78,20 @@ pub fn render_diagnostic(source: &str, path: &str, diagnostic: &Diagnostic) -> S
     // Omit the separating space for an empty line so no output line ends
     // in trailing whitespace (fixture `.stderr` files must survive editors
     // that strip it, and `git diff --check`).
-    let code = if line_text.is_empty() {
+    let snippet = if line_text.is_empty() {
         String::new()
     } else {
         format!(" {line_text}")
     };
 
     format!(
-        "{severity}: {message}\n\
+        "{severity}[{code}]: {message}\n\
          {gutter}--> {path}:{line_number}:{column}\n\
          {gutter} |\n\
-         {line_number} |{code}\n\
+         {line_number} |{snippet}\n\
          {gutter} | {indent}{carets}",
         severity = diagnostic.severity,
+        code = diagnostic.code,
         message = diagnostic.message,
     )
 }

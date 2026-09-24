@@ -54,7 +54,7 @@ Diagnostics come out in source order within each element: first the element's at
 Each diagnostic is one block:
 
 ```text
-<severity>: <message>
+<severity>[<code>]: <message>
  --> <file>:<line>:<column>
   |
 <N> | <source line>
@@ -64,7 +64,7 @@ Each diagnostic is one block:
 For example:
 
 ```text
-error: mismatched closing tag: opened with "title", closed with "heading"
+error[mismatched-closing-tag]: mismatched closing tag: opened with "title", closed with "heading"
  --> examples/fixtures/fail/mismatched-closing-tag.mprx:2:3
   |
 2 |   <title>Users</heading>
@@ -74,6 +74,7 @@ error: mismatched closing tag: opened with "title", closed with "heading"
 The exact rules:
 
 - **Severity** is `error` or `warning`.
+- **Code** is the diagnostic's stable code, such as `mismatched-closing-tag`. A code is never renamed or reused for a different meaning, so scripts can match on it; messages may change. The [diagnostics reference](./diagnostics.md) lists every code.
 - **`<file>`** is the path exactly as you passed it on the command line.
 - **Line and column** are 1-based. Columns count characters (Unicode scalar values), not bytes and not display width. A tab counts as one column.
 - **The gutter** (the spaces before `|`) widens to fit the line number, so line 120 gets a three-character gutter.
@@ -81,9 +82,9 @@ The exact rules:
 - **Tabs** in the source line are kept in the caret line's indentation, so carets line up in your terminal. Wide characters (CJK, emoji) may make the carets look shifted, because v0.1 doesn't measure display width.
 - **Windows line endings** (`\r\n`) are handled; the `\r` is never echoed or counted.
 - **A leading UTF-8 byte-order mark** is skipped: it isn't echoed or counted, so line 1's columns match what your editor shows.
-- The output has no colour and no error codes. It isn't machine-readable yet.
+- The output has no colour, and it isn't machine-readable yet.
 
-The full list of messages is in the [diagnostics reference](./diagnostics.md).
+The full list of codes and messages is in the [diagnostics reference](./diagnostics.md).
 
 ### Exit status
 

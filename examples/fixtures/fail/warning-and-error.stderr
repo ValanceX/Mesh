@@ -1,10 +1,10 @@
-warning: duplicate attribute "class": this occurrence is shadowed by a later one
+warning[duplicate-attribute]: duplicate attribute "class": this occurrence is shadowed by a later one
  --> fixtures/fail/warning-and-error.mprx:1:6
   |
 1 | <div class="a" class="b"></span>
   |      ^^^^^^^^^
 
-error: mismatched closing tag: opened with "div", closed with "span"
+error[mismatched-closing-tag]: mismatched closing tag: opened with "div", closed with "span"
  --> fixtures/fail/warning-and-error.mprx:1:1
   |
 1 | <div class="a" class="b"></span>

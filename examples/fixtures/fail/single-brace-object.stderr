@@ -1,4 +1,4 @@
-error: syntax error
+error[syntax-error]: syntax error
  --> fixtures/fail/single-brace-object.mprx:1:1
   |
 1 | <page data={ k: "v" } />
