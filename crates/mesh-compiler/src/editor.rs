@@ -16,6 +16,10 @@
 //!
 //! The rules for what is recovered are in
 //! `docs/superpowers/specs/2026-09-24-mesh-v0.3-editor-recovery.md`.
+//!
+//! [`candidates`] answers the other question an editor asks while the
+//! file is broken: what may be written here? Its answers come only from
+//! the manifest's declarations, offered only where analysis accepts them.
 
 use mesh_analysis::{Analysis, Resolution, Typed};
 use mesh_manifest::Template;
@@ -108,4 +112,186 @@ pub fn recover(source: &str, template: Template<'_>) -> Recovery {
     Recovery {
         parts: parts.into_iter().map(|(_, analysis)| analysis).collect(),
     }
+}
+
+/// What a completion candidate names.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CandidateKind {
+    Component,
+    Prop,
+    Event,
+    ScopeName,
+    Member,
+    Command,
+}
+
+/// A name that may be written at the cursor (outline D4), derived from a
+/// declaration in the manifest.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Candidate {
+    /// The text to write, such as `alt`, `on.click` or `user-card`.
+    pub label: String,
+    pub kind: CandidateKind,
+    /// Its declared type, or a command's signature, in the notation
+    /// diagnostics use.
+    pub detail: Option<String>,
+    /// Whether a prop or record field is required.
+    pub required: bool,
+    /// The partial name the label replaces.
+    pub replace: Span,
+}
+
+/// The names that may be written at byte `offset` of `source`, checked as
+/// the template of `template` (outline D4). `analysis` is the canonical
+/// compile's analysis of the same `source`, if it has one.
+///
+/// Every candidate comes from a declaration in the manifest, and each
+/// kind is offered only where analysis accepts it: components as tag
+/// names, a component's props and `on.` events in its opening tag,
+/// commands as the whole of an `on.` handler, scope names where any other
+/// expression may start, and after `.` exactly the members
+/// [`mesh_analysis::members`] gives the object's type. The object's type
+/// is the canonical analysis's, or, for a file with no analysis (a syntax
+/// error), [`mesh_analysis::analyze_expression`]'s. No type, no members.
+///
+/// The list is deterministic and has no two candidates with the same
+/// label and kind. Required props come before optional ones; otherwise
+/// everything is in name order, the manifest's.
+pub fn candidates(
+    source: &str,
+    offset: usize,
+    template: Template<'_>,
+    analysis: Option<&Analysis>,
+) -> Vec<Candidate> {
+    use mesh_analysis::{members, read_field, Ty};
+    use mesh_parser::Context;
+
+    let Some(completion) = mesh_parser::context_at(source, offset) else {
+        return Vec::new();
+    };
+    let replace = completion.replace;
+    let candidate = |label: String, kind, detail: Option<String>, required| Candidate {
+        label,
+        kind,
+        detail,
+        required,
+        replace,
+    };
+    let manifest = template.manifest();
+    let mut out: Vec<Candidate> = match completion.context {
+        Context::TagName => manifest
+            .components()
+            .keys()
+            .map(|name| candidate(name.clone(), CandidateKind::Component, None, false))
+            .collect(),
+        Context::AttributeName { tag } => {
+            let Some(component) = manifest.components().get(&tag) else {
+                return Vec::new();
+            };
+            let props = |required: bool| {
+                component
+                    .props
+                    .iter()
+                    .filter(move |(_, field)| field.required == required)
+                    .map(move |(name, field)| {
+                        candidate(
+                            name.clone(),
+                            CandidateKind::Prop,
+                            Some(Ty::from(&field.ty).to_string()),
+                            required,
+                        )
+                    })
+            };
+            let events = component.events.iter().map(|(name, event)| {
+                candidate(
+                    format!("on.{name}"),
+                    CandidateKind::Event,
+                    event.payload.as_ref().map(|ty| Ty::from(ty).to_string()),
+                    false,
+                )
+            });
+            props(true).chain(props(false)).chain(events).collect()
+        }
+        Context::EventName { tag } => {
+            let Some(component) = manifest.components().get(&tag) else {
+                return Vec::new();
+            };
+            component
+                .events
+                .iter()
+                .map(|(name, event)| {
+                    candidate(
+                        name.clone(),
+                        CandidateKind::Event,
+                        event.payload.as_ref().map(|ty| Ty::from(ty).to_string()),
+                        false,
+                    )
+                })
+                .collect()
+        }
+        Context::Handler => template
+            .component()
+            .commands
+            .iter()
+            .map(|(name, command)| {
+                let parameters: Vec<String> = command
+                    .parameters
+                    .iter()
+                    .map(|parameter| format!("{}: {}", parameter.name, Ty::from(&parameter.ty)))
+                    .collect();
+                candidate(
+                    name.clone(),
+                    CandidateKind::Command,
+                    Some(format!("{name}({})", parameters.join(", "))),
+                    false,
+                )
+            })
+            .collect(),
+        Context::Value => template
+            .component()
+            .scope
+            .iter()
+            .map(|(name, ty)| {
+                candidate(
+                    name.clone(),
+                    CandidateKind::ScopeName,
+                    Some(Ty::from(ty).to_string()),
+                    false,
+                )
+            })
+            .collect(),
+        Context::Member {
+            object,
+            object_span,
+        } => {
+            let ty = match analysis {
+                Some(analysis) => analysis.type_at(object_span).cloned(),
+                None => {
+                    let object = mesh_semantic::lower_expression(&object);
+                    mesh_analysis::analyze_expression(&object, template)
+                        .type_at(object_span)
+                        .cloned()
+                }
+            };
+            ty.and_then(|ty| members(manifest, &ty))
+                .into_iter()
+                .flatten()
+                .map(|(name, field)| {
+                    let read = read_field(manifest, &field);
+                    candidate(
+                        name,
+                        CandidateKind::Member,
+                        Some(read.to_string()),
+                        field.required,
+                    )
+                })
+                .collect()
+        }
+        _ => Vec::new(),
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    out.retain(|candidate| seen.insert((candidate.label.clone(), candidate.kind)));
+    out
 }

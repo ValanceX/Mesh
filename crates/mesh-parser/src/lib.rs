@@ -12,10 +12,12 @@ use mesh_syntax::{
 };
 use tree_sitter::Node;
 
+mod context;
 mod nesting;
 mod recover;
 mod syntax_errors;
 
+pub use context::{context_at, Completion, Context};
 pub use nesting::MAX_NESTING_DEPTH;
 pub use recover::{recover, Recovered, RecoveredExpression};
 

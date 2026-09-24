@@ -4,6 +4,7 @@
 
 use crate::types::{FieldTy, Ty};
 use mesh_manifest::Manifest;
+use std::collections::BTreeMap;
 
 /// `ty` with named references at its top level followed to their
 /// definition. The result is never [`Ty::Named`].
@@ -33,6 +34,27 @@ pub(crate) fn read(manifest: &Manifest, field: &FieldTy) -> Ty {
     } else {
         optional(manifest, field.ty.clone())
     }
+}
+
+/// The members a value of type `ty` has, by name, if it's a record once
+/// named references at its top level are expanded; `None` for every other
+/// type. This is the only rule for which members exist: the checker reads
+/// a member through it, and an editor offers its keys. An optional type
+/// has none (reading one is `possibly-absent-access`), and `any` has no
+/// list: every member of it is allowed and unknown.
+///
+/// A member's value, when read, has the type [`read_field`] gives.
+pub fn members(manifest: &Manifest, ty: &Ty) -> Option<BTreeMap<String, FieldTy>> {
+    match expand(manifest, ty) {
+        Ty::Record(fields) => Some(fields),
+        _ => None,
+    }
+}
+
+/// The type a record field's value has when it's read: requiredness is
+/// erased on read, so an optional field of type `T` reads as `T?`.
+pub fn read_field(manifest: &Manifest, field: &FieldTy) -> Ty {
+    read(manifest, field)
 }
 
 /// Whether a value of type `actual` may be used where `expected` is

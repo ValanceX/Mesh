@@ -23,6 +23,8 @@ use serde_json::{json, Value};
 pub(super) enum Query {
     Hover(Position),
     Definition(Position),
+    /// Answered on the compile thread (outline D4).
+    Completion(Position),
 }
 
 /// A request waiting for the snapshot it was made against.
@@ -50,8 +52,7 @@ impl Server {
                 .as_ref()
                 .is_some_and(|compiled| compiled.identity == identity);
         if ready {
-            let answer = self.answer(document, query);
-            return self.respond(id, answer);
+            return self.answer_now(id, document, query);
         }
         self.held.push(Held {
             id,
@@ -87,8 +88,7 @@ impl Server {
             match current {
                 Some((identity, compiled, failed)) if held.identity == identity => {
                     if compiled && !self.due.contains_key(document) {
-                        let answer = self.answer(document, held.query);
-                        self.respond(held.id, answer)?;
+                        self.answer_now(held.id, document, held.query)?;
                     } else if failed {
                         self.respond(held.id, Value::Null)?;
                     } else {
@@ -119,6 +119,14 @@ impl Server {
         let Some(id) = id else {
             return Ok(());
         };
+        if let Some(index) = self.completing.iter().position(|pending| pending == &id) {
+            let id = self.completing.remove(index);
+            return self.respond_error(
+                id,
+                ErrorCode::RequestCanceled,
+                "the request was cancelled".to_string(),
+            );
+        }
         let Some(index) = self.held.iter().position(|held| held.id == id) else {
             return Ok(());
         };
@@ -135,7 +143,21 @@ impl Server {
         for held in std::mem::take(&mut self.held) {
             self.respond(held.id, Value::Null)?;
         }
+        for id in std::mem::take(&mut self.completing) {
+            self.respond(id, Value::Null)?;
+        }
         Ok(())
+    }
+
+    /// Answers `query` from `document`'s compiled state, which is its
+    /// current snapshot's: at once, or for completion, once the compile
+    /// thread has the candidates.
+    fn answer_now(&mut self, id: RequestId, document: &str, query: Query) -> Sent {
+        if let Query::Completion(_) = query {
+            return self.start_completion(id, document, query);
+        }
+        let answer = self.answer(document, query);
+        self.respond(id, answer)
     }
 
     /// `query`'s answer from `document`'s compiled state. Only called
@@ -155,6 +177,7 @@ impl Server {
                     navigate::hover(facts, model, text, offset, self.client.markdown)
                 })
                 .map_or(Value::Null, |hover| json!(hover)),
+            Query::Completion(_) => Value::Null,
             Query::Definition(position) => {
                 let Some((_, snapshot)) = &compiled.template else {
                     return Value::Null;

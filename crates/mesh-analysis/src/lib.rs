@@ -25,7 +25,7 @@ mod check;
 mod relation;
 mod types;
 
-pub use relation::{is_assignable, join};
+pub use relation::{is_assignable, join, members, read_field};
 pub use types::{FieldTy, Ty};
 
 /// Analyzes `ir` as the template of `template`'s component.

@@ -552,27 +552,24 @@ impl<'m> Walker<'m> {
                     property: property.to_string(),
                     span: object_span,
                 });
-                None
+                return None;
             }
-            Ty::Any => Some(Ty::Any),
-            Ty::Record(fields) => match fields.get(property) {
-                Some(field) => Some(relation::read(manifest, field)),
-                None => {
-                    self.facts.push(Fact::UnknownMember {
-                        object: object_ty,
-                        property: property.to_string(),
-                        span: property_span,
-                        candidates: fields.keys().cloned().collect(),
-                    });
-                    None
-                }
-            },
-            _ => {
+            Ty::Any => return Some(Ty::Any),
+            _ => {}
+        }
+        // `members` is the one rule for which members a type has; an
+        // editor's completion offers exactly its keys.
+        let fields = relation::members(manifest, &object_ty);
+        match fields.as_ref().and_then(|fields| fields.get(property)) {
+            Some(field) => Some(relation::read(manifest, field)),
+            None => {
                 self.facts.push(Fact::UnknownMember {
                     object: object_ty,
                     property: property.to_string(),
                     span: property_span,
-                    candidates: Vec::new(),
+                    candidates: fields
+                        .map(|fields| fields.keys().cloned().collect())
+                        .unwrap_or_default(),
                 });
                 None
             }

@@ -8,6 +8,7 @@
 //! identity is still current. Anything else is dropped, so an older
 //! result never replaces a newer one.
 
+mod complete;
 mod documents;
 mod manifest;
 mod navigate;
@@ -15,15 +16,15 @@ mod requests;
 
 use crate::config::Config;
 use crate::convert::{self, Text};
-use crate::worker::{self, Worker};
+use crate::worker::{self, Finished, Worker};
 use crate::{uri, Options, Outcome};
 use crossbeam_channel::{after, never, select, Receiver, Sender};
 use documents::Document;
 use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, DocumentChanges,
-    GotoDefinitionParams, HoverParams, MessageType, OneOf, OptionalVersionedTextDocumentIdentifier,
-    TextDocumentEdit, TextEdit, WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CompletionParams,
+    DocumentChanges, GotoDefinitionParams, HoverParams, MessageType, OneOf,
+    OptionalVersionedTextDocumentIdentifier, TextDocumentEdit, TextEdit, WorkspaceEdit,
 };
 use manifest::ManifestState;
 use mesh_compiler::{ColumnUnit, SourceMap};
@@ -98,6 +99,8 @@ struct Server {
     pending_logs: Vec<(MessageType, String)>,
     /// Requests waiting for their snapshot to be compiled.
     held: Vec<Held>,
+    /// Completions the compile thread is working on.
+    completing: Vec<RequestId>,
 }
 
 pub(crate) fn run(connection: lsp_server::Connection, options: Options) -> Outcome {
@@ -128,6 +131,7 @@ pub(crate) fn run(connection: lsp_server::Connection, options: Options) -> Outco
         unconfigured_logged: BTreeSet::new(),
         pending_logs: Vec::new(),
         held: Vec::new(),
+        completing: Vec::new(),
     };
     drop(connection);
 
@@ -144,7 +148,10 @@ pub(crate) fn run(connection: lsp_server::Connection, options: Options) -> Outco
                 Err(_) => return Outcome::Disconnected,
             },
             recv(results) -> done => match done {
-                Ok(done) => server.finish(done).map(|()| Flow::Continue),
+                Ok(Finished::Compiled(done)) => server.finish(done).map(|()| Flow::Continue),
+                Ok(Finished::Completed(done)) => {
+                    server.finish_completion(done).map(|()| Flow::Continue)
+                }
                 Err(_) => Ok(Flow::Continue),
             },
             recv(timer) -> _ => server.compile_due().map(|()| Flow::Continue),
@@ -287,6 +294,16 @@ impl Server {
                     Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
                 }
             }
+            (Protocol::Running, "textDocument/completion") => {
+                match decode::<CompletionParams>(&method, params) {
+                    Ok(params) => {
+                        let position = params.text_document_position;
+                        let document = position.text_document.uri.as_str().to_string();
+                        self.answer_or_hold(id, &document, Query::Completion(position.position))?;
+                    }
+                    Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
+                }
+            }
             (Protocol::Running, "mesh/panicForTest") if self.options.test_hooks => {
                 panic!("mesh/panicForTest asked for a panic")
             }
@@ -425,6 +442,7 @@ impl Server {
                     "codeActionProvider": { "codeActionKinds": ["quickfix"] },
                     "hoverProvider": true,
                     "definitionProvider": true,
+                    "completionProvider": { "triggerCharacters": ["<", "."], "resolveProvider": false },
                     "workspace": { "workspaceFolders": { "supported": false } }
                 },
                 "serverInfo": { "name": "mesh-lsp", "version": env!("CARGO_PKG_VERSION") }

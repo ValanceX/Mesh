@@ -129,6 +129,11 @@ impl Client {
         self.position_request("textDocument/definition", uri, line, character)
     }
 
+    /// The result of `textDocument/completion`.
+    pub fn completion(&mut self, uri: &str, line: u32, character: u32) -> Value {
+        self.position_request("textDocument/completion", uri, line, character)
+    }
+
     fn position_request(&mut self, method: &str, uri: &str, line: u32, character: u32) -> Value {
         let response = self.request(method, position_params(uri, line, character));
         response

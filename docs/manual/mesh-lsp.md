@@ -10,8 +10,9 @@ What it does today:
 - **Quick fixes** from suggestions: `did you mean "user"?` becomes a one-click replacement.
 - **Hover:** the type of the expression under the cursor, and what a name is declared as in the manifest.
 - **Go to definition:** from a tag, prop, event, command or scope name to where the manifest declares it.
+- **Completion** of tags, props, events, scope names, record members and commands, from the manifest.
 
-Completion, and highlighting queries for the grammar, are coming in later v0.3 passes.
+Highlighting queries for the grammar are coming in a later v0.3 pass.
 
 ## Installing
 
@@ -96,9 +97,25 @@ Types are written the way diagnostics write them. Hovers are Markdown if the cli
 
 **Go to definition** jumps to the name's key in the manifest, such as `"avatar"` under `"components"`. If the manifest is open in the editor, that's its current text.
 
-**Right after typing.** A request made before the new text has been checked waits for that check, which then runs at once instead of after the usual 150 ms. If you change the text again before it's answered, it's answered with `ContentModified`, which editors treat as "ask again".
+## Completion
 
-**Positions** are counted in the unit the client prefers: UTF-8 if it offers that, then UTF-32, and UTF-16 otherwise.
+Completion offers only names the manifest declares, and each only where the compiler accepts it:
+
+- **After `<`:** every component.
+- **In an opening tag,** after its name or a whole attribute: the component's props, required ones first (marked *required*), then the rest, then its events as `on.click`. After `on.`, just its events.
+- **At the start of an `on.` handler:** the template's commands. A handler must be a command, so nothing else is offered there.
+- **Where any other expression starts:** the names in the template's scope.
+- **After `.`:** the fields of the value's type, if it's a record. A value that may be absent has none (reading through it is `possibly-absent-access`), and neither does `any` or a value whose type isn't known, such as a name that isn't in scope.
+
+Everything else is in name order. It works while the file is broken, which it almost always is while you type: after `user.`, after `<avatar `, after a bare `<`. Like hover, it needs a model; without one it offers nothing. It doesn't complete attribute values, text inside strings, closing tags, object keys, `$event`, or argument lists.
+
+## Requests right after typing
+
+A hover, definition or completion request made before the new text has been checked waits for that check, which then runs at once instead of after the usual 150 ms. If you change the text again before it's answered, it's answered with `ContentModified`, which editors treat as "ask again".
+
+## Positions
+
+Positions are counted in the unit the client prefers: UTF-8 if it offers that, then UTF-32, and UTF-16 otherwise.
 
 ## Exit status
 
