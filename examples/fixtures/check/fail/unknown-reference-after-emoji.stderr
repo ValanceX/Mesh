@@ -1,0 +1,6 @@
+error[unknown-reference]: unknown reference "usr": it isn't in the template's scope
+ --> fixtures/check/fail/unknown-reference-after-emoji.mprx:1:26
+  |
+1 | <page title="😀 Users">😀 {usr.name}</page>
+  |                          ^^^
+  = help: did you mean "user"?

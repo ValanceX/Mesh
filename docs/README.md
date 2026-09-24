@@ -16,6 +16,7 @@ Learning-oriented walkthroughs.
 Reference material for when you need exact details.
 
 - [**`mesh` CLI manual**](./manual/mesh-cli.md): commands, output streams, the human and JSON diagnostic formats, and exit codes.
+- [**`mesh-lsp` manual**](./manual/mesh-lsp.md): the language server: installing, configuring it for your editor, and what it publishes when.
 - [**Diagnostics reference**](./manual/diagnostics.md): every diagnostic code and message, what causes it, and how to fix it.
 - [**Component manifest reference**](./manual/manifest.md): the manifest's format, version 1, and how it's validated. Also published as a [JSON Schema](../schemas/manifest-v1.schema.json).
 - [**Diagnostics JSON Schema**](../schemas/diagnostics-v1.schema.json): the document `mesh check --format json` prints.

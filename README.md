@@ -84,7 +84,7 @@ mesh/
 │   ├── mesh-manifest/        component manifest loading and validation
 │   ├── mesh-analysis/        checking templates against a component manifest
 │   ├── mesh-compiler/        compile API, diagnostics, and rendering
-│   ├── mesh-lsp/             language server (a placeholder)
+│   ├── mesh-lsp/             the language server, a client of the compiler
 │   └── mesh-cli/             the `mesh` command-line tool
 ├── grammar/
 │   └── tree-sitter-mprx/     the MPRX Tree-sitter grammar
@@ -110,9 +110,11 @@ mesh/
 - rustc-style diagnostics with stable codes, located syntax errors, and did-you-mean suggestions; warnings don't fail the check
 - JSON diagnostics (`mesh check --format json`)
 
-Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. The language server and npm packages are placeholders.
+In development for v0.3: the `mesh-lsp` language server, which already publishes the compiler's diagnostics and quick fixes (see its [manual](./docs/manual/mesh-lsp.md)).
 
-Next up: editor support through `mesh-lsp`.
+Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. The npm packages are placeholders.
+
+Next up: hover, go-to-definition and completion in `mesh-lsp`.
 
 ## Learn more
 

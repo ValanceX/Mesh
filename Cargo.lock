@@ -544,6 +544,7 @@ dependencies = [
  "clap",
  "jsonschema",
  "mesh-compiler",
+ "mesh-lsp",
  "mesh-manifest",
  "mesh-semantic",
  "mesh-syntax",
