@@ -100,3 +100,18 @@ fn the_schema_agrees_with_every_broken_manifest_fixture() {
     // Guards against a moved directory making the test pass vacuously.
     assert!(checked >= 12, "only {checked} fixtures were checked");
 }
+
+/// The manifest reference's first example is a manifest that both the
+/// loader and the schema accept.
+#[test]
+fn the_manifest_references_example_is_valid() {
+    let reference = read(&repo("docs/manual/manifest.md"));
+    let example = reference
+        .split("```json\n")
+        .nth(1)
+        .and_then(|block| block.split("```").next())
+        .expect("the reference opens with an example manifest");
+    mesh_manifest::load(example).expect("the loader accepts the example");
+    let example: serde_json::Value = serde_json::from_str(example).expect("the example is JSON");
+    assert!(validator().is_valid(&example));
+}

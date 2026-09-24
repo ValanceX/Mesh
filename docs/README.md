@@ -8,15 +8,17 @@ Learning-oriented walkthroughs.
 
 - [**Getting started**](./guides/getting-started.md): install `mesh`, write and check your first file, and read diagnostics.
 - [**Writing MPRX**](./guides/writing-mprx.md): a tour of everything the v0.1 language supports, plus common mistakes and their fixes.
+- [**Checking against a component model**](./guides/checking-against-a-component-model.md): declare your components in a manifest and check what a file means, not just its shape; requiredness, absence and `any`, explained.
 - [**Embedding the compiler**](./guides/embedding-the-compiler.md): call MESH from Rust, handle diagnostics, and walk the Semantic IR.
 
 ## Manuals
 
 Reference material for when you need exact details.
 
-- [**`mesh` CLI manual**](./manual/mesh-cli.md): commands, output streams, diagnostic format, and exit codes.
+- [**`mesh` CLI manual**](./manual/mesh-cli.md): commands, output streams, the human and JSON diagnostic formats, and exit codes.
 - [**Diagnostics reference**](./manual/diagnostics.md): every diagnostic code and message, what causes it, and how to fix it.
-- [**Manifest JSON Schema**](../schemas/manifest-v1.schema.json): the component manifest's format, version 1.
+- [**Component manifest reference**](./manual/manifest.md): the manifest's format, version 1, and how it's validated. Also published as a [JSON Schema](../schemas/manifest-v1.schema.json).
+- [**Diagnostics JSON Schema**](../schemas/diagnostics-v1.schema.json): the document `mesh check --format json` prints.
 - [**MPRX Language Spec**](./MPRX-SPEC.md): the canonical grammar and semantics.
 
 ## Background
