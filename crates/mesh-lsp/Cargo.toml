@@ -5,11 +5,24 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "The MESH language server for MPRX (a placeholder): a client of mesh-compiler, with no semantics of its own."
+description = "The MESH language server for MPRX: a client of mesh-compiler, with no semantics of its own."
 
 [lints]
 workspace = true
 
+[[bin]]
+name = "mesh-lsp"
+path = "src/main.rs"
+
 [dependencies]
 mesh-syntax.workspace = true
 mesh-compiler.workspace = true
+mesh-manifest.workspace = true
+lsp-server = "0.10"
+lsp-types = "0.97"
+crossbeam-channel = "0.5"
+serde = "1"
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
