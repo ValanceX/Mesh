@@ -75,6 +75,51 @@ impl Analysis {
             .find(|typed| typed.span == span)
             .map(|typed| &typed.ty)
     }
+
+    /// The name at byte `offset` and what it resolved to, if a resolved
+    /// name contains it. See [`Analysis::typed_at`] for what "at" means.
+    pub fn resolution_at(&self, offset: usize) -> Option<&Resolution> {
+        innermost(&self.resolutions, offset, |resolution| resolution.span)
+    }
+
+    /// The innermost expression with a type that contains byte `offset`.
+    ///
+    /// A span contains an offset from its start to its end, both
+    /// included, so a cursor just after a name still finds it. Where
+    /// several spans contain the offset, the shortest wins. Two different
+    /// spans of the same length can only both contain it where one ends
+    /// and the other starts, and then the one that starts there wins.
+    pub fn typed_at(&self, offset: usize) -> Option<&Typed> {
+        innermost(&self.types, offset, |typed| typed.span)
+    }
+
+    /// Every fact whose span contains byte `offset`, in [`Analysis::facts`]
+    /// order. Containment is as for [`Analysis::typed_at`].
+    pub fn facts_at(&self, offset: usize) -> impl Iterator<Item = &Fact> {
+        self.facts
+            .iter()
+            .filter(move |fact| contains(fact.span(), offset))
+    }
+}
+
+/// Whether `span` contains `offset`, both ends included.
+fn contains(span: Span, offset: usize) -> bool {
+    span.start_byte <= offset && offset <= span.end_byte
+}
+
+/// The item of `items` whose span contains `offset` and is shortest,
+/// preferring the later start between spans of equal length.
+fn innermost<T>(items: &[T], offset: usize, span: impl Fn(&T) -> Span) -> Option<&T> {
+    items
+        .iter()
+        .filter(|item| contains(span(item), offset))
+        .min_by_key(|item| {
+            let span = span(item);
+            (
+                span.end_byte - span.start_byte,
+                std::cmp::Reverse(span.start_byte),
+            )
+        })
 }
 
 /// An expression's span, and its type.
@@ -298,5 +343,36 @@ impl Fact {
             | Fact::UnknownField { span, .. }
             | Fact::MissingRequiredField { span, .. } => *span,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn span(start_byte: usize, end_byte: usize) -> Span {
+        Span {
+            start_byte,
+            end_byte,
+        }
+    }
+
+    /// Analysis lists operands before the expressions around them, so
+    /// the example-based tests can't tell "innermost" from "first". These
+    /// list the outer span first.
+    #[test]
+    fn the_shortest_containing_span_wins_whatever_the_order() {
+        let spans = [span(0, 10), span(2, 8), span(3, 5), span(20, 21)];
+        assert_eq!(innermost(&spans, 4, |s| *s), Some(&span(3, 5)));
+        assert_eq!(innermost(&spans, 1, |s| *s), Some(&span(0, 10)));
+        assert_eq!(innermost(&spans, 15, |s| *s), None);
+    }
+
+    #[test]
+    fn both_ends_are_included_and_a_tie_goes_to_the_later_start() {
+        let spans = [span(0, 3), span(3, 6)];
+        assert_eq!(innermost(&spans, 0, |s| *s), Some(&span(0, 3)));
+        assert_eq!(innermost(&spans, 3, |s| *s), Some(&span(3, 6)));
+        assert_eq!(innermost(&spans, 6, |s| *s), Some(&span(3, 6)));
     }
 }

@@ -7,6 +7,7 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 ### Added
 
 - **Rust API: `mesh_compiler::SourceMap`.** It maps a byte offset to a 0-based line and column, and back, counting columns in `char`s, UTF-8 bytes or UTF-16 code units (`ColumnUnit`). Its rules are exactly the ones `mesh check`'s output follows: a leading byte-order mark and a line's `\r` aren't columns, and out-of-range offsets and positions clamp instead of panicking. The human and JSON renderers now use it, with unchanged output.
+- **Rust API: offset queries on `mesh_analysis::Analysis`.** `resolution_at`, `typed_at` and `facts_at` answer what an editor asks: what name, typed expression or problem is at this byte? The innermost match wins, and a span includes both of its ends, so a cursor just after a name still finds it.
 
 ### Fixed
 
