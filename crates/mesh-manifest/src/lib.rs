@@ -21,8 +21,10 @@ mod validate;
 /// The manifest schema version this MESH reads.
 pub const VERSION: u64 = 1;
 
-/// The deepest that a manifest's JSON arrays and objects may nest. The
-/// document itself is level 1. A deeper manifest is a
+/// The deepest that MESH supports nesting a manifest's JSON arrays and
+/// objects. The format itself has no limit: this is a resource limit of
+/// this implementation, and a later version may change it. The document
+/// itself is level 1. A deeper manifest is a
 /// `manifest-nesting-too-deep` error, reported before anything else is
 /// checked.
 pub const MAX_NESTING_DEPTH: usize = 128;
@@ -296,7 +298,7 @@ pub fn load(source: &str) -> Result<Manifest, Vec<Diagnostic>> {
             json::ReadError::TooDeep { span } => (
                 DiagnosticCode::MANIFEST_NESTING_TOO_DEEP,
                 format!(
-                    "the manifest nests arrays and objects more than {MAX_NESTING_DEPTH} levels deep"
+                    "the manifest nests arrays and objects more than {MAX_NESTING_DEPTH} levels deep, the deepest MESH supports"
                 ),
                 span,
             ),

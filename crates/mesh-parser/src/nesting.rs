@@ -13,7 +13,9 @@ use tree_sitter::Node;
 
 use crate::{span_of, ParseError};
 
-/// The deepest that elements and expressions may nest. Every element and
+/// The deepest that MESH supports nesting elements and expressions. MPRX
+/// itself has no limit: this is a resource limit of this implementation
+/// (outline D12), and a later version may change it. Every element and
 /// every expression inside another counts as one level, and so does each
 /// pair of parentheses: `<a><b x={-(y)} /></a>` is 5 levels deep at `y`.
 /// That is deeper than any handwritten UI goes, and shallow enough that
@@ -33,8 +35,8 @@ pub(crate) fn check(root: Node) -> Option<ParseError> {
             return Some(ParseError {
                 code: DiagnosticCode::NESTING_TOO_DEEP,
                 message: format!(
-                    "this is nested more than {MAX_NESTING_DEPTH} levels deep; \
-                     elements and expressions can't nest any deeper"
+                    "this is nested more than {MAX_NESTING_DEPTH} levels deep, \
+                     the deepest MESH supports"
                 ),
                 span: level_span(node),
             });

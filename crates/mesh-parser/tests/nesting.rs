@@ -68,7 +68,7 @@ fn an_element_past_the_limit_is_reported_at_its_tag_name() {
     assert_eq!(parsed.errors[0].span.start_byte, 3 * MAX_NESTING_DEPTH + 1);
     assert_eq!(
         parsed.errors[0].message,
-        "this is nested more than 128 levels deep; elements and expressions can't nest any deeper"
+        "this is nested more than 128 levels deep, the deepest MESH supports"
     );
 }
 

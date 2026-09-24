@@ -192,10 +192,10 @@ When one element has several malformed bindings, the parser may recover them as 
 
 ### `nesting-too-deep`
 
-The file is valid MPRX, but it nests more than 128 levels deep. Every element counts as a level, and so does every expression inside another one and every pair of parentheses, so `<a><b x={-(y)} /></a>` is 5 levels deep at `y`. A chain of operators nests too: in `a + b + c`, `a` is 3 expressions deep. The limit keeps MESH from running out of stack on a pathological file, which would crash it instead of reporting an error.
+The file is valid MPRX, but it nests more than 128 levels deep, the deepest MESH supports. MPRX itself sets no limit: this one is MESH's, and a later version may raise it. Every element counts as a level, and so does every expression inside another one and every pair of parentheses, so `<a><b x={-(y)} /></a>` is 5 levels deep at `y`. A chain of operators nests too: in `a + b + c`, `a` is 3 expressions deep. The limit keeps MESH from running out of stack on a pathological file, which would crash it instead of reporting an error.
 
 ```text
-error[nesting-too-deep]: this is nested more than 128 levels deep; elements and expressions can't nest any deeper
+error[nesting-too-deep]: this is nested more than 128 levels deep, the deepest MESH supports
    --> examples/fixtures/fail/nesting-too-deep.mprx:129:2
     |
 129 | <box>
@@ -286,10 +286,10 @@ Only the first JSON syntax error is reported. A leading byte-order mark is allow
 
 ### `manifest-nesting-too-deep`
 
-The manifest is valid JSON, but its arrays and objects nest more than 128 levels deep. The document itself is level 1. This is checked right after the JSON syntax, before anything else, and reported at the first `[` or `{` too deep.
+The manifest is valid JSON, but its arrays and objects nest more than 128 levels deep, the deepest MESH supports. The manifest format sets no limit: this one is MESH's, and a later version may raise it. The document itself is level 1. This is checked right after the JSON syntax, before anything else, and reported at the first `[` or `{` too deep.
 
 ```text
-error[manifest-nesting-too-deep]: the manifest nests arrays and objects more than 128 levels deep
+error[manifest-nesting-too-deep]: the manifest nests arrays and objects more than 128 levels deep, the deepest MESH supports
    --> examples/fixtures/manifest/fail/nesting-too-deep.json:131:1
     |
 131 | { "kind": "string" }

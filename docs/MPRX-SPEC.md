@@ -165,8 +165,10 @@ not just in attribute values — `docs/ARCHITECTURE.md`'s own example,
 content, and `container_element`'s grammar now uses `repeat($.child)` so
 an element can hold any number of text/expression children in any order.
 
-**Nesting limit:** a file may nest at most 128 levels deep. Every
-element counts as a level, and so does every expression inside another
+**Nesting limit:** MPRX itself sets no limit on nesting, but MESH
+supports files nested at most 128 levels deep. That is a resource limit
+of this implementation, not a rule of the language, and a later version
+may change it. Every element counts as a level, and so does every expression inside another
 one and every pair of parentheses, so `<a><b x={-(y)} /></a>` is 5
 levels deep at `y`. A deeper file is rejected by `mesh-parser` with a
 `nesting-too-deep` error, like a syntax error: it gets no AST, and so

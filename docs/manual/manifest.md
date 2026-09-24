@@ -174,3 +174,5 @@ The nesting limit belongs to this MESH, not to the format: it keeps a pathologic
 ## Versions
 
 This page describes version 1, the only version this MESH reads. A version 1 manifest keeps meaning what this page says: a change to the format that would change what an existing manifest means, or reject one that is valid today, comes with a new version number. A change that only allows something new, such as a new `"kind"`, may not.
+
+The promise covers what a manifest means and whether the format allows it. An implementation's documented resource limits, such as the nesting limit, are not part of the format, and a version of MESH may change them.

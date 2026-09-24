@@ -1,4 +1,4 @@
-error[nesting-too-deep]: this is nested more than 128 levels deep; elements and expressions can't nest any deeper
+error[nesting-too-deep]: this is nested more than 128 levels deep, the deepest MESH supports
    --> fixtures/fail/nesting-too-deep.mprx:129:2
     |
 129 | <box>

@@ -1,4 +1,4 @@
-error[manifest-nesting-too-deep]: the manifest nests arrays and objects more than 128 levels deep
+error[manifest-nesting-too-deep]: the manifest nests arrays and objects more than 128 levels deep, the deepest MESH supports
    --> fixtures/manifest/fail/nesting-too-deep.json:131:1
     |
 131 | { "kind": "string" }

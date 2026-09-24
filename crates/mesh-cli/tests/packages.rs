@@ -9,7 +9,10 @@ fn packages() -> Vec<(String, serde_json::Value)> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages");
     let mut found = Vec::new();
     for entry in fs::read_dir(&root).expect("should read packages/") {
-        let path = entry.expect("a directory entry").path().join("package.json");
+        let path = entry
+            .expect("a directory entry")
+            .path()
+            .join("package.json");
         let text = fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("should read {}: {err}", path.display()));
         let json = serde_json::from_str(&text).expect("package.json is JSON");
@@ -22,7 +25,11 @@ fn packages() -> Vec<(String, serde_json::Value)> {
 #[test]
 fn every_package_is_scoped_valance() {
     let packages = packages();
-    assert!(packages.len() >= 3, "only {} packages found", packages.len());
+    assert!(
+        packages.len() >= 3,
+        "only {} packages found",
+        packages.len()
+    );
     for (path, json) in packages {
         let name = json["name"].as_str().expect("a package has a name");
         assert!(name.starts_with("@valance/"), "{path}: {name}");
