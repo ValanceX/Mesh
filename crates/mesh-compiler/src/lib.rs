@@ -11,9 +11,11 @@ mod diagnose;
 mod json;
 mod position;
 mod render;
+pub mod source_map;
 
 pub use json::render_json;
 pub use render::render_diagnostic;
+pub use source_map::{ColumnUnit, LineColumn, SourceMap};
 
 /// The result of compiling one MPRX source file: the Semantic IR, if
 /// compilation succeeded, and every diagnostic produced along the way.

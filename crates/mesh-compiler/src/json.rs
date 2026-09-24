@@ -6,6 +6,7 @@
 //! `schemas/diagnostics-v1.schema.json`.
 
 use crate::position::locate;
+use crate::source_map::SourceMap;
 use mesh_syntax::{Diagnostic, Span};
 use serde::Serialize;
 
@@ -49,17 +50,17 @@ struct Position {
 }
 
 impl JsonSpan {
-    fn new(source: &str, span: Span) -> Self {
+    fn new(map: &SourceMap, source: &str, span: Span) -> Self {
         JsonSpan {
-            start: Position::new(source, span.start_byte),
-            end: Position::new(source, span.end_byte),
+            start: Position::new(map, source, span.start_byte),
+            end: Position::new(map, source, span.end_byte),
         }
     }
 }
 
 impl Position {
-    fn new(source: &str, byte: usize) -> Self {
-        let located = locate(source, byte);
+    fn new(map: &SourceMap, source: &str, byte: usize) -> Self {
+        let located = locate(map, source, byte);
         Position {
             byte,
             line: located.line,
@@ -88,6 +89,9 @@ impl Position {
 ///
 /// [`render_diagnostic`]: crate::render_diagnostic
 pub fn render_json(source: &str, path: &str, diagnostics: &[Diagnostic]) -> String {
+    // One map for the whole document, so locating every span costs
+    // O(log lines + line length), not a scan of the whole source.
+    let map = SourceMap::new(source);
     let document = Document {
         version: VERSION,
         diagnostics: diagnostics
@@ -97,13 +101,13 @@ pub fn render_json(source: &str, path: &str, diagnostics: &[Diagnostic]) -> Stri
                 code: diagnostic.code.as_str(),
                 message: &diagnostic.message,
                 path,
-                span: JsonSpan::new(source, diagnostic.span),
+                span: JsonSpan::new(&map, source, diagnostic.span),
                 suggestions: diagnostic
                     .suggestions
                     .iter()
                     .map(|suggestion| JsonSuggestion {
                         replacement: &suggestion.replacement,
-                        span: JsonSpan::new(source, suggestion.span),
+                        span: JsonSpan::new(&map, source, suggestion.span),
                     })
                     .collect(),
             })

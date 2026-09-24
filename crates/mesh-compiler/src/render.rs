@@ -6,6 +6,7 @@
 //! terminal presentation belongs to the compiler's semantic model.
 
 use crate::position::locate;
+use crate::source_map::SourceMap;
 use mesh_syntax::Diagnostic;
 
 /// Renders `diagnostic` rustc-style: a `severity[code]: message` header, a
@@ -56,7 +57,7 @@ pub fn render_diagnostic(source: &str, path: &str, diagnostic: &Diagnostic) -> S
     // line ending (`\r` or `\n`) points just past the last visible
     // character, and one starting on the byte-order mark points at the
     // first character.
-    let at = locate(source, start);
+    let at = locate(&SourceMap::new(source), source, start);
     let line_number = at.line;
     let column = at.column;
     let line_text = &source[at.text.clone()];
