@@ -12,7 +12,7 @@ What it does today:
 - **Go to definition:** from a tag, prop, event, command or scope name to where the manifest declares it.
 - **Completion** of tags, props, events, scope names, record members and commands, from the manifest.
 
-Highlighting queries for the grammar are coming in a later v0.3 pass.
+Syntax highlighting comes from the grammar's Tree-sitter queries, not from the server. The [editor setup guide](../guides/editor-setup.md) sets up both.
 
 ## Installing
 
@@ -45,27 +45,16 @@ The settings are one object, the `"mesh"` section:
 | `model` | The manifest, as a path relative to the workspace root (or absolute). Without it, every document is checked without a model, as `mesh check` without `--model` checks it. |
 | `components` | Each document's path, relative to the workspace root and written with `/`, mapped to the component whose template it is. A document the map doesn't name is checked without a model, and the server logs that once. |
 
-The server reads the settings from the client's `initializationOptions`. When they change (`workspace/didChangeConfiguration`), it asks the client for section `"mesh"` if the client supports `workspace/configuration`, and otherwise reads `settings.mesh` from the notification. A setting of the wrong type is logged and left out; it never stops the server.
+The server reads the settings from the client's `initializationOptions`. If the client supports `workspace/configuration`, the server also asks it for section `"mesh"` at startup; the answer replaces `initializationOptions` unless it's empty. When the settings change (`workspace/didChangeConfiguration`), it asks again if the client supports that, and otherwise reads `settings.mesh` from the notification. A setting of the wrong type is logged and left out; it never stops the server.
 
-For example, in Neovim 0.10 or later. This example hasn't been tried in a running editor yet; the editor setup guide planned for v0.3 will verify it:
+The [editor setup guide](../guides/editor-setup.md) has a complete configuration for Neovim, checked in a running Neovim, and an unverified one for Helix.
 
-```lua
-vim.filetype.add({ extension = { mprx = "mprx" } })
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "mprx",
-  callback = function(args)
-    vim.lsp.start({
-      name = "mesh-lsp",
-      cmd = { "mesh-lsp" },
-      root_dir = vim.fs.root(args.buf, { "components.json", ".git" }),
-      init_options = {
-        model = "components.json",
-        components = { ["users-page.mprx"] = "users-page" },
-      },
-    })
-  end,
-})
-```
+### Which files it checks
+
+- **MPRX documents** are the ones the client opens with `languageId` `mprx`. Configure your editor to send that for `.mprx` files; the server doesn't look at file extensions. Any other document is ignored: nothing is checked or published for it.
+- **The manifest** is the file `model` names, recognized by its path whatever its `languageId`. Attach the server to it (usually to JSON files) to see its diagnostics and to have unsaved edits to it take effect.
+
+What each open file is gets decided again whenever the settings change: a manifest you opened before configuring `model` becomes the manifest, and one that `model` no longer names stops being it.
 
 ## What it publishes, and when
 
@@ -127,6 +116,6 @@ A message that isn't JSON-RPC at all (not JSON, or JSON without a method or id) 
 
 - **One workspace root:** the first workspace folder, or `rootUri`. Multi-root workspaces aren't supported.
 - **Paths compare exactly.** On a case-insensitive file system, write `components` keys with the same case the editor uses.
-- **Disk changes to the manifest** are seen automatically only if the client supports registering file watchers dynamically. Otherwise they're seen when you reopen the manifest or change the settings.
+- **Disk changes to the manifest** are seen automatically only if the client supports registering file watchers dynamically (Neovim doesn't on Linux). Otherwise they're seen when you open the manifest in the editor or change the settings.
 - **Closing tags and members have no definition.** Go to definition works from an opening tag's name, not a closing tag's, and from `user` in `user.name` but not from `name`, which hover still shows the type of.
 - **A lone `\r`** (a classic Mac line ending) isn't a line break to MESH, so positions in such a file disagree with the editor's.
