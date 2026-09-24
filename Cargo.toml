@@ -13,7 +13,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 # `str::floor_char_boundary` (mesh-compiler's renderer) was stabilized in 1.91.
 rust-version = "1.91"

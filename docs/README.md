@@ -1,6 +1,6 @@
 # MESH documentation
 
-Documentation for **MESH v0.2**. New here? Start with *Getting started*.
+Documentation for **MESH v0.3**. New here? Start with *Getting started*.
 
 ## Guides
 
@@ -26,7 +26,7 @@ Reference material for when you need exact details.
 ## Background
 
 - [**Architecture**](./ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance.
-- Release notes for [**v0.2**](./releases/v0.2.md) and [**v0.1**](./releases/v0.1.md), and the [**CHANGELOG**](../CHANGELOG.md).
+- Release notes for [**v0.3**](./releases/v0.3.md), [**v0.2**](./releases/v0.2.md) and [**v0.1**](./releases/v0.1.md), and the [**CHANGELOG**](../CHANGELOG.md).
 
 ## For contributors
 

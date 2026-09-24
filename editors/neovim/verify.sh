@@ -6,6 +6,7 @@
 #
 #   editors/neovim/verify.sh            # uses `nvim` from PATH
 #   NVIM=/path/to/nvim editors/neovim/verify.sh
+#   MESH_LSP=~/.cargo/bin/mesh-lsp editors/neovim/verify.sh   # an installed server
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -15,10 +16,15 @@ trap 'rm -rf "$work"' EXIT
 
 "$nvim" --version | head -n 1
 
-# mesh-lsp, on PATH as `cargo install` would put it.
-cargo build --quiet --manifest-path "$repo/Cargo.toml" -p mesh-lsp
+# mesh-lsp, on PATH as `cargo install` would put it: MESH_LSP if set (an
+# installed binary), otherwise built from this checkout.
 mkdir -p "$work/bin"
-cp "$repo/target/debug/mesh-lsp" "$work/bin/"
+if [ -n "${MESH_LSP:-}" ]; then
+  cp "$MESH_LSP" "$work/bin/mesh-lsp"
+else
+  cargo build --quiet --manifest-path "$repo/Cargo.toml" -p mesh-lsp
+  cp "$repo/target/debug/mesh-lsp" "$work/bin/"
+fi
 export PATH="$work/bin:$PATH"
 
 # The parser and the query, where the guide installs them, under a data

@@ -229,7 +229,7 @@ A pipeline's exit status is its last command's, here `jq`'s, so a gate that pipe
 
 ## `mesh help`, `--help` and `--version`
 
-`mesh help` and `--help` print usage for `mesh` or for a single command. `mesh --version` (or `-V`) prints the version, such as `mesh 0.2.0`, and exits `0`.
+`mesh help` and `--help` print usage for `mesh` or for a single command. `mesh --version` (or `-V`) prints the version, such as `mesh 0.3.0`, and exits `0`.
 
 ## Limitations
 

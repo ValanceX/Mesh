@@ -46,6 +46,7 @@ fn initialize_advertises_the_capabilities() {
         json!(["quickfix"])
     );
     assert_eq!(result["serverInfo"]["name"], "mesh-lsp");
+    assert_eq!(result["serverInfo"]["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(
         client.exit(true),
         Outcome::Exited {

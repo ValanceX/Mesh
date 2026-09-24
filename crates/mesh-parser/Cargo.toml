@@ -13,5 +13,5 @@ workspace = true
 [dependencies]
 mesh-syntax.workspace = true
 tree-sitter = "0.27.0"
-tree-sitter-mprx = { version = "0.1.0", path = "../../grammar/tree-sitter-mprx" }
+tree-sitter-mprx = { version = "0.3.0", path = "../../grammar/tree-sitter-mprx" }
 thiserror = "2"

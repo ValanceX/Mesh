@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 project(tree-sitter-mprx
-        VERSION "0.1.0"
+        VERSION "0.3.0"
         DESCRIPTION "Mprx grammar for tree-sitter"
         HOMEPAGE_URL "https://github.com/ValanceX/Mesh"
         LANGUAGES C)

@@ -1,6 +1,6 @@
 LANGUAGE_NAME := tree-sitter-mprx
 HOMEPAGE_URL := https://github.com/ValanceX/Mesh
-VERSION := 0.1.0
+VERSION := 0.3.0
 DESCRIPTION := Mprx grammar for tree-sitter
 
 # repository

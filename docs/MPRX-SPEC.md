@@ -7,7 +7,7 @@ MPRX (MeshExpr) is the declarative UI language at the heart of [MESH](../README.
 - **Want a gentler introduction?** The [Writing MPRX guide](./guides/writing-mprx.md) covers the same ground with examples and common mistakes.
 - **Implementing something?** Write against this spec rather than inventing syntax inline. The plans in `docs/superpowers/plans/` build it out step by step.
 
-This is a **living document**. It was updated as each pass shipped and now describes MESH v0.2: §2–§8 are the syntax and its representation, and §9 is what a file means when it's checked against a component manifest. The "Introduced in" column in §8 shows which pass added each node kind.
+This is a **living document**. It was updated as each pass shipped and now describes MESH v0.3, whose language is v0.2's: §2–§8 are the syntax and its representation, and §9 is what a file means when it's checked against a component manifest. The "Introduced in" column in §8 shows which pass added each node kind.
 
 ---
 
@@ -59,7 +59,9 @@ v0.2 changes no syntax. Its passes (outlined in `docs/superpowers/specs/2026-09-
 | 5b | Checking values against their declared types (§9.6) | ✅ Shipped |
 | 6 | JSON diagnostics output, and these semantics written down | ✅ Shipped |
 
-*Last updated 2026-09-24. v0.2 is released as v0.2.0, and v0.1 as v0.1.0 (see the [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. Any grammar or semantics work beyond v0.2 starts a new spec.*
+v0.3 changes neither the syntax nor the semantics: it adds the `mesh-lsp` language server and highlighting queries, both clients of this spec's rules (outlined in `docs/superpowers/specs/2026-09-24-mesh-v0.3-outline.md`). The one behaviour change, the 128-level nesting limit, is a resource limit of the implementation, not a rule of MPRX.
+
+*Last updated 2026-09-24. v0.3 is released as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. Any grammar or semantics work beyond v0.2 (v0.3 has none) starts a new spec.*
 
 ---
 

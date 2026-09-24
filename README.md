@@ -55,6 +55,8 @@ error[mismatched-closing-tag]: mismatched closing tag: opened with "title", clos
 
 Warnings (such as a duplicate attribute) are printed the same way but don't fail the check.
 
+The same checks run in your editor, as you type, through the `mesh-lsp` language server: diagnostics, quick fixes, hover, go to definition and completion. `cargo install --path crates/mesh-lsp`, then follow the [editor setup guide](./docs/guides/editor-setup.md).
+
 New to MESH? The [getting-started guide](./docs/guides/getting-started.md) walks through it step by step.
 
 ## How it works
@@ -87,7 +89,8 @@ mesh/
 │   ├── mesh-lsp/             the language server, a client of the compiler
 │   └── mesh-cli/             the `mesh` command-line tool
 ├── grammar/
-│   └── tree-sitter-mprx/     the MPRX Tree-sitter grammar
+│   └── tree-sitter-mprx/     the MPRX Tree-sitter grammar and its highlighting queries
+├── editors/                verified editor configurations (Neovim)
 └── packages/               npm wrappers for the Rust/WASM build (placeholders)
     ├── mesh-language/        @valance/mesh-language
     ├── mesh-compiler/        @valance/mesh-compiler
@@ -102,19 +105,19 @@ mesh/
 
 ## Status
 
-**v0.2.0 released** (2026-09-24). See the [release notes](./docs/releases/v0.2.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.3.0 released** (2026-09-24). See the [release notes](./docs/releases/v0.3.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), and event bindings (`on.click={...}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings
 - Checking against a component manifest (`mesh check --model`): every component, prop, event, reference and command is resolved, every expression is typed, and every value is checked against its declaration
 - rustc-style diagnostics with stable codes, located syntax errors, and did-you-mean suggestions; warnings don't fail the check
 - JSON diagnostics (`mesh check --format json`)
+- The `mesh-lsp` language server: the compiler's own diagnostics and quick fixes as you type, hover, go to definition, and completion from the manifest, also on files with syntax errors (see its [manual](./docs/manual/mesh-lsp.md))
+- Syntax highlighting from the grammar's Tree-sitter queries, and an [editor setup guide](./docs/guides/editor-setup.md) verified in Neovim
 
-In development for v0.3: the `mesh-lsp` language server, which already publishes the compiler's diagnostics and quick fixes, and answers hover, go to definition and completion (see its [manual](./docs/manual/mesh-lsp.md)).
+Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. Editor configuration is per editor, and only Neovim's is verified. The npm packages are placeholders.
 
-Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. The npm packages are placeholders.
-
-Next up: Tree-sitter highlighting queries, editor setup guides, and the v0.3 release.
+Next up for v0.4: a WASM build and the `@valance/*` npm packages.
 
 ## Learn more
 
@@ -124,6 +127,7 @@ The [documentation index](./docs/README.md) lists everything. The most useful pl
 - [**Writing MPRX**](./docs/guides/writing-mprx.md): the language, with examples and common mistakes
 - [**Checking against a component model**](./docs/guides/checking-against-a-component-model.md): manifests, types, and why absence isn't `null`
 - [**`mesh` CLI manual**](./docs/manual/mesh-cli.md), [**Diagnostics reference**](./docs/manual/diagnostics.md) and [**Manifest reference**](./docs/manual/manifest.md)
+- [**Editor setup**](./docs/guides/editor-setup.md) and the [**`mesh-lsp` manual**](./docs/manual/mesh-lsp.md): MESH in your editor
 - [**Embedding the compiler**](./docs/guides/embedding-the-compiler.md): use MESH from Rust
 - [**MPRX Language Spec**](./docs/MPRX-SPEC.md): the exact syntax and semantics
 - [**Architecture**](./docs/ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance

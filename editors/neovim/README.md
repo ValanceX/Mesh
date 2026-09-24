@@ -7,6 +7,9 @@
 ```console
 $ editors/neovim/verify.sh
 $ NVIM=/path/to/nvim editors/neovim/verify.sh
+$ MESH_LSP=~/.cargo/bin/mesh-lsp editors/neovim/verify.sh
 ```
+
+`MESH_LSP` checks an installed `mesh-lsp` instead of building one.
 
 It needs Rust, Node.js (for the grammar's pinned Tree-sitter CLI; run `npm ci --ignore-scripts && npm rebuild tree-sitter-cli` in `grammar/tree-sitter-mprx` first) and `git`. It isn't run in CI.
