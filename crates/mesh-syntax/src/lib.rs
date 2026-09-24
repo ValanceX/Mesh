@@ -82,6 +82,37 @@ impl DiagnosticCode {
     /// An `on.` event binding with a missing, dotted, or hyphenated event
     /// name, or a value that isn't `{...}`.
     pub const MALFORMED_EVENT_BINDING: DiagnosticCode = DiagnosticCode("malformed-event-binding");
+    /// A component manifest that isn't valid JSON.
+    pub const MANIFEST_SYNTAX_ERROR: DiagnosticCode = DiagnosticCode("manifest-syntax-error");
+    /// A manifest whose `version` is missing or isn't one MESH reads.
+    pub const MANIFEST_UNSUPPORTED_VERSION: DiagnosticCode =
+        DiagnosticCode("manifest-unsupported-version");
+    /// A manifest value of the wrong JSON type, such as `"required": "yes"`.
+    pub const MANIFEST_INVALID_VALUE: DiagnosticCode = DiagnosticCode("manifest-invalid-value");
+    /// A manifest object without a property it must have.
+    pub const MANIFEST_MISSING_PROPERTY: DiagnosticCode =
+        DiagnosticCode("manifest-missing-property");
+    /// A manifest object with a property its schema doesn't allow.
+    pub const MANIFEST_UNKNOWN_PROPERTY: DiagnosticCode =
+        DiagnosticCode("manifest-unknown-property");
+    /// A key repeated in one manifest object.
+    pub const MANIFEST_DUPLICATE_KEY: DiagnosticCode = DiagnosticCode("manifest-duplicate-key");
+    /// A type whose `kind` isn't one a manifest can write.
+    pub const MANIFEST_UNKNOWN_KIND: DiagnosticCode = DiagnosticCode("manifest-unknown-kind");
+    /// A declared name that MPRX can't write in its position.
+    pub const MANIFEST_INVALID_NAME: DiagnosticCode = DiagnosticCode("manifest-invalid-name");
+    /// A command that declares two parameters with the same name.
+    pub const MANIFEST_DUPLICATE_PARAMETER: DiagnosticCode =
+        DiagnosticCode("manifest-duplicate-parameter");
+    /// A `named` type that refers to a type the manifest doesn't declare.
+    pub const MANIFEST_UNKNOWN_TYPE: DiagnosticCode = DiagnosticCode("manifest-unknown-type");
+    /// Named types that refer to themselves, directly or indirectly.
+    pub const MANIFEST_RECURSIVE_TYPE: DiagnosticCode = DiagnosticCode("manifest-recursive-type");
+    /// An `optional` type wrapping a type that is already optional.
+    pub const MANIFEST_NESTED_OPTIONAL: DiagnosticCode = DiagnosticCode("manifest-nested-optional");
+    /// The manifest has no component for the file being checked.
+    pub const MANIFEST_MISSING_COMPONENT: DiagnosticCode =
+        DiagnosticCode("manifest-missing-component");
 
     /// Every code MESH can emit, in catalogue order. The diagnostics
     /// reference (`docs/manual/diagnostics.md`) documents each one, and a
@@ -98,6 +129,19 @@ impl DiagnosticCode {
         DiagnosticCode::SINGLE_BRACE_OBJECT,
         DiagnosticCode::COMMAND_TRAILING_COMMA,
         DiagnosticCode::MALFORMED_EVENT_BINDING,
+        DiagnosticCode::MANIFEST_SYNTAX_ERROR,
+        DiagnosticCode::MANIFEST_UNSUPPORTED_VERSION,
+        DiagnosticCode::MANIFEST_INVALID_VALUE,
+        DiagnosticCode::MANIFEST_MISSING_PROPERTY,
+        DiagnosticCode::MANIFEST_UNKNOWN_PROPERTY,
+        DiagnosticCode::MANIFEST_DUPLICATE_KEY,
+        DiagnosticCode::MANIFEST_UNKNOWN_KIND,
+        DiagnosticCode::MANIFEST_INVALID_NAME,
+        DiagnosticCode::MANIFEST_DUPLICATE_PARAMETER,
+        DiagnosticCode::MANIFEST_UNKNOWN_TYPE,
+        DiagnosticCode::MANIFEST_RECURSIVE_TYPE,
+        DiagnosticCode::MANIFEST_NESTED_OPTIONAL,
+        DiagnosticCode::MANIFEST_MISSING_COMPONENT,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -836,6 +880,19 @@ mod tests {
                 "single-brace-object",
                 "command-trailing-comma",
                 "malformed-event-binding",
+                "manifest-syntax-error",
+                "manifest-unsupported-version",
+                "manifest-invalid-value",
+                "manifest-missing-property",
+                "manifest-unknown-property",
+                "manifest-duplicate-key",
+                "manifest-unknown-kind",
+                "manifest-invalid-name",
+                "manifest-duplicate-parameter",
+                "manifest-unknown-type",
+                "manifest-recursive-type",
+                "manifest-nested-optional",
+                "manifest-missing-component",
             ]
         );
     }

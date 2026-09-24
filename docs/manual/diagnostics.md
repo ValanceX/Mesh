@@ -246,11 +246,114 @@ warning[duplicate-event-binding]: duplicate event binding "click": this occurren
 
 ---
 
+## Manifest errors
+
+`mesh check --model <FILE>` loads a component manifest before it reads the `.mprx` file. It checks the whole manifest first. If the manifest has any errors, `mesh check` reports all of them, in source order, and nothing else: it doesn't check the `.mprx` file at all. The exit status is `1`.
+
+Manifest errors point into the manifest, with the manifest's path, line and column. Every code starts with `manifest-`. The manifest's format is published as a JSON Schema in [`schemas/manifest-v1.schema.json`](../../schemas/manifest-v1.schema.json).
+
+### `manifest-syntax-error`
+
+The manifest isn't valid JSON. The message is the JSON parser's, and the location is where it stopped.
+
+Only the first JSON syntax error is reported. A leading byte-order mark is allowed.
+
+**Fix:** correct the JSON. Trailing commas and comments aren't allowed.
+
+### `manifest-unsupported-version`
+
+The manifest's `"version"` is missing, or isn't `1`, the only version this MESH reads. Another version has another format, so nothing else in the manifest is checked.
+
+**Fix:** write `"version": 1`, and the rest of the manifest in version 1's format.
+
+### `manifest-invalid-value`
+
+A value has the wrong JSON type: an array where an object belongs, a string for `"required"`, a type that isn't an object, and so on.
+
+**Fix:** use the JSON type the message names.
+
+### `manifest-missing-property`
+
+An object is missing a property it must have. Points at the object's opening `{`.
+
+- The manifest needs `"version"`, `"types"` and `"components"`.
+- A component needs all of `"props"`, `"events"`, `"commands"` and `"scope"`, even when they're empty.
+- A prop or record field needs both `"type"` and `"required"`. `"required"` has no default.
+- A type needs a `"kind"`, plus `"element"` for a list, `"fields"` for a record, `"name"` for a named type, and `"type"` for an optional type.
+
+**Fix:** add the property.
+
+### `manifest-unknown-property`
+
+An object has a property its format doesn't allow. Points at the property's key.
+
+**Fix:** remove the property. The manifest describes interfaces only: there are no default values, and a type has only the properties of its kind.
+
+### `manifest-duplicate-key`
+
+A key appears twice in one object. Most JSON tools silently keep the last one; MESH reports the repeat instead, and uses the first occurrence. Points at the second occurrence.
+
+This covers every level: component names, props, events, commands, scope names, named types, record fields, and properties such as `"type"`.
+
+**Fix:** delete or rename one of them.
+
+### `manifest-unknown-kind`
+
+A type's `"kind"` isn't one of `string`, `number`, `boolean`, `null`, `any`, `list`, `record`, `named` or `optional`.
+
+`void` and `nothing` are types MESH uses internally, and a manifest can't write them either.
+
+**Fix:** use one of the kinds above. For a number, use `number`: there's no separate integer type.
+
+### `manifest-invalid-name`
+
+A declared name can't be written in MPRX where it would be used.
+
+- A component name must be a valid tag name: a letter or `_`, then letters, digits, `_` or `-`.
+- Every other name (props, events, commands, command parameters, scope names, named types, record fields) must be a valid identifier: a letter or `_`, then letters, digits or `_`. No `-`, because MPRX reads `-` as minus.
+- None of those identifiers can be `true`, `false` or `null`. MPRX's lexer always reads those words as literals, so a prop, scope name or field spelled that way could never be referred to.
+
+**Fix:** rename it, for example `aria-label` to `ariaLabel`.
+
+### `manifest-duplicate-parameter`
+
+A command declares two parameters with the same name. Points at the second one's name.
+
+**Fix:** rename one of them.
+
+### `manifest-unknown-type`
+
+A `named` type refers to a name that `"types"` doesn't declare. Points at the name.
+
+**Fix:** declare the type in `"types"`, or correct the name. Names are case-sensitive.
+
+### `manifest-recursive-type`
+
+A named type refers to itself, directly or through other named types. Each cycle is reported once, at the first of its types in the manifest.
+
+Recursive types aren't supported in version 1.
+
+**Fix:** break the cycle, for example by typing the recursive part `any`.
+
+### `manifest-nested-optional`
+
+An `optional` type wraps a type that is already optional: another `optional`, or a named type that is one. Points at the inner type.
+
+**Fix:** remove one of the two. "Optional optional" means the same as "optional".
+
+### `manifest-missing-component`
+
+The manifest loaded, but it doesn't declare the component the file is the template of. That component is the file's name without its extension (`users-page.mprx` is `users-page`), unless `--component` names another. Points at the manifest's `"components"` key.
+
+**Fix:** declare the component, or pass `--component <NAME>`.
+
+---
+
 ## CLI errors
 
 ### `could not read <file>: <reason>`
 
-Printed by the CLI, not the compiler, when the file can't be read: it's missing, it's a directory, you don't have permission, or it isn't valid UTF-8. This is a single line with no code and no source snippet. The exit status is `1`.
+Printed by the CLI, not the compiler, when the file (or the `--model` manifest) can't be read: it's missing, it's a directory, you don't have permission, or it isn't valid UTF-8. This is a single line with no code and no source snippet. The exit status is `1`.
 
 ---
 
