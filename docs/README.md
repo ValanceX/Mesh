@@ -15,7 +15,7 @@ Learning-oriented walkthroughs.
 Reference material for when you need exact details.
 
 - [**`mesh` CLI manual**](./manual/mesh-cli.md): commands, output streams, diagnostic format, and exit codes.
-- [**Diagnostics reference**](./manual/diagnostics.md): every message, what causes it, and how to fix it.
+- [**Diagnostics reference**](./manual/diagnostics.md): every diagnostic code and message, what causes it, and how to fix it.
 - [**MPRX Language Spec**](./MPRX-SPEC.md): the canonical grammar and semantics.
 
 ## Background
