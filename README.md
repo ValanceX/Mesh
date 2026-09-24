@@ -74,6 +74,8 @@ mesh/
 │   ├── mesh-syntax/          syntax nodes and source locations
 │   ├── mesh-parser/          Tree-sitter integration, CST → AST
 │   ├── mesh-semantic/        semantic model, lowering, structural validation
+│   ├── mesh-manifest/        component manifest loading and validation
+│   ├── mesh-analysis/        checking templates against a component manifest
 │   ├── mesh-compiler/        compile API, diagnostics, and rendering
 │   ├── mesh-lsp/             language server (placeholder in v0.1)
 │   └── mesh-cli/             the `mesh` command-line tool

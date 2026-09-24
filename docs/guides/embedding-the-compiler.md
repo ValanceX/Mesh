@@ -23,6 +23,7 @@ The crates you'll use:
 | `mesh-syntax` | `Diagnostic`, `DiagnosticCode`, `Severity`, `Span` |
 | `mesh-semantic` | The Semantic IR types: `Element`, `Attribute`, `EventBinding`, `Child`, `Expression`, ... |
 | `mesh-manifest` | `load`, `Manifest`, `Template`, and the manifest's model types |
+| `mesh-analysis` | `analyze`, `Analysis`: what a template's names resolved to, and the problems found, as data |
 
 ## Compiling a source string
 
@@ -93,7 +94,11 @@ fn check_template(manifest_path: &str, manifest_json: &str, source: &str) {
 }
 ```
 
-A manifest diagnostic's span indexes the manifest's text, not the `.mprx` source, so render it against the manifest, as above. In this version the template isn't used yet: `compile_with` returns exactly what `compile` does.
+A manifest diagnostic's span indexes the manifest's text, not the `.mprx` source, so render it against the manifest, as above.
+
+With a template, `compile_with` returns what `compile` does, plus the analysis diagnostics (see [Model errors](../manual/diagnostics.md#model-errors)) after all the others. The IR is the same either way: analysis never changes it. A file with a syntax error has no IR, so it gets no analysis diagnostics.
+
+If you need analysis results as data rather than as diagnostics, call `mesh_analysis::analyze(&ir, template)` yourself. Its `Analysis` holds the `resolutions()` (each name that resolved, with its span, and the component, prop, event, scope name or command it refers to) and the `facts()` (each problem found, with its span and the names that were available). `compile_with` turns those facts into diagnostics.
 
 ## Diagnostics
 
@@ -103,6 +108,12 @@ pub struct Diagnostic {
     pub code: DiagnosticCode, // stable, e.g. DiagnosticCode::MISMATCHED_CLOSING_TAG
     pub message: String,
     pub span: Span,           // byte offsets into the source
+    pub suggestions: Vec<Suggestion>,
+}
+
+pub struct Suggestion {
+    pub replacement: String, // e.g. "user"
+    pub span: Span,          // what it replaces, e.g. the "usr" in {usr}
 }
 
 pub struct Span {
@@ -114,7 +125,8 @@ pub struct Span {
 - `Severity` is `#[non_exhaustive]`. Match it with a wildcard arm, because later versions may add levels.
 - It implements `Display` as `error` / `warning`.
 - `DiagnosticCode` is the diagnostic's stable code. Compare it with the associated constants, such as `DiagnosticCode::SYNTAX_ERROR`, or get the kebab-case string with `as_str()` or `{}`. `DiagnosticCode::ALL` lists every code. A code is never renamed or reused for a different meaning, so it's safe to match on; messages may change. The [diagnostics reference](../manual/diagnostics.md) documents each one.
-- `Diagnostic` is plain data. Printing it with `{}` gives a compact `message (start..end)` form, with no severity, no code and no snippet.
+- `suggestions` lists fixes MESH is fairly sure of, best first; it is usually empty. Today they are only did-you-mean names from a component manifest.
+- `Diagnostic` is plain data. Printing it with `{}` gives a compact `message (start..end)` form, with no severity, no code, no snippet and no suggestions.
 
 For the same output the CLI prints, use `render_diagnostic`:
 
@@ -122,7 +134,7 @@ For the same output the CLI prints, use `render_diagnostic`:
 pub fn render_diagnostic(source: &str, path: &str, diagnostic: &Diagnostic) -> String
 ```
 
-- It returns one block with **no trailing newline**, so you control the spacing between blocks.
+- It returns one block with **no trailing newline**, so you control the spacing between blocks. Each suggestion adds a `= help:` line at the end.
 - `path` is only displayed. The function doesn't read the file, so you can pass any label, such as a URL or `"<generated>"`.
 - It never panics, even when a span is out of range or falls inside a multi-byte character. Such spans are clamped.
 

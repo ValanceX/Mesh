@@ -38,7 +38,7 @@ Parses and validates one MPRX file, then reports every diagnostic.
 1. **Syntax**: the file is one well-formed MPRX element tree (see the [language spec](../MPRX-SPEC.md)).
 2. **Structure**: closing tags match opening tags, and no element repeats an attribute or event binding.
 
-It does **not** yet check references, component names, props, or types against a component model.
+Without `--model`, that's all it checks. References, component names, props and events are checked only against a component manifest.
 
 ### Checking against a manifest
 
@@ -53,7 +53,14 @@ $ mesh check --model examples/components.json --component user-card-example exam
 no errors
 ```
 
-In this version, a valid manifest doesn't change how the file itself is checked: its diagnostics are the same as without `--model`. Checking the file's components, props, events, references and types against the manifest comes later in v0.2.
+With a valid manifest, `mesh check` checks the file as that component's template, after the checks above:
+
+1. **Components**: every element's tag is a component the manifest declares. There are no built-in elements.
+2. **Props and events**: every attribute is a prop of the element's component, every required prop is supplied, and every `on.<name>` is one of its events.
+3. **Names**: every reference is in the template's `scope`, and every command is one of the template's `commands`, with the right number of arguments.
+4. **Placement**: a command appears only as the whole handler of an `on.` binding, and `$event` only in that command's arguments, for an event that carries a value.
+
+These are errors with their own codes, listed under [Model errors](./diagnostics.md#model-errors), and a close match gets a `help` line. Types aren't checked yet: that comes later in v0.2.
 
 ### Output
 
@@ -76,6 +83,7 @@ Each diagnostic is one block:
   |
 <N> | <source line>
   | <carets>
+  = help: did you mean "<name>"?
 ```
 
 For example:
@@ -98,6 +106,7 @@ The exact rules:
 - **Carets** underline the problem's span on the reported line. If a span covers several lines, only its first line is shown and underlined up to the end of that line. An empty span gets a single `^`.
 - **Tabs** in the source line are kept in the caret line's indentation, so carets line up in your terminal. Wide characters (CJK, emoji) may make the carets look shifted, because v0.1 doesn't measure display width.
 - **Windows line endings** (`\r\n`) are handled; the `\r` is never echoed or counted.
+- **`= help:` lines** follow the carets when MESH has a suggestion, one line per suggestion. Most diagnostics have none. Today every suggestion is a similarly spelled name that the manifest declares.
 - **A leading UTF-8 byte-order mark** is skipped: it isn't echoed or counted, so line 1's columns match what your editor shows.
 - The output has no colour, and it isn't machine-readable yet.
 
