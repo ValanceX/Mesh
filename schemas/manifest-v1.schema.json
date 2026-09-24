@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/manifest-v1.schema.json",
+  "title": "MESH component manifest, version 1",
+  "description": "The components and named types an MPRX template is checked against. `mesh check --model` also enforces rules JSON Schema can't express: no duplicate keys or parameter names, every named reference resolves, no recursive named types, and no optional type wraps another, even through a named type.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "types": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": { "$ref": "#/$defs/type" }
+    },
+    "components": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/tagName" },
+      "additionalProperties": { "$ref": "#/$defs/component" }
+    }
+  },
+  "required": ["version", "types", "components"],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "description": "An MPRX identifier: not `true`, `false` or `null`, which MPRX reads as literals.",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "not": { "enum": ["true", "false", "null"] }
+    },
+    "tagName": {
+      "description": "An MPRX tag name.",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+    },
+    "component": {
+      "type": "object",
+      "properties": {
+        "props": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "additionalProperties": { "$ref": "#/$defs/field" }
+        },
+        "events": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "additionalProperties": { "$ref": "#/$defs/event" }
+        },
+        "commands": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "additionalProperties": { "$ref": "#/$defs/command" }
+        },
+        "scope": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "additionalProperties": { "$ref": "#/$defs/type" }
+        }
+      },
+      "required": ["props", "events", "commands", "scope"],
+      "additionalProperties": false
+    },
+    "field": {
+      "description": "A prop or record field: its type, and whether it must be supplied.",
+      "type": "object",
+      "properties": {
+        "type": { "$ref": "#/$defs/type" },
+        "required": { "type": "boolean" }
+      },
+      "required": ["type", "required"],
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/type" }
+      },
+      "additionalProperties": false
+    },
+    "command": {
+      "type": "object",
+      "properties": {
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "$ref": "#/$defs/identifier" },
+              "type": { "$ref": "#/$defs/type" }
+            },
+            "required": ["name", "type"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["parameters"],
+      "additionalProperties": false
+    },
+    "type": {
+      "type": "object",
+      "required": ["kind"],
+      "oneOf": [
+        {
+          "properties": { "kind": { "enum": ["string", "number", "boolean", "null", "any"] } },
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": { "const": "list" },
+            "element": { "$ref": "#/$defs/type" }
+          },
+          "required": ["element"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": { "const": "record" },
+            "fields": {
+              "type": "object",
+              "propertyNames": { "$ref": "#/$defs/identifier" },
+              "additionalProperties": { "$ref": "#/$defs/field" }
+            }
+          },
+          "required": ["fields"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": { "const": "named" },
+            "name": { "type": "string" }
+          },
+          "required": ["name"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": { "const": "optional" },
+            "type": { "$ref": "#/$defs/type" }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

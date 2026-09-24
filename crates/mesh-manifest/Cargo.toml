@@ -14,3 +14,6 @@ workspace = true
 mesh-syntax.workspace = true
 serde = "1"
 serde_json = { version = "1", features = ["raw_value"] }
+
+[dev-dependencies]
+jsonschema = { version = "0.57", default-features = false }

@@ -16,6 +16,7 @@ Reference material for when you need exact details.
 
 - [**`mesh` CLI manual**](./manual/mesh-cli.md): commands, output streams, diagnostic format, and exit codes.
 - [**Diagnostics reference**](./manual/diagnostics.md): every diagnostic code and message, what causes it, and how to fix it.
+- [**Manifest JSON Schema**](../schemas/manifest-v1.schema.json): the component manifest's format, version 1.
 - [**MPRX Language Spec**](./MPRX-SPEC.md): the canonical grammar and semantics.
 
 ## Background

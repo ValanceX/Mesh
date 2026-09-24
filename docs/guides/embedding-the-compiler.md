@@ -22,6 +22,7 @@ The crates you'll use:
 | `mesh-compiler` | `compile`, `CompileResult`, `render_diagnostic` |
 | `mesh-syntax` | `Diagnostic`, `DiagnosticCode`, `Severity`, `Span` |
 | `mesh-semantic` | The Semantic IR types: `Element`, `Attribute`, `EventBinding`, `Child`, `Expression`, ... |
+| `mesh-manifest` | `load`, `Manifest`, `Template`, and the manifest's model types |
 
 ## Compiling a source string
 
@@ -62,6 +63,37 @@ pub struct CompileResult {
 
 - **`ir`** is `None` only when the source couldn't be parsed, which means there's a syntax error. Validation problems like a mismatched closing tag or duplicate attributes are reported as diagnostics, but `ir` is still `Some`, so tools can keep working with a file that has mistakes.
 - **`diagnostics`** lists everything found, in a stable order (see the [diagnostics reference](../manual/diagnostics.md#ordering)). Decide what counts as failure by checking `severity`, as above. Don't use `diagnostics.is_empty()` for that, because warnings are allowed.
+
+To compile a template against a component manifest, load the manifest with `mesh_manifest::load`, pick the component with `Manifest::template`, and pass it through `CompileOptions`:
+
+```rust
+use mesh_compiler::{compile_with, render_diagnostic, CompileOptions};
+
+fn check_template(manifest_path: &str, manifest_json: &str, source: &str) {
+    let manifest = match mesh_manifest::load(manifest_json) {
+        Ok(manifest) => manifest,
+        Err(diagnostics) => {
+            for diagnostic in &diagnostics {
+                eprintln!("{}\n", render_diagnostic(manifest_json, manifest_path, diagnostic));
+            }
+            return;
+        }
+    };
+    let template = match manifest.template("users-page") {
+        Ok(template) => template,
+        Err(diagnostic) => {
+            eprintln!("{}\n", render_diagnostic(manifest_json, manifest_path, &diagnostic));
+            return;
+        }
+    };
+    let result = compile_with(source, &CompileOptions::with_template(template));
+    for diagnostic in &result.diagnostics {
+        eprintln!("{}\n", render_diagnostic(source, "users-page.mprx", diagnostic));
+    }
+}
+```
+
+A manifest diagnostic's span indexes the manifest's text, not the `.mprx` source, so render it against the manifest, as above. In this version the template isn't used yet: `compile_with` returns exactly what `compile` does.
 
 ## Diagnostics
 

@@ -5,7 +5,7 @@
 ## Synopsis
 
 ```text
-mesh check <FILE>
+mesh check [--model <MANIFEST> [--component <NAME>]] <FILE>
 mesh help [COMMAND]
 mesh --help
 mesh --version
@@ -21,22 +21,39 @@ $ cargo install --path crates/mesh-cli
 
 This installs a binary named `mesh` into `~/.cargo/bin`. You can also run it without installing, from the repo root, with `cargo run -p mesh-cli -- <args>`. See [Getting started](../guides/getting-started.md) for the full walkthrough.
 
-## `mesh check <FILE>`
+## `mesh check`
 
 Parses and validates one MPRX file, then reports every diagnostic.
 
-**Argument**
+**Arguments and options**
 
-| Argument | Meaning |
+| | Meaning |
 |---|---|
 | `<FILE>` | Path to the `.mprx` file. Any path works, and the extension isn't enforced. The file must be valid UTF-8. |
+| `--model <MANIFEST>` | A component manifest (JSON) declaring the components the file uses. See [Checking against a manifest](#checking-against-a-manifest). |
+| `--component <NAME>` | The manifest component whose template the file is. Defaults to the file's name without its extension. Needs `--model`. |
 
-**What it checks in v0.1**
+**What it checks**
 
 1. **Syntax**: the file is one well-formed MPRX element tree (see the [language spec](../MPRX-SPEC.md)).
 2. **Structure**: closing tags match opening tags, and no element repeats an attribute or event binding.
 
 It does **not** yet check references, component names, props, or types against a component model.
+
+### Checking against a manifest
+
+With `--model`, `mesh check` first loads the manifest and checks all of it: the JSON, its `"version"`, its format, and its declarations. The format is published as a JSON Schema in [`schemas/manifest-v1.schema.json`](../../schemas/manifest-v1.schema.json), and [`examples/components.json`](../../examples/components.json) is a complete example. If the manifest has any errors, `mesh check` reports every one, with the manifest's path, line and column, and stops without reading `<FILE>`. Their codes all start with `manifest-`; see the [diagnostics reference](./diagnostics.md#manifest-errors).
+
+Every `.mprx` file is the template of one component in the manifest. By default that is the file's name without its extension, so `users-page.mprx` is the template of `users-page`. `--component` names another. A name the manifest doesn't declare is a `manifest-missing-component` error.
+
+```console
+$ mesh check --model examples/components.json examples/users-page.mprx
+no errors
+$ mesh check --model examples/components.json --component user-card-example examples/user-card.mprx
+no errors
+```
+
+In this version, a valid manifest doesn't change how the file itself is checked: its diagnostics are the same as without `--model`. Checking the file's components, props, events, references and types against the manifest comes later in v0.2.
 
 ### Output
 
@@ -91,8 +108,8 @@ The full list of codes and messages is in the [diagnostics reference](./diagnost
 | Status | Meaning |
 |---|---|
 | `0` | No errors. Warnings may have been printed. `no errors` is on stdout. |
-| `1` | At least one error diagnostic, or the file couldn't be read (missing, a directory, not UTF-8, permission denied). |
-| `2` | Usage error, such as a missing `<FILE>` argument or an unknown command or flag. Reported by the argument parser. |
+| `1` | At least one error diagnostic (in the file or the manifest), or the file or manifest couldn't be read (missing, a directory, not UTF-8, permission denied). |
+| `2` | Usage error, such as a missing `<FILE>` argument, an unknown command or flag, or `--component` without `--model`. Reported by the argument parser. |
 
 An unreadable file prints a single line, with no source snippet:
 

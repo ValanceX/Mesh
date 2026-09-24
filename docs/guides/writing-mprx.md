@@ -139,7 +139,7 @@ These are syntax errors in v0.1. Most of them are left out on purpose, to keep t
 | Hyphenated attribute names (`data-id`) | `dataId` or `data_id` |
 | Arbitrary code, assignments, function definitions | commands: `doThing(args)` |
 
-Also out of scope for v0.1: checking references against a component model. `mesh check` verifies structure, so `<user-card user={usr} />` passes even if nothing named `usr` exists. Component-aware type checking is the next milestone.
+Also out of scope for v0.1: checking references against a component model. `mesh check` verifies structure, so `<user-card user={usr} />` passes even if nothing named `usr` exists. Component-aware type checking is the next milestone. v0.2 adds `mesh check --model`, which loads a component manifest; checking the file against it is still to come.
 
 ## Common mistakes at a glance
 
