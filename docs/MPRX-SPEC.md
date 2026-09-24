@@ -303,21 +303,21 @@ table rather than re-deriving names per pass.
 | ------------------------------------------- | ------------------------------------ | -------------------------------------------------------- | ------------------------------- |
 | Element                                     | Pass 1                               | `Element`                                                | `Element`                       |
 | Attribute                                   | Pass 1                               | `Attribute`                                              | `Attribute`                     |
-| StringLiteral (attr value)                  | Pass 1                               | `StringLiteral`                                          | `String` (inline)               |
-| Text (child)                                | Pass 1                               | `Text`                                                   | `Text`                          |
+| StringLiteral (attr value)                  | Pass 1                               | `StringLiteral`                                          | `AttributeValue::String{value,span}` |
+| Text (child)                                | Pass 1                               | `Text`                                                   | `Child::Text{value,span}` |
 | AttributeValue                              | Pass 1 (revised Pass 2)              | `AttributeValue`                                         | `AttributeValue`                |
 | Expression (wrapper)                        | Pass 2                               | `Expression`                                             | `Expression`                    |
 | Literal (String/Number/Boolean/Null)        | Pass 2                               | `Literal`                                                | `Literal`                       |
-| Reference                                   | Pass 2                               | `Reference`                                              | `Expression::Reference(String)` |
+| Reference                                   | Pass 2                               | `Reference`                                              | `Expression::Reference{name,span}` |
 | MemberAccess                                | Pass 2                               | `MemberAccess`                                           | `Expression::MemberAccess{..}`  |
 | Child (Text \| Expression)                  | Pass 2                               | *extends existing `Vec<Text>` to a child enum — see §10* | same                            |
 | UnaryExpression                             | Pass 3a                              | `UnaryExpression` (+ `UnaryOperator`)                     | `Expression::Unary{operator,operand}` (reuses `mesh_syntax::UnaryOperator`) |
 | BinaryExpression                            | Pass 3a                              | `BinaryExpression` (+ `BinaryOperator`)                   | `Expression::Binary{operator,left,right}` (reuses `mesh_syntax::BinaryOperator`) |
 | ConditionalExpression                       | Pass 3a                              | `ConditionalExpression`                                  | `Expression::Conditional{condition,consequent,alternate}` |
-| ArrayExpression                             | Pass 3b                              | `ArrayExpression`                                        | `Expression::Array(Vec<Expression>)` |
-| ObjectExpression                            | Pass 3b                              | `ObjectExpression` (+ `ObjectMember`, `ObjectKey`)        | `Expression::Object(Vec<ObjectMember>)` (IR-local `ObjectMember{key: String, value}` — `ObjectKey` flattens, see note below) |
+| ArrayExpression                             | Pass 3b                              | `ArrayExpression`                                        | `Expression::Array{elements,span}` |
+| ObjectExpression                            | Pass 3b                              | `ObjectExpression` (+ `ObjectMember`, `ObjectKey`)        | `Expression::Object{members,span}` (IR-local `ObjectMember{key, key_span, value, span}` — `ObjectKey` flattens, see note below) |
 | CommandInvocation                           | Pass 3b                              | `CommandInvocation`                                      | `Expression::Command{command,arguments}` |
-| EventValue                                  | Pass 3b (alongside CommandInvocation) | `EventValue`                                             | `Expression::EventValue(String)` |
+| EventValue                                  | Pass 3b (alongside CommandInvocation) | `EventValue`                                             | `Expression::EventValue{name,span}` |
 | EventBinding                                | Pass 4b                              | `EventBinding`                                            | `EventBinding`                  |
 | Child::Element (nested)                     | Pass 4a                              | extends `Child` enum                                     | same                            |
 | Diagnostics (plural, from both parse+lower) | Pass 4a                              | n/a — changes `parse`/`lower` signatures                 | n/a                             |
@@ -344,6 +344,8 @@ Pass 3b's `ObjectKey` does *not* get this treatment: its two variants
 just name a field), so the IR flattens `ObjectMember`'s key to a plain
 `String` rather than reusing or mirroring `ObjectKey` — a genuine lowering
 step, not a reuse.
+
+**Spans in the Semantic IR (v0.2 Pass 2):** the v0.1 IR mirrored the AST *without* spans. From v0.2 every IR node carries a `span` (a `mesh_syntax::Span`, byte offsets), and the parts of a construct that a diagnostic can point at on their own carry a separate span: `name_span` on elements, attributes and event bindings, `property_span` on member access, `command_span` on commands, and `key_span` on object members. The AST carries the same name spans. Tuple variants that had to gain a span became struct variants; `Literal` stays span-free, with its span on `Expression::Literal`.
 
 ---
 

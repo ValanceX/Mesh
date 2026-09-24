@@ -98,7 +98,7 @@ The block format is documented in the [CLI manual](../manual/mesh-cli.md#diagnos
 
 ## Walking the Semantic IR
 
-The IR is a plain tree of owned values with no source positions. For `examples/user-card.mprx`:
+The IR is a plain tree of owned values. Every node records where it came from in the source. For `examples/user-card.mprx`:
 
 ```xml
 <user-card
@@ -113,48 +113,55 @@ The IR is a plain tree of owned values with no source positions. For `examples/u
 Element {
     name: "user-card",
     attributes: [
-        Attribute { name: "user",    value: Expression(Reference("user")) },
-        Attribute { name: "compact", value: Expression(MemberAccess { object: Reference("layout"), property: "compact" }) },
+        Attribute { name: "user",    value: Expression(Reference { name: "user" }) },
+        Attribute { name: "compact", value: Expression(MemberAccess { object: Reference { name: "layout" }, property: "compact" }) },
     ],
     event_bindings: [
         EventBinding {
             name: "select",
-            handler: Command { command: "selectUser", arguments: [EventValue("event")] },
+            handler: Command { command: "selectUser", arguments: [EventValue { name: "event" }] },
         },
     ],
     children: [],
 }
 ```
 
+(Spans are left out above; every node has them. See [Source spans](#source-spans).)
+
 The main types, all from `mesh_semantic`:
 
 ```rust
 pub struct Element {
     pub name: String,
+    pub name_span: Span,                     // just the tag name
     pub attributes: Vec<Attribute>,
     pub event_bindings: Vec<EventBinding>,   // name has no "on." prefix: "select"
     pub children: Vec<Child>,
+    pub span: Span,                          // the whole element
 }
 
-pub enum AttributeValue { String(String), Expression(Expression) }
+pub struct Attribute { pub name: String, pub name_span: Span, pub value: AttributeValue, pub span: Span }
+pub struct EventBinding { pub name: String, pub name_span: Span, pub handler: Expression, pub span: Span }
+
+pub enum AttributeValue { String { value: String, span: Span }, Expression(Expression) }
 
 pub enum Child {
-    Text(String),              // whitespace-only text is already removed
+    Text { value: String, span: Span },  // whitespace-only text is already removed
     Expression(Expression),
     Element(Box<Element>),
 }
 
 pub enum Expression {
-    Literal(Literal),          // String, Number (kept as source text), Boolean, Null
-    Reference(String),
-    MemberAccess { object: Box<Expression>, property: String },
-    Unary { operator: UnaryOperator, operand: Box<Expression> },
-    Binary { operator: BinaryOperator, left: Box<Expression>, right: Box<Expression> },
-    Conditional { condition: Box<Expression>, consequent: Box<Expression>, alternate: Box<Expression> },
-    Array(Vec<Expression>),
-    Object(Vec<ObjectMember>), // ObjectMember { key: String, value: Expression }
-    Command { command: String, arguments: Vec<Expression> },
-    EventValue(String),        // "$event" is stored as "event"
+    Literal { value: Literal, span: Span },  // String, Number (kept as source text), Boolean, Null
+    Reference { name: String, span: Span },
+    MemberAccess { object: Box<Expression>, property: String, property_span: Span, span: Span },
+    Unary { operator: UnaryOperator, operand: Box<Expression>, span: Span },
+    Binary { operator: BinaryOperator, left: Box<Expression>, right: Box<Expression>, span: Span },
+    Conditional { condition: Box<Expression>, consequent: Box<Expression>, alternate: Box<Expression>, span: Span },
+    Array { elements: Vec<Expression>, span: Span },
+    Object { members: Vec<ObjectMember>, span: Span }, // ObjectMember { key, key_span, value, span }
+    Command { command: String, command_span: Span, arguments: Vec<Expression>, span: Span },
+    EventValue { name: String, span: Span },            // "$event" is stored as "event"
 }
 ```
 
@@ -175,7 +182,7 @@ fn print_tree(element: &Element, depth: usize) {
     println!("{indent}<{}>", element.name);
     for attribute in &element.attributes {
         match &attribute.value {
-            AttributeValue::String(value) => println!("{indent}  {} = {value:?}", attribute.name),
+            AttributeValue::String { value, .. } => println!("{indent}  {} = {value:?}", attribute.name),
             AttributeValue::Expression(expr) => println!("{indent}  {} = {expr:?}", attribute.name),
         }
     }
@@ -184,7 +191,7 @@ fn print_tree(element: &Element, depth: usize) {
     }
     for child in &element.children {
         match child {
-            Child::Text(text) => println!("{indent}  text {text:?}"),
+            Child::Text { value, .. } => println!("{indent}  text {value:?}"),
             Child::Expression(expr) => println!("{indent}  expr {expr:?}"),
             Child::Element(child) => print_tree(child, depth + 1),
         }
@@ -192,6 +199,26 @@ fn print_tree(element: &Element, depth: usize) {
 }
 ```
 
+### Source spans
+
+Every IR node has a `span`: a `mesh_syntax::Span { start_byte, end_byte }` covering the construct in the source. Where a part of a construct can be wrong on its own, it has its own span too:
+
+| Field | Covers |
+|---|---|
+| `Element.name_span` | the opening tag's name: `user-card` |
+| `Attribute.name_span` | the attribute's name, without `=` or the value |
+| `EventBinding.name_span` | the event name after `on.`: `select` |
+| `MemberAccess.property_span` | the property after the `.` |
+| `Command.command_span` | the command's name, without the arguments |
+| `ObjectMember.key_span` | the key as written, quotes included for a quoted key |
+
+`Expression::span()` and `AttributeValue::span()` return the span of any variant.
+
+- Offsets are **bytes** into the source exactly as you passed it, including a leading byte-order mark. They are always on character boundaries, so `&source[span.start_byte..span.end_byte]` is the construct's text.
+- A string attribute value's span includes its quotes. A parenthesized expression's span doesn't include the parentheses; `(a + b)` has no node of its own.
+- To show a span as a line and column, use `render_diagnostic`, or count lines yourself.
+- Spans make IR values from different sources compare unequal even when they mean the same thing. To compare meaning, zero the spans first.
+
 ## Stability
 
-v0.1 is the first release. The IR's *meaning* is intended to be stable, but its Rust types may still change before 1.0. In particular, v0.1 has no serialized IR format, so treat the IR as an in-process value. Pin a tag rather than tracking `main`.
+v0.1 is the first release. The IR's *meaning* is intended to be stable, but its Rust types may still change before 1.0: v0.2, for example, adds source spans, which changes several variants' shapes. In particular, v0.1 has no serialized IR format, so treat the IR as an in-process value. Pin a tag rather than tracking `main`.
