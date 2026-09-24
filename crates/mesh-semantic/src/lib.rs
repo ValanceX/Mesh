@@ -1,10 +1,10 @@
 //! Semantic model for MPRX.
 //!
-//! For v0.1, this crate builds the Semantic IR from the `mesh-syntax` AST,
-//! applying structural validation (duplicate-attribute/duplicate-event-binding
-//! deduplication, tag-name-mismatch checks) along the way. It does not yet
-//! resolve component/prop/binding references against an external component
-//! model — that requires a typed component model that doesn't exist yet.
+//! This crate builds the Semantic IR from the `mesh-syntax` AST, applying
+//! structural validation (duplicate-attribute/duplicate-event-binding
+//! deduplication, tag-name-mismatch checks) along the way. It knows
+//! nothing about components: resolving and type-checking the IR against a
+//! component manifest is `mesh-analysis`'s job.
 
 use mesh_syntax::Span;
 
@@ -235,9 +235,10 @@ fn dedupe_last_wins<'a, T>(
 ///
 /// This copies each node's source spans into the IR, deduplicates
 /// shadowed attributes and event bindings (last occurrence wins), and
-/// flags mismatched closing tags — it does not yet resolve references
-/// against a component model.
-/// `ir` is always `Some(..)`: no diagnostic in v0.1, regardless of
+/// flags mismatched closing tags. Resolving names against a component
+/// model is `mesh-analysis`'s job, not this one's.
+///
+/// `ir` is always `Some(..)`: no lowering diagnostic, regardless of
 /// severity, prevents producing IR for an AST that exists.
 pub fn lower(ast: &mesh_syntax::Element) -> LowerResult {
     let (element, diagnostics) = lower_element(ast);

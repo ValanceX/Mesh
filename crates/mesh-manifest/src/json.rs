@@ -52,27 +52,41 @@ impl Value {
     }
 }
 
-/// Why a document isn't JSON: `serde_json`'s message, and where it
-/// stopped.
+/// Why a document can't be read.
 #[derive(Debug)]
-pub(crate) struct SyntaxError {
-    pub message: String,
-    pub span: Span,
+pub(crate) enum ReadError {
+    /// It isn't JSON: `serde_json`'s message, and where it stopped.
+    Syntax { message: String, span: Span },
+    /// It is JSON, but its arrays and objects nest more than
+    /// [`crate::MAX_NESTING_DEPTH`] levels deep. Span: the first `[` or `{`
+    /// too deep.
+    TooDeep { span: Span },
 }
 
 /// Parses `source` into a spanned tree. A leading byte-order mark is
 /// skipped; spans still index `source` as read, BOM included.
-pub(crate) fn parse(source: &str) -> Result<Json, SyntaxError> {
+///
+/// Building the tree recurses once per level of nesting, and re-reads
+/// each nested value's text, so a document nested more deeply than
+/// [`crate::MAX_NESTING_DEPTH`] is rejected before it is built.
+pub(crate) fn parse(source: &str) -> Result<Json, ReadError> {
     let body = source.strip_prefix('\u{feff}').unwrap_or(source);
     match serde_json::from_str::<&RawValue>(body) {
-        Ok(raw) => Ok(node(source, raw)),
+        Ok(raw) => match too_deep(source) {
+            Some(span) => Err(ReadError::TooDeep { span }),
+            None => Ok(node(source, raw)),
+        },
         // Reading into a `Value` finds the same mistake at the same place,
         // but names some more precisely: "trailing comma" rather than
-        // "key must be a string".
+        // "key must be a string". It stops at its own recursion limit,
+        // though, so a deeply nested document keeps the first message.
         Err(raw_error) => {
-            let error = serde_json::from_str::<serde_json::Value>(body)
-                .err()
-                .unwrap_or(raw_error);
+            let error = match too_deep(source) {
+                Some(_) => raw_error,
+                None => serde_json::from_str::<serde_json::Value>(body)
+                    .err()
+                    .unwrap_or(raw_error),
+            };
             Err(syntax_error(source, body, &error))
         }
     }
@@ -121,6 +135,42 @@ fn node(source: &str, raw: &RawValue) -> Json {
     Json { span, value }
 }
 
+/// The first `[` or `{` in `source` that opens a level nested more than
+/// [`crate::MAX_NESTING_DEPTH`] deep, if any. A scan of the text, not a
+/// recursive walk: brackets inside strings don't count. Exact for a valid
+/// document; for an invalid one, only a guide.
+fn too_deep(source: &str) -> Option<Span> {
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (index, byte) in source.bytes().enumerate() {
+        if in_string {
+            match byte {
+                _ if escaped => escaped = false,
+                b'\\' => escaped = true,
+                b'"' => in_string = false,
+                _ => {}
+            }
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'[' | b'{' => {
+                depth += 1;
+                if depth > crate::MAX_NESTING_DEPTH {
+                    return Some(Span {
+                        start_byte: index,
+                        end_byte: index + 1,
+                    });
+                }
+            }
+            b']' | b'}' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    None
+}
+
 /// Where `text`, a slice borrowed from `source`, sits in `source`.
 fn span_of(source: &str, text: &str) -> Span {
     let start_byte = text.as_ptr() as usize - source.as_ptr() as usize;
@@ -152,7 +202,7 @@ fn key_span(source: &str, gap_start: usize, gap_end: usize) -> Span {
 
 /// `serde_json`'s error, located at the byte it reports. Its line and
 /// column count from 1, and the column counts bytes.
-fn syntax_error(source: &str, body: &str, error: &serde_json::Error) -> SyntaxError {
+fn syntax_error(source: &str, body: &str, error: &serde_json::Error) -> ReadError {
     let line_start: usize = body
         .split_inclusive('\n')
         .take(error.line().saturating_sub(1))
@@ -165,7 +215,7 @@ fn syntax_error(source: &str, body: &str, error: &serde_json::Error) -> SyntaxEr
         Some((message, _)) => message.to_string(),
         None => message,
     };
-    SyntaxError {
+    ReadError::Syntax {
         message,
         span: Span {
             start_byte: offset,
@@ -210,6 +260,68 @@ mod tests {
         &source[span.start_byte..span.end_byte]
     }
 
+    struct Syntax {
+        message: String,
+        span: Span,
+    }
+
+    /// Parses `source`, expecting a syntax error.
+    fn syntax_error(source: &str) -> Syntax {
+        match parse(source) {
+            Err(ReadError::Syntax { message, span }) => Syntax { message, span },
+            other => panic!("expected a syntax error, got {other:?}"),
+        }
+    }
+
+    /// Parses `source`, expecting it to be too deep, and returns where.
+    fn too_deep_at(source: &str) -> usize {
+        match parse(source) {
+            Err(ReadError::TooDeep { span }) => span.start_byte,
+            other => panic!("expected nesting too deep, got {other:?}"),
+        }
+    }
+
+    fn nested(levels: usize) -> String {
+        format!("{}{}", "[".repeat(levels), "]".repeat(levels))
+    }
+
+    #[test]
+    fn reads_nesting_up_to_the_limit() {
+        assert!(parse(&nested(crate::MAX_NESTING_DEPTH)).is_ok());
+        let objects = format!(
+            "{}1{}",
+            r#"{"a":"#.repeat(crate::MAX_NESTING_DEPTH),
+            "}".repeat(crate::MAX_NESTING_DEPTH)
+        );
+        assert!(parse(&objects).is_ok());
+    }
+
+    #[test]
+    fn rejects_nesting_past_the_limit_at_the_first_bracket_too_deep() {
+        let limit = crate::MAX_NESTING_DEPTH;
+        assert_eq!(too_deep_at(&nested(limit + 1)), limit);
+        assert_eq!(
+            too_deep_at(&format!("\u{feff}{}", nested(limit + 1))),
+            limit + 3
+        );
+        // Far past the limit: rejected without recursing (this runs on a
+        // test thread, with a small stack), and in linear time.
+        assert_eq!(too_deep_at(&nested(1_000_000)), limit);
+    }
+
+    #[test]
+    fn brackets_in_strings_are_not_nesting() {
+        let brackets = "[{".repeat(crate::MAX_NESTING_DEPTH);
+        let source = format!(r#"{{"a\"{brackets}": "\\{brackets}"}}"#);
+        assert!(parse(&source).is_ok(), "{source}");
+    }
+
+    #[test]
+    fn a_syntax_error_is_reported_before_nesting() {
+        let source = format!("{},", nested(crate::MAX_NESTING_DEPTH + 1));
+        assert_eq!(syntax_error(&source).message, "trailing characters");
+    }
+
     #[test]
     fn spans_every_value_and_key() {
         let source = " {\n  \"a\" : [1, true, null],\n  \"b\\\"c\": {\"d\": \"é\"}\n}\n";
@@ -251,7 +363,7 @@ mod tests {
         };
         assert_eq!(members[0].key_span.start_byte, 4);
 
-        let error = parse("\u{feff}{\"a\" 1}").expect_err("invalid JSON");
+        let error = syntax_error("\u{feff}{\"a\" 1}");
         assert_eq!(error.span.start_byte, 3 + 5);
         assert_eq!(error.message, "expected `:`");
     }
@@ -259,7 +371,7 @@ mod tests {
     #[test]
     fn locates_syntax_errors() {
         let source = "{\n  \"a\": 1,\n}";
-        let error = parse(source).expect_err("trailing comma");
+        let error = syntax_error(source);
         assert_eq!(error.message, "trailing comma");
         assert_eq!(
             slice(
@@ -272,11 +384,11 @@ mod tests {
             "}"
         );
 
-        let error = parse("").expect_err("empty");
+        let error = syntax_error("");
         assert_eq!(error.message, "EOF while parsing a value");
         assert_eq!(error.span.start_byte, 0);
 
-        let error = parse("{} x").expect_err("trailing characters");
+        let error = syntax_error("{} x");
         assert_eq!(error.message, "trailing characters");
         assert_eq!(error.span.start_byte, 3);
     }
@@ -330,7 +442,7 @@ mod tests {
         // serde_json's column counts bytes, so the offset lands on the
         // offending byte even after multi-byte characters and CRLF lines.
         let source = "{\r\n  \"日本\": \"é\"\r\n  x\r\n}";
-        let error = parse(source).expect_err("missing comma");
+        let error = syntax_error(source);
         assert_eq!(error.message, "expected `,` or `}`");
         assert_eq!(&source[error.span.start_byte..], "x\r\n}");
         assert_eq!(error.span.start_byte, error.span.end_byte);

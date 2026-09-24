@@ -1,0 +1,270 @@
+{
+  "version": 1,
+  "types": {
+    "Deep":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "list", "element":
+{ "kind": "string" }
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+  },
+  "components": {
+    "page": {
+      "props": {
+        "title": { "type": { "kind": "string" }, "required": true }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "template": { "props": {}, "events": {}, "commands": {}, "scope": {} }
+  }
+}

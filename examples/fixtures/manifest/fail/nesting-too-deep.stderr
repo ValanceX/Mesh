@@ -1,0 +1,5 @@
+error[manifest-nesting-too-deep]: the manifest nests arrays and objects more than 128 levels deep
+   --> fixtures/manifest/fail/nesting-too-deep.json:131:1
+    |
+131 | { "kind": "string" }
+    | ^

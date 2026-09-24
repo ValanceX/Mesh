@@ -1,5 +1,5 @@
-//! Type checking, diagnostics, transformation, optimization, and code
-//! generation for MPRX, built on the semantic model in `mesh-semantic`.
+//! The compiler entry point for MPRX: source text to Semantic IR, with
+//! every diagnostic found along the way, rendered rustc-style or as JSON.
 //!
 //! This crate orchestrates parse → lower → analyze and aggregates
 //! diagnostics. [`compile_with`] also takes the component model a

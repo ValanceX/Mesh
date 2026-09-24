@@ -12,7 +12,10 @@ use mesh_syntax::{
 };
 use tree_sitter::Node;
 
+mod nesting;
 mod syntax_errors;
+
+pub use nesting::MAX_NESTING_DEPTH;
 
 /// An error produced while parsing MPRX source text.
 ///
@@ -39,10 +42,12 @@ pub struct ParseResult {
 /// into the [`mesh_syntax`] AST.
 ///
 /// `ast` is `None` if the source fails to parse outright, if the
-/// resulting tree contains syntax errors, or if the tree does not
-/// contain exactly one root element. Syntax errors are located: `errors`
-/// holds one [`ParseError`] per error region, in source order, each with
-/// the narrowest useful span.
+/// resulting tree contains syntax errors, if it nests more than
+/// [`MAX_NESTING_DEPTH`] levels deep, or if the tree does not contain
+/// exactly one root element. Syntax errors are located: `errors` holds
+/// one [`ParseError`] per error region, in source order, each with the
+/// narrowest useful span. A file too deeply nested gets one
+/// `nesting-too-deep` error, at the first place it goes too deep.
 pub fn parse(source: &str) -> ParseResult {
     let mut parser = tree_sitter::Parser::new();
     parser
@@ -68,6 +73,13 @@ pub fn parse(source: &str) -> ParseResult {
         return ParseResult {
             ast: None,
             errors: syntax_errors::collect(root, source),
+        };
+    }
+
+    if let Some(error) = nesting::check(root) {
+        return ParseResult {
+            ast: None,
+            errors: vec![error],
         };
     }
 
@@ -149,11 +161,9 @@ fn lower_child(node: Node, source: &str) -> Child {
         // `element` wraps `choice(self_closing_element, container_element)` —
         // unwrap it the same way `parse()` unwraps the root element node.
         //
-        // Nested elements introduce a second mutually-recursive lowering
-        // path (lower_element -> lower_child -> lower_element -> ...)
-        // alongside the pre-existing, unguarded recursion in expression
-        // lowering. No recursion-depth guard exists for either path —
-        // tracked as a known, deferred concern, not fixed here.
+        // Lowering recurses once per element and expression level. That
+        // is bounded: `parse` rejects a tree nested more than
+        // `MAX_NESTING_DEPTH` levels deep before lowering it.
         "element" => Child::Element(Box::new(lower_element(
             inner
                 .child(0)

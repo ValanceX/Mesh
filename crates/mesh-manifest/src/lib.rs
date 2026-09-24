@@ -21,6 +21,12 @@ mod validate;
 /// The manifest schema version this MESH reads.
 pub const VERSION: u64 = 1;
 
+/// The deepest that a manifest's JSON arrays and objects may nest. The
+/// document itself is level 1. A deeper manifest is a
+/// `manifest-nesting-too-deep` error, reported before anything else is
+/// checked.
+pub const MAX_NESTING_DEPTH: usize = 128;
+
 /// A type a manifest can write. Named references are aliases for their
 /// definition; [`Manifest::expand`] follows them.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -198,11 +204,25 @@ impl<'m> Template<'m> {
 /// found, in source order, with spans into `source`.
 pub fn load(source: &str) -> Result<Manifest, Vec<Diagnostic>> {
     let document = json::parse(source).map_err(|error| {
+        let (code, message, span) = match error {
+            json::ReadError::Syntax { message, span } => (
+                DiagnosticCode::MANIFEST_SYNTAX_ERROR,
+                format!("the manifest isn't valid JSON: {message}"),
+                span,
+            ),
+            json::ReadError::TooDeep { span } => (
+                DiagnosticCode::MANIFEST_NESTING_TOO_DEEP,
+                format!(
+                    "the manifest nests arrays and objects more than {MAX_NESTING_DEPTH} levels deep"
+                ),
+                span,
+            ),
+        };
         vec![Diagnostic {
             severity: Severity::Error,
-            code: DiagnosticCode::MANIFEST_SYNTAX_ERROR,
-            message: format!("the manifest isn't valid JSON: {}", error.message),
-            span: error.span,
+            code,
+            message,
+            span,
             suggestions: Vec::new(),
         }]
     })?;

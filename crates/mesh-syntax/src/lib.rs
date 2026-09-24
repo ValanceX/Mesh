@@ -15,7 +15,7 @@ pub struct Span {
 
 /// How serious a [`Diagnostic`] is.
 ///
-/// For v0.1, `Error` and `Warning` both describe how serious an issue is,
+/// `Error` and `Warning` both describe how serious an issue is,
 /// not whether it blocks lowering — check `ir.is_some()` on the
 /// `LowerResult`/`ParseResult` to see whether IR was produced, regardless
 /// of severity (e.g. a mismatched closing tag is an `Error` but still
@@ -82,8 +82,15 @@ impl DiagnosticCode {
     /// An `on.` event binding with a missing, dotted, or hyphenated event
     /// name, or a value that isn't `{...}`.
     pub const MALFORMED_EVENT_BINDING: DiagnosticCode = DiagnosticCode("malformed-event-binding");
+    /// Elements and expressions nested more than
+    /// `mesh_parser::MAX_NESTING_DEPTH` levels deep.
+    pub const NESTING_TOO_DEEP: DiagnosticCode = DiagnosticCode("nesting-too-deep");
     /// A component manifest that isn't valid JSON.
     pub const MANIFEST_SYNTAX_ERROR: DiagnosticCode = DiagnosticCode("manifest-syntax-error");
+    /// A component manifest whose arrays and objects nest more than
+    /// `mesh_manifest::MAX_NESTING_DEPTH` levels deep.
+    pub const MANIFEST_NESTING_TOO_DEEP: DiagnosticCode =
+        DiagnosticCode("manifest-nesting-too-deep");
     /// A manifest whose `version` is missing or isn't one MESH reads.
     pub const MANIFEST_UNSUPPORTED_VERSION: DiagnosticCode =
         DiagnosticCode("manifest-unsupported-version");
@@ -170,7 +177,9 @@ impl DiagnosticCode {
         DiagnosticCode::SINGLE_BRACE_OBJECT,
         DiagnosticCode::COMMAND_TRAILING_COMMA,
         DiagnosticCode::MALFORMED_EVENT_BINDING,
+        DiagnosticCode::NESTING_TOO_DEEP,
         DiagnosticCode::MANIFEST_SYNTAX_ERROR,
+        DiagnosticCode::MANIFEST_NESTING_TOO_DEEP,
         DiagnosticCode::MANIFEST_UNSUPPORTED_VERSION,
         DiagnosticCode::MANIFEST_INVALID_VALUE,
         DiagnosticCode::MANIFEST_MISSING_PROPERTY,
@@ -459,16 +468,17 @@ pub struct CommandInvocation {
 }
 
 /// A `$`-prefixed special value, e.g. `$event`. The lexical rule is
-/// general (`'$' identifier`), but v0.1 semantics only meaningfully
-/// understand `$event` — structural parsing only, no validation of the
-/// name; see `docs/MPRX-SPEC.md` §2 and §5.
+/// general (`'$' identifier`), and parsing accepts any name; `$event` is
+/// the only one with a meaning, and checking against a component model
+/// reports any other as `unknown-special-value`. See `docs/MPRX-SPEC.md`
+/// §2, §5 and §9.5.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventValue {
     pub name: String,
     pub span: Span,
 }
 
-/// An expression inside an `{...}` block. This is §5's complete v0.1
+/// An expression inside an `{...}` block. This is §5's complete
 /// expression grammar — every node kind the spec defines has a variant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
@@ -952,7 +962,9 @@ mod tests {
                 "single-brace-object",
                 "command-trailing-comma",
                 "malformed-event-binding",
+                "nesting-too-deep",
                 "manifest-syntax-error",
+                "manifest-nesting-too-deep",
                 "manifest-unsupported-version",
                 "manifest-invalid-value",
                 "manifest-missing-property",

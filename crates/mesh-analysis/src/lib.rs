@@ -59,7 +59,10 @@ impl Analysis {
     /// The type of every expression that has one, in the order analysis
     /// typed them (operands before the expression they're in). An
     /// expression has no type when a fact about it, or about a part of it,
-    /// was reported instead.
+    /// was reported instead, with one exception: an operator whose result
+    /// type is fixed (`!`, `-`, arithmetic, comparisons, `&&`, `||`, `==`
+    /// and `!=`) keeps that type whatever its operands are, since it can't
+    /// cause a second, spurious diagnostic.
     pub fn types(&self) -> &[Typed] {
         &self.types
     }

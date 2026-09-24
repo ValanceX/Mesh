@@ -35,7 +35,7 @@ use mesh_syntax::Diagnostic;
 ///
 /// Lines and columns are 1-based. Columns count Unicode scalar values
 /// (`char`s), not bytes, and deliberately ignore terminal display width:
-/// wide characters get no special alignment in v0.1. Tabs before the
+/// wide characters get no special alignment. Tabs before the
 /// span are echoed in the underline so carets stay aligned. A span
 /// covering several lines is underlined only to the end of its first
 /// line, and a trailing `\r` (CRLF sources) is never shown, counted, or

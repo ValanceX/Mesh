@@ -73,9 +73,18 @@ fn the_schema_agrees_with_every_broken_manifest_fixture() {
             .strip_prefix("error[")
             .and_then(|rest| rest.split(']').next())
             .expect("a fixture's output starts with error[code]");
-        let Ok(instance) = serde_json::from_str::<serde_json::Value>(&read(&path)) else {
-            assert_eq!(code, "manifest-syntax-error", "{}", path.display());
-            continue;
+        let instance = match serde_json::from_str::<serde_json::Value>(&read(&path)) {
+            Ok(instance) => instance,
+            // `serde_json`'s own recursion limit is the loader's nesting
+            // limit, so it can't read a manifest nested too deeply either.
+            Err(error) if error.to_string().starts_with("recursion limit exceeded") => {
+                assert_eq!(code, "manifest-nesting-too-deep", "{}", path.display());
+                continue;
+            }
+            Err(_) => {
+                assert_eq!(code, "manifest-syntax-error", "{}", path.display());
+                continue;
+            }
         };
         if SCHEMA_CODES.contains(&code) {
             assert!(

@@ -161,13 +161,15 @@ Props, events, commands and scope names are separate: each is written in a diffe
 
 `mesh check --model` loads and checks the whole manifest before it reads the `.mprx` file. If anything is wrong, it reports every problem it finds, each at its line and column in the manifest, and checks nothing else. Each problem has its own `manifest-*` code, listed in the [diagnostics reference](./diagnostics.md#manifest-errors):
 
-- the JSON itself: `manifest-syntax-error`, and `manifest-duplicate-key` for a key repeated in any object, which most JSON tools would silently accept;
+- the JSON itself: `manifest-syntax-error`, `manifest-nesting-too-deep` for arrays and objects nested more than 128 levels deep, and `manifest-duplicate-key` for a key repeated in any object, which most JSON tools would silently accept;
 - the version: `manifest-unsupported-version`;
 - the format the schema describes: `manifest-invalid-value`, `manifest-missing-property`, `manifest-unknown-property`, `manifest-unknown-kind` and `manifest-invalid-name`;
 - rules the schema can't express: `manifest-duplicate-parameter`, `manifest-unknown-type`, `manifest-recursive-type` and `manifest-nested-optional`;
 - and once the manifest is valid, `manifest-missing-component` if it doesn't declare the component the file is the template of.
 
 A manifest the JSON Schema accepts can still have the problems in the last two items; `mesh check` is the complete check.
+
+The nesting limit belongs to this MESH, not to the format: it keeps a pathological manifest from exhausting the stack. Write deeply nested types as named types, and a manifest never comes near it.
 
 ## Versions
 

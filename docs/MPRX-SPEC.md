@@ -165,6 +165,14 @@ not just in attribute values — `docs/ARCHITECTURE.md`'s own example,
 content, and `container_element`'s grammar now uses `repeat($.child)` so
 an element can hold any number of text/expression children in any order.
 
+**Nesting limit:** a file may nest at most 128 levels deep. Every
+element counts as a level, and so does every expression inside another
+one and every pair of parentheses, so `<a><b x={-(y)} /></a>` is 5
+levels deep at `y`. A deeper file is rejected by `mesh-parser` with a
+`nesting-too-deep` error, like a syntax error: it gets no AST, and so
+no IR. The limit (`mesh_parser::MAX_NESTING_DEPTH`) keeps the
+recursive stages after parsing within a small, fixed stack.
+
 **Whitespace in child content:** whitespace-only text children are
 formatting and are omitted from the semantic model; text containing any
 non-whitespace character is preserved verbatim, with no trimming,
