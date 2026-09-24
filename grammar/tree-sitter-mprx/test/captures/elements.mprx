@@ -1,0 +1,7 @@
+<page title="Users" subtitle="say \"hi\"\n">
+  Some text, then a nested element.
+  <user-card compact={true} />
+  <section>
+    <heading>Title</heading>
+  </section>
+</page>

@@ -1,0 +1,4 @@
+<page title={user.name}>
+  <avatar src={user.
+  <text>{user.name}</text>
+</page>

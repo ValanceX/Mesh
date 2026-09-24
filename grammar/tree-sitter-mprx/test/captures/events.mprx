@@ -1,0 +1,3 @@
+<list on.select={selectUser($event)} on.clear={reset()}>
+  <button on.click={save(user, { force: true })} />
+</list>

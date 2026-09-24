@@ -33,6 +33,11 @@ fn main() {
 
     c_config.compile("tree-sitter-mprx");
 
+    // Without this, adding or removing a query wouldn't rerun the script,
+    // so the `with_*_query` flags below would go stale on an incremental
+    // build.
+    println!("cargo:rerun-if-changed=queries");
+
     println!("cargo:rustc-check-cfg=cfg(with_highlights_query)");
     if !"queries/highlights.scm".is_empty()
         && std::path::Path::new("queries/highlights.scm").exists()

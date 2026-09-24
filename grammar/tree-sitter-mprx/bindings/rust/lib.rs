@@ -57,6 +57,9 @@ pub const LOCALS_QUERY: &str = include_str!("../../queries/locals.scm");
 pub const TAGS_QUERY: &str = include_str!("../../queries/tags.scm");
 
 #[cfg(test)]
+mod highlight_tests;
+
+#[cfg(test)]
 mod tests {
     #[test]
     fn test_can_load_grammar() {

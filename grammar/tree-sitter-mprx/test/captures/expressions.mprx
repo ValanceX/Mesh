@@ -1,0 +1,9 @@
+<page
+  a={!done}
+  b={-count * 2 / 3 % 4 + 1 - 0.5}
+  c={x < y && x <= y || x > y && x >= y}
+  d={x == y != z}
+  e={ready ? user.profile.name : null}
+  f={[1, "two", false,]}
+  g={{ name: user.name, "display name": "Ann", }}
+  h={(a + b) * c} />

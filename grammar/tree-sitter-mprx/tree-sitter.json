@@ -10,6 +10,7 @@
         "mprx"
       ],
       "injection-regex": "^mprx$",
+      "highlights": "queries/highlights.scm",
       "class-name": "TreeSitterMprx"
     }
   ],
