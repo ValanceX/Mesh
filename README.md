@@ -104,9 +104,9 @@ mesh/
 - The `mesh check` CLI
 - rustc-style diagnostics with source snippets; warnings don't fail the check
 
-Known limitations: references, components and props aren't type-checked yet. The language server and npm packages are placeholders.
+Known limitations: in v0.1.0, references, components and props aren't type-checked. The language server and npm packages are placeholders.
 
-Next up: component-aware type checking. Unreleased on `main` so far: most syntax errors point at the actual mistake, and every diagnostic has a stable code (see the [CHANGELOG](./CHANGELOG.md)).
+Unreleased on `main` so far (see the [CHANGELOG](./CHANGELOG.md)): most syntax errors point at the actual mistake, every diagnostic has a stable code, and `mesh check --model` checks a file against a component manifest, resolving every component, prop, event, reference and command and type-checking every value. Next up: JSON diagnostics output and the v0.2 release.
 
 ## Learn more
 
