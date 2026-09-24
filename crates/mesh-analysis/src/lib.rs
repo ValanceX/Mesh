@@ -17,6 +17,11 @@ use mesh_manifest::Template;
 use mesh_syntax::Span;
 
 mod check;
+mod relation;
+mod types;
+
+pub use relation::{is_assignable, join};
+pub use types::{FieldTy, Ty};
 
 /// Analyzes `ir` as the template of `template`'s component.
 pub fn analyze(ir: &mesh_semantic::Element, template: Template<'_>) -> Analysis {
