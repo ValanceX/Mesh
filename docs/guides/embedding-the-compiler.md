@@ -23,7 +23,7 @@ The crates you'll use:
 | `mesh-syntax` | `Diagnostic`, `DiagnosticCode`, `Severity`, `Span` |
 | `mesh-semantic` | The Semantic IR types: `Element`, `Attribute`, `EventBinding`, `Child`, `Expression`, ... |
 | `mesh-manifest` | `load`, `Manifest`, `Template`, and the manifest's model types |
-| `mesh-analysis` | `analyze`, `Analysis`: what a template's names resolved to, and the problems found, as data |
+| `mesh-analysis` | `analyze`, `Analysis`: what a template's names resolved to, each expression's type, and the problems found, as data; `Ty`, `is_assignable` and `join` |
 
 ## Compiling a source string
 
@@ -98,7 +98,13 @@ A manifest diagnostic's span indexes the manifest's text, not the `.mprx` source
 
 With a template, `compile_with` returns what `compile` does, plus the analysis diagnostics (see [Model errors](../manual/diagnostics.md#model-errors)) after all the others. The IR is the same either way: analysis never changes it. A file with a syntax error has no IR, so it gets no analysis diagnostics.
 
-If you need analysis results as data rather than as diagnostics, call `mesh_analysis::analyze(&ir, template)` yourself. Its `Analysis` holds the `resolutions()` (each name that resolved, with its span, and the component, prop, event, scope name or command it refers to) and the `facts()` (each problem found, with its span and the names that were available). `compile_with` turns those facts into diagnostics.
+If you need analysis results as data rather than as diagnostics, call `mesh_analysis::analyze(&ir, template)` yourself. Its `Analysis` holds:
+
+- `resolutions()`: each name that resolved, with its span, and the component, prop, event, scope name or command it refers to;
+- `types()`: each expression's type (`Ty`), with its span, and `type_at(span)` to look one up. An expression involved in an error has no type;
+- `facts()`: each problem found, with its span and the names that were available. `compile_with` turns these into diagnostics.
+
+`Ty` prints in the docs' notation (`list<User>`, `string?`). To compare two types the way the checks do, use `mesh_analysis::is_assignable(manifest, &actual, &expected)` and `mesh_analysis::join(manifest, &a, &b)`; there is no other compatibility logic.
 
 ## Diagnostics
 

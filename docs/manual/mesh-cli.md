@@ -59,8 +59,9 @@ With a valid manifest, `mesh check` checks the file as that component's template
 2. **Props and events**: every attribute is a prop of the element's component, every required prop is supplied, and every `on.<name>` is one of its events.
 3. **Names**: every reference is in the template's `scope`, and every command is one of the template's `commands`, with the right number of arguments.
 4. **Placement**: a command appears only as the whole handler of an `on.` binding, and `$event` only in that command's arguments, for an event that carries a value.
+5. **Expressions**: every expression has a type. Members exist on what they're read from, operators get the types they need, and compared values, conditional branches and array elements have a common type.
 
-These are errors with their own codes, listed under [Model errors](./diagnostics.md#model-errors), and a close match gets a `help` line. Types aren't checked yet: that comes later in v0.2.
+These are errors with their own codes, listed under [Model errors](./diagnostics.md#model-errors), and a close match gets a `help` line. Whether prop values and command arguments have the right types isn't checked yet: that comes later in v0.2.
 
 ### Output
 
