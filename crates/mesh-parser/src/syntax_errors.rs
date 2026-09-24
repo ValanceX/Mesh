@@ -30,13 +30,39 @@ pub(crate) fn collect(root: Node, source: &str) -> Vec<ParseError> {
         )];
     }
 
-    let mut regions = Vec::new();
-    collect_regions(root, &mut regions);
+    let mut errors = Vec::new();
 
-    let errors: Vec<ParseError> = regions
-        .into_iter()
-        .map(|region| classify(region, source))
-        .collect();
+    // Visits every outermost `ERROR` node and every `MISSING` node, in
+    // source order. Never descends into an `ERROR`: nested errors belong
+    // to the region that contains them.
+    //
+    // Iterative rather than recursive: a deeply nested tree (thousands of
+    // levels, one error at the bottom) would otherwise recurse once per
+    // level and blow the stack. An explicit stack holds the same walk;
+    // pushing each node's children in reverse makes them pop, and so get
+    // visited, in source order. `path` holds the ancestors of the node
+    // being visited, root first; each stack entry remembers its depth so
+    // `path` can be cut back when the walk moves to a sibling.
+    let mut stack = vec![(root, 0)];
+    let mut path: Vec<Node> = Vec::new();
+    while let Some((node, depth)) = stack.pop() {
+        path.truncate(depth);
+        if node.is_error() || node.is_missing() {
+            let region = Region {
+                node,
+                ancestors: &path,
+            };
+            errors.push(classify(region, source));
+            continue;
+        }
+        if !node.has_error() {
+            continue;
+        }
+        path.push(node);
+        let mut cursor = node.walk();
+        let children: Vec<Node> = node.children(&mut cursor).collect();
+        stack.extend(children.into_iter().rev().map(|child| (child, depth + 1)));
+    }
 
     // `has_error()` guarantees at least one region; this only guards
     // against a Tree-sitter behaviour change turning into a silent pass.
@@ -46,41 +72,55 @@ pub(crate) fn collect(root: Node, source: &str) -> Vec<ParseError> {
     errors
 }
 
-/// Pushes every outermost `ERROR` node and every `MISSING` node, in
-/// source order. Never descends into an `ERROR`: nested errors belong to
-/// the region that contains them.
+/// An error region together with the path from the root down to it.
 ///
-/// Iterative rather than recursive: a deeply nested tree (thousands of
-/// levels, one error at the bottom) would otherwise recurse once per
-/// level and blow the stack. An explicit stack holds the same walk;
-/// pushing each node's children in reverse makes them pop, and so get
-/// visited, in source order.
-fn collect_regions<'tree>(node: Node<'tree>, regions: &mut Vec<Node<'tree>>) {
-    let mut stack = vec![node];
-    while let Some(node) = stack.pop() {
-        if node.is_error() || node.is_missing() {
-            regions.push(node);
-            continue;
-        }
-        if !node.has_error() {
-            continue;
-        }
-        let mut cursor = node.walk();
-        let children: Vec<Node<'tree>> = node.children(&mut cursor).collect();
-        stack.extend(children.into_iter().rev());
+/// Tree-sitter's `Node::parent()` (and `prev_sibling()`/`next_sibling()`,
+/// which call it) re-walks the tree from the root on every call, and for
+/// a zero-width `MISSING` node it recurses once per level on the way
+/// down. On a deeply nested file that is both slow and a stack overflow,
+/// so the classifier never calls them: it reads parents and siblings from
+/// the path the walk in [`collect`] already holds.
+#[derive(Clone, Copy)]
+struct Region<'path, 'tree> {
+    node: Node<'tree>,
+    /// Every ancestor of `node`, root first, so the parent is last.
+    ancestors: &'path [Node<'tree>],
+}
+
+impl<'tree> Region<'_, 'tree> {
+    /// The `n`th ancestor: 1 is the parent, 2 the grandparent, and so on.
+    fn ancestor(&self, n: usize) -> Option<Node<'tree>> {
+        let index = self.ancestors.len().checked_sub(n)?;
+        self.ancestors.get(index).copied()
+    }
+
+    fn parent(&self) -> Option<Node<'tree>> {
+        self.ancestor(1)
+    }
+
+    /// The node `offset` places after this one among its parent's
+    /// children (negative for before), counting anonymous tokens too, as
+    /// `Node::prev_sibling`/`next_sibling` do.
+    fn sibling(&self, offset: isize) -> Option<Node<'tree>> {
+        let parent = self.parent()?;
+        let mut cursor = parent.walk();
+        let siblings: Vec<Node> = parent.children(&mut cursor).collect();
+        let index = siblings.iter().position(|n| n.id() == self.node.id())?;
+        siblings.get(index.checked_add_signed(offset)?).copied()
     }
 }
 
-fn classify(region: Node, source: &str) -> ParseError {
-    if region.is_missing() {
+fn classify(region: Region, source: &str) -> ParseError {
+    if region.node.is_missing() {
         classify_missing(region, source)
     } else {
         classify_error(region, source)
     }
 }
 
-fn classify_missing(missing: Node, source: &str) -> ParseError {
-    let Some(parent) = missing.parent() else {
+fn classify_missing(region: Region, source: &str) -> ParseError {
+    let missing = region.node;
+    let Some(parent) = region.parent() else {
         return syntax_error("invalid syntax", span_of(missing));
     };
 
@@ -89,13 +129,13 @@ fn classify_missing(missing: Node, source: &str) -> ParseError {
     // (`<p>a < b</p>` reads `< b` as an unfinished nested element), which
     // is told apart by the whitespace right after the `<`.
     if missing.kind() == "/>" && parent.kind() == "self_closing_element" {
-        return unfinished_open_tag(parent, source);
+        return unfinished_open_tag(region, parent, source);
     }
 
     // An operand is missing inside an expression: `{a +}`, or the slot
     // after a trailing comma in `save(a, b,)`.
     if parent.kind() == "expression" {
-        if let Some(comma) = trailing_command_comma(missing, source) {
+        if let Some(comma) = trailing_command_comma(region, source) {
             return command_trailing_comma(comma);
         }
         return syntax_error("expected an expression", span_of(missing));
@@ -104,15 +144,16 @@ fn classify_missing(missing: Node, source: &str) -> ParseError {
     syntax_error("invalid syntax", span_of(missing))
 }
 
-fn classify_error(error: Node, source: &str) -> ParseError {
-    let parent_kind = error.parent().map(|parent| parent.kind());
+fn classify_error(region: Region, source: &str) -> ParseError {
+    let error = region.node;
+    let parent_kind = region.parent().map(|parent| parent.kind());
 
-    if let Some(diagnostic) = malformed_event_binding(error, source) {
+    if let Some(diagnostic) = malformed_event_binding(region, source) {
         return diagnostic;
     }
 
     if parent_kind == Some("container_element") {
-        if let Some(less_than) = less_than_in_text(error, source) {
+        if let Some(less_than) = less_than_in_text(region, source) {
             return less_than_diagnostic(less_than);
         }
     }
@@ -126,8 +167,8 @@ fn classify_error(error: Node, source: &str) -> ParseError {
         }
     }
 
-    if parent_kind == Some("expression_block") && is_single_brace_object(error) {
-        let block = error.parent().expect("parent_kind is Some");
+    if parent_kind == Some("expression_block") && is_single_brace_object(region) {
+        let block = region.parent().expect("parent_kind is Some");
         return ParseError {
             code: DiagnosticCode::SINGLE_BRACE_OBJECT,
             message: "an object needs its own braces inside `{...}`: write `{{ key: value }}`"
@@ -138,8 +179,8 @@ fn classify_error(error: Node, source: &str) -> ParseError {
 
     if parent_kind == Some("command_invocation")
         && error.utf8_text(source.as_bytes()) == Ok(",")
-        && error.prev_sibling().map(|n| n.kind()) == Some("expression")
-        && error.next_sibling().map(|n| n.kind()) == Some(")")
+        && region.sibling(-1).map(|n| n.kind()) == Some("expression")
+        && region.sibling(1).map(|n| n.kind()) == Some(")")
     {
         return command_trailing_comma(span_of(error));
     }
@@ -149,8 +190,8 @@ fn classify_error(error: Node, source: &str) -> ParseError {
     }
 
     if parent_kind == Some("source_file") && starts_with_kind(error, "<") {
-        let next_root = error.next_sibling().filter(|n| n.kind() == "element");
-        let prev_root = error.prev_sibling().filter(|n| n.kind() == "element");
+        let next_root = region.sibling(1).filter(|n| n.kind() == "element");
+        let prev_root = region.sibling(-1).filter(|n| n.kind() == "element");
         if next_root.is_some() || prev_root.is_some() {
             // Point at whichever root comes second: that's the extra one.
             let extra = next_root.unwrap_or(error);
@@ -166,8 +207,9 @@ fn classify_error(error: Node, source: &str) -> ParseError {
 
 /// `on.={x}`, `on.a.b={x}`, `on.my-event={x}`, `on.click="x"`: an `ERROR`
 /// inside an `event_binding`, or one that starts with the `on.` prefix.
-fn malformed_event_binding(error: Node, source: &str) -> Option<ParseError> {
-    let parent = error.parent()?;
+fn malformed_event_binding(region: Region, source: &str) -> Option<ParseError> {
+    let error = region.node;
+    let parent = region.parent()?;
     let start = if parent.kind() == "event_binding" {
         parent.start_byte()
     } else if source[error.start_byte()..].starts_with("on.") {
@@ -201,8 +243,9 @@ fn malformed_event_binding(error: Node, source: &str) -> Option<ParseError> {
 /// by whitespace, `=`, or a digit (`a < b`, `a <= b`, `x<5`). Anything
 /// else after the `<` (`<!--`, `<$`) is some other mistake, so it's left
 /// to the `syntax-error` fallback.
-fn less_than_in_text(error: Node, source: &str) -> Option<Span> {
-    let element = error.parent()?;
+fn less_than_in_text(region: Region, source: &str) -> Option<Span> {
+    let error = region.node;
+    let element = region.parent()?;
     let mut cursor = error.walk();
     let less_than = error.children(&mut cursor).find(|token| {
         token.kind() == "<"
@@ -264,17 +307,18 @@ fn hyphenated_attribute_name(error: Node, source: &str) -> Option<ParseError> {
 /// `data={ k: "v" }`: the block's first thing is a key followed by `:`.
 /// Tree-sitter leaves either `k:` in the `ERROR` (identifier key) or just
 /// `: "v"` after a string-key expression (`{ "k": "v" }`).
-fn is_single_brace_object(error: Node) -> bool {
+fn is_single_brace_object(region: Region) -> bool {
+    let error = region.node;
     let first = error.child(0);
     let first_kind = first.map(|n| n.kind());
     let second_kind = error.child(1).map(|n| n.kind());
 
     // The key must be the first thing in the block, right after its `{`.
     let (key, before_key) = match (first_kind, second_kind) {
-        (Some("expression"), Some(":")) => (first, error.prev_sibling()),
+        (Some("expression"), Some(":")) => (first, region.sibling(-1)),
         (Some(":"), _) => {
-            let key = error.prev_sibling().filter(|n| n.kind() == "expression");
-            (key, key.and_then(|key| key.prev_sibling()))
+            let key = region.sibling(-1).filter(|n| n.kind() == "expression");
+            (key, key.and(region.sibling(-2)))
         }
         _ => return false,
     };
@@ -296,11 +340,13 @@ fn is_object_key(expression: Node) -> bool {
 
 /// The comma before a missing operand, when that operand would have been
 /// the last argument of a command: `save(a, b,)`.
-fn trailing_command_comma(missing: Node, source: &str) -> Option<Span> {
-    let mut ancestor = missing.parent()?;
-    while ancestor.kind() == "expression" {
-        ancestor = ancestor.parent()?;
-    }
+fn trailing_command_comma(region: Region, source: &str) -> Option<Span> {
+    let missing = region.node;
+    let ancestor = region
+        .ancestors
+        .iter()
+        .rev()
+        .find(|ancestor| ancestor.kind() != "expression")?;
     if ancestor.kind() != "command_invocation" {
         return None;
     }
@@ -325,14 +371,16 @@ fn command_trailing_comma(span: Span) -> ParseError {
 }
 
 /// A self-closing element Tree-sitter had to finish with a `MISSING /> `.
-fn unfinished_open_tag(element: Node, source: &str) -> ParseError {
+fn unfinished_open_tag(region: Region, element: Node, source: &str) -> ParseError {
     let less_than = element
         .child(0)
         .expect("a self_closing_element always starts with `<`");
 
     // `a < b` in text: the element is nested (so it sits in text) and the
     // `<` is followed by whitespace, which a real tag never is.
-    let nested = element.parent().and_then(|n| n.parent()).map(|n| n.kind()) == Some("child");
+    // `element` is the `MISSING` node's parent, so its grandparent is
+    // the `MISSING` node's third ancestor.
+    let nested = region.ancestor(3).map(|n| n.kind()) == Some("child");
     if nested && source[less_than.end_byte()..].starts_with(char::is_whitespace) {
         return less_than_diagnostic(span_of(less_than));
     }

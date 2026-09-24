@@ -97,3 +97,32 @@ fn check_skips_a_leading_byte_order_mark_when_reporting_columns() {
             "1 | <div></span>\n  | ^^^^^^^^^^^^\n",
         ));
 }
+
+#[test]
+fn check_rejects_a_deeply_nested_syntax_error_without_crashing() {
+    // D17: v0.1 rejected this with exit 1. Locating the error must not
+    // overflow the main thread's stack, which a crash (SIGABRT) would show
+    // as a signal instead of an exit code. Each `<p>` is on its own line
+    // so the rendered snippet stays one short line.
+    let depth = 20_000;
+    let file = temp_mprx(&format!(
+        "{}{{a +}}\n{}",
+        "<p>\n".repeat(depth),
+        "</p>\n".repeat(depth)
+    ));
+
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .arg(file.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "error[syntax-error]: expected an expression\n",
+        ))
+        .stderr(predicate::str::contains(format!(
+            " --> {}:{}:5\n",
+            file.path().display(),
+            depth + 1
+        )));
+}

@@ -456,28 +456,89 @@ fn every_syntax_code_is_a_known_code() {
     }
 }
 
-/// D17 regression: `collect_regions` used to recurse once per nesting
-/// level while walking down to the error, so a source with many nested
-/// elements around a single error overflowed the stack (SIGABRT) instead
-/// of being rejected with exit 1, the same as any other invalid source.
-/// v0.1 rejected shapes like this cleanly; only the v0.2 error-location
-/// walk introduced the crash.
-///
-/// 3,000 levels of nesting reliably overflows the old recursive
-/// `collect_regions` here, while staying well inside the stack budget
-/// `Node::parent()` itself needs during classification — that call is
-/// Tree-sitter's own, unrelated to this fix, and starts needing more
-/// stack than a test thread has somewhere past ~3,200 levels regardless
-/// of how `collect_regions` is written. 3,000 is comfortably below that
-/// ceiling and comfortably above where the old code broke.
+/// D17 regression: v0.1 rejected every one of these with exit 1, however
+/// deep the nesting. Locating the error must not overflow the stack
+/// (SIGABRT) or take quadratic time on the way down: the walk is
+/// iterative, and classification reads parents and siblings from the
+/// walk's own path rather than Tree-sitter's `Node::parent()`, which
+/// re-walks from the root and recurses once per level for a zero-width
+/// `MISSING` node. 20,000 levels is far past where either used to break
+/// on a test thread's stack, and each case covers a different classifier
+/// path: a `MISSING` operand, a `MISSING` `/>` read three ancestors up, an
+/// `ERROR` checked against its parent, a trailing comma found by walking
+/// ancestors, and an `ERROR` checked against its siblings.
 #[test]
-fn walks_a_deeply_nested_error_tree_without_overflowing_the_stack() {
-    let depth = 3_000;
-    let source = format!("{}{}{}", "<p>".repeat(depth), "{a +}", "</p>".repeat(depth));
+fn locates_errors_in_deeply_nested_sources() {
+    let depth = 20_000;
+    let nest = |inner: &str| format!("{}{inner}{}", "<p>".repeat(depth), "</p>".repeat(depth));
+    // Every case's error starts inside the innermost `<p>`, which ends at
+    // this byte.
+    let inside = 3 * depth;
 
-    let result = mesh_parser::parse(&source);
+    let cases = [
+        (nest("{a +}"), ("syntax-error", inside + 4, "")),
+        (nest("a < b"), ("less-than-in-text", inside + 2, "<")),
+        (
+            nest("<q data-id=\"x\" />"),
+            ("hyphenated-attribute-name", inside + 3, "data-id"),
+        ),
+        (
+            nest("<q x={f(a, b,)} />"),
+            ("command-trailing-comma", inside + 12, ","),
+        ),
+        (
+            nest("<q x={ k: 1 } />"),
+            ("single-brace-object", inside + 5, "{ k: 1 }"),
+        ),
+    ];
+    for (source, expected) in &cases {
+        assert_eq!(
+            errors(source),
+            [*expected],
+            "inner: {:?}",
+            &source[inside..]
+        );
+    }
+}
 
-    assert_eq!(result.errors.len(), 1, "errors: {:?}", result.errors);
-    assert_eq!(result.errors[0].code, DiagnosticCode::SYNTAX_ERROR);
-    assert!(result.ast.is_none());
+/// The walk keeps the path to the node it's visiting, cutting it back as
+/// it moves from one branch to the next. Here the `c-d` error comes right
+/// after a sibling attribute that holds an error of its own: it's only
+/// classified as a hyphenated name because its parent is read as the
+/// `<q ...>` tag, not as a node left over from the `{{b +}}` branch.
+#[test]
+fn reads_the_right_parent_after_a_sibling_with_an_error() {
+    let depth = 20_000;
+    let inner = "<q a={{b +}} c-d=\"1\" />";
+    let deep = format!("{}{inner}{}", "<p>".repeat(depth), "</p>".repeat(depth));
+    let inside = 3 * depth;
+
+    assert_located(&[(
+        inner,
+        &[
+            ("syntax-error", 7, "b +"),
+            ("hyphenated-attribute-name", 13, "c-d"),
+        ],
+    )]);
+    assert_eq!(
+        errors(&deep),
+        [
+            ("syntax-error", inside + 7, "b +"),
+            ("hyphenated-attribute-name", inside + 13, "c-d"),
+        ]
+    );
+}
+
+/// A file with thousands of sibling mistakes reports every one, in
+/// source order.
+#[test]
+fn reports_thousands_of_sibling_errors_in_source_order() {
+    let count = 2_000;
+    let line = "<t>a < b</t>\n";
+    let source = format!("<r>\n{}</r>\n", line.repeat(count));
+
+    let expected: Vec<Located> = (0..count)
+        .map(|i| ("less-than-in-text", 4 + i * line.len() + 5, "<"))
+        .collect();
+    assert_eq!(errors(&source), expected);
 }
