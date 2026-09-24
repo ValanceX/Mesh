@@ -241,8 +241,9 @@ fn broken_manifests_exit_one_with_expected_diagnostics() {
 /// The example manifest must model the examples truthfully, so later
 /// passes can check the examples against it without editing it. This
 /// checks only that the names line up: the component each example is the
-/// template of, and the tag of every element in it, are declared. It
-/// doesn't check props, events, references or types (Passes 4–5).
+/// template of, and the tag of every element in it, are declared.
+/// `examples_check_clean_against_the_example_model` checks that the
+/// examples use them correctly.
 #[test]
 fn example_manifest_declares_what_the_examples_name() {
     fn tags(element: &mesh_semantic::Element, out: &mut Vec<String>) {

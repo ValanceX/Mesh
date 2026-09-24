@@ -61,7 +61,9 @@ With a valid manifest, `mesh check` checks the file as that component's template
 4. **Placement**: a command appears only as the whole handler of an `on.` binding, and `$event` only in that command's arguments, for an event that carries a value.
 5. **Expressions**: every expression has a type. Members exist on what they're read from, operators get the types they need, and compared values, conditional branches and array elements have a common type.
 
-These are errors with their own codes, listed under [Model errors](./diagnostics.md#model-errors), and a close match gets a `help` line. Whether prop values and command arguments have the right types isn't checked yet: that comes later in v0.2.
+6. **Values**: every prop value, command argument (`$event` included) and object literal field has a type that fits its declaration. An object literal given to a record type must have exactly the record's fields, every required one included. An array literal given to a list type is checked element by element, and a conditional given a type branch by branch, so they need no common type there.
+
+These are errors with their own codes, listed under [Model errors](./diagnostics.md#model-errors), and a close match gets a `help` line. Element children aren't checked against the component, since components can't declare what content they accept yet.
 
 ### Output
 
