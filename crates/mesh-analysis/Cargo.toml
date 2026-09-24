@@ -1,0 +1,19 @@
+[package]
+name = "mesh-analysis"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Semantic analysis for MPRX: resolves and checks a template's Semantic IR against its component manifest."
+
+[lints]
+workspace = true
+
+[dependencies]
+mesh-syntax.workspace = true
+mesh-semantic.workspace = true
+mesh-manifest.workspace = true
+
+[dev-dependencies]
+mesh-parser.workspace = true
