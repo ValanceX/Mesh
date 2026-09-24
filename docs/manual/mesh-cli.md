@@ -79,6 +79,7 @@ The exact rules:
 - **Carets** underline the problem's span on the reported line. If a span covers several lines, only its first line is shown and underlined up to the end of that line. An empty span gets a single `^`.
 - **Tabs** in the source line are kept in the caret line's indentation, so carets line up in your terminal. Wide characters (CJK, emoji) may make the carets look shifted, because v0.1 doesn't measure display width.
 - **Windows line endings** (`\r\n`) are handled; the `\r` is never echoed or counted.
+- **A leading UTF-8 byte-order mark** is skipped: it isn't echoed or counted, so line 1's columns match what your editor shows.
 - The output has no colour and no error codes. It isn't machine-readable yet.
 
 The full list of messages is in the [diagnostics reference](./diagnostics.md).
@@ -126,4 +127,3 @@ These print usage for `mesh` or for a single command. v0.1 has no `--version` fl
 - **One file per invocation.** To check several files, loop over them.
 - **Syntax errors aren't located.** Every syntax error is reported as `syntax error` at `1:1`, underlining the first line. See the [diagnostics reference](./diagnostics.md#syntax-error).
 - **No `compile` command yet.** The compiler produces the Semantic IR, but the CLI doesn't write it out. Use the [Rust API](../guides/embedding-the-compiler.md) to get at it.
-- **A leading UTF-8 byte-order mark** counts as one column on line 1, so carets on that line land one position to the right.

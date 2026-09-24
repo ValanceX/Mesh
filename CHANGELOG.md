@@ -8,6 +8,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 - **Toolchain.** The repo pins its Rust toolchain in `rust-toolchain.toml`, and the minimum supported Rust version is 1.91. CI checks both.
 
+### Fixed
+
+- **Byte-order marks.** A file that starts with a UTF-8 byte-order mark no longer reports line 1's columns one position too far right, and the invisible mark is no longer echoed in the source snippet.
+
 ## [0.1.0] - 2026-09-24
 
 The first release. See the [v0.1 release notes](./docs/releases/v0.1.md) for an overview.

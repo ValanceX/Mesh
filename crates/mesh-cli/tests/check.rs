@@ -78,3 +78,22 @@ fn check_renders_errors_with_a_source_snippet_and_fails() {
             "1 | <div></span>\n  | ^^^^^^^^^^^^\n\n",
         ));
 }
+
+#[test]
+fn check_skips_a_leading_byte_order_mark_when_reporting_columns() {
+    let file = temp_mprx("\u{feff}<div></span>");
+
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .arg("check")
+        .arg(file.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(format!(
+            " --> {}:1:1\n",
+            file.path().display()
+        )))
+        .stderr(predicate::str::contains(
+            "1 | <div></span>\n  | ^^^^^^^^^^^^\n",
+        ));
+}

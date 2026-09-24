@@ -214,3 +214,119 @@ fn floors_a_span_that_splits_a_multi_byte_character() {
          | ^"
     );
 }
+
+#[test]
+fn skips_a_leading_byte_order_mark() {
+    // The BOM is bytes 0..3; `<div></span>` is bytes 3..15.
+    let source = "\u{feff}<div></span>\n";
+    let rendered = render_diagnostic(source, "bom.mprx", &diagnostic(Severity::Error, "m", 3, 15));
+    assert_eq!(
+        rendered,
+        "error: m\n \
+         --> bom.mprx:1:1\n  \
+         |\n\
+         1 | <div></span>\n  \
+         | ^^^^^^^^^^^^"
+    );
+}
+
+#[test]
+fn a_span_starting_on_the_byte_order_mark_points_at_the_first_character() {
+    // v0.1 syntax errors span the whole document (0..len), and an empty
+    // span at 0 is also possible: both start on the BOM itself.
+    let source = "\u{feff}<a>";
+    for (start, end, carets) in [(0, 6, "^^^"), (0, 0, "^"), (1, 2, "^")] {
+        let rendered = render_diagnostic(
+            source,
+            "bom.mprx",
+            &diagnostic(Severity::Error, "m", start, end),
+        );
+        assert_eq!(
+            rendered,
+            format!("error: m\n --> bom.mprx:1:1\n  |\n1 | <a>\n  | {carets}"),
+            "span {start}..{end}"
+        );
+    }
+}
+
+#[test]
+fn renders_a_file_holding_only_a_byte_order_mark_like_an_empty_file() {
+    let rendered = render_diagnostic(
+        "\u{feff}",
+        "bom.mprx",
+        &diagnostic(Severity::Error, "m", 0, 0),
+    );
+    assert_eq!(
+        rendered,
+        "error: m\n \
+         --> bom.mprx:1:1\n  \
+         |\n\
+         1 |\n  \
+         | ^"
+    );
+}
+
+#[test]
+fn skips_a_byte_order_mark_in_a_crlf_source() {
+    // `<a>` is bytes 3..6, then `\r\n`.
+    let source = "\u{feff}<a>\r\n<b />";
+    let rendered = render_diagnostic(source, "bom.mprx", &diagnostic(Severity::Error, "m", 3, 8));
+    assert_eq!(
+        rendered,
+        "error: m\n \
+         --> bom.mprx:1:1\n  \
+         |\n\
+         1 | <a>\n  \
+         | ^^^"
+    );
+}
+
+#[test]
+fn a_byte_order_mark_does_not_shift_later_lines() {
+    // `<b />` is bytes 7..12. This already passes; it pins that the BOM
+    // handling only ever touches line 1.
+    let source = "\u{feff}<a>\n<b />";
+    let rendered = render_diagnostic(source, "bom.mprx", &diagnostic(Severity::Error, "m", 7, 12));
+    assert_eq!(
+        rendered,
+        "error: m\n \
+         --> bom.mprx:2:1\n  \
+         |\n\
+         2 | <b />\n  \
+         | ^^^^^"
+    );
+}
+
+/// The renderer's contract: any `(source, span)` pair renders without
+/// panicking, and never echoes a byte-order mark or a line-ending `\r`.
+/// Pass 1's located syntax errors add zero-width spans and spans at byte
+/// 0 of BOM files, so this sweeps every span, zero-width, reversed and
+/// out-of-range ones included, over sources that combine a BOM, CRLF line
+/// endings and multi-byte characters.
+#[test]
+fn never_panics_for_any_span_over_bom_crlf_and_multi_byte_sources() {
+    let sources = [
+        "",
+        "\u{feff}",
+        "\u{feff}\r\n",
+        "\u{feff}<a>\r\n<b />",
+        "\u{feff}é\r\nü",
+        "héllo\r\nwörld\n",
+        "\r\n\r\n",
+    ];
+    for source in sources {
+        for start in 0..=source.len() + 2 {
+            for end in 0..=source.len() + 2 {
+                let rendered = render_diagnostic(
+                    source,
+                    "p.mprx",
+                    &diagnostic(Severity::Error, "m", start, end),
+                );
+                assert!(
+                    !rendered.contains(['\u{feff}', '\r']),
+                    "span {start}..{end} of {source:?}: {rendered:?}"
+                );
+            }
+        }
+    }
+}

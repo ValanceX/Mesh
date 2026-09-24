@@ -7,6 +7,10 @@
 
 use mesh_syntax::Diagnostic;
 
+/// The UTF-8 byte-order mark, as `fs::read_to_string` leaves it at the
+/// start of a file saved "with BOM".
+const BOM: char = '\u{feff}';
+
 /// Renders `diagnostic` rustc-style: a `severity: message` header, a
 /// `--> path:line:column` location, and the source line the diagnostic
 /// starts on, underlined with carets:
@@ -28,10 +32,14 @@ use mesh_syntax::Diagnostic;
 /// span are echoed in the underline so carets stay aligned. A span
 /// covering several lines is underlined only to the end of its first
 /// line, and a trailing `\r` (CRLF sources) is never shown, counted, or
-/// underlined. An out-of-range span, or one that splits a multi-byte
-/// character, is clamped rather than panicking — a bad span should
-/// degrade the snippet, not crash the CLI.
+/// underlined; neither is a leading byte-order mark. An out-of-range
+/// span, or one that splits a multi-byte character, is clamped rather
+/// than panicking — a bad span should degrade the snippet, not crash
+/// the CLI.
 pub fn render_diagnostic(source: &str, path: &str, diagnostic: &Diagnostic) -> String {
+    // Normalize the span before anything else. Every slice below uses
+    // `start` and `end`, never the raw span offsets, so no span can make
+    // this function slice mid-character or out of range.
     let start = source.floor_char_boundary(diagnostic.span.start_byte);
     let end = source
         .floor_char_boundary(diagnostic.span.end_byte)
@@ -41,15 +49,25 @@ pub fn render_diagnostic(source: &str, path: &str, diagnostic: &Diagnostic) -> S
     let line_end = source[start..]
         .find('\n')
         .map_or(source.len(), |i| start + i);
-    let line_text = source[line_start..line_end].trim_end_matches('\r');
-    let text_end = line_start + line_text.len();
+    // A leading byte-order mark is an encoding marker, not text: it is
+    // never shown, counted as a column, or underlined. This only moves
+    // where line 1's text starts; it works on the normalized `line_start`
+    // and never replaces the normalization above.
+    let text_start = if line_start == 0 && source.starts_with(BOM) {
+        BOM.len_utf8()
+    } else {
+        line_start
+    };
+    let line_text = source[text_start..line_end].trim_end_matches('\r');
+    let text_end = text_start + line_text.len();
     let line_number = source[..line_start].matches('\n').count() + 1;
     // A span starting inside the line ending (`\r` or `\n`) points just
-    // past the last visible character, never into the line ending itself.
-    let visible_start = start.min(text_end);
-    let column = source[line_start..visible_start].chars().count() + 1;
+    // past the last visible character, never into the line ending itself;
+    // one starting on the byte-order mark points at the first character.
+    let visible_start = start.clamp(text_start, text_end);
+    let column = source[text_start..visible_start].chars().count() + 1;
 
-    let indent: String = source[line_start..visible_start]
+    let indent: String = source[text_start..visible_start]
         .chars()
         .map(|c| if c == '\t' { '\t' } else { ' ' })
         .collect();
