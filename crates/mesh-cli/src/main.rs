@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use mesh_compiler::CompileOptions;
 use mesh_syntax::{Diagnostic, Severity};
 use std::fs;
+use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -68,8 +69,8 @@ fn run_check(file: &str, model: Option<&str>, component: Option<&str>, format: F
             match mesh_manifest::load(&text) {
                 Ok(manifest) => Some((manifest, text, path)),
                 Err(diagnostics) => {
-                    print_diagnostics(format, &text, path, &diagnostics);
-                    return ExitCode::FAILURE;
+                    let printed = print_diagnostics(format, &text, path, &diagnostics);
+                    return exit(printed, ExitCode::FAILURE);
                 }
             }
         }
@@ -82,8 +83,8 @@ fn run_check(file: &str, model: Option<&str>, component: Option<&str>, format: F
             match manifest.template(&name) {
                 Ok(template) => CompileOptions::with_template(template),
                 Err(diagnostic) => {
-                    print_diagnostics(format, text, path, &[diagnostic]);
-                    return ExitCode::FAILURE;
+                    let printed = print_diagnostics(format, text, path, &[diagnostic]);
+                    return exit(printed, ExitCode::FAILURE);
                 }
             }
         }
@@ -94,7 +95,7 @@ fn run_check(file: &str, model: Option<&str>, component: Option<&str>, format: F
         return ExitCode::FAILURE;
     };
     let result = mesh_compiler::compile_with(&source, &options);
-    print_diagnostics(format, &source, file, &result.diagnostics);
+    let printed = print_diagnostics(format, &source, file, &result.diagnostics);
 
     // Only errors fail the check — warnings are reported but non-fatal.
     let has_errors = result
@@ -102,15 +103,36 @@ fn run_check(file: &str, model: Option<&str>, component: Option<&str>, format: F
         .iter()
         .any(|diagnostic| diagnostic.severity == Severity::Error);
     if has_errors {
-        return ExitCode::FAILURE;
+        return exit(printed, ExitCode::FAILURE);
     }
 
     // In JSON, the document is the whole answer: an empty (or
     // warnings-only) list and exit status 0 already say "no errors".
-    if format == Format::Human {
-        println!("no errors");
+    let printed = match format {
+        Format::Human => printed.and_then(|()| writeln!(io::stdout().lock(), "no errors")),
+        Format::Json => printed,
+    };
+    exit(printed, ExitCode::SUCCESS)
+}
+
+/// The exit status once output is written: `status`, the check's own
+/// result, unless writing failed.
+///
+/// A reader that goes away early (`mesh check ... | head`) closes the
+/// pipe, and every write after that fails with `BrokenPipe`. That isn't a
+/// failure of the check, so the check's status stands and nothing more
+/// is printed. Any other write error is reported, if stderr still works,
+/// and fails the run.
+fn exit(printed: io::Result<()>, status: ExitCode) -> ExitCode {
+    match printed {
+        Ok(()) => status,
+        Err(err) if err.kind() == io::ErrorKind::BrokenPipe => status,
+        Err(err) => {
+            // Nothing more can be done if stderr is gone too.
+            let _ = writeln!(io::stderr().lock(), "error: could not write output: {err}");
+            ExitCode::FAILURE
+        }
     }
-    ExitCode::SUCCESS
 }
 
 /// Reads `path`, or reports why it can't be read.
@@ -118,7 +140,8 @@ fn read(path: &str) -> Option<String> {
     match fs::read_to_string(path) {
         Ok(text) => Some(text),
         Err(err) => {
-            eprintln!("error: could not read {path}: {err}");
+            // If stderr is gone, there's no one left to tell.
+            let _ = writeln!(io::stderr().lock(), "error: could not read {path}: {err}");
             None
         }
     }
@@ -144,15 +167,22 @@ fn file_stem(file: &str) -> String {
 /// JSON: one document on stdout, ending in a newline, even when there are
 /// no diagnostics. Every run that checks anything prints exactly one, so
 /// several runs' output is JSON Lines.
-fn print_diagnostics(format: Format, source: &str, path: &str, diagnostics: &[Diagnostic]) {
+///
+/// Stops at the first write that fails; see [`exit`].
+fn print_diagnostics(
+    format: Format,
+    source: &str,
+    path: &str,
+    diagnostics: &[Diagnostic],
+) -> io::Result<()> {
     if format == Format::Json {
-        println!("{}", mesh_compiler::render_json(source, path, diagnostics));
-        return;
+        let document = mesh_compiler::render_json(source, path, diagnostics);
+        return writeln!(io::stdout().lock(), "{document}");
     }
+    let mut stderr = io::stderr().lock();
     for diagnostic in diagnostics {
-        eprintln!(
-            "{}\n",
-            mesh_compiler::render_diagnostic(source, path, diagnostic)
-        );
+        let block = mesh_compiler::render_diagnostic(source, path, diagnostic);
+        writeln!(stderr, "{block}\n")?;
     }
+    Ok(())
 }

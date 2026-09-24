@@ -12,6 +12,7 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ### Fixed
 
+- **A closed pipe no longer crashes `mesh check`.** When whatever reads its output stops early, as in `mesh check --format json big.mprx | head -c 100`, `mesh check` used to panic with exit status 101. It now stops printing and exits with the check's own status.
 - **JSON rendering is linear.** `render_json` located every span by scanning the source from the start, so a file with many diagnostics took time proportional to their number times the file's size.
 
 - **Deeply nested files no longer crash MESH.** A valid `.mprx` file nested a few thousand levels deep overflowed the stack and aborted `mesh check`, with no diagnostic and a signal instead of an exit status; a manifest nested tens of thousands of levels deep did the same, and loading one took time quadratic in its depth. Now a file may nest at most 128 levels deep. Every element counts as a level, and so does every expression inside another one and every pair of parentheses. A deeper file is a `nesting-too-deep` error, reported like a syntax error. A manifest whose JSON arrays and objects nest more than 128 levels deep is a `manifest-nesting-too-deep` error. In the Rust API, the limits are `mesh_parser::MAX_NESTING_DEPTH` and `mesh_manifest::MAX_NESTING_DEPTH`, and at those limits the whole pipeline, from parsing to rendering, runs on a 2 MiB thread stack.

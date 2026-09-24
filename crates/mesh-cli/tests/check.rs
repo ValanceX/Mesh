@@ -413,3 +413,56 @@ fn the_cli_manuals_json_example_is_what_mesh_prints() {
     };
     assert_eq!(parse(indented), parse(printed));
 }
+
+/// Runs `mesh check` on a file with thousands of errors, far more output
+/// than a pipe buffer holds, with the stream `closed` already closed by
+/// its reader, and returns the exit status and stderr (or `""` if stderr
+/// was the stream closed).
+fn check_with_a_closed_pipe(format: &str, closed: &str) -> (Option<i32>, String) {
+    use std::process::{Command, Stdio};
+    let file = temp_mprx(&format!("<p>{}</p>", "{a +}".repeat(5_000)));
+    let mut command = Command::new(assert_cmd::cargo::cargo_bin("mesh"));
+    command
+        .args(["check", "--format", format])
+        .arg(file.path())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = command.spawn().expect("mesh starts");
+    // Close the reading end before `mesh` can write, so every write to it
+    // fails with a broken pipe.
+    let mut stderr = match closed {
+        "stdout" => {
+            drop(child.stdout.take());
+            child.stderr.take()
+        }
+        _ => {
+            drop(child.stderr.take());
+            None
+        }
+    };
+    let mut captured = String::new();
+    if let Some(stderr) = stderr.as_mut() {
+        std::io::Read::read_to_string(stderr, &mut captured).expect("stderr is UTF-8");
+    }
+    // Drain stdout if it's still open, so `mesh` can't block on it.
+    if let Some(mut stdout) = child.stdout.take() {
+        std::io::copy(&mut stdout, &mut std::io::sink()).expect("stdout can be drained");
+    }
+    let status = child.wait().expect("mesh exits");
+    (status.code(), captured)
+}
+
+#[test]
+fn json_output_to_a_closed_pipe_exits_quietly() {
+    let (code, stderr) = check_with_a_closed_pipe("json", "stdout");
+    assert_eq!(code, Some(1), "stderr: {stderr}");
+    assert!(!stderr.contains("panicked"), "stderr: {stderr}");
+}
+
+#[test]
+fn human_output_to_a_closed_pipe_exits_quietly() {
+    // With stderr closed there's nothing to read a panic from, so the
+    // exit status is the evidence: a panic exits 101.
+    let (code, _) = check_with_a_closed_pipe("human", "stderr");
+    assert_eq!(code, Some(1));
+}
