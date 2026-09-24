@@ -1,0 +1,4 @@
+<text>
+  <probe str={name} num={count} flag={flag} none={null} />
+  <probe str="a string attribute is a string" />
+</text>

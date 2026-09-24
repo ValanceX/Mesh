@@ -1,0 +1,5 @@
+error[type-mismatch]: the list element needs string, found number
+ --> fixtures/check/fail/element-type-mismatch.mprx:1:24
+  |
+1 | <probe strings={[name, count]} />
+  |                        ^^^^^

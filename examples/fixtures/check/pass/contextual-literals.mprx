@@ -1,0 +1,5 @@
+<text>
+  <probe users={[{ name: "Ada", active: true }, { name: "Bo", active: false, avatar: "bo.png" }]} />
+  <probe user={flag ? { name: "Ada", active: true } : { name: "Bo", active: false, avatar: "bo.png" }} />
+  <probe strings={flag ? [name] : []} point={{ x: 1, y: 2, note: flag ? maybeName : "centre" }} />
+</text>

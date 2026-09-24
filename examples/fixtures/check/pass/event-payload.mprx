@@ -1,0 +1,4 @@
+<text>
+  <input value={name} on.change={select({ name: $event, active: flag })} />
+  <button on.click={setCount($event)}>Count</button>
+</text>

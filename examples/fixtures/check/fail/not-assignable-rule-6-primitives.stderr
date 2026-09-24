@@ -1,0 +1,5 @@
+error[type-mismatch]: the prop "disabled" of component "button" needs boolean, found string
+ --> fixtures/check/fail/not-assignable-rule-6-primitives.mprx:1:19
+  |
+1 | <button disabled={"yes"}>Save</button>
+  |                   ^^^^^

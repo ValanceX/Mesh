@@ -1,0 +1,3 @@
+<text>
+  <probe strings={[name, "Ada"]} users={users} />
+</text>

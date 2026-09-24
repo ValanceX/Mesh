@@ -150,6 +150,10 @@ impl DiagnosticCode {
     pub const NO_COMMON_TYPE: DiagnosticCode = DiagnosticCode("no-common-type");
     /// An object literal that repeats a key.
     pub const DUPLICATE_OBJECT_KEY: DiagnosticCode = DiagnosticCode("duplicate-object-key");
+    /// An object literal with a key the expected record doesn't declare.
+    pub const UNKNOWN_FIELD: DiagnosticCode = DiagnosticCode("unknown-field");
+    /// An object literal without a field the expected record requires.
+    pub const MISSING_REQUIRED_FIELD: DiagnosticCode = DiagnosticCode("missing-required-field");
 
     /// Every code MESH can emit, in catalogue order. The diagnostics
     /// reference (`docs/manual/diagnostics.md`) documents each one, and a
@@ -196,6 +200,8 @@ impl DiagnosticCode {
         DiagnosticCode::TYPE_MISMATCH,
         DiagnosticCode::NO_COMMON_TYPE,
         DiagnosticCode::DUPLICATE_OBJECT_KEY,
+        DiagnosticCode::UNKNOWN_FIELD,
+        DiagnosticCode::MISSING_REQUIRED_FIELD,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -976,6 +982,8 @@ mod tests {
                 "type-mismatch",
                 "no-common-type",
                 "duplicate-object-key",
+                "unknown-field",
+                "missing-required-field",
             ]
         );
     }

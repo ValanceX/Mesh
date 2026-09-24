@@ -1,0 +1,11 @@
+error[type-mismatch]: the field "y" needs number, found string
+ --> fixtures/check/fail/field-type-mismatch.mprx:1:26
+  |
+1 | <probe point={{ x: 1, y: "2", note: null }} />
+  |                          ^^^
+
+error[type-mismatch]: the field "note" needs string?, found null
+ --> fixtures/check/fail/field-type-mismatch.mprx:1:37
+  |
+1 | <probe point={{ x: 1, y: "2", note: null }} />
+  |                                     ^^^^

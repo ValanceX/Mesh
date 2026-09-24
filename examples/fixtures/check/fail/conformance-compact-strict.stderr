@@ -1,0 +1,5 @@
+error[type-mismatch]: the prop "compact" of component "compact-strict" needs boolean, found boolean?, which may be absent
+ --> fixtures/check/fail/conformance-compact-strict.mprx:1:26
+  |
+1 | <compact-strict compact={layout.compact} />
+  |                          ^^^^^^^^^^^^^^

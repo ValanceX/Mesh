@@ -1,0 +1,5 @@
+<text>
+  <probe anything={users} />
+  <probe anything={null} />
+  <probe anything={{ any: "shape" }} />
+</text>

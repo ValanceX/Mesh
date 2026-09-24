@@ -1,0 +1,5 @@
+error[type-mismatch]: the prop "str" of component "probe" needs string, found number
+ --> fixtures/check/fail/branch-type-mismatch.mprx:1:27
+  |
+1 | <probe str={flag ? name : count} />
+  |                           ^^^^^

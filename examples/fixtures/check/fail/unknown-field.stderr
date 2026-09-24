@@ -1,0 +1,5 @@
+error[unknown-field]: User has no field "nickname"
+ --> fixtures/check/fail/unknown-field.mprx:1:43
+  |
+1 | <probe user={{ name: "Ada", active: true, nickname: "A" }} />
+  |                                           ^^^^^^^^

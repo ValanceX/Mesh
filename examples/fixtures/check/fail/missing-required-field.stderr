@@ -1,0 +1,5 @@
+error[missing-required-field]: the object is missing the field "active", which User requires
+ --> fixtures/check/fail/missing-required-field.mprx:1:14
+  |
+1 | <probe user={{ name: "Ada" }} />
+  |              ^^^^^^^^^^^^^^^

@@ -1,0 +1,5 @@
+error[type-mismatch]: the prop "size" of component "avatar" needs string, found number
+ --> fixtures/check/fail/conformance-prop-type.mprx:1:33
+  |
+1 | <avatar src={user.avatar} size={1} />
+  |                                 ^

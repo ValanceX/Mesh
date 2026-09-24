@@ -184,6 +184,21 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
             format!("duplicate object key {key:?}: this occurrence is shadowed by a later one"),
             Vec::new(),
         ),
+        Fact::UnknownField {
+            record,
+            field,
+            span,
+            candidates,
+        } => (
+            DiagnosticCode::UNKNOWN_FIELD,
+            format!("{record} has no field {field:?}"),
+            suggest(field, candidates, *span, ""),
+        ),
+        Fact::MissingRequiredField { record, field, .. } => (
+            DiagnosticCode::MISSING_REQUIRED_FIELD,
+            format!("the object is missing the field {field:?}, which {record} requires"),
+            Vec::new(),
+        ),
     };
     Diagnostic {
         severity: Severity::Error,
@@ -204,6 +219,14 @@ fn expecting(expectation: &Expectation) -> String {
             format!("an operand of `{}`", binary(*operator))
         }
         Expectation::Condition => "the condition".to_string(),
+        Expectation::Prop { component, prop } => {
+            format!("the prop {prop:?} of component {component:?}")
+        }
+        Expectation::Argument { command, parameter } => {
+            format!("the argument {parameter:?} of command {command:?}")
+        }
+        Expectation::Field { field } => format!("the field {field:?}"),
+        Expectation::Element => "the list element".to_string(),
     }
 }
 

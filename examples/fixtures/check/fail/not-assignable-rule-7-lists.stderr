@@ -1,0 +1,5 @@
+error[type-mismatch]: the prop "strings" of component "probe" needs list<string>, found list<User>
+ --> fixtures/check/fail/not-assignable-rule-7-lists.mprx:1:17
+  |
+1 | <probe strings={users} />
+  |                 ^^^^^

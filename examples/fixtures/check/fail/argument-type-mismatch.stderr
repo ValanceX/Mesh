@@ -1,0 +1,5 @@
+error[type-mismatch]: the argument "count" of command "setCount" needs number, found string
+ --> fixtures/check/fail/argument-type-mismatch.mprx:1:28
+  |
+1 | <button on.click={setCount(name)}>Count</button>
+  |                            ^^^^

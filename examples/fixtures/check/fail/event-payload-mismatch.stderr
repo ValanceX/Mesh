@@ -1,0 +1,5 @@
+error[type-mismatch]: the argument "count" of command "setCount" needs number, found string
+ --> fixtures/check/fail/event-payload-mismatch.mprx:1:28
+  |
+1 | <input on.change={setCount($event)} />
+  |                            ^^^^^^

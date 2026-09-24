@@ -1,0 +1,5 @@
+error[type-mismatch]: the prop "str" of component "probe" needs string, found any?, which may be absent
+ --> fixtures/check/fail/conformance-possibly-absent-any.mprx:1:13
+  |
+1 | <probe str={maybeAnything} />
+  |             ^^^^^^^^^^^^^

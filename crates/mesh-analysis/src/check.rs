@@ -98,27 +98,41 @@ impl<'m> Walker<'m> {
         }
 
         for attribute in &element.attributes {
+            // The prop's declared type, if the prop resolves.
+            let mut expected = None;
             if let Some((name, component)) = component {
-                if component.props.contains_key(&attribute.name) {
-                    self.resolve(
-                        attribute.name_span,
-                        Target::Prop {
+                match component.props.get_key_value(&attribute.name) {
+                    Some((prop, field)) => {
+                        self.resolve(
+                            attribute.name_span,
+                            Target::Prop {
+                                component: name.to_string(),
+                                prop: prop.clone(),
+                            },
+                        );
+                        let expectation = Expectation::Prop {
                             component: name.to_string(),
-                            prop: attribute.name.clone(),
-                        },
-                    );
-                } else {
-                    self.facts.push(Fact::UnknownProp {
+                            prop: prop.clone(),
+                        };
+                        expected = Some((Ty::from(&field.ty), expectation));
+                    }
+                    None => self.facts.push(Fact::UnknownProp {
                         component: name.to_string(),
                         prop: attribute.name.clone(),
                         span: attribute.name_span,
                         candidates: component.props.keys().cloned().collect(),
-                    });
+                    }),
                 }
             }
-            match &attribute.value {
-                AttributeValue::String { .. } => {}
-                AttributeValue::Expression(expression) => {
+            match (&attribute.value, expected) {
+                (AttributeValue::String { span, .. }, Some((expected, expectation))) => {
+                    self.expect(Ty::String, *span, expectation, &expected);
+                }
+                (AttributeValue::String { .. }, None) => {}
+                (AttributeValue::Expression(expression), Some((expected, expectation))) => {
+                    self.check(expression, Place::Value, &expected, expectation);
+                }
+                (AttributeValue::Expression(expression), None) => {
                     self.expression(expression, Place::Value);
                 }
             }
@@ -214,7 +228,9 @@ impl<'m> Walker<'m> {
     }
 
     /// A command in handler position: resolves its name and checks its
-    /// arity, then walks its arguments in `place`.
+    /// arity, then checks each argument against its parameter's type.
+    /// With the wrong number of arguments, or an unknown command, the
+    /// arguments are only typed.
     fn command(
         &mut self,
         command: &str,
@@ -224,26 +240,189 @@ impl<'m> Walker<'m> {
         place: Place<'m>,
     ) {
         let commands = &self.template.component().commands;
-        match commands.get_key_value(command) {
+        let parameters = match commands.get_key_value(command) {
             Some((name, declared)) => {
                 self.resolve(command_span, Target::Command(name.clone()));
-                if declared.parameters.len() != arguments.len() {
+                if declared.parameters.len() == arguments.len() {
+                    Some(&declared.parameters)
+                } else {
                     self.facts.push(Fact::CommandArityMismatch {
                         command: command.to_string(),
                         expected: declared.parameters.len(),
                         found: arguments.len(),
                         span,
                     });
+                    None
                 }
             }
-            None => self.facts.push(Fact::UnknownCommand {
-                command: command.to_string(),
-                span: command_span,
-                candidates: commands.keys().cloned().collect(),
-            }),
+            None => {
+                self.facts.push(Fact::UnknownCommand {
+                    command: command.to_string(),
+                    span: command_span,
+                    candidates: commands.keys().cloned().collect(),
+                });
+                None
+            }
+        };
+        match parameters {
+            Some(parameters) => {
+                for (argument, parameter) in arguments.iter().zip(parameters) {
+                    let expectation = Expectation::Argument {
+                        command: command.to_string(),
+                        parameter: parameter.name.clone(),
+                    };
+                    self.check(argument, place, &Ty::from(&parameter.ty), expectation);
+                }
+            }
+            None => {
+                for argument in arguments {
+                    self.expression(argument, place);
+                }
+            }
         }
-        for argument in arguments {
-            self.expression(argument, place);
+    }
+
+    /// Checks `expression` where a value of type `expected` is expected
+    /// (outline D9): types it, and reports a [`Fact::TypeMismatch`] unless
+    /// its type is assignable to `expected`. The expected type is pushed
+    /// into literals instead, with the same relation: an object literal
+    /// where a record is expected is checked field by field, an array
+    /// literal where a list is expected element by element, and a
+    /// conditional branch by branch. Returns the expression's type, if it
+    /// has one.
+    fn check(
+        &mut self,
+        expression: &Expression,
+        place: Place<'m>,
+        expected: &Ty,
+        expectation: Expectation,
+    ) -> Option<Ty> {
+        // A literal is present, so where a record or list that may be
+        // absent is expected, the record or list itself is (rule 2).
+        let present = || match relation::expand(self.manifest(), expected) {
+            Ty::Optional(inner) => *inner,
+            _ => expected.clone(),
+        };
+        match expression {
+            Expression::Object { members, span } => {
+                let present = present();
+                if let Ty::Record(fields) = relation::expand(self.manifest(), &present) {
+                    return self.object_against(members, *span, &present, &fields, place);
+                }
+            }
+            Expression::Array { elements, span } => {
+                if let Ty::List(item) = relation::expand(self.manifest(), &present()) {
+                    return self.array_against(elements, *span, &item, place);
+                }
+            }
+            Expression::Conditional {
+                condition,
+                consequent,
+                alternate,
+                span,
+            } => {
+                if let Some(ty) = self.expression(condition, place) {
+                    self.expect(ty, condition.span(), Expectation::Condition, &Ty::Boolean);
+                }
+                let consequent = self.check(consequent, place, expected, expectation.clone());
+                let alternate = self.check(alternate, place, expected, expectation);
+                // Each branch fits on its own, so they need no common
+                // type; the conditional has one where they do.
+                let ty = join(self.manifest(), &consequent?, &alternate?)
+                    .unwrap_or_else(|| expected.clone());
+                return self.typed(*span, ty);
+            }
+            _ => {}
+        }
+        let ty = self.expression(expression, place)?;
+        self.expect(ty.clone(), expression.span(), expectation, expected);
+        Some(ty)
+    }
+
+    /// An array literal where a list of `item` is expected: each element
+    /// must fit `item`, so the elements need no common type. The array is
+    /// a list of their common type where they have one (`[]` stays
+    /// `list<nothing>`), and a list of `item` where they don't.
+    fn array_against(
+        &mut self,
+        elements: &[Expression],
+        span: Span,
+        item: &Ty,
+        place: Place<'m>,
+    ) -> Option<Ty> {
+        let types: Vec<Option<Ty>> = elements
+            .iter()
+            .map(|element| self.check(element, place, item, Expectation::Element))
+            .collect();
+        let mut common = Some(Ty::Nothing);
+        for ty in types {
+            let ty = ty?;
+            common = common.and_then(|common| join(self.manifest(), &common, &ty));
+        }
+        let common = common.unwrap_or_else(|| item.clone());
+        self.typed(span, Ty::List(Box::new(common)))
+    }
+
+    /// An object literal where the record type `record` (whose fields are
+    /// `fields`) is expected: each key must be one of the fields, each
+    /// value must fit its field, and every required field must be
+    /// present. The same as `is_assignable` for the literal's own type,
+    /// reported field by field.
+    fn object_against(
+        &mut self,
+        members: &[ObjectMember],
+        span: Span,
+        record: &Ty,
+        fields: &BTreeMap<String, FieldTy>,
+        place: Place<'m>,
+    ) -> Option<Ty> {
+        let last = last_occurrences(members);
+        let mut own = BTreeMap::new();
+        let mut complete = true;
+        for (index, member) in members.iter().enumerate() {
+            // A shadowed occurrence isn't part of the literal: its value is
+            // typed, but not checked against the field.
+            if self.shadowed(members, index, &last) {
+                self.expression(&member.value, place);
+                continue;
+            }
+            let ty = match fields.get(&member.key) {
+                Some(field) => {
+                    let expectation = Expectation::Field {
+                        field: member.key.clone(),
+                    };
+                    self.check(&member.value, place, &field.ty, expectation)
+                }
+                None => {
+                    self.facts.push(Fact::UnknownField {
+                        record: record.clone(),
+                        field: member.key.clone(),
+                        span: member.key_span,
+                        candidates: fields.keys().cloned().collect(),
+                    });
+                    self.expression(&member.value, place)
+                }
+            };
+            match ty {
+                Some(ty) => {
+                    own.insert(member.key.clone(), FieldTy { ty, required: true });
+                }
+                None => complete = false,
+            }
+        }
+        for (name, field) in fields {
+            if field.required && !last.contains_key(name.as_str()) {
+                self.facts.push(Fact::MissingRequiredField {
+                    record: record.clone(),
+                    field: name.clone(),
+                    span,
+                });
+            }
+        }
+        if complete {
+            self.typed(span, Ty::Record(own))
+        } else {
+            None
         }
     }
 

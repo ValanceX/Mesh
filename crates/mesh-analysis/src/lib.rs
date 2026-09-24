@@ -88,6 +88,14 @@ pub enum Expectation {
     Operand(Operator),
     /// The condition of `c ? a : b`.
     Condition,
+    /// A prop's value.
+    Prop { component: String, prop: String },
+    /// A command's argument.
+    Argument { command: String, parameter: String },
+    /// A field's value in an object literal.
+    Field { field: String },
+    /// An element of an array literal where a list is expected.
+    Element,
 }
 
 /// A unary or binary operator.
@@ -246,6 +254,21 @@ pub enum Fact {
     /// An object literal repeats a key. Span: an earlier occurrence of
     /// the key, which the last one shadows; `last` is the last one's key.
     DuplicateObjectKey { key: String, span: Span, last: Span },
+    /// An object literal, where the record type `record` is expected, has
+    /// a key that isn't one of its fields. Span: the key.
+    UnknownField {
+        record: Ty,
+        field: String,
+        span: Span,
+        candidates: Vec<String>,
+    },
+    /// An object literal, where the record type `record` is expected,
+    /// lacks a field it declares required. Span: the object literal.
+    MissingRequiredField {
+        record: Ty,
+        field: String,
+        span: Span,
+    },
 }
 
 impl Fact {
@@ -268,7 +291,9 @@ impl Fact {
             | Fact::PossiblyAbsentAccess { span, .. }
             | Fact::TypeMismatch { span, .. }
             | Fact::NoCommonType { span, .. }
-            | Fact::DuplicateObjectKey { span, .. } => *span,
+            | Fact::DuplicateObjectKey { span, .. }
+            | Fact::UnknownField { span, .. }
+            | Fact::MissingRequiredField { span, .. } => *span,
         }
     }
 }

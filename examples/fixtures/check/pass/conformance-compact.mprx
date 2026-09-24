@@ -1,0 +1,4 @@
+<text>
+  <compact-required compact={layout.compact} />
+  <compact-optional compact={layout.compact} />
+</text>

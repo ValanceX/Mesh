@@ -1,0 +1,5 @@
+<text>
+  <probe user={anything} />
+  <probe strings={anything} />
+  <button on.click={select($event)}>Select</button>
+</text>

@@ -1,0 +1,5 @@
+error[type-mismatch]: the prop "maybeStr" of component "probe" needs string?, found null
+ --> fixtures/check/fail/conformance-null-is-not-absence.mprx:1:18
+  |
+1 | <probe maybeStr={null} />
+  |                  ^^^^

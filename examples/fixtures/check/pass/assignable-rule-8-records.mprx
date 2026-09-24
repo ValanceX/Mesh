@@ -1,0 +1,6 @@
+<text>
+  <probe user={user} />
+  <probe user={{ name: "Ada", active: true }} />
+  <probe point={{ x: 1, y: count, note: maybeName }} />
+  <probe point={{ x: 1, y: 2, label: "origin", note: "centre" }} />
+</text>

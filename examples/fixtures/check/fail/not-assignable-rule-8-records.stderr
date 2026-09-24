@@ -1,0 +1,5 @@
+error[type-mismatch]: the prop "point" of component "probe" needs { label?: string, note: string?, x: number, y: number }, found User
+ --> fixtures/check/fail/not-assignable-rule-8-records.mprx:1:15
+  |
+1 | <probe point={user} />
+  |               ^^^^

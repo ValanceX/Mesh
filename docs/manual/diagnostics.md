@@ -460,7 +460,8 @@ With `--model`, a file that is valid MPRX is also checked against the manifest, 
 - every element is an instance of a component the manifest declares, and its attributes and `on.` bindings are that component's props and events;
 - every reference is a name in the template's `scope`, and every command is one of the template's `commands`;
 - commands and `$event` appear only where they may;
-- every expression has a type, and the operators and conditionals in it are used with the types they need.
+- every expression has a type, and the operators and conditionals in it are used with the types they need;
+- every prop value, command argument and object literal field has a type that fits its declaration.
 
 Each mistake is reported once, at the name or expression that's wrong. When a declared name is close to the one written, a `help` line suggests it. A file with a syntax error isn't checked against the model.
 
@@ -697,6 +698,23 @@ What each place needs:
 |---|---|
 | `!x`, `x && y`, `x \|\| y`, the condition of `c ? a : b` | `boolean` |
 | `-x`, `x + y`, `x - y`, `x * y`, `x / y`, `x % y`, `x < y`, `x <= y`, `x > y`, `x >= y` | `number` |
+| a prop's value | the prop's declared type |
+| a command's argument, `$event` included | the parameter's declared type |
+| a field's value in an object literal given to a record | the field's declared type |
+| an element of an array literal given to a list | the list's element type |
+| each branch of `c ? a : b` given a type | that type |
+
+Nothing is converted to fit: `"yes"` is a `string`, not a `boolean`. A value written as a quoted attribute, like `size="lg"`, is a `string` too.
+
+```text
+error[type-mismatch]: the prop "disabled" of component "button" needs boolean, found string
+ --> examples/fixtures/check/fail/not-assignable-rule-6-primitives.mprx:1:19
+  |
+1 | <button disabled={"yes"}>Save</button>
+  |                   ^^^^^
+```
+
+A prop declared optional (`"required": false`) may be left out, but a value you do give it must fit its type: an optional *declaration* doesn't make the *value* optional.
 
 `+` adds numbers only: there's no string concatenation. There are no implicit conversions either, so `"1"` isn't a number and `0` isn't `false`.
 
@@ -724,6 +742,8 @@ error[no-common-type]: `==` compares string with number, which have no common ty
   |        ^^^^^^^^^
 ```
 
+Where a type is expected, such as a prop's value, an array literal is checked against it element by element and a conditional branch by branch, so they need no common type there: `[{ name: "Ada", active: true }, { name: "Bo", active: false, avatar: "bo.png" }]` fits a `list<User>` prop, and a wrong element or branch is a `type-mismatch` at itself.
+
 Equality is strict, with no conversions: a string never equals a number, so comparing them is a mistake rather than `false`. Two types have a common type when they are the same, when one is `any`, or when one is only optional where the other isn't: `string` and `string?` have the common type `string?`. `null` is a value, not absence, so `maybeName == null` compares `string?` with `null` and has no common type. An empty array `[]` fits with any list.
 
 **Fix:** compare or combine values of the same type.
@@ -743,6 +763,36 @@ error[duplicate-object-key]: duplicate object key "first": this occurrence is sh
 The shadowed value is still checked for its own mistakes, but it isn't part of the object, so it isn't checked against a record's field.
 
 **Fix:** remove or rename one of them.
+
+### `unknown-field`
+
+An object literal, given where a record type is expected, has a key the record doesn't declare. Records are exact: a field the component model doesn't declare is never silently accepted. Points at the key.
+
+```text
+error[unknown-field]: User has no field "nickname"
+ --> examples/fixtures/check/fail/unknown-field.mprx:1:43
+  |
+1 | <probe user={{ name: "Ada", active: true, nickname: "A" }} />
+  |                                           ^^^^^^^^
+```
+
+**Fix:** remove the key, or correct its name.
+
+### `missing-required-field`
+
+An object literal, given where a record type is expected, lacks a field the record declares with `"required": true`. Points at the object literal; each missing field is reported separately.
+
+```text
+error[missing-required-field]: the object is missing the field "active", which User requires
+ --> examples/fixtures/check/fail/missing-required-field.mprx:1:14
+  |
+1 | <probe user={{ name: "Ada" }} />
+  |              ^^^^^^^^^^^^^^^
+```
+
+As with props, a required field must be written even when its type is optional.
+
+**Fix:** add the field.
 
 ---
 
@@ -773,10 +823,4 @@ With `--model`, model errors come after all of those, in source order. Two error
 
 Without `--model`, MESH checks only that a file is well-formed MPRX. Unknown components, props, events, references and commands all pass: catching them needs a component manifest.
 
-With `--model`, these still pass `mesh check` even when they're wrong:
-
-- A prop value of the wrong type (`disabled={"yes"}`)
-- A command argument or `$event` of the wrong type
-- An object literal whose fields don't match the record type it's given to
-
-That's the rest of v0.2.
+With `--model`, element children aren't checked against the component: a component can't yet declare what content it accepts, so any children are allowed. The expressions inside them are still checked.
