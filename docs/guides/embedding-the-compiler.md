@@ -19,8 +19,8 @@ The crates you'll use:
 
 | Crate | What you get from it |
 |---|---|
-| `mesh-compiler` | `compile`, `CompileResult`, `render_diagnostic` |
-| `mesh-syntax` | `Diagnostic`, `DiagnosticCode`, `Severity`, `Span` |
+| `mesh-compiler` | `compile`, `compile_with`, `CompileOptions`, `CompileResult`, `render_diagnostic`, `render_json` |
+| `mesh-syntax` | `Diagnostic`, `DiagnosticCode`, `Severity`, `Span`, `Suggestion` |
 | `mesh-semantic` | The Semantic IR types: `Element`, `Attribute`, `EventBinding`, `Child`, `Expression`, ... |
 | `mesh-manifest` | `load`, `Manifest`, `Template`, and the manifest's model types |
 | `mesh-analysis` | `analyze`, `Analysis`: what a template's names resolved to, each expression's type, and the problems found, as data; `Ty`, `is_assignable` and `join` |
@@ -146,6 +146,18 @@ pub fn render_diagnostic(source: &str, path: &str, diagnostic: &Diagnostic) -> S
 
 The block format is documented in the [CLI manual](../manual/mesh-cli.md#diagnostic-format).
 
+For the JSON the CLI prints with `--format json`, use `render_json`:
+
+```rust
+pub fn render_json(source: &str, path: &str, diagnostics: &[Diagnostic]) -> String
+```
+
+- It returns one JSON document on one line, with no trailing newline, holding every diagnostic in the order given. It's the same document for no diagnostics as for many: `{"version":1,"diagnostics":[]}`.
+- Every diagnostic must be reported against `source`, and `path` labels them all, as for `render_diagnostic`. Manifest diagnostics index the manifest's text, so render them in a document of their own.
+- Each span has its byte offsets and the line and column `render_diagnostic` would show.
+
+The document is described in the [CLI manual](../manual/mesh-cli.md#json-output) and published as a JSON Schema in [`schemas/diagnostics-v1.schema.json`](../../schemas/diagnostics-v1.schema.json).
+
 ## Walking the Semantic IR
 
 The IR is a plain tree of owned values. Every node records where it came from in the source. For `examples/user-card.mprx`:
@@ -266,7 +278,7 @@ Every IR node has a `span`: a `mesh_syntax::Span { start_byte, end_byte }` cover
 
 - Offsets are **bytes** into the source exactly as you passed it, including a leading byte-order mark. They are always on character boundaries, so `&source[span.start_byte..span.end_byte]` is the construct's text.
 - A string attribute value's span includes its quotes. A parenthesized expression's span doesn't include the parentheses; `(a + b)` has no node of its own.
-- To show a span as a line and column, use `render_diagnostic`, or count lines yourself.
+- To show a span as a line and column, use `render_diagnostic` or `render_json`, or count lines yourself.
 - Spans make IR values from different sources compare unequal even when they mean the same thing. To compare meaning, zero the spans first.
 
 ## Stability

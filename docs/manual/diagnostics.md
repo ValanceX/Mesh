@@ -1,8 +1,8 @@
 # Diagnostics reference
 
-This page lists every diagnostic MESH can produce: its code, what triggers it, how serious it is, and how to fix it. For the output format, see the [CLI manual](./mesh-cli.md#diagnostic-format).
+This page lists every diagnostic MESH can produce: its code, what triggers it, how serious it is, and how to fix it. For the output formats, see the CLI manual: [human](./mesh-cli.md#diagnostic-format) and [JSON](./mesh-cli.md#json-output).
 
-Every diagnostic has a **code**, shown in brackets after its severity: `error[unterminated-tag]`. Codes are stable:
+Every diagnostic has a **code**, shown in brackets after its severity, `error[unterminated-tag]`, and as the `code` property in JSON output. Codes are machine-readable API, so programs should match on them, never on messages. They are stable:
 
 - A code is never renamed.
 - A retired code is never reused for a different meaning.
@@ -800,7 +800,7 @@ As with props, a required field must be written even when its type is optional.
 
 ### `could not read <file>: <reason>`
 
-Printed by the CLI, not the compiler, when the file (or the `--model` manifest) can't be read: it's missing, it's a directory, you don't have permission, or it isn't valid UTF-8. This is a single line with no code and no source snippet. The exit status is `1`.
+Printed by the CLI, not the compiler, when the file (or the `--model` manifest) can't be read: it's missing, it's a directory, you don't have permission, or it isn't valid UTF-8. This is a single line on stderr with no code and no source snippet, even with `--format json`, which then prints nothing on stdout. The exit status is `1`.
 
 ---
 

@@ -381,3 +381,35 @@ fn rejects_an_unknown_format() {
         .stdout("")
         .stderr(predicate::str::contains("[possible values: human, json]"));
 }
+
+/// The CLI manual's JSON example is what `mesh` prints for the command
+/// it shows, and its indented copy is the same document.
+#[test]
+fn the_cli_manuals_json_example_is_what_mesh_prints() {
+    let manual = std::fs::read_to_string("../../docs/manual/mesh-cli.md")
+        .expect("should read the CLI manual");
+    let mut lines = manual.lines();
+    let command = lines
+        .find_map(|line| line.strip_prefix("$ mesh check --format json --model "))
+        .expect("the manual shows a JSON example");
+    let printed = lines.next().expect("the example shows its output");
+    let args: Vec<&str> = command.split_whitespace().collect();
+
+    Command::cargo_bin("mesh")
+        .unwrap()
+        .current_dir("../..")
+        .args(["check", "--format", "json", "--model"])
+        .args(&args)
+        .assert()
+        .stdout(format!("{printed}\n"));
+
+    let indented = manual
+        .split("```json\n")
+        .nth(1)
+        .and_then(|block| block.split("```").next())
+        .expect("the manual shows the document indented");
+    let parse = |text: &str| -> serde_json::Value {
+        serde_json::from_str(text).expect("the example is JSON")
+    };
+    assert_eq!(parse(indented), parse(printed));
+}

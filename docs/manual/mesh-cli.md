@@ -5,7 +5,7 @@
 ## Synopsis
 
 ```text
-mesh check [--model <MANIFEST> [--component <NAME>]] <FILE>
+mesh check [--model <MANIFEST> [--component <NAME>]] [--format <human|json>] <FILE>
 mesh help [COMMAND]
 mesh --help
 mesh --version
@@ -32,6 +32,7 @@ Parses and validates one MPRX file, then reports every diagnostic.
 | `<FILE>` | Path to the `.mprx` file. Any path works, and the extension isn't enforced. The file must be valid UTF-8. |
 | `--model <MANIFEST>` | A component manifest (JSON) declaring the components the file uses. See [Checking against a manifest](#checking-against-a-manifest). |
 | `--component <NAME>` | The manifest component whose template the file is. Defaults to the file's name without its extension. Needs `--model`. |
+| `--format <human\|json>` | How to print diagnostics. `human` (the default) prints rustc-style blocks on stderr; `json` prints one JSON document on stdout. See [JSON output](#json-output). |
 
 **What it checks**
 
@@ -67,12 +68,14 @@ These are errors with their own codes, listed under [Model errors](./diagnostics
 
 ### Output
 
-MESH keeps its two output streams separate, so scripts can rely on them:
+MESH keeps its two output streams separate, so scripts can rely on them. With the default `--format human`:
 
 | Stream | What's written |
 |---|---|
 | **stderr** | Every diagnostic, in the order the compiler produced it, each followed by one blank line. Also used for "could not read" failures. |
 | **stdout** | The single line `no errors` if the file has no *errors*. Warnings alone still print it. Nothing otherwise. |
+
+With `--format json`, stdout gets one JSON document holding every diagnostic, and stderr gets only "could not read" failures; see [JSON output](#json-output).
 
 Diagnostics come out in source order within each element: first the element's attributes, then its event bindings, then its closing tag, then its children. Their order is never re-sorted.
 
@@ -111,15 +114,80 @@ The exact rules:
 - **Windows line endings** (`\r\n`) are handled; the `\r` is never echoed or counted.
 - **`= help:` lines** follow the carets when MESH has a suggestion, one line per suggestion. Most diagnostics have none. Today every suggestion is a similarly spelled name that the manifest declares.
 - **A leading UTF-8 byte-order mark** is skipped: it isn't echoed or counted, so line 1's columns match what your editor shows.
-- The output has no colour, and it isn't machine-readable yet.
+- The output has no colour. For output a program can read, use [`--format json`](#json-output).
 
 The full list of codes and messages is in the [diagnostics reference](./diagnostics.md).
+
+### JSON output
+
+`--format json` prints the same diagnostics for a program to read: a generator that repairs its own output, an editor plugin, or a CI step that annotates a pull request. It reports exactly what the human format reports, in the same order, with the same exit status.
+
+```console
+$ mesh check --format json --model examples/fixtures/check/components.json --component template examples/fixtures/check/fail/unknown-reference.mprx
+{"version":1,"diagnostics":[{"severity":"error","code":"unknown-reference","message":"unknown reference \"usr\": it isn't in the template's scope","path":"examples/fixtures/check/fail/unknown-reference.mprx","span":{"start":{"byte":13,"line":1,"column":14},"end":{"byte":16,"line":1,"column":17}},"suggestions":[{"replacement":"user","span":{"start":{"byte":13,"line":1,"column":14},"end":{"byte":16,"line":1,"column":17}}}]}]}
+```
+
+The same document, indented for reading:
+
+```json
+{
+  "version": 1,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "unknown-reference",
+      "message": "unknown reference \"usr\": it isn't in the template's scope",
+      "path": "examples/fixtures/check/fail/unknown-reference.mprx",
+      "span": {
+        "start": { "byte": 13, "line": 1, "column": 14 },
+        "end": { "byte": 16, "line": 1, "column": 17 }
+      },
+      "suggestions": [
+        {
+          "replacement": "user",
+          "span": {
+            "start": { "byte": 13, "line": 1, "column": 14 },
+            "end": { "byte": 16, "line": 1, "column": 17 }
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+**The document.** Each run that checks a file prints exactly one document, on one line, followed by a newline. A file with no diagnostics gets `{"version":1,"diagnostics":[]}`, and `no errors` isn't printed. Several runs' output, one after another, is therefore [JSON Lines](https://jsonlines.org). Nothing is written to stderr.
+
+| Property | Meaning |
+|---|---|
+| `version` | The version of the document's shape, `1`. It changes only if a property is removed or changes meaning. Properties may be added without changing it, so ignore any you don't know. |
+| `diagnostics` | Every diagnostic, in the order the human format prints them. |
+
+Each diagnostic has:
+
+| Property | Meaning |
+|---|---|
+| `severity` | `"error"` or `"warning"`. Only errors fail the check. |
+| `code` | The stable code, such as `"unknown-reference"`. Match on this, never on `message`. |
+| `message` | The human-readable message. It may change between versions. |
+| `path` | The file the span points into, exactly as you passed it: the `.mprx` file, or the `--model` manifest for a `manifest-*` code. |
+| `span` | Where the problem is: a `start` and an `end` position. `end` is just past the span's last character, so it may be on a later line. |
+| `suggestions` | Replacements that would probably fix the problem, best first: each has a `replacement` and the `span` it replaces. Usually empty; never missing. |
+
+A position has three numbers:
+
+- `byte`: a 0-based offset into the file's bytes. A leading byte-order mark counts, as its three bytes.
+- `line` and `column`: 1-based, exactly as the human format's `-->` line shows them. Columns count characters (Unicode scalar values), and a byte-order mark or a line's `\r` is never a column.
+
+The document's shape is published as a JSON Schema in [`schemas/diagnostics-v1.schema.json`](../../schemas/diagnostics-v1.schema.json).
+
+**When there's no document.** A file or manifest that can't be read gets the usual `could not read` line on stderr, nothing on stdout, and exit status `1`. A usage error gets the argument parser's message on stderr and exit status `2`. So a program can rely on this: exit status `0` or `1` with a document on stdout means the check ran; anything else means it didn't, and stderr says why.
 
 ### Exit status
 
 | Status | Meaning |
 |---|---|
-| `0` | No errors. Warnings may have been printed. `no errors` is on stdout. |
+| `0` | No errors. Warnings may have been printed. With `--format human`, `no errors` is on stdout. |
 | `1` | At least one error diagnostic (in the file or the manifest), or the file or manifest couldn't be read (missing, a directory, not UTF-8, permission denied). |
 | `2` | Usage error, such as a missing `<FILE>` argument, an unknown command or flag, or `--component` without `--model`. Reported by the argument parser. |
 
@@ -148,6 +216,16 @@ To fail on warnings as well, test stderr:
 out=$(mesh check "$f" 2>&1 >/dev/null)
 [ -z "$out" ] || { printf '%s\n' "$out"; exit 1; }
 ```
+
+With `--format json`, a tool like [`jq`](https://jqlang.org) can pick out what it needs. For example, one `path:line:column: code` line per error:
+
+```sh
+mesh check --format json "$f" |
+  jq -r '.diagnostics[] | select(.severity == "error")
+         | "\(.path):\(.span.start.line):\(.span.start.column): \(.code)"'
+```
+
+A pipeline's exit status is its last command's, here `jq`'s, so a gate that pipes `mesh` loses its failures. In bash, `set -o pipefail` keeps them.
 
 ## `mesh help`, `--help` and `--version`
 
