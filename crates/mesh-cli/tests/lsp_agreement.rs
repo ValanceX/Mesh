@@ -439,3 +439,131 @@ fn every_prefix_publishes_what_mesh_check_reports() {
     }
     assert!(mismatches.is_empty(), "{mismatches:#?}");
 }
+
+/// The LSP position of `byte` in `source`, in UTF-16 units.
+fn position(source: &str, byte: usize) -> Value {
+    let at = SourceMap::new(source).line_column(source, byte, ColumnUnit::Utf16);
+    json!({ "line": at.line, "character": at.column })
+}
+
+/// Every prefix of every fixture, as someone types it (outline D7, "It
+/// doesn't crash"; audit C10). For each run `fixtures.rs` makes, except
+/// those whose manifest is broken, every prefix is sent as a change to
+/// one open document, and:
+/// - its publication is exactly what `mesh check --format json` reports
+///   for that prefix, as in `every_prefix_publishes_what_mesh_check_reports`;
+/// - hover, definition and completion, at the prefix's end and at three
+///   earlier offsets, each answer with a result, never an error.
+#[test]
+fn every_prefix_of_every_fixture_agrees_and_answers() {
+    let mut mismatches = Vec::new();
+    let mut prefixes = 0;
+    for run in runs() {
+        if run
+            .model
+            .as_deref()
+            .is_some_and(|model| model.starts_with("fixtures/manifest/"))
+        {
+            continue;
+        }
+        let workspace = tempfile::tempdir().expect("a temp dir");
+        let root = workspace
+            .path()
+            .canonicalize()
+            .expect("the temp dir exists");
+        let mut settings = json!({});
+        if let Some(model) = &run.model {
+            let target = root.join(model);
+            fs::create_dir_all(target.parent().expect("a parent")).expect("a directory");
+            fs::copy(examples_dir().join(model), &target).expect("the manifest copies");
+            settings["model"] = json!(model);
+        }
+        if let Some(component) = &run.component {
+            settings["components"] = json!({ run.file.clone(): component });
+        }
+        let (mut client, _) = Client::initialized(json!({
+            "processId": null,
+            "rootUri": file_uri(&root),
+            "capabilities": {},
+            "initializationOptions": settings,
+        }));
+        let full = fs::read_to_string(examples_dir().join(&run.file)).expect("reads");
+        let path = root.join(&run.file);
+        fs::create_dir_all(path.parent().expect("a parent")).expect("a directory");
+        let uri = file_uri(&path);
+        let ends: Vec<usize> = full
+            .char_indices()
+            .map(|(end, _)| end)
+            .chain([full.len()])
+            .collect();
+        for (version, &end) in ends.iter().enumerate() {
+            let source = &full[..end];
+            let what = format!("{} prefix of {end} bytes", run.file);
+            let version = i32::try_from(version).expect("a small version");
+            if version == 0 {
+                client.open(&uri, version, source);
+            } else {
+                client.change(&uri, version, source);
+            }
+            let published = client.next_publication(&uri);
+            assert_eq!(published.version, Some(version), "{what}");
+
+            fs::write(&path, source).expect("the prefix writes");
+            let (_, cli_diagnostics) = cli_in(&root, &run);
+            mismatches.extend(compare(
+                &what,
+                source,
+                ColumnUnit::Utf16,
+                &cli_diagnostics,
+                &published,
+            ));
+
+            let offsets = [end, end / 3, end * 2 / 3, 0].map(|offset| {
+                ends.iter()
+                    .rev()
+                    .find(|&&e| e <= offset)
+                    .copied()
+                    .unwrap_or(0)
+            });
+            for offset in offsets {
+                let params = json!({
+                    "textDocument": { "uri": uri },
+                    "position": position(source, offset),
+                });
+                for method in [
+                    "textDocument/hover",
+                    "textDocument/definition",
+                    "textDocument/completion",
+                ] {
+                    let response = client.request(method, params.clone());
+                    if let Err(error) = response.response_result {
+                        mismatches.push(format!("{what}: {method} at {offset}: {error:?}"));
+                    }
+                }
+            }
+            prefixes += 1;
+        }
+    }
+    assert!(prefixes >= 6_000, "only {prefixes} prefixes were walked");
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
+}
+
+/// `mesh check --format json` for `run`, with `root` as the directory its
+/// paths are relative to.
+fn cli_in(root: &Path, run: &Run) -> (String, Vec<Value>) {
+    let mut command = Command::cargo_bin("mesh").expect("the mesh binary");
+    command
+        .current_dir(root)
+        .args(["check", "--format", "json"]);
+    if let Some(model) = &run.model {
+        command.args(["--model", model]);
+    }
+    if let Some(component) = &run.component {
+        command.args(["--component", component]);
+    }
+    let output = command.arg(&run.file).output().expect("mesh check runs");
+    let document: Value = serde_json::from_slice(&output.stdout)
+        .unwrap_or_else(|err| panic!("{}: stdout isn't JSON: {err}", run.file));
+    let diagnostics = document["diagnostics"].as_array().expect("a list").clone();
+    (run.file.clone(), diagnostics)
+}

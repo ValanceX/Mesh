@@ -546,6 +546,7 @@ dependencies = [
  "mesh-compiler",
  "mesh-lsp",
  "mesh-manifest",
+ "mesh-parser",
  "mesh-semantic",
  "mesh-syntax",
  "predicates",
