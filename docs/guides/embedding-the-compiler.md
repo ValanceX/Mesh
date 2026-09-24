@@ -4,13 +4,16 @@ The `mesh` CLI is a thin wrapper around a library API. This guide shows how to c
 
 ## Adding the dependency
 
-The v0.1 crates aren't on crates.io yet. Depend on them from git:
+The crates aren't on crates.io yet. Depend on them from git:
 
 ```toml
 [dependencies]
-mesh-compiler = { git = "https://github.com/ValanceX/Mesh", tag = "v0.1.0" }
-mesh-syntax   = { git = "https://github.com/ValanceX/Mesh", tag = "v0.1.0" }
-mesh-semantic = { git = "https://github.com/ValanceX/Mesh", tag = "v0.1.0" }
+mesh-compiler = { git = "https://github.com/ValanceX/Mesh", tag = "v0.2.0" }
+mesh-syntax   = { git = "https://github.com/ValanceX/Mesh", tag = "v0.2.0" }
+mesh-semantic = { git = "https://github.com/ValanceX/Mesh", tag = "v0.2.0" }
+# Only to check against a component manifest, or to use the analysis as data:
+mesh-manifest = { git = "https://github.com/ValanceX/Mesh", tag = "v0.2.0" }
+mesh-analysis = { git = "https://github.com/ValanceX/Mesh", tag = "v0.2.0" }
 ```
 
 The parser builds a Tree-sitter grammar written in C, so your build machine needs a C compiler. Rust's standard setup already includes one on most platforms.
@@ -283,4 +286,4 @@ Every IR node has a `span`: a `mesh_syntax::Span { start_byte, end_byte }` cover
 
 ## Stability
 
-v0.1 is the first release. The IR's *meaning* is intended to be stable, but its Rust types may still change before 1.0: v0.2, for example, adds source spans, which changes several variants' shapes. In particular, v0.1 has no serialized IR format, so treat the IR as an in-process value. Pin a tag rather than tracking `main`.
+The IR's *meaning* is intended to be stable, but its Rust types may still change before 1.0: v0.2, for example, added source spans, which changed several variants' shapes, and the [CHANGELOG](../../CHANGELOG.md) marks each such change as breaking. There is no serialized IR format, so treat the IR as an in-process value. Diagnostic codes and the JSON diagnostics document are stable, as the [CLI manual](../manual/mesh-cli.md#json-output) describes. Pin a tag rather than tracking `main`.

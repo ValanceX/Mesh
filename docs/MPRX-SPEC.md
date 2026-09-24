@@ -59,7 +59,7 @@ v0.2 changes no syntax. Its passes (outlined in `docs/superpowers/specs/2026-09-
 | 5b | Checking values against their declared types (§9.6) | ✅ Shipped |
 | 6 | JSON diagnostics output, and these semantics written down | ✅ Shipped |
 
-*Last updated 2026-09-24. v0.1 is released as v0.1.0 (see the [release notes](./releases/v0.1.md)). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. Any grammar or semantics work beyond v0.2 starts a new spec.*
+*Last updated 2026-09-24. v0.2 is released as v0.2.0, and v0.1 as v0.1.0 (see the [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. Any grammar or semantics work beyond v0.2 starts a new spec.*
 
 ---
 

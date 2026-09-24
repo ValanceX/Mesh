@@ -1,13 +1,13 @@
 # MESH documentation
 
-Documentation for **MESH v0.1**. New here? Start with *Getting started*.
+Documentation for **MESH v0.2**. New here? Start with *Getting started*.
 
 ## Guides
 
 Learning-oriented walkthroughs.
 
 - [**Getting started**](./guides/getting-started.md): install `mesh`, write and check your first file, and read diagnostics.
-- [**Writing MPRX**](./guides/writing-mprx.md): a tour of everything the v0.1 language supports, plus common mistakes and their fixes.
+- [**Writing MPRX**](./guides/writing-mprx.md): a tour of everything the language supports, plus common mistakes and their fixes.
 - [**Checking against a component model**](./guides/checking-against-a-component-model.md): declare your components in a manifest and check what a file means, not just its shape; requiredness, absence and `any`, explained.
 - [**Embedding the compiler**](./guides/embedding-the-compiler.md): call MESH from Rust, handle diagnostics, and walk the Semantic IR.
 
@@ -24,7 +24,7 @@ Reference material for when you need exact details.
 ## Background
 
 - [**Architecture**](./ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance.
-- [**v0.1 release notes**](./releases/v0.1.md) and the [**CHANGELOG**](../CHANGELOG.md).
+- Release notes for [**v0.2**](./releases/v0.2.md) and [**v0.1**](./releases/v0.1.md), and the [**CHANGELOG**](../CHANGELOG.md).
 
 ## For contributors
 

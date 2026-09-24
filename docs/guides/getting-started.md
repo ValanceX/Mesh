@@ -1,4 +1,4 @@
-# Getting started with MESH v0.1
+# Getting started with MESH
 
 This guide covers installing the `mesh` command, writing your first MPRX file, and reading the diagnostics MESH prints. It takes about ten minutes.
 
@@ -6,7 +6,7 @@ This guide covers installing the `mesh` command, writing your first MPRX file, a
 
 ## 1. Install the CLI
 
-MESH v0.1 is distributed as source. Clone the repo and install the `mesh` binary with Cargo:
+MESH is distributed as source. Clone the repo and install the `mesh` binary with Cargo:
 
 ```console
 $ git clone https://github.com/ValanceX/Mesh.git
@@ -50,7 +50,7 @@ $ mesh check hello.mprx
 no errors
 ```
 
-`mesh check` parses the file, builds its semantic model, and runs the v0.1 structural checks. When nothing is wrong, it prints `no errors` and exits with status `0`.
+`mesh check` parses the file, builds its semantic model, and runs its structural checks. When nothing is wrong, it prints `no errors` and exits with status `0`.
 
 ## 4. Break it on purpose
 
@@ -94,7 +94,7 @@ A **warning** is printed the same way, but it doesn't fail the check. The output
 
 ## 5. Look at the examples
 
-The repo ships two canonical v0.1 examples that always check clean:
+The repo ships two canonical examples that always check clean:
 
 ```console
 $ mesh check examples/user-card.mprx
@@ -103,11 +103,12 @@ $ mesh check examples/users-page.mprx
 no errors
 ```
 
-`examples/fixtures/` has a small corpus of deliberately broken files. Each one sits next to a `.stderr` file with the exact output `mesh check` prints for it. Browse it to see every kind of diagnostic v0.1 produces.
+`examples/fixtures/` has a small corpus of deliberately broken files. Each one sits next to a `.stderr` file with the exact output `mesh check` prints for it. Browse it to see every kind of diagnostic MESH produces.
 
 ## Where next
 
-- [Writing MPRX](./writing-mprx.md): a tour of everything the v0.1 language supports, plus common mistakes.
+- [Writing MPRX](./writing-mprx.md): a tour of everything the language supports, plus common mistakes.
+- [Checking against a component model](./checking-against-a-component-model.md): declare your components, and check that a file uses them correctly.
 - [`mesh` CLI manual](../manual/mesh-cli.md): exact output format and exit codes.
 - [Diagnostics reference](../manual/diagnostics.md): every message and how to fix it.
 - [Embedding the compiler](./embedding-the-compiler.md): calling MESH from your own Rust code.

@@ -18,7 +18,7 @@ Because MPRX is small, MESH can parse, validate, and compile every UI before it 
 ## Why MESH
 
 - **Familiar syntax.** Tags, attributes, and `{expressions}` work the way you'd expect if you've used HTML, JSX, Vue, or Svelte.
-- **Checked before it runs.** Invalid syntax, mismatched tags, and duplicate bindings are caught at compile time, not in front of users.
+- **Checked before it runs.** Invalid syntax is caught at compile time, not in front of users. Against a component manifest, so is every unknown component, prop, event, name or command, and every value of the wrong type.
 - **Safe for generated UI.** MPRX can only express structure, bindings, simple expressions, and *intent*. Something like `selectUser($event)` is a request for NEXUS to handle, not code that MESH runs.
 - **Renderer-independent.** A compiled MESH tree carries no assumptions about DOM, Canvas, or hardware. [PORT](https://github.com/ValanceX/Port) decides how it's drawn.
 - **One brain for compiler and editor.** The language server reuses the compiler itself, so your editor and your build always agree.
@@ -34,6 +34,13 @@ no errors
 ```
 
 (Or skip installing and run `cargo run -p mesh-cli -- check <file>` from the repo root.)
+
+Give it a component manifest, and it checks what the file means, too:
+
+```console
+$ mesh check --model examples/components.json examples/users-page.mprx
+no errors
+```
 
 Mistakes are reported with their location:
 
@@ -77,11 +84,11 @@ mesh/
 │   ├── mesh-manifest/        component manifest loading and validation
 │   ├── mesh-analysis/        checking templates against a component manifest
 │   ├── mesh-compiler/        compile API, diagnostics, and rendering
-│   ├── mesh-lsp/             language server (placeholder in v0.1)
+│   ├── mesh-lsp/             language server (a placeholder)
 │   └── mesh-cli/             the `mesh` command-line tool
 ├── grammar/
 │   └── tree-sitter-mprx/     the MPRX Tree-sitter grammar
-└── packages/               npm wrappers for the Rust/WASM build (placeholders in v0.1)
+└── packages/               npm wrappers for the Rust/WASM build (placeholders)
     ├── mesh-language/        @valence/mesh-language
     ├── mesh-compiler/        @valence/mesh-compiler
     └── mesh-lsp/             @valence/mesh-lsp
@@ -95,28 +102,28 @@ mesh/
 
 ## Status
 
-**v0.1.0 released** (2026-09-24). See the [release notes](./docs/releases/v0.1.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.2.0 released** (2026-09-24). See the [release notes](./docs/releases/v0.2.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
-- Elements, attributes, strings, and text
-- `{...}` expressions in attributes and content: literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`
-- Event bindings (`on.click={...}`)
+- The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), and event bindings (`on.click={...}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings
-- The `mesh check` CLI
-- rustc-style diagnostics with source snippets; warnings don't fail the check
+- Checking against a component manifest (`mesh check --model`): every component, prop, event, reference and command is resolved, every expression is typed, and every value is checked against its declaration
+- rustc-style diagnostics with stable codes, located syntax errors, and did-you-mean suggestions; warnings don't fail the check
+- JSON diagnostics (`mesh check --format json`)
 
-Known limitations: in v0.1.0, references, components and props aren't type-checked. The language server and npm packages are placeholders.
+Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. The language server and npm packages are placeholders.
 
-Unreleased on `main` so far (see the [CHANGELOG](./CHANGELOG.md)): most syntax errors point at the actual mistake, every diagnostic has a stable code, and `mesh check --model` checks a file against a component manifest, resolving every component, prop, event, reference and command and type-checking every value. Next up: JSON diagnostics output and the v0.2 release.
+Next up: editor support through `mesh-lsp`.
 
 ## Learn more
 
 The [documentation index](./docs/README.md) lists everything. The most useful places to start:
 
 - [**Getting started**](./docs/guides/getting-started.md): install `mesh` and check your first file
-- [**Writing MPRX**](./docs/guides/writing-mprx.md): the v0.1 language, with examples and common mistakes
-- [**`mesh` CLI manual**](./docs/manual/mesh-cli.md) and [**Diagnostics reference**](./docs/manual/diagnostics.md)
+- [**Writing MPRX**](./docs/guides/writing-mprx.md): the language, with examples and common mistakes
+- [**Checking against a component model**](./docs/guides/checking-against-a-component-model.md): manifests, types, and why absence isn't `null`
+- [**`mesh` CLI manual**](./docs/manual/mesh-cli.md), [**Diagnostics reference**](./docs/manual/diagnostics.md) and [**Manifest reference**](./docs/manual/manifest.md)
 - [**Embedding the compiler**](./docs/guides/embedding-the-compiler.md): use MESH from Rust
-- [**MPRX Language Spec**](./docs/MPRX-SPEC.md): the exact syntax, with what's shipped and what's planned
+- [**MPRX Language Spec**](./docs/MPRX-SPEC.md): the exact syntax and semantics
 - [**Architecture**](./docs/ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance
 
 ## Tech

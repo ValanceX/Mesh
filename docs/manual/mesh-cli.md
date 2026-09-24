@@ -1,6 +1,6 @@
-# `mesh` CLI manual (v0.1)
+# `mesh` CLI manual
 
-`mesh` is the native command-line tool for MESH. In v0.1 it has one command, `check`.
+`mesh` is the native command-line tool for MESH. It has one command, `check`.
 
 ## Synopsis
 
@@ -110,7 +110,7 @@ The exact rules:
 - **Line and column** are 1-based. Columns count characters (Unicode scalar values), not bytes and not display width. A tab counts as one column.
 - **The gutter** (the spaces before `|`) widens to fit the line number, so line 120 gets a three-character gutter.
 - **Carets** underline the problem's span on the reported line. If a span covers several lines, only its first line is shown and underlined up to the end of that line. An empty span gets a single `^`.
-- **Tabs** in the source line are kept in the caret line's indentation, so carets line up in your terminal. Wide characters (CJK, emoji) may make the carets look shifted, because v0.1 doesn't measure display width.
+- **Tabs** in the source line are kept in the caret line's indentation, so carets line up in your terminal. Wide characters (CJK, emoji) may make the carets look shifted, because MESH doesn't measure display width.
 - **Windows line endings** (`\r\n`) are handled; the `\r` is never echoed or counted.
 - **`= help:` lines** follow the carets when MESH has a suggestion, one line per suggestion. Most diagnostics have none. Today every suggestion is a similarly spelled name that the manifest declares.
 - **A leading UTF-8 byte-order mark** is skipped: it isn't echoed or counted, so line 1's columns match what your editor shows.
@@ -229,9 +229,9 @@ A pipeline's exit status is its last command's, here `jq`'s, so a gate that pipe
 
 ## `mesh help`, `--help` and `--version`
 
-`mesh help` and `--help` print usage for `mesh` or for a single command. `mesh --version` (or `-V`) prints the version, such as `mesh 0.1.0`, and exits `0`.
+`mesh help` and `--help` print usage for `mesh` or for a single command. `mesh --version` (or `-V`) prints the version, such as `mesh 0.2.0`, and exits `0`.
 
-## Limitations in v0.1
+## Limitations
 
 - **One file per invocation.** To check several files, loop over them.
 - **No `compile` command yet.** The compiler produces the Semantic IR, but the CLI doesn't write it out. Use the [Rust API](../guides/embedding-the-compiler.md) to get at it.

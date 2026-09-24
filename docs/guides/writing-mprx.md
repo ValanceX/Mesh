@@ -1,6 +1,6 @@
 # Writing MPRX
 
-This guide walks through everything MPRX v0.1 can express, with runnable examples. Every snippet here passes `mesh check` unless it's marked as a mistake. For the formal grammar, see the [MPRX Language Spec](../MPRX-SPEC.md).
+This guide walks through everything MPRX can express, with runnable examples. Every snippet here passes `mesh check` unless it's marked as a mistake. For the formal grammar, see the [MPRX Language Spec](../MPRX-SPEC.md).
 
 ## The shape of a document
 
@@ -123,23 +123,23 @@ An event binding says what should happen when an element emits an event:
 
 The syntax is `on.<event>={expression}`. The handler is usually a **command invocation**, which is a *request* by name plus arguments. MESH records it; the runtime (NEXUS) decides what the command does. `$event` refers to the value the event carries.
 
-Any event name is accepted. v0.1 doesn't keep a registry of known events and doesn't check handler types. An attribute named plain `on` (`on="x"`) is still an ordinary attribute.
+On its own, `mesh check` accepts any event name and any handler: there is no registry of known events. Checked against a component manifest, the event must be one the element's component declares, and the handler must be a command invocation. An attribute named plain `on` (`on="x"`) is still an ordinary attribute.
 
 As with attributes, if the same event is bound twice on one element, the last binding wins and MESH warns about the earlier one.
 
 ## What MPRX deliberately doesn't have
 
-These are syntax errors in v0.1. Most of them are left out on purpose, to keep the language small enough to check completely:
+These are syntax errors. Most of them are left out on purpose, to keep the language small enough to check completely:
 
 | Not supported | Instead |
 |---|---|
-| Comments (`<!-- -->`) | none in v0.1 |
+| Comments (`<!-- -->`) | none |
 | Subscripts (`items[0]`, `map["key"]`) | expose the value you need as a named property |
-| Optional chaining (`user?.name`) | none in v0.1 |
+| Optional chaining (`user?.name`) | none |
 | Hyphenated attribute names (`data-id`) | `dataId` or `data_id` |
 | Arbitrary code, assignments, function definitions | commands: `doThing(args)` |
 
-Also out of scope for v0.1: checking references against a component model. On its own, `mesh check` verifies structure, so `<user-card user={usr} />` passes even if nothing named `usr` exists. Unreleased on `main`, `mesh check --model` checks the file against a component manifest: its components, props, events, references, commands and types (see the [CLI manual](../manual/mesh-cli.md#checking-against-a-manifest)).
+On its own, `mesh check` verifies structure, so `<user-card user={usr} />` passes even if nothing named `usr` exists. `mesh check --model` checks the file against a component manifest as well: its components, props, events, references, commands and types. See [Checking against a component model](./checking-against-a-component-model.md).
 
 ## Common mistakes at a glance
 

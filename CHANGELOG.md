@@ -2,7 +2,9 @@
 
 All notable changes to MESH are recorded here. The project follows [Semantic Versioning](https://semver.org). Until 1.0, minor versions may include breaking changes.
 
-## [Unreleased]
+## [0.2.0] - 2026-09-24
+
+MPRX is now checked against a component model. See the [v0.2 release notes](./docs/releases/v0.2.md) for an overview.
 
 ### Added
 
@@ -73,4 +75,5 @@ The first release. See the [v0.1 release notes](./docs/releases/v0.1.md) for an 
 - No component-model or type checking yet.
 - `mesh-lsp` and the npm packages are placeholders.
 
+[0.2.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.1.0
