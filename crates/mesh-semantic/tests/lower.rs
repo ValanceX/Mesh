@@ -1,9 +1,20 @@
+use mesh_syntax::Span;
+
+/// Every AST these tests build uses this span, so every span in the
+/// lowered IR is this span too.
+const NO_SPAN: Span = Span {
+    start_byte: 0,
+    end_byte: 0,
+};
+
 #[test]
 fn lowers_a_self_closing_element_with_a_string_attribute() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "page".to_string(),
         closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: "title".to_string(),
             value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
                 value: "Users".to_string(),
@@ -32,7 +43,10 @@ fn lowers_a_self_closing_element_with_a_string_attribute() {
     assert_eq!(ir.attributes[0].name, "title");
     assert_eq!(
         ir.attributes[0].value,
-        mesh_semantic::AttributeValue::String("Users".to_string())
+        mesh_semantic::AttributeValue::String {
+            value: "Users".to_string(),
+            span: NO_SPAN
+        }
     );
     assert!(ir.children.is_empty());
 }
@@ -40,12 +54,15 @@ fn lowers_a_self_closing_element_with_a_string_attribute() {
 #[test]
 fn lowers_a_member_access_expression_attribute() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "page".to_string(),
         closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: "user".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::MemberAccess(
                 mesh_syntax::MemberAccess {
+                    property_span: NO_SPAN,
                     object: Box::new(mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                         name: "user".to_string(),
                         span: mesh_syntax::Span {
@@ -78,8 +95,13 @@ fn lowers_a_member_access_expression_attribute() {
     assert_eq!(
         ir.attributes[0].value,
         mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::MemberAccess {
-            object: Box::new(mesh_semantic::Expression::Reference("user".to_string())),
+            object: Box::new(mesh_semantic::Expression::Reference {
+                name: "user".to_string(),
+                span: NO_SPAN
+            }),
             property: "name".to_string(),
+            property_span: NO_SPAN,
+            span: NO_SPAN,
         })
     );
 }
@@ -87,6 +109,7 @@ fn lowers_a_member_access_expression_attribute() {
 #[test]
 fn lowers_an_expression_child() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "title".to_string(),
         closing_name: None,
         attributes: vec![],
@@ -110,17 +133,22 @@ fn lowers_an_expression_child() {
 
     assert_eq!(
         ir.children[0],
-        mesh_semantic::Child::Expression(mesh_semantic::Expression::Reference("user".to_string()))
+        mesh_semantic::Child::Expression(mesh_semantic::Expression::Reference {
+            name: "user".to_string(),
+            span: NO_SPAN
+        })
     );
 }
 
 #[test]
 fn lowers_boolean_and_null_literals() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "page".to_string(),
         closing_name: None,
         attributes: vec![
             mesh_syntax::Attribute {
+                name_span: NO_SPAN,
                 name: "disabled".to_string(),
                 value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Literal(
                     mesh_syntax::Literal::Boolean(mesh_syntax::BooleanLiteral {
@@ -137,6 +165,7 @@ fn lowers_boolean_and_null_literals() {
                 },
             },
             mesh_syntax::Attribute {
+                name_span: NO_SPAN,
                 name: "value".to_string(),
                 value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Literal(
                     mesh_syntax::Literal::Null(mesh_syntax::NullLiteral {
@@ -164,24 +193,28 @@ fn lowers_boolean_and_null_literals() {
 
     assert_eq!(
         ir.attributes[0].value,
-        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Literal(
-            mesh_semantic::Literal::Boolean(true)
-        ))
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Literal {
+            value: mesh_semantic::Literal::Boolean(true),
+            span: NO_SPAN
+        })
     );
     assert_eq!(
         ir.attributes[1].value,
-        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Literal(
-            mesh_semantic::Literal::Null
-        ))
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Literal {
+            value: mesh_semantic::Literal::Null,
+            span: NO_SPAN
+        })
     );
 }
 
 #[test]
 fn lowers_a_unary_expression() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "page".to_string(),
         closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: "disabled".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Unary(
                 mesh_syntax::UnaryExpression {
@@ -218,7 +251,11 @@ fn lowers_a_unary_expression() {
         ir.attributes[0].value,
         mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Unary {
             operator: mesh_syntax::UnaryOperator::Not,
-            operand: Box::new(mesh_semantic::Expression::Reference("disabled".to_string())),
+            operand: Box::new(mesh_semantic::Expression::Reference {
+                name: "disabled".to_string(),
+                span: NO_SPAN
+            }),
+            span: NO_SPAN,
         })
     );
 }
@@ -226,9 +263,11 @@ fn lowers_a_unary_expression() {
 #[test]
 fn lowers_a_binary_expression_preserving_nested_precedence() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "page".to_string(),
         closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: "total".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Binary(
                 mesh_syntax::BinaryExpression {
@@ -292,12 +331,23 @@ fn lowers_a_binary_expression_preserving_nested_precedence() {
         ir.attributes[0].value,
         mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Binary {
             operator: mesh_syntax::BinaryOperator::Add,
-            left: Box::new(mesh_semantic::Expression::Reference("a".to_string())),
+            left: Box::new(mesh_semantic::Expression::Reference {
+                name: "a".to_string(),
+                span: NO_SPAN
+            }),
             right: Box::new(mesh_semantic::Expression::Binary {
                 operator: mesh_syntax::BinaryOperator::Mul,
-                left: Box::new(mesh_semantic::Expression::Reference("b".to_string())),
-                right: Box::new(mesh_semantic::Expression::Reference("c".to_string())),
+                left: Box::new(mesh_semantic::Expression::Reference {
+                    name: "b".to_string(),
+                    span: NO_SPAN
+                }),
+                right: Box::new(mesh_semantic::Expression::Reference {
+                    name: "c".to_string(),
+                    span: NO_SPAN
+                }),
+                span: NO_SPAN,
             }),
+            span: NO_SPAN,
         })
     );
 }
@@ -305,9 +355,11 @@ fn lowers_a_binary_expression_preserving_nested_precedence() {
 #[test]
 fn lowers_a_conditional_expression() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "page".to_string(),
         closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: "size".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Conditional(
                 mesh_syntax::ConditionalExpression {
@@ -362,13 +414,19 @@ fn lowers_a_conditional_expression() {
     assert_eq!(
         ir.attributes[0].value,
         mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Conditional {
-            condition: Box::new(mesh_semantic::Expression::Reference("compact".to_string())),
-            consequent: Box::new(mesh_semantic::Expression::Literal(
-                mesh_semantic::Literal::String("sm".to_string())
-            )),
-            alternate: Box::new(mesh_semantic::Expression::Literal(
-                mesh_semantic::Literal::String("md".to_string())
-            )),
+            condition: Box::new(mesh_semantic::Expression::Reference {
+                name: "compact".to_string(),
+                span: NO_SPAN
+            }),
+            consequent: Box::new(mesh_semantic::Expression::Literal {
+                value: mesh_semantic::Literal::String("sm".to_string()),
+                span: NO_SPAN
+            }),
+            alternate: Box::new(mesh_semantic::Expression::Literal {
+                value: mesh_semantic::Literal::String("md".to_string()),
+                span: NO_SPAN
+            }),
+            span: NO_SPAN,
         })
     );
 }
@@ -376,9 +434,11 @@ fn lowers_a_conditional_expression() {
 #[test]
 fn lowers_an_array_expression() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "page".to_string(),
         closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: "items".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Array(
                 mesh_syntax::ArrayExpression {
@@ -425,24 +485,36 @@ fn lowers_an_array_expression() {
 
     assert_eq!(
         ir.attributes[0].value,
-        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Array(vec![
-            mesh_semantic::Expression::Literal(mesh_semantic::Literal::Number("1".to_string())),
-            mesh_semantic::Expression::Literal(mesh_semantic::Literal::Number("2".to_string())),
-        ]))
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Array {
+            elements: vec![
+                mesh_semantic::Expression::Literal {
+                    value: mesh_semantic::Literal::Number("1".to_string()),
+                    span: NO_SPAN
+                },
+                mesh_semantic::Expression::Literal {
+                    value: mesh_semantic::Literal::Number("2".to_string()),
+                    span: NO_SPAN
+                },
+            ],
+            span: NO_SPAN
+        })
     );
 }
 
 #[test]
 fn lowers_an_object_expression_flattening_the_key() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "page".to_string(),
         closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: "data".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Object(
                 mesh_syntax::ObjectExpression {
                     members: vec![
                         mesh_syntax::ObjectMember {
+                            key_span: NO_SPAN,
                             key: mesh_syntax::ObjectKey::Identifier("name".to_string()),
                             value: mesh_syntax::Expression::Literal(mesh_syntax::Literal::String(
                                 mesh_syntax::StringLiteral {
@@ -459,6 +531,7 @@ fn lowers_an_object_expression_flattening_the_key() {
                             },
                         },
                         mesh_syntax::ObjectMember {
+                            key_span: NO_SPAN,
                             key: mesh_syntax::ObjectKey::String(mesh_syntax::StringLiteral {
                                 value: "a-b".to_string(),
                                 span: mesh_syntax::Span {
@@ -504,32 +577,44 @@ fn lowers_an_object_expression_flattening_the_key() {
 
     assert_eq!(
         ir.attributes[0].value,
-        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Object(vec![
-            mesh_semantic::ObjectMember {
-                key: "name".to_string(),
-                value: mesh_semantic::Expression::Literal(mesh_semantic::Literal::String(
-                    "Users".to_string()
-                )),
-            },
-            mesh_semantic::ObjectMember {
-                key: "a-b".to_string(),
-                value: mesh_semantic::Expression::Literal(mesh_semantic::Literal::Number(
-                    "1".to_string()
-                )),
-            },
-        ]))
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Object {
+            members: vec![
+                mesh_semantic::ObjectMember {
+                    key: "name".to_string(),
+                    value: mesh_semantic::Expression::Literal {
+                        value: mesh_semantic::Literal::String("Users".to_string()),
+                        span: NO_SPAN
+                    },
+                    key_span: NO_SPAN,
+                    span: NO_SPAN,
+                },
+                mesh_semantic::ObjectMember {
+                    key: "a-b".to_string(),
+                    value: mesh_semantic::Expression::Literal {
+                        value: mesh_semantic::Literal::Number("1".to_string()),
+                        span: NO_SPAN
+                    },
+                    key_span: NO_SPAN,
+                    span: NO_SPAN,
+                },
+            ],
+            span: NO_SPAN
+        })
     );
 }
 
 #[test]
 fn lowers_a_command_invocation() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "page".to_string(),
         closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: "action".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::Command(
                 mesh_syntax::CommandInvocation {
+                    command_span: NO_SPAN,
                     command: "selectUser".to_string(),
                     arguments: vec![mesh_syntax::Expression::EventValue(
                         mesh_syntax::EventValue {
@@ -565,7 +650,12 @@ fn lowers_a_command_invocation() {
         ir.attributes[0].value,
         mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Command {
             command: "selectUser".to_string(),
-            arguments: vec![mesh_semantic::Expression::EventValue("event".to_string())],
+            arguments: vec![mesh_semantic::Expression::EventValue {
+                name: "event".to_string(),
+                span: NO_SPAN
+            }],
+            command_span: NO_SPAN,
+            span: NO_SPAN,
         })
     );
 }
@@ -573,9 +663,11 @@ fn lowers_a_command_invocation() {
 #[test]
 fn lowers_an_event_value() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "page".to_string(),
         closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: "handler".to_string(),
             value: mesh_syntax::AttributeValue::Expression(mesh_syntax::Expression::EventValue(
                 mesh_syntax::EventValue {
@@ -603,15 +695,17 @@ fn lowers_an_event_value() {
 
     assert_eq!(
         ir.attributes[0].value,
-        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::EventValue(
-            "event".to_string()
-        ))
+        mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::EventValue {
+            name: "event".to_string(),
+            span: NO_SPAN
+        })
     );
 }
 
 #[test]
 fn omits_whitespace_only_text_children_from_the_ir() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: Some("div".to_string()),
         attributes: vec![],
@@ -643,13 +737,17 @@ fn omits_whitespace_only_text_children_from_the_ir() {
     assert_eq!(ir.children.len(), 1);
     assert_eq!(
         ir.children[0],
-        mesh_semantic::Child::Text("Hello".to_string())
+        mesh_semantic::Child::Text {
+            value: "Hello".to_string(),
+            span: NO_SPAN
+        }
     );
 }
 
 #[test]
 fn preserves_meaningful_text_verbatim_including_internal_whitespace() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: Some("div".to_string()),
         attributes: vec![],
@@ -671,19 +769,24 @@ fn preserves_meaningful_text_verbatim_including_internal_whitespace() {
 
     assert_eq!(
         ir.children[0],
-        mesh_semantic::Child::Text("Hello     world".to_string())
+        mesh_semantic::Child::Text {
+            value: "Hello     world".to_string(),
+            span: NO_SPAN
+        }
     );
 }
 
 #[test]
 fn lowers_a_nested_element() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: Some("div".to_string()),
         attributes: vec![],
         event_bindings: vec![],
         children: vec![mesh_syntax::Child::Element(Box::new(
             mesh_syntax::Element {
+                name_span: NO_SPAN,
                 name: "span".to_string(),
                 closing_name: Some("span".to_string()),
                 attributes: vec![],
@@ -715,7 +818,10 @@ fn lowers_a_nested_element() {
             assert_eq!(inner.name, "span");
             assert_eq!(
                 inner.children[0],
-                mesh_semantic::Child::Text("A".to_string())
+                mesh_semantic::Child::Text {
+                    value: "A".to_string(),
+                    span: NO_SPAN
+                }
             );
         }
         other => panic!("expected an element child, got {other:?}"),
@@ -725,10 +831,12 @@ fn lowers_a_nested_element() {
 #[test]
 fn lowers_an_event_binding() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: None,
         attributes: vec![],
         event_bindings: vec![mesh_syntax::EventBinding {
+            name_span: NO_SPAN,
             name: "click".to_string(),
             handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "handler".to_string(),
@@ -755,7 +863,7 @@ fn lowers_an_event_binding() {
     assert_eq!(element.event_bindings.len(), 1);
     assert_eq!(element.event_bindings[0].name, "click");
     match &element.event_bindings[0].handler {
-        mesh_semantic::Expression::Reference(reference) => assert_eq!(reference, "handler"),
+        mesh_semantic::Expression::Reference { name, .. } => assert_eq!(name, "handler"),
         other => panic!("expected a reference expression handler, got {other:?}"),
     }
 }
@@ -769,6 +877,7 @@ fn duplicate_attributes_keep_the_last_occurrence_and_warn_about_earlier_ones() {
         end_byte: usize,
     ) -> mesh_syntax::Attribute {
         mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: name.to_string(),
             value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
                 value: value.to_string(),
@@ -785,6 +894,7 @@ fn duplicate_attributes_keep_the_last_occurrence_and_warn_about_earlier_ones() {
     }
 
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: None,
         attributes: vec![
@@ -842,6 +952,7 @@ fn surviving_attributes_are_ordered_by_their_winning_occurrence_not_first_encoun
         end_byte: usize,
     ) -> mesh_syntax::Attribute {
         mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: name.to_string(),
             value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
                 value: value.to_string(),
@@ -865,6 +976,7 @@ fn surviving_attributes_are_ordered_by_their_winning_occurrence_not_first_encoun
     // (pos 4) comes after title's only occurrence (pos 3) — this is the
     // case that actually distinguishes the two orderings.
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: None,
         attributes: vec![
@@ -888,13 +1000,13 @@ fn surviving_attributes_are_ordered_by_their_winning_occurrence_not_first_encoun
     assert_eq!(element.attributes.len(), 3);
     assert_eq!(element.attributes[0].name, "class");
     match &element.attributes[0].value {
-        mesh_semantic::AttributeValue::String(value) => assert_eq!(value, "b"),
+        mesh_semantic::AttributeValue::String { value, .. } => assert_eq!(value, "b"),
         other => panic!("expected a string attribute value, got {other:?}"),
     }
     assert_eq!(element.attributes[1].name, "title");
     assert_eq!(element.attributes[2].name, "id");
     match &element.attributes[2].value {
-        mesh_semantic::AttributeValue::String(value) => assert_eq!(value, "z"),
+        mesh_semantic::AttributeValue::String { value, .. } => assert_eq!(value, "z"),
         other => panic!("expected a string attribute value, got {other:?}"),
     }
 
@@ -929,6 +1041,7 @@ fn surviving_attributes_are_ordered_by_their_winning_occurrence_not_first_encoun
 fn duplicate_event_bindings_keep_the_last_occurrence_and_warn_about_earlier_ones() {
     fn event_binding(name: &str, start_byte: usize, end_byte: usize) -> mesh_syntax::EventBinding {
         mesh_syntax::EventBinding {
+            name_span: NO_SPAN,
             name: name.to_string(),
             handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "handler".to_string(),
@@ -945,6 +1058,7 @@ fn duplicate_event_bindings_keep_the_last_occurrence_and_warn_about_earlier_ones
     }
 
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: None,
         attributes: vec![],
@@ -977,9 +1091,11 @@ fn duplicate_event_bindings_keep_the_last_occurrence_and_warn_about_earlier_ones
 #[test]
 fn an_attribute_and_an_event_binding_with_the_same_name_do_not_collide() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: None,
         attributes: vec![mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: "click".to_string(),
             value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
                 value: "x".to_string(),
@@ -994,6 +1110,7 @@ fn an_attribute_and_an_event_binding_with_the_same_name_do_not_collide() {
             },
         }],
         event_bindings: vec![mesh_syntax::EventBinding {
+            name_span: NO_SPAN,
             name: "click".to_string(),
             handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "handler".to_string(),
@@ -1026,6 +1143,7 @@ fn an_attribute_and_an_event_binding_with_the_same_name_do_not_collide() {
 fn a_nested_child_s_duplicate_event_binding_diagnostic_propagates_to_the_parent_result() {
     fn event_binding(name: &str, start_byte: usize, end_byte: usize) -> mesh_syntax::EventBinding {
         mesh_syntax::EventBinding {
+            name_span: NO_SPAN,
             name: name.to_string(),
             handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "handler".to_string(),
@@ -1042,6 +1160,7 @@ fn a_nested_child_s_duplicate_event_binding_diagnostic_propagates_to_the_parent_
     }
 
     let child = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "button".to_string(),
         closing_name: None,
         attributes: vec![],
@@ -1057,6 +1176,7 @@ fn a_nested_child_s_duplicate_event_binding_diagnostic_propagates_to_the_parent_
     };
 
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: None,
         attributes: vec![],
@@ -1098,6 +1218,7 @@ fn a_nested_child_s_duplicate_event_binding_diagnostic_propagates_to_the_parent_
 #[test]
 fn mismatched_closing_tag_produces_a_non_fatal_error_diagnostic_and_still_lowers() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: Some("span".to_string()),
         attributes: vec![],
@@ -1127,6 +1248,7 @@ fn mismatched_closing_tag_produces_a_non_fatal_error_diagnostic_and_still_lowers
 #[test]
 fn self_closing_elements_are_never_tag_mismatch_checked() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: None,
         attributes: vec![],
@@ -1145,6 +1267,7 @@ fn self_closing_elements_are_never_tag_mismatch_checked() {
 #[test]
 fn matching_closing_tag_produces_no_diagnostics() {
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: Some("div".to_string()),
         attributes: vec![],
@@ -1169,6 +1292,7 @@ fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
         end_byte: usize,
     ) -> mesh_syntax::Attribute {
         mesh_syntax::Attribute {
+            name_span: NO_SPAN,
             name: name.to_string(),
             value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
                 value: value.to_string(),
@@ -1186,6 +1310,7 @@ fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
 
     fn event_binding(name: &str, start_byte: usize, end_byte: usize) -> mesh_syntax::EventBinding {
         mesh_syntax::EventBinding {
+            name_span: NO_SPAN,
             name: name.to_string(),
             handler: mesh_syntax::Expression::Reference(mesh_syntax::Reference {
                 name: "handler".to_string(),
@@ -1203,6 +1328,7 @@ fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
 
     // Child: one duplicate attribute only (id="x" shadowed by id="y").
     let child = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "button".to_string(),
         closing_name: None,
         attributes: vec![
@@ -1221,6 +1347,7 @@ fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
     // closing tag, and one nested child (above) with its own duplicate
     // attribute.
     let ast = mesh_syntax::Element {
+        name_span: NO_SPAN,
         name: "div".to_string(),
         closing_name: Some("span".to_string()),
         attributes: vec![
@@ -1338,4 +1465,208 @@ fn diagnostics_are_ordered_depth_first_pre_order_across_all_three_rules() {
             end_byte: 11
         }
     );
+}
+
+/// A distinct span per construct, so the test can tell them apart.
+fn at(start_byte: usize) -> Span {
+    Span {
+        start_byte,
+        end_byte: start_byte + 1,
+    }
+}
+
+#[test]
+fn copies_every_span_from_the_ast() {
+    let ast = mesh_syntax::Element {
+        name: "page".to_string(),
+        name_span: at(1),
+        closing_name: Some("page".to_string()),
+        attributes: vec![mesh_syntax::Attribute {
+            name: "title".to_string(),
+            name_span: at(2),
+            value: mesh_syntax::AttributeValue::String(mesh_syntax::StringLiteral {
+                value: "Users".to_string(),
+                span: at(3),
+            }),
+            span: at(4),
+        }],
+        event_bindings: vec![mesh_syntax::EventBinding {
+            name: "click".to_string(),
+            name_span: at(5),
+            handler: mesh_syntax::Expression::Command(mesh_syntax::CommandInvocation {
+                command: "go".to_string(),
+                command_span: at(6),
+                arguments: vec![mesh_syntax::Expression::MemberAccess(
+                    mesh_syntax::MemberAccess {
+                        object: Box::new(mesh_syntax::Expression::Reference(
+                            mesh_syntax::Reference {
+                                name: "a".to_string(),
+                                span: at(7),
+                            },
+                        )),
+                        property: "b".to_string(),
+                        property_span: at(8),
+                        span: at(9),
+                    },
+                )],
+                span: at(10),
+            }),
+            span: at(11),
+        }],
+        children: vec![
+            mesh_syntax::Child::Text(mesh_syntax::Text {
+                value: "  ".to_string(),
+                span: at(12),
+            }),
+            mesh_syntax::Child::Text(mesh_syntax::Text {
+                value: "Hi".to_string(),
+                span: at(13),
+            }),
+            mesh_syntax::Child::Expression(mesh_syntax::Expression::Object(
+                mesh_syntax::ObjectExpression {
+                    members: vec![mesh_syntax::ObjectMember {
+                        key: mesh_syntax::ObjectKey::Identifier("k".to_string()),
+                        key_span: at(14),
+                        value: mesh_syntax::Expression::Literal(mesh_syntax::Literal::Null(
+                            mesh_syntax::NullLiteral { span: at(15) },
+                        )),
+                        span: at(16),
+                    }],
+                    span: at(17),
+                },
+            )),
+        ],
+        span: at(18),
+    };
+
+    let ir = mesh_semantic::lower(&ast).ir.expect("should produce IR");
+
+    assert_eq!(
+        ir,
+        mesh_semantic::Element {
+            name: "page".to_string(),
+            name_span: at(1),
+            attributes: vec![mesh_semantic::Attribute {
+                name: "title".to_string(),
+                name_span: at(2),
+                value: mesh_semantic::AttributeValue::String {
+                    value: "Users".to_string(),
+                    span: at(3),
+                },
+                span: at(4),
+            }],
+            event_bindings: vec![mesh_semantic::EventBinding {
+                name: "click".to_string(),
+                name_span: at(5),
+                handler: mesh_semantic::Expression::Command {
+                    command: "go".to_string(),
+                    command_span: at(6),
+                    arguments: vec![mesh_semantic::Expression::MemberAccess {
+                        object: Box::new(mesh_semantic::Expression::Reference {
+                            name: "a".to_string(),
+                            span: at(7),
+                        }),
+                        property: "b".to_string(),
+                        property_span: at(8),
+                        span: at(9),
+                    }],
+                    span: at(10),
+                },
+                span: at(11),
+            }],
+            // The whitespace-only text at(12) is dropped; the rest keep
+            // their spans.
+            children: vec![
+                mesh_semantic::Child::Text {
+                    value: "Hi".to_string(),
+                    span: at(13),
+                },
+                mesh_semantic::Child::Expression(mesh_semantic::Expression::Object {
+                    members: vec![mesh_semantic::ObjectMember {
+                        key: "k".to_string(),
+                        key_span: at(14),
+                        value: mesh_semantic::Expression::Literal {
+                            value: mesh_semantic::Literal::Null,
+                            span: at(15),
+                        },
+                        span: at(16),
+                    }],
+                    span: at(17),
+                }),
+            ],
+            span: at(18),
+        }
+    );
+}
+
+#[test]
+fn expression_span_reads_the_span_of_every_variant() {
+    use mesh_semantic::{Expression, Literal};
+
+    let leaf = || {
+        Box::new(Expression::Reference {
+            name: "x".to_string(),
+            span: NO_SPAN,
+        })
+    };
+    let expressions = [
+        Expression::Literal {
+            value: Literal::Null,
+            span: at(1),
+        },
+        Expression::Reference {
+            name: "x".to_string(),
+            span: at(2),
+        },
+        Expression::MemberAccess {
+            object: leaf(),
+            property: "y".to_string(),
+            property_span: NO_SPAN,
+            span: at(3),
+        },
+        Expression::Unary {
+            operator: mesh_syntax::UnaryOperator::Not,
+            operand: leaf(),
+            span: at(4),
+        },
+        Expression::Binary {
+            operator: mesh_syntax::BinaryOperator::Add,
+            left: leaf(),
+            right: leaf(),
+            span: at(5),
+        },
+        Expression::Conditional {
+            condition: leaf(),
+            consequent: leaf(),
+            alternate: leaf(),
+            span: at(6),
+        },
+        Expression::Array {
+            elements: vec![],
+            span: at(7),
+        },
+        Expression::Object {
+            members: vec![],
+            span: at(8),
+        },
+        Expression::Command {
+            command: "go".to_string(),
+            command_span: NO_SPAN,
+            arguments: vec![],
+            span: at(9),
+        },
+        Expression::EventValue {
+            name: "event".to_string(),
+            span: at(10),
+        },
+    ];
+
+    for (index, expression) in expressions.iter().enumerate() {
+        assert_eq!(expression.span(), at(index + 1), "{expression:?}");
+    }
+    let value = mesh_semantic::AttributeValue::String {
+        value: "s".to_string(),
+        span: at(11),
+    };
+    assert_eq!(value.span(), at(11));
 }

@@ -6,21 +6,35 @@
 //! resolve component/prop/binding references against an external component
 //! model — that requires a typed component model that doesn't exist yet.
 
-/// The Semantic IR form of an [`mesh_syntax::Element`] — structurally
-/// identical to the AST for v0.1, since no resolution happens yet.
+use mesh_syntax::Span;
+
+/// The Semantic IR form of an [`mesh_syntax::Element`].
+///
+/// Every IR node carries the source [`Span`]s a diagnostic may need to
+/// point at: `span` covers the whole construct, and a separate `*_span`
+/// field covers each name that can be wrong on its own. Spans are byte
+/// offsets into the source exactly as read, a leading BOM included.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
     pub name: String,
+    /// The opening tag's name, e.g. `user-card` in `<user-card ...>`.
+    pub name_span: Span,
     pub attributes: Vec<Attribute>,
     pub event_bindings: Vec<EventBinding>,
     pub children: Vec<Child>,
+    /// The whole element, from `<` to its closing `>` or `/>`.
+    pub span: Span,
 }
 
 /// The Semantic IR form of an [`mesh_syntax::Attribute`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Attribute {
     pub name: String,
+    /// The attribute's name, without `=` or the value.
+    pub name_span: Span,
     pub value: AttributeValue,
+    /// The whole `name=value`.
+    pub span: Span,
 }
 
 /// The Semantic IR form of an [`mesh_syntax::EventBinding`]. `name` holds
@@ -29,27 +43,43 @@ pub struct Attribute {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventBinding {
     pub name: String,
+    /// The event name after `on.`, e.g. `click` in `on.click={...}`.
+    pub name_span: Span,
     pub handler: Expression,
+    /// The whole `on.name={handler}`.
+    pub span: Span,
 }
 
-/// The Semantic IR form of an [`mesh_syntax::AttributeValue`]. Unlike the
-/// AST's `String(StringLiteral)`, the string case here is a plain `String`
-/// — source spans are AST-only and don't carry into the IR.
+/// The Semantic IR form of an [`mesh_syntax::AttributeValue`]. A string
+/// value is decoded; its `span` covers the quoted source text, quotes
+/// included.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttributeValue {
-    String(String),
+    String { value: String, span: Span },
     Expression(Expression),
+}
+
+impl AttributeValue {
+    /// The value's source span: the quoted string, or the expression
+    /// inside `{...}`.
+    pub fn span(&self) -> Span {
+        match self {
+            AttributeValue::String { span, .. } => *span,
+            AttributeValue::Expression(expression) => expression.span(),
+        }
+    }
 }
 
 /// The Semantic IR form of an [`mesh_syntax::Child`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Child {
-    Text(String),
+    Text { value: String, span: Span },
     Expression(Expression),
     Element(Box<Element>),
 }
 
-/// The Semantic IR form of an [`mesh_syntax::Literal`].
+/// The Semantic IR form of an [`mesh_syntax::Literal`]: the value only.
+/// Its span is on the enclosing [`Expression::Literal`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Literal {
     String(String),
@@ -65,43 +95,95 @@ pub enum Literal {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjectMember {
     pub key: String,
+    /// The key as written: the bare identifier, or the quoted string
+    /// including its quotes.
+    pub key_span: Span,
     pub value: Expression,
+    /// The whole `key: value`.
+    pub span: Span,
 }
 
 /// The Semantic IR form of an [`mesh_syntax::Expression`]. `Unary` and
 /// `Binary` reuse [`mesh_syntax::UnaryOperator`]/[`mesh_syntax::BinaryOperator`]
-/// directly rather than redeclaring an IR-local copy — those enums carry
-/// no [`mesh_syntax::Span`] to strip, unlike every other AST type mirrored
-/// here.
+/// directly rather than redeclaring an IR-local copy.
+///
+/// Every variant has a `span` field covering the whole expression, so
+/// `Expression::Reference { name, .. }` matches without naming it, and
+/// [`Expression::span`] reads it from any variant. A parenthesized
+/// expression has no node of its own, and its span excludes the
+/// parentheses.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
-    Literal(Literal),
-    Reference(String),
+    Literal {
+        value: Literal,
+        span: Span,
+    },
+    Reference {
+        name: String,
+        span: Span,
+    },
     MemberAccess {
         object: Box<Expression>,
         property: String,
+        /// The property name after the `.`.
+        property_span: Span,
+        span: Span,
     },
     Unary {
         operator: mesh_syntax::UnaryOperator,
         operand: Box<Expression>,
+        span: Span,
     },
     Binary {
         operator: mesh_syntax::BinaryOperator,
         left: Box<Expression>,
         right: Box<Expression>,
+        span: Span,
     },
     Conditional {
         condition: Box<Expression>,
         consequent: Box<Expression>,
         alternate: Box<Expression>,
+        span: Span,
     },
-    Array(Vec<Expression>),
-    Object(Vec<ObjectMember>),
+    Array {
+        elements: Vec<Expression>,
+        span: Span,
+    },
+    Object {
+        members: Vec<ObjectMember>,
+        span: Span,
+    },
     Command {
         command: String,
+        /// The command's name, without the parentheses or arguments.
+        command_span: Span,
         arguments: Vec<Expression>,
+        span: Span,
     },
-    EventValue(String),
+    /// A `$` special value. `name` has no `$`: `$event` is `"event"`.
+    EventValue {
+        name: String,
+        span: Span,
+    },
+}
+
+impl Expression {
+    /// The span of the whole expression.
+    pub fn span(&self) -> Span {
+        match self {
+            Expression::Literal { span, .. }
+            | Expression::Reference { span, .. }
+            | Expression::MemberAccess { span, .. }
+            | Expression::Unary { span, .. }
+            | Expression::Binary { span, .. }
+            | Expression::Conditional { span, .. }
+            | Expression::Array { span, .. }
+            | Expression::Object { span, .. }
+            | Expression::Command { span, .. }
+            | Expression::EventValue { span, .. } => *span,
+        }
+    }
 }
 
 /// The result of lowering one AST [`mesh_syntax::Element`] into Semantic
@@ -150,9 +232,10 @@ fn dedupe_last_wins<'a, T>(
 
 /// Lowers an AST [`mesh_syntax::Element`] into its Semantic IR form.
 ///
-/// For v0.1 this drops source spans, deduplicates shadowed attributes and
-/// event bindings (last occurrence wins), and flags mismatched closing
-/// tags — it does not yet resolve references against a component model.
+/// This copies each node's source spans into the IR, deduplicates
+/// shadowed attributes and event bindings (last occurrence wins), and
+/// flags mismatched closing tags — it does not yet resolve references
+/// against a component model.
 /// `ir` is always `Some(..)`: no diagnostic in v0.1, regardless of
 /// severity, prevents producing IR for an AST that exists.
 pub fn lower(ast: &mesh_syntax::Element) -> LowerResult {
@@ -207,12 +290,14 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
 
     let element = Element {
         name: ast.name.clone(),
+        name_span: ast.name_span,
         attributes: attributes.into_iter().map(lower_attribute).collect(),
         event_bindings: event_bindings
             .into_iter()
             .map(lower_event_binding)
             .collect(),
         children,
+        span: ast.span,
     };
 
     (element, diagnostics)
@@ -221,22 +306,27 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
 fn lower_attribute(attribute: &mesh_syntax::Attribute) -> Attribute {
     Attribute {
         name: attribute.name.clone(),
+        name_span: attribute.name_span,
         value: lower_attribute_value(&attribute.value),
+        span: attribute.span,
     }
 }
 
 fn lower_event_binding(binding: &mesh_syntax::EventBinding) -> EventBinding {
     EventBinding {
         name: binding.name.clone(),
+        name_span: binding.name_span,
         handler: lower_expression(&binding.handler),
+        span: binding.span,
     }
 }
 
 fn lower_attribute_value(value: &mesh_syntax::AttributeValue) -> AttributeValue {
     match value {
-        mesh_syntax::AttributeValue::String(literal) => {
-            AttributeValue::String(literal.value.clone())
-        }
+        mesh_syntax::AttributeValue::String(literal) => AttributeValue::String {
+            value: literal.value.clone(),
+            span: literal.span,
+        },
         mesh_syntax::AttributeValue::Expression(expression) => {
             AttributeValue::Expression(lower_expression(expression))
         }
@@ -251,7 +341,13 @@ fn lower_attribute_value(value: &mesh_syntax::AttributeValue) -> AttributeValue 
 fn lower_child(child: &mesh_syntax::Child) -> (Option<Child>, Vec<mesh_syntax::Diagnostic>) {
     match child {
         mesh_syntax::Child::Text(text) if text.value.trim().is_empty() => (None, Vec::new()),
-        mesh_syntax::Child::Text(text) => (Some(Child::Text(text.value.clone())), Vec::new()),
+        mesh_syntax::Child::Text(text) => (
+            Some(Child::Text {
+                value: text.value.clone(),
+                span: text.span,
+            }),
+            Vec::new(),
+        ),
         mesh_syntax::Child::Expression(expression) => (
             Some(Child::Expression(lower_expression(expression))),
             Vec::new(),
@@ -268,46 +364,64 @@ fn lower_child(child: &mesh_syntax::Child) -> (Option<Child>, Vec<mesh_syntax::D
 
 fn lower_expression(expression: &mesh_syntax::Expression) -> Expression {
     match expression {
-        mesh_syntax::Expression::Literal(literal) => Expression::Literal(lower_literal(literal)),
-        mesh_syntax::Expression::Reference(reference) => {
-            Expression::Reference(reference.name.clone())
-        }
+        mesh_syntax::Expression::Literal(literal) => Expression::Literal {
+            value: lower_literal(literal),
+            span: literal_span(literal),
+        },
+        mesh_syntax::Expression::Reference(reference) => Expression::Reference {
+            name: reference.name.clone(),
+            span: reference.span,
+        },
         mesh_syntax::Expression::MemberAccess(member) => Expression::MemberAccess {
             object: Box::new(lower_expression(&member.object)),
             property: member.property.clone(),
+            property_span: member.property_span,
+            span: member.span,
         },
         mesh_syntax::Expression::Unary(unary) => Expression::Unary {
             operator: unary.operator,
             operand: Box::new(lower_expression(&unary.operand)),
+            span: unary.span,
         },
         mesh_syntax::Expression::Binary(binary) => Expression::Binary {
             operator: binary.operator,
             left: Box::new(lower_expression(&binary.left)),
             right: Box::new(lower_expression(&binary.right)),
+            span: binary.span,
         },
         mesh_syntax::Expression::Conditional(conditional) => Expression::Conditional {
             condition: Box::new(lower_expression(&conditional.condition)),
             consequent: Box::new(lower_expression(&conditional.consequent)),
             alternate: Box::new(lower_expression(&conditional.alternate)),
+            span: conditional.span,
         },
-        mesh_syntax::Expression::Array(array) => {
-            Expression::Array(array.elements.iter().map(lower_expression).collect())
-        }
-        mesh_syntax::Expression::Object(object) => {
-            Expression::Object(object.members.iter().map(lower_object_member).collect())
-        }
+        mesh_syntax::Expression::Array(array) => Expression::Array {
+            elements: array.elements.iter().map(lower_expression).collect(),
+            span: array.span,
+        },
+        mesh_syntax::Expression::Object(object) => Expression::Object {
+            members: object.members.iter().map(lower_object_member).collect(),
+            span: object.span,
+        },
         mesh_syntax::Expression::Command(command) => Expression::Command {
             command: command.command.clone(),
+            command_span: command.command_span,
             arguments: command.arguments.iter().map(lower_expression).collect(),
+            span: command.span,
         },
-        mesh_syntax::Expression::EventValue(event) => Expression::EventValue(event.name.clone()),
+        mesh_syntax::Expression::EventValue(event) => Expression::EventValue {
+            name: event.name.clone(),
+            span: event.span,
+        },
     }
 }
 
 fn lower_object_member(member: &mesh_syntax::ObjectMember) -> ObjectMember {
     ObjectMember {
         key: lower_object_key(&member.key),
+        key_span: member.key_span,
         value: lower_expression(&member.value),
+        span: member.span,
     }
 }
 
@@ -324,5 +438,14 @@ fn lower_literal(literal: &mesh_syntax::Literal) -> Literal {
         mesh_syntax::Literal::Number(n) => Literal::Number(n.value.clone()),
         mesh_syntax::Literal::Boolean(b) => Literal::Boolean(b.value),
         mesh_syntax::Literal::Null(_) => Literal::Null,
+    }
+}
+
+fn literal_span(literal: &mesh_syntax::Literal) -> Span {
+    match literal {
+        mesh_syntax::Literal::String(s) => s.span,
+        mesh_syntax::Literal::Number(n) => n.span,
+        mesh_syntax::Literal::Boolean(b) => b.span,
+        mesh_syntax::Literal::Null(n) => n.span,
     }
 }
