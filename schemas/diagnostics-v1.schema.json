@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/diagnostics-v1.schema.json",
+  "title": "MESH diagnostics, version 1",
+  "description": "What `mesh check --format json` prints on stdout: one document, on one line, holding every diagnostic of the run in the order MESH reports them. This schema lists exactly the properties this MESH prints. A later MESH may add properties without changing `version`, so consumers should ignore properties they don't know rather than validate against an older copy of this schema.",
+  "type": "object",
+  "properties": {
+    "version": { "const": 1 },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    }
+  },
+  "required": ["version", "diagnostics"],
+  "additionalProperties": false,
+  "$defs": {
+    "diagnostic": {
+      "type": "object",
+      "properties": {
+        "severity": {
+          "description": "`error` fails the check; `warning` doesn't.",
+          "enum": ["error", "warning"]
+        },
+        "code": {
+          "description": "The diagnostic's stable code, in kebab-case. A code is never renamed or reused for a different meaning; new codes may be added.",
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "message": {
+          "description": "A human-readable message. It may change between versions; match on `code`, not on this.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The file the span points into, exactly as it was passed on the command line: the `.mprx` file, or the `--model` manifest for a `manifest-*` code.",
+          "type": "string"
+        },
+        "span": { "$ref": "#/$defs/span" },
+        "suggestions": {
+          "description": "Replacements that would probably fix the problem, best first. Usually empty.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/suggestion" }
+        }
+      },
+      "required": ["severity", "code", "message", "path", "span", "suggestions"],
+      "additionalProperties": false
+    },
+    "suggestion": {
+      "type": "object",
+      "properties": {
+        "replacement": {
+          "description": "The text to put in place of `span`.",
+          "type": "string"
+        },
+        "span": { "$ref": "#/$defs/span" }
+      },
+      "required": ["replacement", "span"],
+      "additionalProperties": false
+    },
+    "span": {
+      "description": "A source range: `start` is its first character, and `end` is just past its last.",
+      "type": "object",
+      "properties": {
+        "start": { "$ref": "#/$defs/position" },
+        "end": { "$ref": "#/$defs/position" }
+      },
+      "required": ["start", "end"],
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "object",
+      "properties": {
+        "byte": {
+          "description": "A 0-based byte offset into the file's UTF-8 text, a byte-order mark included.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "line": {
+          "description": "The 1-based line.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "description": "The 1-based column, counting Unicode scalar values from the start of the line. A byte-order mark and a line's `\\r` are not columns.",
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": ["byte", "line", "column"],
+      "additionalProperties": false
+    }
+  }
+}

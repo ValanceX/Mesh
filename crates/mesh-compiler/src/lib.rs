@@ -8,9 +8,11 @@
 //! layer turns what analysis found into diagnostics.
 
 mod diagnose;
+mod json;
 mod position;
 mod render;
 
+pub use json::render_json;
 pub use render::render_diagnostic;
 
 /// The result of compiling one MPRX source file: the Semantic IR, if
