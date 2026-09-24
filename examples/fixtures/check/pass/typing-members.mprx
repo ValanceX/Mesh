@@ -1,0 +1,3 @@
+<page title={user.name}>
+  <text>{user.avatar} {layout.compact} {users} {anything.deeply.nested}</text>
+</page>

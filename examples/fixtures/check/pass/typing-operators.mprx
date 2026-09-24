@@ -1,0 +1,1 @@
+<text>{-count * 2 + 1} {count >= 10 && !flag || anything} {!anything} {-anything}</text>

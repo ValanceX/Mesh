@@ -4,8 +4,10 @@
 //! and computes suggestions. Analysis reports what it found and which
 //! names were available; this layer decides how to say it.
 
-use mesh_analysis::Fact;
-use mesh_syntax::{Diagnostic, DiagnosticCode, Severity, Span, Suggestion};
+use mesh_analysis::{Combination, Expectation, Fact, Operator};
+use mesh_syntax::{
+    BinaryOperator, Diagnostic, DiagnosticCode, Severity, Span, Suggestion, UnaryOperator,
+};
 
 /// The diagnostic for `fact`. Every analysis fact is an error.
 pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
@@ -118,6 +120,70 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
             format!("unknown special value `${name}`: the only one is `$event`"),
             suggest(name, candidates, *span, "$"),
         ),
+        Fact::UnknownMember {
+            object,
+            property,
+            span,
+            candidates,
+        } => (
+            DiagnosticCode::UNKNOWN_MEMBER,
+            format!("{object} has no member {property:?}"),
+            suggest(property, candidates, *span, ""),
+        ),
+        Fact::PossiblyAbsentAccess {
+            object, property, ..
+        } => (
+            DiagnosticCode::POSSIBLY_ABSENT_ACCESS,
+            format!(
+                "this value may be absent (its type is {object}), so its member {property:?} can't be read; MPRX has no optional chaining"
+            ),
+            Vec::new(),
+        ),
+        Fact::TypeMismatch {
+            expectation,
+            expected,
+            actual,
+            possibly_absent,
+            ..
+        } => (
+            DiagnosticCode::TYPE_MISMATCH,
+            format!(
+                "{} needs {expected}, found {actual}{}",
+                expecting(expectation),
+                if *possibly_absent {
+                    ", which may be absent"
+                } else {
+                    ""
+                }
+            ),
+            Vec::new(),
+        ),
+        Fact::NoCommonType {
+            combination,
+            left,
+            right,
+            ..
+        } => (
+            DiagnosticCode::NO_COMMON_TYPE,
+            match combination {
+                Combination::Branches => {
+                    format!("the branches have no common type: {left} and {right}")
+                }
+                Combination::Elements => format!(
+                    "this element doesn't fit with the ones before it: {left} and {right} have no common type"
+                ),
+                Combination::Equality(operator) => format!(
+                    "`{}` compares {left} with {right}, which have no common type",
+                    binary(*operator)
+                ),
+            },
+            Vec::new(),
+        ),
+        Fact::DuplicateObjectKey { key, .. } => (
+            DiagnosticCode::DUPLICATE_OBJECT_KEY,
+            format!("duplicate object key {key:?}: this occurrence is shadowed by a later one"),
+            Vec::new(),
+        ),
     };
     Diagnostic {
         severity: Severity::Error,
@@ -125,6 +191,44 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
         message,
         span: fact.span(),
         suggestions,
+    }
+}
+
+/// What expected a type, as the start of a sentence.
+fn expecting(expectation: &Expectation) -> String {
+    match expectation {
+        Expectation::Operand(Operator::Unary(operator)) => {
+            format!("the operand of `{}`", unary(*operator))
+        }
+        Expectation::Operand(Operator::Binary(operator)) => {
+            format!("an operand of `{}`", binary(*operator))
+        }
+        Expectation::Condition => "the condition".to_string(),
+    }
+}
+
+fn unary(operator: UnaryOperator) -> &'static str {
+    match operator {
+        UnaryOperator::Not => "!",
+        UnaryOperator::Negate => "-",
+    }
+}
+
+fn binary(operator: BinaryOperator) -> &'static str {
+    match operator {
+        BinaryOperator::Mul => "*",
+        BinaryOperator::Div => "/",
+        BinaryOperator::Mod => "%",
+        BinaryOperator::Add => "+",
+        BinaryOperator::Sub => "-",
+        BinaryOperator::Lt => "<",
+        BinaryOperator::Le => "<=",
+        BinaryOperator::Gt => ">",
+        BinaryOperator::Ge => ">=",
+        BinaryOperator::Eq => "==",
+        BinaryOperator::Ne => "!=",
+        BinaryOperator::And => "&&",
+        BinaryOperator::Or => "||",
     }
 }
 

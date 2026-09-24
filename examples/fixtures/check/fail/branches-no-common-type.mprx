@@ -1,0 +1,1 @@
+<text>{flag ? name : count}</text>

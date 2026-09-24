@@ -1,0 +1,5 @@
+error[possibly-absent-access]: this value may be absent (its type is User?), so its member "name" can't be read; MPRX has no optional chaining
+ --> fixtures/check/fail/possibly-absent-access.mprx:1:8
+  |
+1 | <text>{maybeUser.name}</text>
+  |        ^^^^^^^^^

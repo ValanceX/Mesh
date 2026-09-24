@@ -1,0 +1,6 @@
+error[unknown-member]: User has no member "nmae"
+ --> fixtures/check/fail/unknown-member.mprx:1:13
+  |
+1 | <text>{user.nmae}</text>
+  |             ^^^^
+  = help: did you mean "name"?

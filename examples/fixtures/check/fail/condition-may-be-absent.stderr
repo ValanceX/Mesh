@@ -1,0 +1,5 @@
+error[type-mismatch]: the condition needs boolean, found boolean?, which may be absent
+ --> fixtures/check/fail/condition-may-be-absent.mprx:1:8
+  |
+1 | <text>{maybeFlag ? "on" : "off"}</text>
+  |        ^^^^^^^^^

@@ -1,0 +1,5 @@
+error[no-common-type]: this element doesn't fit with the ones before it: string? and number have no common type
+ --> fixtures/check/fail/array-elements-no-common-type.mprx:1:26
+  |
+1 | <text>{[name, maybeName, count]}</text>
+  |                          ^^^^^

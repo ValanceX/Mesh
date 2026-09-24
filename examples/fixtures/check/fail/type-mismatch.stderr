@@ -1,0 +1,5 @@
+error[type-mismatch]: an operand of `+` needs number, found string
+ --> fixtures/check/fail/type-mismatch.mprx:1:16
+  |
+1 | <text>{count + name}</text>
+  |                ^^^^

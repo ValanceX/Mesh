@@ -138,6 +138,18 @@ impl DiagnosticCode {
     pub const EVENT_HAS_NO_PAYLOAD: DiagnosticCode = DiagnosticCode("event-has-no-payload");
     /// A `$` name other than `$event`.
     pub const UNKNOWN_SPECIAL_VALUE: DiagnosticCode = DiagnosticCode("unknown-special-value");
+    /// A member access on a record without that field, or on a value
+    /// that has no members.
+    pub const UNKNOWN_MEMBER: DiagnosticCode = DiagnosticCode("unknown-member");
+    /// A member access on a value that may be absent.
+    pub const POSSIBLY_ABSENT_ACCESS: DiagnosticCode = DiagnosticCode("possibly-absent-access");
+    /// A value whose type doesn't fit where it's used.
+    pub const TYPE_MISMATCH: DiagnosticCode = DiagnosticCode("type-mismatch");
+    /// Conditional branches, array elements or `==` operands with no
+    /// common type.
+    pub const NO_COMMON_TYPE: DiagnosticCode = DiagnosticCode("no-common-type");
+    /// An object literal that repeats a key.
+    pub const DUPLICATE_OBJECT_KEY: DiagnosticCode = DiagnosticCode("duplicate-object-key");
 
     /// Every code MESH can emit, in catalogue order. The diagnostics
     /// reference (`docs/manual/diagnostics.md`) documents each one, and a
@@ -179,6 +191,11 @@ impl DiagnosticCode {
         DiagnosticCode::EVENT_VALUE_OUTSIDE_HANDLER,
         DiagnosticCode::EVENT_HAS_NO_PAYLOAD,
         DiagnosticCode::UNKNOWN_SPECIAL_VALUE,
+        DiagnosticCode::UNKNOWN_MEMBER,
+        DiagnosticCode::POSSIBLY_ABSENT_ACCESS,
+        DiagnosticCode::TYPE_MISMATCH,
+        DiagnosticCode::NO_COMMON_TYPE,
+        DiagnosticCode::DUPLICATE_OBJECT_KEY,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -954,6 +971,11 @@ mod tests {
                 "event-value-outside-handler",
                 "event-has-no-payload",
                 "unknown-special-value",
+                "unknown-member",
+                "possibly-absent-access",
+                "type-mismatch",
+                "no-common-type",
+                "duplicate-object-key",
             ]
         );
     }

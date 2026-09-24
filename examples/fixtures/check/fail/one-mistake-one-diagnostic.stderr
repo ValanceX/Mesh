@@ -1,0 +1,6 @@
+error[unknown-reference]: unknown reference "usr": it isn't in the template's scope
+ --> fixtures/check/fail/one-mistake-one-diagnostic.mprx:1:8
+  |
+1 | <text>{usr.name + 1 > count}</text>
+  |        ^^^
+  = help: did you mean "user"?

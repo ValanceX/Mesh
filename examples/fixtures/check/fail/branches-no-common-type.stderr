@@ -1,0 +1,5 @@
+error[no-common-type]: the branches have no common type: string and number
+ --> fixtures/check/fail/branches-no-common-type.mprx:1:8
+  |
+1 | <text>{flag ? name : count}</text>
+  |        ^^^^^^^^^^^^^^^^^^^

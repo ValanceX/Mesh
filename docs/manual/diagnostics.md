@@ -459,7 +459,8 @@ With `--model`, a file that is valid MPRX is also checked against the manifest, 
 
 - every element is an instance of a component the manifest declares, and its attributes and `on.` bindings are that component's props and events;
 - every reference is a name in the template's `scope`, and every command is one of the template's `commands`;
-- commands and `$event` appear only where they may.
+- commands and `$event` appear only where they may;
+- every expression has a type, and the operators and conditionals in it are used with the types they need.
 
 Each mistake is reported once, at the name or expression that's wrong. When a declared name is close to the one written, a `help` line suggests it. A file with a syntax error isn't checked against the model.
 
@@ -645,6 +646,104 @@ error[unknown-special-value]: unknown special value `$evnt`: the only one is `$e
 
 **Fix:** write `$event`.
 
+### `unknown-member`
+
+A member access reads a field the value doesn't have: the record type has no such field, or the value isn't a record at all. Strings, numbers and lists have no members. Points at the member name.
+
+```text
+error[unknown-member]: User has no member "nmae"
+ --> examples/fixtures/check/fail/unknown-member.mprx:1:13
+  |
+1 | <text>{user.nmae}</text>
+  |             ^^^^
+  = help: did you mean "name"?
+```
+
+A value of type `any` has every member, and reading one gives `any`.
+
+**Fix:** correct the name, or declare the field in the record type.
+
+### `possibly-absent-access`
+
+A member access reads a field of a value that may be absent: its type is optional (`T?`), `any?` included. MPRX has no optional chaining and no presence test, so there is no way to read it safely. Points at the value.
+
+```text
+error[possibly-absent-access]: this value may be absent (its type is User?), so its member "name" can't be read; MPRX has no optional chaining
+ --> examples/fixtures/check/fail/possibly-absent-access.mprx:1:8
+  |
+1 | <text>{maybeUser.name}</text>
+  |        ^^^^^^^^^
+```
+
+Reading a field that is itself optional is fine: `user.avatar`, where `avatar` is declared `"required": false`, has type `string?`. It's reading *through* it, as in `user.avatar.length`, that fails.
+
+**Fix:** give the template a value that is always present, for example a scope name typed `User` rather than `User?`.
+
+### `type-mismatch`
+
+A value's type doesn't fit where it's used. Points at the value, and the message says what was needed and what was found.
+
+```text
+error[type-mismatch]: an operand of `+` needs number, found string
+ --> examples/fixtures/check/fail/type-mismatch.mprx:1:16
+  |
+1 | <text>{count + name}</text>
+  |                ^^^^
+```
+
+What each place needs:
+
+| Where | Needs |
+|---|---|
+| `!x`, `x && y`, `x \|\| y`, the condition of `c ? a : b` | `boolean` |
+| `-x`, `x + y`, `x - y`, `x * y`, `x / y`, `x % y`, `x < y`, `x <= y`, `x > y`, `x >= y` | `number` |
+
+`+` adds numbers only: there's no string concatenation. There are no implicit conversions either, so `"1"` isn't a number and `0` isn't `false`.
+
+A value of type `any` fits everywhere a present value does. A value that may be absent (`T?`, including `any?`) fits only where absence is allowed. When absence is the only reason it doesn't fit, the message ends with `which may be absent`:
+
+```text
+error[type-mismatch]: the condition needs boolean, found boolean?, which may be absent
+ --> examples/fixtures/check/fail/condition-may-be-absent.mprx:1:8
+  |
+1 | <text>{maybeFlag ? "on" : "off"}</text>
+  |        ^^^^^^^^^
+```
+
+**Fix:** use a value of the needed type.
+
+### `no-common-type`
+
+Two types that must have a common type don't: the operands of `==` or `!=`, the two branches of `c ? a : b`, or the elements of an array. Points at the comparison or conditional, or at the first array element that doesn't fit with the ones before it.
+
+```text
+error[no-common-type]: `==` compares string with number, which have no common type
+ --> examples/fixtures/check/fail/no-common-type.mprx:1:8
+  |
+1 | <text>{name == 1}</text>
+  |        ^^^^^^^^^
+```
+
+Equality is strict, with no conversions: a string never equals a number, so comparing them is a mistake rather than `false`. Two types have a common type when they are the same, when one is `any`, or when one is only optional where the other isn't: `string` and `string?` have the common type `string?`. `null` is a value, not absence, so `maybeName == null` compares `string?` with `null` and has no common type. An empty array `[]` fits with any list.
+
+**Fix:** compare or combine values of the same type.
+
+### `duplicate-object-key`
+
+An object literal has the same key more than once. As with a duplicate attribute, the last occurrence is the one that counts: each earlier one is reported, at its key.
+
+```text
+error[duplicate-object-key]: duplicate object key "first": this occurrence is shadowed by a later one
+ --> examples/fixtures/check/fail/duplicate-object-key.mprx:1:10
+  |
+1 | <text>{{ first: name, first: "Ada" }}</text>
+  |          ^^^^^
+```
+
+The shadowed value is still checked for its own mistakes, but it isn't part of the object, so it isn't checked against a record's field.
+
+**Fix:** remove or rename one of them.
+
 ---
 
 ## CLI errors
@@ -676,7 +775,8 @@ Without `--model`, MESH checks only that a file is well-formed MPRX. Unknown com
 
 With `--model`, these still pass `mesh check` even when they're wrong:
 
-- Type mismatches (`disabled={"yes"}`)
-- Members that don't exist (`user.nmae`)
+- A prop value of the wrong type (`disabled={"yes"}`)
+- A command argument or `$event` of the wrong type
+- An object literal whose fields don't match the record type it's given to
 
 That's the rest of v0.2.

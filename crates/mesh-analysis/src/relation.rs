@@ -2,7 +2,7 @@
 //! `join` (outline D9). Every check that compares types goes through
 //! these two functions; no checker has compatibility logic of its own.
 
-use crate::types::Ty;
+use crate::types::{FieldTy, Ty};
 use mesh_manifest::Manifest;
 
 /// `ty` with named references at its top level followed to their
@@ -21,6 +21,17 @@ pub(crate) fn optional(manifest: &Manifest, ty: Ty) -> Ty {
     match expand(manifest, &ty) {
         Ty::Optional(_) => ty,
         _ => Ty::Optional(Box::new(ty)),
+    }
+}
+
+/// The type a field's value has when it's read (outline D5: requiredness
+/// is erased on read). `f: T` reads as `T`; `f?: T`, `f: T?` and `f?: T?`
+/// all read as `T?`.
+pub(crate) fn read(manifest: &Manifest, field: &FieldTy) -> Ty {
+    if field.required {
+        field.ty.clone()
+    } else {
+        optional(manifest, field.ty.clone())
     }
 }
 
@@ -162,6 +173,26 @@ mod tests {
         assert_eq!(optional(&manifest, opt(Ty::String)), opt(Ty::String));
         assert_eq!(optional(&manifest, named("Alias")), named("Alias"));
         assert_eq!(optional(&manifest, named("Name")), opt(named("Name")));
+    }
+
+    #[test]
+    fn reading_a_field_erases_requiredness() {
+        let manifest = manifest();
+        let field = |ty: Ty, required: bool| FieldTy { ty, required };
+        assert_eq!(read(&manifest, &field(Ty::String, true)), Ty::String);
+        assert_eq!(read(&manifest, &field(Ty::String, false)), opt(Ty::String));
+        assert_eq!(
+            read(&manifest, &field(opt(Ty::String), true)),
+            opt(Ty::String)
+        );
+        assert_eq!(
+            read(&manifest, &field(opt(Ty::String), false)),
+            opt(Ty::String)
+        );
+        assert_eq!(
+            read(&manifest, &field(named("Maybe"), false)),
+            named("Maybe")
+        );
     }
 
     #[test]

@@ -1,0 +1,5 @@
+error[no-common-type]: `==` compares string? with null, which have no common type
+ --> fixtures/check/fail/equality-null-is-not-absence.mprx:1:8
+  |
+1 | <text>{maybeName == null}</text>
+  |        ^^^^^^^^^^^^^^^^^

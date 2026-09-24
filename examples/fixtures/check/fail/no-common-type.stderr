@@ -1,0 +1,5 @@
+error[no-common-type]: `==` compares string with number, which have no common type
+ --> fixtures/check/fail/no-common-type.mprx:1:8
+  |
+1 | <text>{name == 1}</text>
+  |        ^^^^^^^^^
