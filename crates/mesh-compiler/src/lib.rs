@@ -18,11 +18,22 @@ pub use render::render_diagnostic;
 pub use source_map::{ColumnUnit, LineColumn, SourceMap};
 
 /// The result of compiling one MPRX source file: the Semantic IR, if
-/// compilation succeeded, and every diagnostic produced along the way.
+/// compilation succeeded, every diagnostic produced along the way, and,
+/// when the file was checked against a component model, what analysis
+/// found.
+///
+/// It is `#[non_exhaustive]`: only this crate builds one, so a later
+/// field doesn't break code that reads it.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompileResult {
     pub ir: Option<mesh_semantic::Element>,
     pub diagnostics: Vec<mesh_syntax::Diagnostic>,
+    /// The analysis of `ir` against the template in [`CompileOptions`]:
+    /// its resolutions, types and facts. The analysis diagnostics in
+    /// `diagnostics` are exactly its facts, in order. `None` without a
+    /// template, or without IR (a file with a syntax error).
+    pub analysis: Option<mesh_analysis::Analysis>,
 }
 
 /// What a compile checks `source` against, beyond the MPRX language.
@@ -88,10 +99,18 @@ pub fn compile_with(source: &str, options: &CompileOptions<'_>) -> CompileResult
         None => None,
     };
 
-    if let (Some(ir), Some(template)) = (&ir, template) {
-        let analysis = mesh_analysis::analyze(ir, *template);
-        diagnostics.extend(analysis.facts().iter().map(diagnose::diagnostic));
-    }
+    let analysis = match (&ir, template) {
+        (Some(ir), Some(template)) => {
+            let analysis = mesh_analysis::analyze(ir, *template);
+            diagnostics.extend(analysis.facts().iter().map(diagnose::diagnostic));
+            Some(analysis)
+        }
+        _ => None,
+    };
 
-    CompileResult { ir, diagnostics }
+    CompileResult {
+        ir,
+        diagnostics,
+        analysis,
+    }
 }

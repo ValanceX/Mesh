@@ -20,6 +20,7 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ### Changed
 
+- **Breaking, Rust API: `CompileResult` keeps its analysis, and is `#[non_exhaustive]`.** `compile_with` used to analyze a file against its template and keep only the diagnostics. Its `CompileResult` now also has `analysis: Option<mesh_analysis::Analysis>`: the resolutions, types and facts the analysis diagnostics came from. It's `None` from `compile` and for a file with a syntax error. Code that builds a `CompileResult` or destructures every field must change; code that reads its fields by name doesn't. Being `#[non_exhaustive]`, the next field won't break anyone.
 - **The npm packages are renamed to the `@valance` scope:** `@valance/mesh-language`, `@valance/mesh-compiler` and `@valance/mesh-lsp`, with the Valance spelling. They are still unpublished placeholders. `@valance/mesh-lsp` no longer depends on a Node language server: it will only launch the Rust `mesh-lsp` binary.
 - **Breaking, in principle: the nesting limits.** A file or manifest nested more than 128 levels deep, which v0.2 accepted if it was shallow enough not to crash, is now rejected. These are MESH's supported limits, resource limits of this implementation: neither MPRX nor manifest version 1 limits nesting, so the manifest's version doesn't change. No handwritten UI or manifest comes near the limit; to stay under it, flatten the file, or write deeply nested manifest types as named types.
 

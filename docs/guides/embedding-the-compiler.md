@@ -62,11 +62,15 @@ fn main() {
 pub struct CompileResult {
     pub ir: Option<mesh_semantic::Element>,
     pub diagnostics: Vec<mesh_syntax::Diagnostic>,
+    pub analysis: Option<mesh_analysis::Analysis>,
 }
 ```
 
+`CompileResult` is `#[non_exhaustive]`: read its fields by name, and let the compiler build it.
+
 - **`ir`** is `None` only when the source couldn't be parsed, which means there's a syntax error. Validation problems like a mismatched closing tag or duplicate attributes are reported as diagnostics, but `ir` is still `Some`, so tools can keep working with a file that has mistakes.
 - **`diagnostics`** lists everything found, in a stable order (see the [diagnostics reference](../manual/diagnostics.md#ordering)). Decide what counts as failure by checking `severity`, as above. Don't use `diagnostics.is_empty()` for that, because warnings are allowed.
+- **`analysis`** is what checking against a component model found, as data (below). It's `None` from `compile`, and from a file with a syntax error.
 
 To compile a template against a component manifest, load the manifest with `mesh_manifest::load`, pick the component with `Manifest::template`, and pass it through `CompileOptions`:
 
@@ -101,7 +105,7 @@ A manifest diagnostic's span indexes the manifest's text, not the `.mprx` source
 
 With a template, `compile_with` returns what `compile` does, plus the analysis diagnostics (see [Model errors](../manual/diagnostics.md#model-errors)) after all the others. The IR is the same either way: analysis never changes it. A file with a syntax error has no IR, so it gets no analysis diagnostics.
 
-If you need analysis results as data rather than as diagnostics, call `mesh_analysis::analyze(&ir, template)` yourself. Its `Analysis` holds:
+If you need analysis results as data rather than as diagnostics, read `result.analysis`: it's the analysis the diagnostics came from, so the two can't disagree. Its `Analysis` holds:
 
 - `resolutions()`: each name that resolved, with its span, and the component, prop, event, scope name or command it refers to;
 - `types()`: each expression's type (`Ty`), with its span, and `type_at(span)` to look one up. An expression involved in an error has no type;
