@@ -288,6 +288,21 @@ Every IR node has a `span`: a `mesh_syntax::Span { start_byte, end_byte }` cover
 - To show a span as a line and column, use `render_diagnostic` or `render_json`, or count lines yourself.
 - Spans make IR values from different sources compare unequal even when they mean the same thing. To compare meaning, zero the spans first.
 
+## Files with syntax errors, for editors
+
+A file with a syntax error has no IR, so `compile_with` gives it no analysis: its syntax errors are all the compiler says about it, and that's the right answer for a build. An editor, though, wants hover and go-to-definition on the parts that parse while you type the part that doesn't. `mesh_compiler::editor::recover(source, template)` gives it those:
+
+```rust
+use mesh_compiler::editor;
+
+let recovery = editor::recover(source, template);
+if let Some(resolution) = recovery.resolution_at(offset) {
+    // `resolution.target` is what the name under the cursor refers to.
+}
+```
+
+It keeps each element whose tag name was written, minus the attributes, bindings and children that don't parse, and the clean expression of a `{…}` block that doesn't, and analyzes them against the template. `Recovery` answers `resolution_at` and `typed_at`, as `Analysis` does, and nothing else: it has no facts and no diagnostics. **It is not the compiler's verdict.** Don't report anything from it, cache it as a file's analysis, or compare it with `compile_with`'s result.
+
 ## Stability
 
 The IR's *meaning* is intended to be stable, but its Rust types may still change before 1.0: v0.2, for example, added source spans, which changed several variants' shapes, and the [CHANGELOG](../../CHANGELOG.md) marks each such change as breaking. There is no serialized IR format, so treat the IR as an in-process value. Diagnostic codes and the JSON diagnostics document are stable, as the [CLI manual](../manual/mesh-cli.md#json-output) describes. Pin a tag rather than tracking `main`.

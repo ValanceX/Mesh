@@ -13,9 +13,11 @@ use mesh_syntax::{
 use tree_sitter::Node;
 
 mod nesting;
+mod recover;
 mod syntax_errors;
 
 pub use nesting::MAX_NESTING_DEPTH;
+pub use recover::{recover, Recovered, RecoveredExpression};
 
 /// An error produced while parsing MPRX source text.
 ///

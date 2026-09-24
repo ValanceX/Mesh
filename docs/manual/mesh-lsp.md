@@ -80,7 +80,9 @@ vim.api.nvim_create_autocmd("FileType", {
 
 ## Hover and go to definition
 
-Both answer from the same check that produced the diagnostics, so they need a model: a document checked without one (no `model` setting, a manifest with errors, or no entry in `components`) has no hover and no definitions. They work on a file that parses; on a file with a syntax error they answer nothing yet.
+Both answer from the same check that produced the diagnostics, so they need a model: a document checked without one (no `model` setting, a manifest with errors, or no entry in `components`) has no hover and no definitions.
+
+**On a file with a syntax error** they still work on the parts that parse. An element counts once its tag name is written, even if the rest of its tag isn't finished yet; what it keeps is its attributes, event bindings and children that parse. A `{…}` block that doesn't parse is left out, but a complete expression inside it still counts: in `{user.}`, `user` does. One unclosed `{` can make the whole rest of the file unreadable to the parser, and then the complete elements before it still work. The diagnostics are unaffected: they are always exactly `mesh check`'s, whatever hover can still see.
 
 **Hover** shows what the cursor is on:
 

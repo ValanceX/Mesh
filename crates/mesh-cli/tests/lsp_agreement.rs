@@ -371,3 +371,71 @@ fn every_fixture_publishes_what_mesh_check_reports_in_utf16() {
 fn every_fixture_publishes_what_mesh_check_reports_in_utf8() {
     agree("utf-8", ColumnUnit::Utf8);
 }
+
+/// Every prefix of the users page, as someone types it: each is sent as a
+/// change to one open document, and each publication must be exactly what
+/// `mesh check --format json` reports for that prefix. Most prefixes have
+/// syntax errors, so the server computes editor recovery for them (outline
+/// D3); this shows recovery never adds to or changes what is published
+/// (invariants I2 and I3).
+#[test]
+fn every_prefix_publishes_what_mesh_check_reports() {
+    let workspace = tempfile::tempdir().expect("a temp dir");
+    let root = workspace
+        .path()
+        .canonicalize()
+        .expect("the temp dir exists");
+    fs::copy(
+        examples_dir().join("components.json"),
+        root.join("components.json"),
+    )
+    .expect("the manifest copies");
+    let (mut client, _) = Client::initialized(json!({
+        "processId": null,
+        "rootUri": file_uri(&root),
+        "capabilities": {},
+        "initializationOptions": {
+            "model": "components.json",
+            "components": { "users-page.mprx": "users-page" }
+        },
+    }));
+    let full = fs::read_to_string(examples_dir().join("users-page.mprx")).expect("reads");
+    let path = root.join("users-page.mprx");
+    let uri = file_uri(&path);
+    let mut mismatches = Vec::new();
+    let ends: Vec<usize> = full
+        .char_indices()
+        .map(|(end, _)| end)
+        .chain([full.len()])
+        .collect();
+    for (version, end) in ends.into_iter().enumerate() {
+        let source = &full[..end];
+        let version = i32::try_from(version).expect("a small version");
+        if version == 0 {
+            client.open(&uri, version, source);
+        } else {
+            client.change(&uri, version, source);
+        }
+        let published = client.next_publication(&uri);
+        assert_eq!(published.version, Some(version));
+
+        fs::write(&path, source).expect("the prefix writes");
+        let output = Command::cargo_bin("mesh")
+            .expect("the mesh binary")
+            .current_dir(&root)
+            .args(["check", "--format", "json", "--model", "components.json"])
+            .args(["--component", "users-page", "users-page.mprx"])
+            .output()
+            .expect("mesh check runs");
+        let document: Value = serde_json::from_slice(&output.stdout).expect("JSON");
+        let cli = document["diagnostics"].as_array().expect("a list").clone();
+        mismatches.extend(compare(
+            &format!("prefix of {end} bytes"),
+            source,
+            ColumnUnit::Utf16,
+            &cli,
+            &published,
+        ));
+    }
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
+}

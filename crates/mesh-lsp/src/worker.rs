@@ -5,6 +5,7 @@
 //! (invariant I1): the diagnostics it returns are exactly the compiler's.
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use mesh_compiler::editor::{self, Recovery};
 use mesh_compiler::{CompileOptions, CompileResult};
 use mesh_manifest::Manifest;
 use std::any::Any;
@@ -58,9 +59,19 @@ pub(crate) struct Done {
     pub(crate) text: Arc<str>,
     /// What the snapshot was checked against.
     pub(crate) model: Model,
-    /// The canonical compile's result, or the message of a panic while
-    /// compiling.
-    pub(crate) result: Result<Arc<CompileResult>, String>,
+    /// The canonical compile's result and, for a snapshot with no IR
+    /// checked against a model, its editor recovery (outline D3); or the
+    /// message of a panic while compiling.
+    pub(crate) result: Result<Compiled, String>,
+}
+
+/// What the compile thread found about one snapshot.
+pub(crate) struct Compiled {
+    /// Exactly what `compile_with` (or `compile`) returned.
+    pub(crate) canonical: Arc<CompileResult>,
+    /// Editor-only: what the parts that parse mean, when the canonical
+    /// result has no IR. Never published, never merged into `canonical`.
+    pub(crate) recovery: Option<Arc<Recovery>>,
 }
 
 pub(crate) struct Worker {
@@ -91,7 +102,6 @@ pub(crate) fn spawn(gate: Option<Receiver<()>>) -> io::Result<Worker> {
                     let _ = gate.recv();
                 }
                 let result = panic::catch_unwind(AssertUnwindSafe(|| compile(&job)))
-                    .map(Arc::new)
                     .map_err(|payload| panic_message(payload.as_ref()));
                 let done = Done {
                     uri: job.uri,
@@ -110,8 +120,28 @@ pub(crate) fn spawn(gate: Option<Receiver<()>>) -> io::Result<Worker> {
     Ok(Worker { jobs, results })
 }
 
-/// The canonical compile of `job`'s snapshot.
-fn compile(job: &Job) -> CompileResult {
+/// The canonical compile of `job`'s snapshot, then, only if it has no IR
+/// and a template, the editor recovery of the same text (recovery spec,
+/// R1 and R8).
+fn compile(job: &Job) -> Compiled {
+    let canonical = canonical(job);
+    let recovery = match &job.model {
+        Model::Template {
+            manifest,
+            component,
+        } if canonical.ir.is_none() => manifest
+            .template(component)
+            .ok()
+            .map(|template| Arc::new(editor::recover(&job.text, template))),
+        _ => None,
+    };
+    Compiled {
+        canonical: Arc::new(canonical),
+        recovery,
+    }
+}
+
+fn canonical(job: &Job) -> CompileResult {
     match &job.model {
         Model::None => mesh_compiler::compile(&job.text),
         Model::Template {

@@ -10,6 +10,7 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     MessageType, PublishDiagnosticsParams, Uri,
 };
+use mesh_compiler::editor::Recovery;
 use mesh_compiler::{CompileResult, SourceMap};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -38,6 +39,9 @@ pub(super) struct Compiled {
     pub(super) map: SourceMap,
     /// Exactly what `compile_with` (or `compile`) returned.
     pub(super) result: Arc<CompileResult>,
+    /// Editor-only recovery, when `result` has no IR (outline D3). Only
+    /// hover and definition read it; nothing publishes it.
+    pub(super) recovery: Option<Arc<Recovery>>,
     /// The component the text was checked as, and the manifest snapshot
     /// that declares it; `None` when it was checked without a model.
     pub(super) template: Option<(String, Arc<ManifestSnapshot>)>,
@@ -224,8 +228,8 @@ impl Server {
         if self.identity(document) != done.identity || self.due.contains_key(&done.uri) {
             return Ok(());
         }
-        let result = match done.result {
-            Ok(result) => result,
+        let (result, recovery) = match done.result {
+            Ok(compiled) => (compiled.canonical, compiled.recovery),
             Err(message) => {
                 if let Some(document) = self.documents.get_mut(&done.uri) {
                     document.failed = Some(done.identity);
@@ -265,6 +269,7 @@ impl Server {
                 text: done.text,
                 map,
                 result,
+                recovery,
                 template,
             });
         }

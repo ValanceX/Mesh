@@ -149,10 +149,13 @@ fn a_definition_while_the_manifest_is_open_uses_its_buffer() {
     assert_eq!(&manifest[span.start_byte..span.end_byte], r#""avatar""#);
 }
 
+/// On a broken file, hover answers from the parts that parse (Pass 3;
+/// `tests/recovery.rs`). A `{…}` block that doesn't parse isn't one of
+/// them, so a name inside it has no hover.
 #[test]
-fn no_hover_on_a_file_with_a_syntax_error() {
+fn no_hover_inside_a_block_that_doesnt_parse() {
     let (_workspace, mut client, uri, source) = users_page();
-    let broken = source.replace("</page>", "</page");
+    let broken = source.replace("compact ? \"sm\"", "compact ? user.");
     client.change(&uri, 2, &broken);
     client.next_publication(&uri);
     assert_eq!(

@@ -33,6 +33,23 @@ pub fn analyze(ir: &mesh_semantic::Element, template: Template<'_>) -> Analysis 
     check::analyze(ir, template)
 }
 
+/// Analyzes one expression in the template of `template`'s component, as
+/// the value of an attribute whose type nothing constrains: not as an
+/// `on.` handler, and not as a handler command's argument. So a command
+/// in it is `CommandOutsideHandler`, and `$event` is
+/// `EventValueOutsideHandler`.
+///
+/// It runs the same walk as [`analyze`], so a reference, member access or
+/// operator gets exactly the resolution and type it would get in a
+/// template. An editor uses it for an expression it recovered from a file
+/// with syntax errors, where there is no element to analyze.
+pub fn analyze_expression(
+    expression: &mesh_semantic::Expression,
+    template: Template<'_>,
+) -> Analysis {
+    check::analyze_expression(expression, template)
+}
+
 /// The results of analyzing one template: kept beside the IR, never
 /// written into it.
 #[derive(Debug, Clone, PartialEq, Eq)]

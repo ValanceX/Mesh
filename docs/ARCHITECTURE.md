@@ -142,6 +142,8 @@ Crate boundaries can change as we learn more.
 - **mesh-compiler**: semantic analysis, type checking, component and binding resolution, template compilation, diagnostics, transformation, optimization, and code generation.
 - **mesh-lsp**: diagnostics and quick fixes, hover, go-to-definition, and completion. It is **a client of the compiler**, which stays the single semantic authority: its diagnostics are the compiler's own, and it has no parser or type system of its own, so the editor and the build can't disagree. Its npm package only launches it.
 
+  An open document has three kinds of state, and they never mix. **Canonical state** is exactly what `mesh_compiler::compile_with` returns for its text: its diagnostics, and for a file that parses, its IR and analysis. **Editor recovery state** exists only for a file with a syntax error: `mesh_compiler::editor::recover` keeps the parts that parse and analyzes them with the same analysis code, so hover and go-to-definition still work there. It has no diagnostics, so it can never be published or mistaken for the compiler's verdict. **Presentation** turns either into protocol messages (ranges, hover text, quick fixes) and adds nothing of its own.
+
 ### A language-neutral IR (long-term)
 
 The Semantic IR describes UI without tying it to any runtime language:

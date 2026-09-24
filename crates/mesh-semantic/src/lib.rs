@@ -365,7 +365,11 @@ fn lower_child(child: &mesh_syntax::Child) -> (Option<Child>, Vec<mesh_syntax::D
     }
 }
 
-fn lower_expression(expression: &mesh_syntax::Expression) -> Expression {
+/// Lowers one AST expression into its IR form. [`lower`] uses it for
+/// every expression in an element; it is public for tools that have an
+/// expression without an element around it, such as an editor's recovery
+/// of a file with syntax errors. Lowering an expression reports nothing.
+pub fn lower_expression(expression: &mesh_syntax::Expression) -> Expression {
     match expression {
         mesh_syntax::Expression::Literal(literal) => Expression::Literal {
             value: lower_literal(literal),

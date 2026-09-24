@@ -8,6 +8,7 @@
 //! layer turns what analysis found into diagnostics.
 
 mod diagnose;
+pub mod editor;
 mod json;
 mod position;
 mod render;

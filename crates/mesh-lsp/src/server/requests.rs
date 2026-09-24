@@ -182,7 +182,13 @@ impl Server {
     ) -> Option<(Facts<'a>, Model<'a>, Text<'a>, usize)> {
         let (component, snapshot) = compiled.template.as_ref()?;
         let manifest = snapshot.loaded.as_ref().ok()?;
-        let facts = Facts::Canonical(compiled.result.analysis.as_ref()?);
+        // Canonical state when the compile has it; recovery only when it
+        // has no IR (outline D3).
+        let facts = match (&compiled.result.analysis, &compiled.recovery) {
+            (Some(analysis), _) => Facts::Canonical(analysis),
+            (None, Some(recovery)) if compiled.result.ir.is_none() => Facts::Recovered(recovery),
+            _ => return None,
+        };
         let text = Text {
             source: &compiled.text,
             map: &compiled.map,

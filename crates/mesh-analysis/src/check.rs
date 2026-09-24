@@ -11,26 +11,42 @@ use mesh_syntax::{BinaryOperator, Span, UnaryOperator};
 use std::collections::BTreeMap;
 
 pub(crate) fn analyze(ir: &Element, template: Template<'_>) -> Analysis {
-    let mut walker = Walker {
-        template,
-        facts: Vec::new(),
-        resolutions: Vec::new(),
-        types: Vec::new(),
-    };
+    let mut walker = Walker::new(template);
     walker.element(ir);
-    let Walker {
-        mut facts,
-        resolutions,
-        types,
-        ..
-    } = walker;
-    // Stable, so facts that start at the same byte keep the order the
-    // walk found them in.
-    facts.sort_by_key(|fact| fact.span().start_byte);
-    Analysis {
-        facts,
-        resolutions,
-        types,
+    walker.finish()
+}
+
+pub(crate) fn analyze_expression(expression: &Expression, template: Template<'_>) -> Analysis {
+    let mut walker = Walker::new(template);
+    walker.expression(expression, Place::Value);
+    walker.finish()
+}
+
+impl<'m> Walker<'m> {
+    fn new(template: Template<'m>) -> Self {
+        Walker {
+            template,
+            facts: Vec::new(),
+            resolutions: Vec::new(),
+            types: Vec::new(),
+        }
+    }
+
+    fn finish(self) -> Analysis {
+        let Walker {
+            mut facts,
+            resolutions,
+            types,
+            ..
+        } = self;
+        // Stable, so facts that start at the same byte keep the order the
+        // walk found them in.
+        facts.sort_by_key(|fact| fact.span().start_byte);
+        Analysis {
+            facts,
+            resolutions,
+            types,
+        }
     }
 }
 

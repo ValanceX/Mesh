@@ -9,6 +9,7 @@
 use crate::convert::Text;
 use lsp_types::{Hover, HoverContents, Location, MarkupContent, MarkupKind, Uri};
 use mesh_analysis::{Analysis, Resolution, Target, Ty, Typed};
+use mesh_compiler::editor::Recovery;
 use mesh_manifest::{Declaration, Manifest};
 use mesh_syntax::Span;
 use std::str::FromStr;
@@ -18,18 +19,22 @@ use std::str::FromStr;
 pub(super) enum Facts<'a> {
     /// The canonical compile's analysis.
     Canonical(&'a Analysis),
+    /// A broken snapshot's editor recovery (outline D3).
+    Recovered(&'a Recovery),
 }
 
 impl<'a> Facts<'a> {
     fn resolution_at(self, offset: usize) -> Option<&'a Resolution> {
         match self {
             Facts::Canonical(analysis) => analysis.resolution_at(offset),
+            Facts::Recovered(recovery) => recovery.resolution_at(offset),
         }
     }
 
     fn typed_at(self, offset: usize) -> Option<&'a Typed> {
         match self {
             Facts::Canonical(analysis) => analysis.typed_at(offset),
+            Facts::Recovered(recovery) => recovery.typed_at(offset),
         }
     }
 }

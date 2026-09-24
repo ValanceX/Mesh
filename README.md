@@ -114,7 +114,7 @@ In development for v0.3: the `mesh-lsp` language server, which already publishes
 
 Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. The npm packages are placeholders.
 
-Next up: completion in `mesh-lsp`, and hover and go-to-definition on files with syntax errors.
+Next up: completion in `mesh-lsp`.
 
 ## Learn more
 
