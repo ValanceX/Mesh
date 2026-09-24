@@ -223,6 +223,7 @@ fn dedupe_last_wins<'a, T>(
                     name(item)
                 ),
                 span: span(item),
+                suggestions: Vec::new(),
             });
         }
     }
@@ -277,6 +278,7 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
                     ast.name, closing_name
                 ),
                 span: ast.span,
+                suggestions: Vec::new(),
             });
         }
     }

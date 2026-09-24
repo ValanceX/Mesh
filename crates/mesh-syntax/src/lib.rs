@@ -157,13 +157,25 @@ impl fmt::Display for DiagnosticCode {
 }
 
 /// A single compile-time diagnostic: its severity, its stable
-/// [`DiagnosticCode`], a human-readable message, and the source [`Span`]
-/// it applies to.
+/// [`DiagnosticCode`], a human-readable message, the source [`Span`] it
+/// applies to, and any [`Suggestion`]s for fixing it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
     pub severity: Severity,
     pub code: DiagnosticCode,
     pub message: String,
+    pub span: Span,
+    /// Replacements that would probably fix the problem, best first.
+    /// Empty when there's nothing close enough to suggest.
+    pub suggestions: Vec<Suggestion>,
+}
+
+/// A proposed fix for a [`Diagnostic`]: replace the source text at
+/// `span` with `replacement`. For example, `user` for the `usr` in
+/// `{usr}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Suggestion {
+    pub replacement: String,
     pub span: Span,
 }
 

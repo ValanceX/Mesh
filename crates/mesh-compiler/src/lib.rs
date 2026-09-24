@@ -66,6 +66,7 @@ pub fn compile_with(source: &str, options: &CompileOptions<'_>) -> CompileResult
             code: err.code,
             message: err.message,
             span: err.span,
+            suggestions: Vec::new(),
         })
         .collect();
 

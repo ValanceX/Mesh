@@ -149,6 +149,7 @@ impl Manifest {
                     "the manifest declares no component {name:?}, which this file is the template of"
                 ),
                 span: self.components_span,
+                suggestions: Vec::new(),
             }),
         }
     }
@@ -202,6 +203,7 @@ pub fn load(source: &str) -> Result<Manifest, Vec<Diagnostic>> {
             code: DiagnosticCode::MANIFEST_SYNTAX_ERROR,
             message: format!("the manifest isn't valid JSON: {}", error.message),
             span: error.span,
+            suggestions: Vec::new(),
         }]
     })?;
     validate::manifest(&document)

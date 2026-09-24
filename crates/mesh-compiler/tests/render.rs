@@ -1,5 +1,5 @@
 use mesh_compiler::render_diagnostic;
-use mesh_syntax::{Diagnostic, DiagnosticCode, Severity, Span};
+use mesh_syntax::{Diagnostic, DiagnosticCode, Severity, Span, Suggestion};
 
 fn diagnostic(severity: Severity, message: &str, start_byte: usize, end_byte: usize) -> Diagnostic {
     Diagnostic {
@@ -10,6 +10,7 @@ fn diagnostic(severity: Severity, message: &str, start_byte: usize, end_byte: us
             start_byte,
             end_byte,
         },
+        suggestions: Vec::new(),
     }
 }
 
@@ -405,4 +406,43 @@ fn renders_located_syntax_errors_in_bom_crlf_and_multi_byte_sources() {
             "source: {source:?}"
         );
     }
+}
+
+#[test]
+fn renders_each_suggestion_as_a_help_line() {
+    let source = "<page>\n  <card user={usr} />\n</page>\n";
+    let rendered = render_diagnostic(
+        source,
+        "x.mprx",
+        &Diagnostic {
+            suggestions: vec![Suggestion {
+                replacement: "user".to_string(),
+                span: Span {
+                    start_byte: 21,
+                    end_byte: 24,
+                },
+            }],
+            ..diagnostic(Severity::Error, "unknown reference \"usr\"", 21, 24)
+        },
+    );
+    assert_eq!(
+        rendered,
+        "error[syntax-error]: unknown reference \"usr\"\n \
+         --> x.mprx:2:15\n  \
+         |\n\
+         2 |   <card user={usr} />\n  \
+         |               ^^^\n  \
+         = help: did you mean \"user\"?"
+    );
+}
+
+#[test]
+fn a_diagnostic_without_suggestions_has_no_help_line() {
+    let rendered = render_diagnostic(
+        "<page />",
+        "x.mprx",
+        &diagnostic(Severity::Error, "boom", 1, 5),
+    );
+    assert!(!rendered.contains("help"), "{rendered}");
+    assert!(rendered.ends_with("^^^^"), "{rendered}");
 }

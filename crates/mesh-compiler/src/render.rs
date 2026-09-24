@@ -12,8 +12,9 @@ use mesh_syntax::Diagnostic;
 const BOM: char = '\u{feff}';
 
 /// Renders `diagnostic` rustc-style: a `severity[code]: message` header, a
-/// `--> path:line:column` location, and the source line the diagnostic
-/// starts on, underlined with carets:
+/// `--> path:line:column` location, the source line the diagnostic
+/// starts on, underlined with carets, and a `= help:` line for each of
+/// its suggestions:
 ///
 /// ```text
 /// error[mismatched-closing-tag]: mismatched closing tag: opened with "title", closed with "heading"
@@ -21,6 +22,15 @@ const BOM: char = '\u{feff}';
 ///   |
 /// 2 |   <title>Users</heading>
 ///   |   ^^^^^^^^^^^^^^^^^^^^^^
+/// ```
+///
+/// ```text
+/// error[unknown-reference]: unknown reference "usr": it isn't in the template's scope
+///  --> card.mprx:2:15
+///   |
+/// 2 |   <card user={usr} />
+///   |               ^^^
+///   = help: did you mean "user"?
 /// ```
 ///
 /// Returns exactly one block with no trailing newline — separating
@@ -84,7 +94,7 @@ pub fn render_diagnostic(source: &str, path: &str, diagnostic: &Diagnostic) -> S
         format!(" {line_text}")
     };
 
-    format!(
+    let mut block = format!(
         "{severity}[{code}]: {message}\n\
          {gutter}--> {path}:{line_number}:{column}\n\
          {gutter} |\n\
@@ -93,5 +103,12 @@ pub fn render_diagnostic(source: &str, path: &str, diagnostic: &Diagnostic) -> S
         severity = diagnostic.severity,
         code = diagnostic.code,
         message = diagnostic.message,
-    )
+    );
+    for suggestion in &diagnostic.suggestions {
+        block.push_str(&format!(
+            "\n{gutter} = help: did you mean {:?}?",
+            suggestion.replacement
+        ));
+    }
+    block
 }

@@ -105,6 +105,7 @@ impl Validator {
             code,
             message,
             span,
+            suggestions: Vec::new(),
         });
     }
 
