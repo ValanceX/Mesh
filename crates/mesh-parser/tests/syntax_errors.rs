@@ -455,3 +455,29 @@ fn every_syntax_code_is_a_known_code() {
         }
     }
 }
+
+/// D17 regression: `collect_regions` used to recurse once per nesting
+/// level while walking down to the error, so a source with many nested
+/// elements around a single error overflowed the stack (SIGABRT) instead
+/// of being rejected with exit 1, the same as any other invalid source.
+/// v0.1 rejected shapes like this cleanly; only the v0.2 error-location
+/// walk introduced the crash.
+///
+/// 3,000 levels of nesting reliably overflows the old recursive
+/// `collect_regions` here, while staying well inside the stack budget
+/// `Node::parent()` itself needs during classification — that call is
+/// Tree-sitter's own, unrelated to this fix, and starts needing more
+/// stack than a test thread has somewhere past ~3,200 levels regardless
+/// of how `collect_regions` is written. 3,000 is comfortably below that
+/// ceiling and comfortably above where the old code broke.
+#[test]
+fn walks_a_deeply_nested_error_tree_without_overflowing_the_stack() {
+    let depth = 3_000;
+    let source = format!("{}{}{}", "<p>".repeat(depth), "{a +}", "</p>".repeat(depth));
+
+    let result = mesh_parser::parse(&source);
+
+    assert_eq!(result.errors.len(), 1, "errors: {:?}", result.errors);
+    assert_eq!(result.errors[0].code, DiagnosticCode::SYNTAX_ERROR);
+    assert!(result.ast.is_none());
+}

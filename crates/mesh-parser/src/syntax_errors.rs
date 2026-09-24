@@ -49,17 +49,25 @@ pub(crate) fn collect(root: Node, source: &str) -> Vec<ParseError> {
 /// Pushes every outermost `ERROR` node and every `MISSING` node, in
 /// source order. Never descends into an `ERROR`: nested errors belong to
 /// the region that contains them.
+///
+/// Iterative rather than recursive: a deeply nested tree (thousands of
+/// levels, one error at the bottom) would otherwise recurse once per
+/// level and blow the stack. An explicit stack holds the same walk;
+/// pushing each node's children in reverse makes them pop, and so get
+/// visited, in source order.
 fn collect_regions<'tree>(node: Node<'tree>, regions: &mut Vec<Node<'tree>>) {
-    if node.is_error() || node.is_missing() {
-        regions.push(node);
-        return;
-    }
-    if !node.has_error() {
-        return;
-    }
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        collect_regions(child, regions);
+    let mut stack = vec![node];
+    while let Some(node) = stack.pop() {
+        if node.is_error() || node.is_missing() {
+            regions.push(node);
+            continue;
+        }
+        if !node.has_error() {
+            continue;
+        }
+        let mut cursor = node.walk();
+        let children: Vec<Node<'tree>> = node.children(&mut cursor).collect();
+        stack.extend(children.into_iter().rev());
     }
 }
 
