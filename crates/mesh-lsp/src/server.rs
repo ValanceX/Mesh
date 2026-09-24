@@ -8,29 +8,28 @@
 //! identity is still current. Anything else is dropped, so an older
 //! result never replaces a newer one.
 
+mod documents;
+mod manifest;
+
 use crate::config::Config;
 use crate::convert::{self, Text};
-use crate::worker::{self, Done, Identity, Job, Model, Worker};
+use crate::worker::{self, Worker};
 use crate::{uri, Options, Outcome};
 use crossbeam_channel::{after, never, select, Receiver, Sender};
+use documents::Document;
 use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentChanges, MessageType, OneOf,
-    OptionalVersionedTextDocumentIdentifier, PublishDiagnosticsParams, TextDocumentEdit, TextEdit,
-    Uri, WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, DocumentChanges,
+    MessageType, OneOf, OptionalVersionedTextDocumentIdentifier, TextDocumentEdit, TextEdit,
+    WorkspaceEdit,
 };
+use manifest::ManifestState;
 use mesh_compiler::{ColumnUnit, SourceMap};
-use mesh_manifest::Manifest;
-use mesh_syntax::Diagnostic;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fs;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::Arc;
 use std::time::Instant;
 
 /// The client has gone: a send failed, so nothing more can be said.
@@ -66,47 +65,6 @@ struct Client {
     configuration: bool,
     /// Registering `workspace/didChangeWatchedFiles` dynamically.
     watch: bool,
-}
-
-/// An open document.
-struct Document {
-    uri: Uri,
-    version: i32,
-    text: Arc<str>,
-    generation: u64,
-    /// The component its template is, if the configuration names one the
-    /// manifest doesn't declare. Reported on the manifest (D9).
-    missing: Option<String>,
-    /// The canonical state of the latest snapshot compiled and published.
-    compiled: Option<Compiled>,
-}
-
-/// A snapshot's canonical state: what the compiler said about its text.
-struct Compiled {
-    identity: Identity,
-    version: i32,
-    text: Arc<str>,
-    map: SourceMap,
-    diagnostics: Vec<Diagnostic>,
-}
-
-/// One version of the manifest's text, loaded (D9).
-struct ManifestSnapshot {
-    uri: String,
-    text: String,
-    map: SourceMap,
-    loaded: Result<Arc<Manifest>, Vec<Diagnostic>>,
-}
-
-#[derive(Default)]
-struct ManifestState {
-    generation: u64,
-    /// Where the configuration says the manifest is.
-    path: Option<PathBuf>,
-    /// The client's URI and text while the manifest is open in it.
-    open: Option<(String, String)>,
-    /// `None` without a configured, readable manifest.
-    snapshot: Option<Arc<ManifestSnapshot>>,
 }
 
 struct Server {
@@ -541,320 +499,6 @@ impl Server {
             return self.reload_manifest();
         }
         Ok(())
-    }
-
-    // --- The manifest (D9) ----------------------------------------------
-
-    fn is_manifest(&self, document: &str) -> bool {
-        self.manifest.path.is_some() && uri::to_path(document) == self.manifest.path
-    }
-
-    /// Starts a new manifest generation from the open buffer or the disk,
-    /// then recompiles every open document against it.
-    fn reload_manifest(&mut self) -> Sent {
-        self.manifest.generation += 1;
-        self.manifest.snapshot = None;
-        if let Some(path) = self.manifest.path.clone() {
-            let (document_uri, text) = match &self.manifest.open {
-                Some((open_uri, text)) => (open_uri.clone(), Ok(text.clone())),
-                None => (uri::from_path(&path), fs::read_to_string(&path)),
-            };
-            match text {
-                Ok(text) => {
-                    let loaded = mesh_manifest::load(&text).map(Arc::new);
-                    self.manifest.snapshot = Some(Arc::new(ManifestSnapshot {
-                        uri: document_uri,
-                        map: SourceMap::new(&text),
-                        text,
-                        loaded,
-                    }));
-                }
-                Err(err) => self.log(
-                    MessageType::WARNING,
-                    format!(
-                        "couldn't read the manifest {}: {err}; checking without a model",
-                        path.display()
-                    ),
-                )?,
-            }
-        }
-        let uris: Vec<String> = self.documents.keys().cloned().collect();
-        for document in uris {
-            self.compile(&document)?;
-        }
-        self.publish_manifest()
-    }
-
-    /// Publishes the manifest's diagnostics if they changed: its load
-    /// errors while it's broken, or else one `manifest-missing-component`
-    /// per component an open document is configured as and the manifest
-    /// doesn't declare.
-    fn publish_manifest(&mut self) -> Sent {
-        let current = self.manifest.snapshot.as_ref().map(|snapshot| {
-            let text = Text {
-                source: &snapshot.text,
-                map: &snapshot.map,
-                unit: self.unit,
-            };
-            let diagnostics = match &snapshot.loaded {
-                Err(diagnostics) => text.diagnostics(diagnostics),
-                Ok(manifest) => {
-                    let missing: BTreeSet<&str> = self
-                        .documents
-                        .values()
-                        .filter_map(|document| document.missing.as_deref())
-                        .collect();
-                    let diagnostics: Vec<Diagnostic> = missing
-                        .into_iter()
-                        .filter_map(|component| manifest.template(component).err())
-                        .collect();
-                    text.diagnostics(&diagnostics)
-                }
-            };
-            (snapshot.uri.clone(), diagnostics)
-        });
-        if current == self.manifest_published {
-            return Ok(());
-        }
-        if let Some((old_uri, _)) = &self.manifest_published {
-            if current.as_ref().map(|(uri, _)| uri) != Some(old_uri) {
-                self.publish(old_uri, Vec::new(), None)?;
-            }
-        }
-        if let Some((manifest_uri, diagnostics)) = &current {
-            self.publish(manifest_uri, diagnostics.clone(), None)?;
-        }
-        self.manifest_published = current;
-        Ok(())
-    }
-
-    // --- Documents (D10) ------------------------------------------------
-
-    fn did_open(&mut self, params: DidOpenTextDocumentParams) -> Sent {
-        let document = params.text_document;
-        let key = document.uri.as_str().to_string();
-        if self.is_manifest(&key) {
-            self.manifest.open = Some((key, document.text));
-            return self.reload_manifest();
-        }
-        self.next_generation += 1;
-        self.documents.insert(
-            key.clone(),
-            Document {
-                uri: document.uri,
-                version: document.version,
-                text: Arc::from(document.text),
-                generation: self.next_generation,
-                missing: None,
-                compiled: None,
-            },
-        );
-        self.compile(&key)?;
-        self.publish_manifest()
-    }
-
-    fn did_change(&mut self, params: DidChangeTextDocumentParams) -> Sent {
-        let key = params.text_document.uri.as_str().to_string();
-        let version = params.text_document.version;
-
-        if self.is_manifest(&key) {
-            if let Some((_, text)) = &mut self.manifest.open {
-                *text = apply_changes(text, &params.content_changes, self.unit);
-                return self.reload_manifest();
-            }
-            return Ok(());
-        }
-
-        let Some(document) = self.documents.get_mut(&key) else {
-            return self.log(
-                MessageType::WARNING,
-                format!("didChange for {key}, which isn't open; ignoring it"),
-            );
-        };
-        if version < document.version {
-            let current = document.version;
-            return self.log(
-                MessageType::WARNING,
-                format!("didChange for {key} version {version}, older than {current}; ignoring it"),
-            );
-        }
-        let text = apply_changes(&document.text, &params.content_changes, self.unit);
-        self.next_generation += 1;
-        document.text = Arc::from(text);
-        document.version = version;
-        document.generation = self.next_generation;
-
-        if self.options.debounce.is_zero() {
-            self.compile(&key)
-        } else {
-            self.due.insert(key, Instant::now() + self.options.debounce);
-            Ok(())
-        }
-    }
-
-    fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Sent {
-        let key = params.text_document.uri.as_str().to_string();
-        if self.is_manifest(&key) {
-            // Back to the file on disk.
-            self.manifest.open = None;
-            return self.reload_manifest();
-        }
-        self.due.remove(&key);
-        if let Some(document) = self.documents.remove(&key) {
-            self.publish(document.uri.as_str(), Vec::new(), None)?;
-        }
-        self.unconfigured_logged.remove(&key);
-        self.publish_manifest()
-    }
-
-    /// Compiles every document whose debounce has run out.
-    fn compile_due(&mut self) -> Sent {
-        let now = Instant::now();
-        let ready: Vec<String> = self
-            .due
-            .iter()
-            .filter(|(_, deadline)| **deadline <= now)
-            .map(|(key, _)| key.clone())
-            .collect();
-        for key in ready {
-            self.compile(&key)?;
-        }
-        Ok(())
-    }
-
-    fn identity(&self, document: &Document) -> Identity {
-        Identity {
-            document: document.generation,
-            manifest: self.manifest.generation,
-            config: self.config_generation,
-        }
-    }
-
-    /// Sends the document's current snapshot to the compile thread.
-    fn compile(&mut self, key: &str) -> Sent {
-        self.due.remove(key);
-        let (model, missing) = self.model_for(key)?;
-        let Some(document) = self.documents.get_mut(key) else {
-            return Ok(());
-        };
-        document.missing = missing;
-        let Some(document) = self.documents.get(key) else {
-            return Ok(());
-        };
-        let job = Job {
-            uri: key.to_string(),
-            identity: self.identity(document),
-            version: document.version,
-            text: Arc::clone(&document.text),
-            model,
-        };
-        if !self.worker.send(job) {
-            return self.log(
-                MessageType::ERROR,
-                "mesh-lsp: the compile thread has stopped".to_string(),
-            );
-        }
-        Ok(())
-    }
-
-    /// What the document at `key` is checked against, and the component
-    /// it's configured as if the manifest doesn't declare it (D6, D9).
-    fn model_for(&mut self, key: &str) -> Result<(Model, Option<String>), Disconnected> {
-        let Some(snapshot) = self.manifest.snapshot.clone() else {
-            return Ok((Model::None, None));
-        };
-        let Ok(manifest) = &snapshot.loaded else {
-            // A broken manifest: model-less checking (D9).
-            return Ok((Model::None, None));
-        };
-        let component = self.root.as_ref().and_then(|root| {
-            let path = uri::to_path(key)?;
-            let document_key = uri::key(root, &path)?;
-            self.config.components.get(&document_key).cloned()
-        });
-        let Some(component) = component else {
-            if self.unconfigured_logged.insert(key.to_string()) {
-                self.log(
-                    MessageType::INFO,
-                    format!(
-                        "{key} has no component in \"mesh.components\", so it's checked without a model"
-                    ),
-                )?;
-            }
-            return Ok((Model::None, None));
-        };
-        if manifest.components().contains_key(&component) {
-            Ok((
-                Model::Template {
-                    manifest: Arc::clone(manifest),
-                    component,
-                },
-                None,
-            ))
-        } else {
-            Ok((Model::None, Some(component)))
-        }
-    }
-
-    /// Publishes a compile's result if its snapshot is still current;
-    /// otherwise drops it (D10's staleness rule).
-    fn finish(&mut self, done: Done) -> Sent {
-        let Some(document) = self.documents.get(&done.uri) else {
-            return Ok(());
-        };
-        if self.identity(document) != done.identity || self.due.contains_key(&done.uri) {
-            return Ok(());
-        }
-        let diagnostics = match done.result {
-            Ok(diagnostics) => diagnostics,
-            Err(message) => {
-                return self.log(
-                    MessageType::ERROR,
-                    format!(
-                        "mesh-lsp: internal error checking {} version {}: {message}",
-                        done.uri, done.version
-                    ),
-                );
-            }
-        };
-        let map = SourceMap::new(&done.text);
-        let published = Text {
-            source: &done.text,
-            map: &map,
-            unit: self.unit,
-        }
-        .diagnostics(&diagnostics);
-        let uri = document.uri.as_str().to_string();
-        if let Some(document) = self.documents.get_mut(&done.uri) {
-            document.compiled = Some(Compiled {
-                identity: done.identity,
-                version: done.version,
-                text: done.text,
-                map,
-                diagnostics,
-            });
-        }
-        self.publish(&uri, published, Some(done.version))
-    }
-
-    fn publish(
-        &self,
-        document: &str,
-        diagnostics: Vec<lsp_types::Diagnostic>,
-        version: Option<i32>,
-    ) -> Sent {
-        let Ok(uri) = Uri::from_str(document) else {
-            eprintln!("mesh-lsp: can't publish to {document:?}, which isn't a URI");
-            return Ok(());
-        };
-        self.notify(
-            "textDocument/publishDiagnostics",
-            PublishDiagnosticsParams {
-                uri,
-                diagnostics,
-                version,
-            },
-        )
     }
 
     // --- Quick fixes ----------------------------------------------------
