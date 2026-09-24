@@ -1,0 +1,4 @@
+# Fixture sources and their expected `.stderr` output are compared byte for
+# byte (after trimming trailing whitespace). Keep them LF everywhere, even
+# on checkouts with `core.autocrlf=true`, so the fixtures pass on Windows.
+examples/fixtures/** text eol=lf
