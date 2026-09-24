@@ -104,7 +104,7 @@ mesh/
 
 Known limitations: references, components and props aren't type-checked yet. The language server and npm packages are placeholders.
 
-Next up: component-aware type checking. Unreleased on `main` so far: syntax errors point at the actual mistake, and every diagnostic has a stable code (see the [CHANGELOG](./CHANGELOG.md)).
+Next up: component-aware type checking. Unreleased on `main` so far: most syntax errors point at the actual mistake, and every diagnostic has a stable code (see the [CHANGELOG](./CHANGELOG.md)).
 
 ## Learn more
 

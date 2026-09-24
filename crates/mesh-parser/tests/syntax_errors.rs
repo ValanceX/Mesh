@@ -88,6 +88,37 @@ fn locates_a_missing_closing_tag() {
 }
 
 #[test]
+fn a_missing_closing_tag_is_the_only_error_reported_for_its_element() {
+    // Once the root is never closed, the parser gives up on everything
+    // inside it: the whole element is one error region, and a region gets
+    // exactly one diagnostic. The other mistakes surface once the closing
+    // tag is added. The reference documents this; pinning it here makes
+    // any change to it deliberate.
+    assert_located(&[
+        ("<page x=1>\n", &[("missing-closing-tag", 0, "<page x=1>")]),
+        (
+            "<page>\n  <q data-id=\"1\" />\n",
+            &[("missing-closing-tag", 0, "<page>")],
+        ),
+        (
+            "<page>\n  <text>a < b</text>\n",
+            &[("missing-closing-tag", 0, "<page>")],
+        ),
+    ]);
+    assert_located(&[
+        ("<page x=1></page>\n", &[("syntax-error", 6, "x=1")]),
+        (
+            "<page>\n  <q data-id=\"1\" />\n</page>\n",
+            &[("hyphenated-attribute-name", 12, "data-id")],
+        ),
+        (
+            "<page>\n  <text>a < b</text>\n</page>\n",
+            &[("less-than-in-text", 17, "<")],
+        ),
+    ]);
+}
+
+#[test]
 fn locates_a_less_than_sign_in_text() {
     assert_located(&[
         ("<p>a < b</p>\n", &[("less-than-in-text", 5, "<")]),

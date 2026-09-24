@@ -20,7 +20,7 @@ Every example below lives in `examples/fixtures/`, next to a `.stderr` file with
 
 ## Syntax errors
 
-A syntax error is reported where the mistake is. A file can have several, and each is reported separately, in source order:
+Most syntax errors are reported where the mistake is; the exceptions are covered [below](#syntax-error). A file can have several, and each is reported separately, in source order:
 
 ```text
 error[less-than-in-text]: `<` in text starts a tag; to show a literal `<`, put the text in a string expression, like `{"a < b"}`
@@ -109,6 +109,8 @@ error[missing-closing-tag]: `<card>` is never closed: expected `</card>`
 1 | <card>
   | ^^^^^^
 ```
+
+While the root element is unclosed, MESH can't tell what's inside it, so this is the only error reported for that element. Other mistakes inside it, such as a `<` in text or a hyphenated attribute name, show up once you add the closing tag.
 
 **Fix:** add the closing tag, or write the element as self-closing: `<card />`.
 
