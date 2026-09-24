@@ -17,16 +17,15 @@
   "metadata": {
     "version": "0.1.0",
     "license": "MIT",
-    "description": "Mprx grammar for tree-sitter",
+    "description": "Tree-sitter grammar for MPRX, the MESH UI language: parsing for mesh-parser, and highlighting queries for editors",
     "authors": [
       {
         "name": "Jack Miller",
-        "url": ""
+        "email": "jackmiller0899@gmail.com"
       }
     ],
     "links": {
-      "repository": "https://github.com/ValanceX/Mesh",
-      "funding": ""
+      "repository": "https://github.com/ValanceX/Mesh"
     }
   },
   "bindings": {

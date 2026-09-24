@@ -1,7 +1,8 @@
 //! The MESH language server.
 //!
 //! It serves canonical diagnostics and quick fixes for MPRX documents and
-//! their component manifest. It is a client of `mesh-compiler`, the single
+//! their component manifest, and hover, go to definition and completion
+//! for MPRX documents, also on files with syntax errors. It is a client of `mesh-compiler`, the single
 //! semantic authority: the diagnostics it publishes are exactly the ones
 //! `mesh check` reports for the same text, manifest and component, and it
 //! has no parser or type system of its own.

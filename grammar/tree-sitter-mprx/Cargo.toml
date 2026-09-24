@@ -1,8 +1,8 @@
 [package]
-authors = [ "Jack Miller" ]
+authors = [ "Jack Miller <jackmiller0899@gmail.com>" ]
 autoexamples = false
 categories = [ "parser-implementations", "parsing", "text-editors" ]
-description = "Mprx grammar for tree-sitter"
+description = "Tree-sitter grammar for MPRX, the MESH UI language: parsing for mesh-parser, and highlighting queries for editors"
 edition = "2024"
 keywords = [ "incremental", "parsing", "tree-sitter", "mprx" ]
 license = "MIT"

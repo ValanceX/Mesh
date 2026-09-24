@@ -126,11 +126,14 @@ mesh/
 │   ├── mesh-syntax/
 │   ├── mesh-parser/
 │   ├── mesh-semantic/
+│   ├── mesh-manifest/
+│   ├── mesh-analysis/
 │   ├── mesh-compiler/
 │   ├── mesh-lsp/
 │   └── mesh-cli/
 ├── grammar/
-│   └── tree-sitter-mprx/
+│   └── tree-sitter-mprx/     the grammar, and its highlighting queries
+├── editors/                  verified editor configurations
 └── Cargo.toml
 ```
 
@@ -143,6 +146,8 @@ Crate boundaries can change as we learn more.
 - **mesh-lsp**: diagnostics and quick fixes, hover, go-to-definition, and completion. It is **a client of the compiler**, which stays the single semantic authority: its diagnostics are the compiler's own, and it has no parser or type system of its own, so the editor and the build can't disagree. Its npm package only launches it.
 
   An open document has three kinds of state, and they never mix. **Canonical state** is exactly what `mesh_compiler::compile_with` returns for its text: its diagnostics, and for a file that parses, its IR and analysis. **Editor recovery state** exists only for a file with a syntax error: `mesh_compiler::editor::recover` keeps the parts that parse and analyzes them with the same analysis code, so hover and go-to-definition still work there. It has no diagnostics, so it can never be published or mistaken for the compiler's verdict. **Presentation** turns either into protocol messages (ranges, hover text, quick fixes) and adds nothing of its own.
+
+- **Highlighting** comes from the grammar's Tree-sitter queries, which editors load directly. They colour text and decide nothing: no MESH feature reads a query capture, so they may be approximate where the compiler may not.
 
 ### A language-neutral IR (long-term)
 

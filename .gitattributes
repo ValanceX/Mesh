@@ -2,3 +2,7 @@
 # byte (after trimming trailing whitespace). Keep them LF everywhere, even
 # on checkouts with `core.autocrlf=true`, so the fixtures pass on Windows.
 examples/fixtures/** text eol=lf
+
+# The highlighting samples and their expected captures, compared byte for
+# byte with rows and columns: LF everywhere, too.
+grammar/tree-sitter-mprx/test/captures/** text eol=lf

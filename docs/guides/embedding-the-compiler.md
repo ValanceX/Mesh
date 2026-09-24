@@ -303,6 +303,29 @@ if let Some(resolution) = recovery.resolution_at(offset) {
 
 It keeps each element whose tag name was written, minus the attributes, bindings and children that don't parse, and the clean expression of a `{…}` block that doesn't, and analyzes them against the template. `Recovery` answers `resolution_at` and `typed_at`, as `Analysis` does, and nothing else: it has no facts and no diagnostics. **It is not the compiler's verdict.** Don't report anything from it, cache it as a file's analysis, or compare it with `compile_with`'s result.
 
+## Completion, for editors
+
+`mesh_compiler::editor::candidates(source, offset, template, analysis)` lists the names that may be written at a byte offset, the way `mesh-lsp` completes them. Pass the canonical analysis (`compile_with`'s `analysis`) when there is one; for a file with a syntax error, pass `None`, and it types what it needs from the parts that parse:
+
+```rust
+use mesh_compiler::{compile_with, editor, CompileOptions};
+
+let result = compile_with(source, &CompileOptions::with_template(template));
+for candidate in editor::candidates(source, offset, template, result.analysis.as_ref()) {
+    // `candidate.label` replaces the text at `candidate.replace`;
+    // `kind`, `detail` (its type or signature) and `required` describe it.
+}
+```
+
+Every candidate comes from the manifest, and each kind is offered only where the checker accepts it: components after `<`, a component's props and `on.` events in its opening tag, commands as an `on.` handler, scope names where another expression starts, and a record's fields after `.`. Required props come first; everything else is in name order.
+
+It's built from two smaller pieces you can use on their own:
+
+- `mesh_parser::context_at(source, offset)` says what kind of place the offset is in (a tag name, an attribute of `<avatar`, a member of `user`, and so on) and which partial name a completion would replace. It reads the tokens before the offset, so it works on broken text, and it's total: any offset, any text.
+- `mesh_analysis::members(manifest, ty)` is the one rule for which members a type has, the same one the checker uses for `unknown-member`; `mesh_analysis::read_field` gives a member's type as read (an optional field of type `T` reads as `T?`).
+
+Like `recover`, all of this is editor-only: it says what could be written, never whether what is written is right. Only `compile_with` says that.
+
 ## Stability
 
 The IR's *meaning* is intended to be stable, but its Rust types may still change before 1.0: v0.2, for example, added source spans, which changed several variants' shapes, and the [CHANGELOG](../../CHANGELOG.md) marks each such change as breaking. There is no serialized IR format, so treat the IR as an in-process value. Diagnostic codes and the JSON diagnostics document are stable, as the [CLI manual](../manual/mesh-cli.md#json-output) describes. Pin a tag rather than tracking `main`.
