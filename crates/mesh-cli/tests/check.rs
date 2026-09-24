@@ -226,7 +226,7 @@ fn check_takes_the_component_from_the_file_name_unless_given() {
 }
 
 #[test]
-fn check_with_a_model_reports_the_same_mprx_diagnostics() {
+fn check_with_a_model_adds_analysis_diagnostics_after_the_files_own() {
     let manifest = temp_manifest(PAGE_MANIFEST);
     let file = temp_mprx(r#"<page a="1" a="2"></pages>"#);
 
@@ -248,9 +248,17 @@ fn check_with_a_model_reports_the_same_mprx_diagnostics() {
         .expect("should run mesh check");
 
     assert_eq!(with.status.code(), Some(1));
-    assert_eq!(with.status.code(), without.status.code());
     assert_eq!(with.stdout, without.stdout);
-    assert_eq!(with.stderr, without.stderr);
+    let without = String::from_utf8(without.stderr).expect("UTF-8 stderr");
+    let with = String::from_utf8(with.stderr).expect("UTF-8 stderr");
+    let added = with
+        .strip_prefix(&without)
+        .unwrap_or_else(|| panic!("the file's own diagnostics come first:\n{with}"));
+    assert!(
+        added.starts_with("error[unknown-prop]: component \"page\" has no prop \"a\"\n"),
+        "{added}"
+    );
+    assert_eq!(added.matches("error[").count(), 1, "{added}");
 }
 
 #[test]

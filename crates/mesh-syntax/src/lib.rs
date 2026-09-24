@@ -113,6 +113,31 @@ impl DiagnosticCode {
     /// The manifest has no component for the file being checked.
     pub const MANIFEST_MISSING_COMPONENT: DiagnosticCode =
         DiagnosticCode("manifest-missing-component");
+    /// An element whose tag names no component in the manifest.
+    pub const UNKNOWN_COMPONENT: DiagnosticCode = DiagnosticCode("unknown-component");
+    /// An attribute that isn't a prop of the element's component.
+    pub const UNKNOWN_PROP: DiagnosticCode = DiagnosticCode("unknown-prop");
+    /// An element that omits a prop its component requires.
+    pub const MISSING_REQUIRED_PROP: DiagnosticCode = DiagnosticCode("missing-required-prop");
+    /// An `on.<name>` binding for an event the element's component lacks.
+    pub const UNKNOWN_EVENT: DiagnosticCode = DiagnosticCode("unknown-event");
+    /// A name that isn't in the template's scope.
+    pub const UNKNOWN_REFERENCE: DiagnosticCode = DiagnosticCode("unknown-reference");
+    /// A command the template's component doesn't declare.
+    pub const UNKNOWN_COMMAND: DiagnosticCode = DiagnosticCode("unknown-command");
+    /// A command invoked with the wrong number of arguments.
+    pub const COMMAND_ARITY_MISMATCH: DiagnosticCode = DiagnosticCode("command-arity-mismatch");
+    /// A command invoked anywhere but as the whole handler of `on.<name>`.
+    pub const COMMAND_OUTSIDE_HANDLER: DiagnosticCode = DiagnosticCode("command-outside-handler");
+    /// An `on.<name>` handler that isn't a command invocation.
+    pub const HANDLER_NOT_COMMAND: DiagnosticCode = DiagnosticCode("handler-not-command");
+    /// `$event` anywhere but in an `on.<name>` handler's arguments.
+    pub const EVENT_VALUE_OUTSIDE_HANDLER: DiagnosticCode =
+        DiagnosticCode("event-value-outside-handler");
+    /// `$event` in the handler of an event that carries no value.
+    pub const EVENT_HAS_NO_PAYLOAD: DiagnosticCode = DiagnosticCode("event-has-no-payload");
+    /// A `$` name other than `$event`.
+    pub const UNKNOWN_SPECIAL_VALUE: DiagnosticCode = DiagnosticCode("unknown-special-value");
 
     /// Every code MESH can emit, in catalogue order. The diagnostics
     /// reference (`docs/manual/diagnostics.md`) documents each one, and a
@@ -142,6 +167,18 @@ impl DiagnosticCode {
         DiagnosticCode::MANIFEST_RECURSIVE_TYPE,
         DiagnosticCode::MANIFEST_NESTED_OPTIONAL,
         DiagnosticCode::MANIFEST_MISSING_COMPONENT,
+        DiagnosticCode::UNKNOWN_COMPONENT,
+        DiagnosticCode::UNKNOWN_PROP,
+        DiagnosticCode::MISSING_REQUIRED_PROP,
+        DiagnosticCode::UNKNOWN_EVENT,
+        DiagnosticCode::UNKNOWN_REFERENCE,
+        DiagnosticCode::UNKNOWN_COMMAND,
+        DiagnosticCode::COMMAND_ARITY_MISMATCH,
+        DiagnosticCode::COMMAND_OUTSIDE_HANDLER,
+        DiagnosticCode::HANDLER_NOT_COMMAND,
+        DiagnosticCode::EVENT_VALUE_OUTSIDE_HANDLER,
+        DiagnosticCode::EVENT_HAS_NO_PAYLOAD,
+        DiagnosticCode::UNKNOWN_SPECIAL_VALUE,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -905,6 +942,18 @@ mod tests {
                 "manifest-recursive-type",
                 "manifest-nested-optional",
                 "manifest-missing-component",
+                "unknown-component",
+                "unknown-prop",
+                "missing-required-prop",
+                "unknown-event",
+                "unknown-reference",
+                "unknown-command",
+                "command-arity-mismatch",
+                "command-outside-handler",
+                "handler-not-command",
+                "event-value-outside-handler",
+                "event-has-no-payload",
+                "unknown-special-value",
             ]
         );
     }

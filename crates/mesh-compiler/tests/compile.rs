@@ -1,5 +1,5 @@
 use mesh_semantic::{AttributeValue, Child, Element, Expression};
-use mesh_syntax::Span;
+use mesh_syntax::{DiagnosticCode, Span};
 
 /// The span every span becomes in [`without_spans`].
 const NO_SPAN: Span = Span {
@@ -767,26 +767,78 @@ fn d11_child_text_and_expression() {
     assert_eq!(children, ["héllo ", "user.name", " 日本"]);
 }
 
-#[test]
-fn compiling_against_a_template_gives_the_same_result_for_now() {
-    let manifest = mesh_manifest::load(
-        r#"{ "version": 1, "types": {}, "components": {
-            "page": { "props": {}, "events": {}, "commands": {}, "scope": {} }
-        } }"#,
-    )
-    .expect("a valid manifest");
-    let template = manifest.template("page").expect("a declared component");
-    let options = mesh_compiler::CompileOptions::with_template(template);
+/// A manifest declaring `page` (one required prop, `title`) and `view`,
+/// whose template has `user` in scope.
+const MANIFEST: &str = r#"{ "version": 1, "types": {}, "components": {
+    "page": {
+        "props": { "title": { "type": { "kind": "string" }, "required": true } },
+        "events": {}, "commands": {}, "scope": {}
+    },
+    "view": {
+        "props": {}, "events": {}, "commands": {},
+        "scope": { "user": { "kind": "string" } }
+    }
+} }"#;
 
-    for source in [
-        r#"<page title={user} a="1" a="2" />"#,
-        "<page",
-        "<page></pages>",
-    ] {
+#[test]
+fn compiling_against_a_template_appends_analysis_diagnostics() {
+    let manifest = mesh_manifest::load(MANIFEST).expect("a valid manifest");
+    let options =
+        mesh_compiler::CompileOptions::with_template(manifest.template("view").expect("declared"));
+
+    let source = r#"<page title={usr} a="1" a="2"></pages>"#;
+    let with = mesh_compiler::compile_with(source, &options);
+    let without = mesh_compiler::compile(source);
+
+    // The file's own diagnostics come first, unchanged; then analysis.
+    assert_eq!(with.ir, without.ir);
+    assert_eq!(with.diagnostics[..2], without.diagnostics[..]);
+    let added: Vec<(DiagnosticCode, &str, Vec<&str>)> = with.diagnostics[2..]
+        .iter()
+        .map(|diagnostic| {
+            (
+                diagnostic.code,
+                slice(source, diagnostic.span),
+                diagnostic
+                    .suggestions
+                    .iter()
+                    .map(|suggestion| suggestion.replacement.as_str())
+                    .collect(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        added,
+        [
+            (DiagnosticCode::UNKNOWN_REFERENCE, "usr", vec!["user"]),
+            (DiagnosticCode::UNKNOWN_PROP, "a", vec![]),
+        ]
+    );
+    assert!(with.diagnostics.iter().all(|diagnostic| diagnostic
+        .suggestions
+        .iter()
+        .all(|s| s.span == diagnostic.span)));
+}
+
+/// Analysis needs IR: a file with a syntax error is reported exactly as
+/// without a template.
+#[test]
+fn a_file_with_a_syntax_error_is_not_analyzed() {
+    let manifest = mesh_manifest::load(MANIFEST).expect("a valid manifest");
+    let options =
+        mesh_compiler::CompileOptions::with_template(manifest.template("view").expect("declared"));
+    for source in ["<pag", "<pag title={usr}>{</pag>", ""] {
         assert_eq!(
             mesh_compiler::compile_with(source, &options),
             mesh_compiler::compile(source),
             "{source}"
         );
     }
+}
+
+/// D17: without a template, nothing is analyzed, whatever the file says.
+#[test]
+fn compiling_without_a_template_reports_no_analysis_diagnostics() {
+    let result = mesh_compiler::compile(r#"<nothing-declared x={usr} on.y={$z} />"#);
+    assert_eq!(result.diagnostics, []);
 }

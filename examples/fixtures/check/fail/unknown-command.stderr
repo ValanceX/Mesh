@@ -1,0 +1,6 @@
+error[unknown-command]: unknown command "sav": the template's component doesn't declare it
+ --> fixtures/check/fail/unknown-command.mprx:1:19
+  |
+1 | <button on.click={sav()}>Save</button>
+  |                   ^^^
+  = help: did you mean "save"?

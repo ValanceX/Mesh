@@ -1,0 +1,5 @@
+error[event-value-outside-handler]: `$event` can only be used in the arguments of an `on.` handler's command
+ --> fixtures/check/fail/event-value-outside-handler.mprx:1:14
+  |
+1 | <page title={$event} />
+  |              ^^^^^^

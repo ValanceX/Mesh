@@ -1,0 +1,5 @@
+error[command-arity-mismatch]: command "select" takes 1 argument, but 0 were given
+ --> fixtures/check/fail/command-arity-mismatch.mprx:1:19
+  |
+1 | <button on.click={select()}>Select</button>
+  |                   ^^^^^^^^

@@ -1,10 +1,13 @@
 //! Type checking, diagnostics, transformation, optimization, and code
 //! generation for MPRX, built on the semantic model in `mesh-semantic`.
 //!
-//! This crate orchestrates parse → lower and aggregates diagnostics.
-//! [`compile_with`] also takes the component model a template is checked
-//! against ([`CompileOptions`]); no check uses it yet.
+//! This crate orchestrates parse → lower → analyze and aggregates
+//! diagnostics. [`compile_with`] also takes the component model a
+//! template is checked against ([`CompileOptions`]); with one, the IR is
+//! analyzed against it (`mesh-analysis`), and this crate's diagnostic
+//! layer turns what analysis found into diagnostics.
 
+mod diagnose;
 mod render;
 
 pub use render::render_diagnostic;
@@ -51,12 +54,13 @@ pub fn compile(source: &str) -> CompileResult {
 
 /// Compiles `source` as [`compile`] does, with `options`.
 ///
-/// A template in `options` is accepted but not yet used: no check reads
-/// the component model until name resolution lands, so the result is
-/// the same as [`compile`]'s.
+/// With a template in `options`, the IR is also analyzed as that
+/// component's template, and analysis diagnostics follow the parse and
+/// lowering ones, in source order. Analysis needs IR, so a file with a
+/// syntax error gets no analysis diagnostics.
 pub fn compile_with(source: &str, options: &CompileOptions<'_>) -> CompileResult {
     // Destructured so that a new option can't be silently ignored here.
-    let CompileOptions { template: _ } = options;
+    let CompileOptions { template } = options;
     let parsed = mesh_parser::parse(source);
     let mut diagnostics: Vec<mesh_syntax::Diagnostic> = parsed
         .errors
@@ -78,6 +82,11 @@ pub fn compile_with(source: &str, options: &CompileOptions<'_>) -> CompileResult
         }
         None => None,
     };
+
+    if let (Some(ir), Some(template)) = (&ir, template) {
+        let analysis = mesh_analysis::analyze(ir, *template);
+        diagnostics.extend(analysis.facts().iter().map(diagnose::diagnostic));
+    }
 
     CompileResult { ir, diagnostics }
 }

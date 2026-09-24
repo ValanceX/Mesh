@@ -492,6 +492,7 @@ dependencies = [
 name = "mesh-compiler"
 version = "0.1.0"
 dependencies = [
+ "mesh-analysis",
  "mesh-manifest",
  "mesh-parser",
  "mesh-semantic",

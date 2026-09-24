@@ -1,0 +1,5 @@
+error[missing-required-prop]: component "avatar" requires the prop "src"
+ --> fixtures/check/fail/missing-required-prop.mprx:1:2
+  |
+1 | <avatar size="sm" />
+  |  ^^^^^^

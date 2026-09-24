@@ -1,0 +1,6 @@
+error[unknown-reference]: unknown reference "usr": it isn't in the template's scope
+ --> fixtures/check/fail/unknown-reference.mprx:1:14
+  |
+1 | <page title={usr.name} />
+  |              ^^^
+  = help: did you mean "user"?

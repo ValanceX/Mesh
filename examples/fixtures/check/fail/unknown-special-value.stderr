@@ -1,0 +1,6 @@
+error[unknown-special-value]: unknown special value `$evnt`: the only one is `$event`
+ --> fixtures/check/fail/unknown-special-value.mprx:1:26
+  |
+1 | <button on.click={select($evnt)}>Select</button>
+  |                          ^^^^^
+  = help: did you mean "$event"?

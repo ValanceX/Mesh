@@ -1,0 +1,6 @@
+error[unknown-prop]: component "avatar" has no prop "sise"
+ --> fixtures/check/fail/unknown-prop.mprx:1:27
+  |
+1 | <avatar src={user.avatar} sise="sm" />
+  |                           ^^^^
+  = help: did you mean "size"?

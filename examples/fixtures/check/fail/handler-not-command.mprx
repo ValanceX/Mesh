@@ -1,0 +1,1 @@
+<button on.click={user.name}>Select</button>

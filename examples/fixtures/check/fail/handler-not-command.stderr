@@ -1,0 +1,5 @@
+error[handler-not-command]: the handler of `on.click` must be a command invocation, like `save()`
+ --> fixtures/check/fail/handler-not-command.mprx:1:19
+  |
+1 | <button on.click={user.name}>Select</button>
+  |                   ^^^^^^^^^

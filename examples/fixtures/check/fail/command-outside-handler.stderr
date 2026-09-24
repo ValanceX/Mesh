@@ -1,0 +1,5 @@
+error[command-outside-handler]: command "save" can only be invoked as the whole handler of an `on.` binding
+ --> fixtures/check/fail/command-outside-handler.mprx:1:14
+  |
+1 | <page title={save()} />
+  |              ^^^^^^

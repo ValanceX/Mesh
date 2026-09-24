@@ -1,0 +1,6 @@
+error[unknown-component]: unknown component "avatr": the manifest doesn't declare it
+ --> fixtures/check/fail/unknown-component.mprx:2:4
+  |
+2 |   <avatr src={user.avatar} />
+  |    ^^^^^
+  = help: did you mean "avatar"?

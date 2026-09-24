@@ -453,6 +453,200 @@ error[manifest-missing-component]: the manifest declares no component "template"
 
 ---
 
+## Model errors
+
+With `--model`, a file that is valid MPRX is also checked against the manifest, as the template of one component (the file's name without its extension, or `--component`):
+
+- every element is an instance of a component the manifest declares, and its attributes and `on.` bindings are that component's props and events;
+- every reference is a name in the template's `scope`, and every command is one of the template's `commands`;
+- commands and `$event` appear only where they may.
+
+Each mistake is reported once, at the name or expression that's wrong. When a declared name is close to the one written, a `help` line suggests it. A file with a syntax error isn't checked against the model.
+
+### `unknown-component`
+
+An element's tag names a component the manifest doesn't declare. MESH has no built-in elements: `page`, `text` and `button` are components like any other, and the manifest must declare them. Points at the tag name.
+
+```text
+error[unknown-component]: unknown component "avatr": the manifest doesn't declare it
+ --> examples/fixtures/check/fail/unknown-component.mprx:2:4
+  |
+2 |   <avatr src={user.avatar} />
+  |    ^^^^^
+  = help: did you mean "avatar"?
+```
+
+The element's attributes and `on.` bindings aren't checked, since there's no component to check them against. The expressions in them still are.
+
+**Fix:** declare the component in the manifest, or correct the tag. Names are case-sensitive.
+
+### `unknown-prop`
+
+An attribute isn't one of the props the element's component declares. Points at the attribute name.
+
+```text
+error[unknown-prop]: component "avatar" has no prop "sise"
+ --> examples/fixtures/check/fail/unknown-prop.mprx:1:27
+  |
+1 | <avatar src={user.avatar} sise="sm" />
+  |                           ^^^^
+  = help: did you mean "size"?
+```
+
+**Fix:** correct the name, or declare the prop in the manifest.
+
+### `missing-required-prop`
+
+An element doesn't supply a prop its component declares with `"required": true`. Points at the tag name; each missing prop is reported separately.
+
+```text
+error[missing-required-prop]: component "avatar" requires the prop "src"
+ --> examples/fixtures/check/fail/missing-required-prop.mprx:1:2
+  |
+1 | <avatar size="sm" />
+  |  ^^^^^^
+```
+
+A required prop must be written even when its *type* is optional: `"src": { "type": { "kind": "optional", ... }, "required": true }` means the value may be absent, not that the attribute may be left out. The two are independent.
+
+**Fix:** supply the prop, or declare it `"required": false`.
+
+### `unknown-event`
+
+An `on.<name>` binding names an event the element's component doesn't declare. Points at the event name.
+
+```text
+error[unknown-event]: component "button" has no event "clik"
+ --> examples/fixtures/check/fail/unknown-event.mprx:1:12
+  |
+1 | <button on.clik={save()}>Save</button>
+  |            ^^^^
+  = help: did you mean "click"?
+```
+
+**Fix:** correct the name, or declare the event in the manifest.
+
+### `unknown-reference`
+
+An expression refers to a name that isn't in the template's `scope`. Points at the name.
+
+```text
+error[unknown-reference]: unknown reference "usr": it isn't in the template's scope
+ --> examples/fixtures/check/fail/unknown-reference.mprx:1:14
+  |
+1 | <page title={usr.name} />
+  |              ^^^
+  = help: did you mean "user"?
+```
+
+The scope is everything an expression can refer to. Props aren't in it automatically: if the template needs a prop's value, the manifest lists that name in `scope` too. A reference that isn't in scope isn't checked any further, so `usr.name` gets this one error and nothing about `.name`.
+
+**Fix:** correct the name, or add it to the template component's `scope`.
+
+### `unknown-command`
+
+A handler invokes a command that the template's component doesn't declare. Points at the command name.
+
+```text
+error[unknown-command]: unknown command "sav": the template's component doesn't declare it
+ --> examples/fixtures/check/fail/unknown-command.mprx:1:19
+  |
+1 | <button on.click={sav()}>Save</button>
+  |                   ^^^
+  = help: did you mean "save"?
+```
+
+**Fix:** correct the name, or declare the command in the template component's `commands`.
+
+### `command-arity-mismatch`
+
+A command is invoked with more or fewer arguments than it declares parameters. Every parameter is required. Points at the whole invocation.
+
+```text
+error[command-arity-mismatch]: command "select" takes 1 argument, but 0 were given
+ --> examples/fixtures/check/fail/command-arity-mismatch.mprx:1:19
+  |
+1 | <button on.click={select()}>Select</button>
+  |                   ^^^^^^^^
+```
+
+**Fix:** pass exactly one argument per parameter, in order.
+
+### `command-outside-handler`
+
+A command is invoked anywhere but as the whole handler of an `on.` binding: in an attribute value, in content, inside an operator, or as another command's argument. A command is an action, not a value. Points at the invocation, and nothing inside it is checked.
+
+```text
+error[command-outside-handler]: command "save" can only be invoked as the whole handler of an `on.` binding
+ --> examples/fixtures/check/fail/command-outside-handler.mprx:1:14
+  |
+1 | <page title={save()} />
+  |              ^^^^^^
+```
+
+**Fix:** move the command into an `on.` binding, such as `on.click={save()}`.
+
+### `handler-not-command`
+
+An `on.` binding's handler isn't a command invocation. Points at the handler, and nothing inside it is checked.
+
+```text
+error[handler-not-command]: the handler of `on.click` must be a command invocation, like `save()`
+ --> examples/fixtures/check/fail/handler-not-command.mprx:1:19
+  |
+1 | <button on.click={user.name}>Select</button>
+  |                   ^^^^^^^^^
+```
+
+**Fix:** invoke a command: `on.click={select(user)}`.
+
+### `event-value-outside-handler`
+
+`$event` is used outside the arguments of an `on.` handler's command. It's the value the event carries, so it only exists there.
+
+```text
+error[event-value-outside-handler]: `$event` can only be used in the arguments of an `on.` handler's command
+ --> examples/fixtures/check/fail/event-value-outside-handler.mprx:1:14
+  |
+1 | <page title={$event} />
+  |              ^^^^^^
+```
+
+`$event` can appear anywhere inside a handler's arguments, including inside an object or array: `on.change={update({ name: $event })}`.
+
+**Fix:** use `$event` only as (part of) an argument of the command in an `on.` handler.
+
+### `event-has-no-payload`
+
+`$event` is used in the handler of an event that the manifest declares without a `"payload"`, so there is no value.
+
+```text
+error[event-has-no-payload]: event "press" of component "button" carries no value, so there is no `$event`
+ --> examples/fixtures/check/fail/event-has-no-payload.mprx:1:26
+  |
+1 | <button on.press={select($event)}>Select</button>
+  |                          ^^^^^^
+```
+
+**Fix:** don't use `$event` in this handler, or declare the event's `"payload"` type in the manifest.
+
+### `unknown-special-value`
+
+A `$` name other than `$event`. `$event` is the only special value.
+
+```text
+error[unknown-special-value]: unknown special value `$evnt`: the only one is `$event`
+ --> examples/fixtures/check/fail/unknown-special-value.mprx:1:26
+  |
+1 | <button on.click={select($evnt)}>Select</button>
+  |                          ^^^^^
+  = help: did you mean "$event"?
+```
+
+**Fix:** write `$event`.
+
+---
+
 ## CLI errors
 
 ### `could not read <file>: <reason>`
@@ -474,13 +668,15 @@ Validation diagnostics are reported element by element, from the root downwards.
 
 So a parent's mismatched-tag error comes before a warning inside one of its children. The `examples/fixtures/fail/warning-and-error.mprx` fixture shows a warning and an error in one file.
 
+With `--model`, model errors come after all of those, in source order. Two errors that start at the same place keep the order MESH found them in.
+
 ## What MESH doesn't diagnose yet
 
-These pass `mesh check` even when they're wrong:
+Without `--model`, MESH checks only that a file is well-formed MPRX. Unknown components, props, events, references and commands all pass: catching them needs a component manifest.
 
-- References to names that don't exist (`user={usr}`)
-- Unknown components or props
+With `--model`, these still pass `mesh check` even when they're wrong:
+
 - Type mismatches (`disabled={"yes"}`)
-- Unknown event names or commands
+- Members that don't exist (`user.nmae`)
 
-Catching them needs a component model. That's the rest of v0.2.
+That's the rest of v0.2.

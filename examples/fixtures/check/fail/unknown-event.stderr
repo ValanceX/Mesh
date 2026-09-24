@@ -1,0 +1,6 @@
+error[unknown-event]: component "button" has no event "clik"
+ --> fixtures/check/fail/unknown-event.mprx:1:12
+  |
+1 | <button on.clik={save()}>Save</button>
+  |            ^^^^
+  = help: did you mean "click"?

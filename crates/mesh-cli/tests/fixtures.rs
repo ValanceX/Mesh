@@ -14,6 +14,11 @@
 //! - `examples/fixtures/manifest/fail/*.json` — broken manifests. Checking
 //!   `fixtures/manifest/template.mprx` against each must exit 1 with empty
 //!   stdout; stderr must match the sibling `.stderr` file.
+//! - `examples/fixtures/check/{pass,fail}/*.mprx` — checked against the
+//!   manifest `fixtures/check/components.json`, each as the template of its
+//!   `template` component. Pass fixtures must check clean (exit 0,
+//!   `no errors`, empty stderr); fail fixtures must exit 1 with empty
+//!   stdout, and stderr must match the sibling `.stderr` file.
 //!
 //! Discovery is deliberately non-recursive: only files directly inside
 //! each of those directories are found, and files in nested
@@ -48,6 +53,15 @@ const EXAMPLE_COMPONENTS: [(&str, &str); 1] = [("user-card.mprx", "user-card-exa
 
 /// The file every broken-manifest fixture is checked with.
 const MANIFEST_TEMPLATE: &str = "fixtures/manifest/template.mprx";
+
+/// The manifest every `fixtures/check/` file is checked against, as the
+/// template of its `template` component.
+const CHECK_ARGS: [&str; 4] = [
+    "--model",
+    "fixtures/check/components.json",
+    "--component",
+    "template",
+];
 
 /// Every `.mprx` file directly inside `examples/<relative_dir>` (not
 /// recursive), as a path relative to `examples/`, sorted so failures
@@ -91,13 +105,14 @@ fn check(relative_path: &Path, extra_args: &[&str]) -> Output {
 /// `expected_stderr` returning an empty string means "stderr must be empty".
 fn assert_corpus(
     relative_dir: &str,
+    extra_args: &[&str],
     expected_code: i32,
     expected_stderr: impl Fn(&Path) -> String,
 ) {
     let runs = mprx_files(relative_dir)
         .into_iter()
         .map(|file| {
-            let output = check(&file, &[]);
+            let output = check(&file, extra_args);
             (file, output)
         })
         .collect();
@@ -170,17 +185,27 @@ fn canonical_v0_1_examples_are_present() {
 
 #[test]
 fn examples_check_clean() {
-    assert_corpus("", 0, |_| String::new());
+    assert_corpus("", &[], 0, |_| String::new());
 }
 
 #[test]
 fn pass_fixtures_exit_zero_with_expected_warnings() {
-    assert_corpus("fixtures/pass", 0, stderr_file);
+    assert_corpus("fixtures/pass", &[], 0, stderr_file);
 }
 
 #[test]
 fn fail_fixtures_exit_one_with_expected_diagnostics() {
-    assert_corpus("fixtures/fail", 1, stderr_file);
+    assert_corpus("fixtures/fail", &[], 1, stderr_file);
+}
+
+#[test]
+fn check_pass_fixtures_check_clean_against_their_model() {
+    assert_corpus("fixtures/check/pass", &CHECK_ARGS, 0, |_| String::new());
+}
+
+#[test]
+fn check_fail_fixtures_exit_one_with_expected_diagnostics() {
+    assert_corpus("fixtures/check/fail", &CHECK_ARGS, 1, stderr_file);
 }
 
 #[test]
@@ -267,4 +292,29 @@ fn example_manifest_declares_what_the_examples_name() {
         missing.is_empty(),
         "examples/{EXAMPLE_MODEL} doesn't declare: {missing:#?}"
     );
+}
+
+/// Every code that checking against a model can produce (every code
+/// after the `manifest-*` ones) has a fail fixture named after it, whose
+/// expected output reports that code.
+#[test]
+fn every_model_code_has_its_own_fail_fixture() {
+    let codes = mesh_syntax::DiagnosticCode::ALL;
+    let first = codes
+        .iter()
+        .position(|code| *code == mesh_syntax::DiagnosticCode::MANIFEST_MISSING_COMPONENT)
+        .expect("the last manifest code is listed")
+        + 1;
+    assert!(first < codes.len(), "no model codes yet");
+
+    let mut missing = Vec::new();
+    for code in &codes[first..] {
+        let fixture = PathBuf::from(format!("fixtures/check/fail/{code}.mprx"));
+        if !examples_dir().join(&fixture).is_file() {
+            missing.push(format!("{}: no such fixture", fixture.display()));
+        } else if !stderr_file(&fixture).contains(&format!("error[{code}]")) {
+            missing.push(format!("{}: doesn't report {code}", fixture.display()));
+        }
+    }
+    assert!(missing.is_empty(), "{missing:#?}");
 }

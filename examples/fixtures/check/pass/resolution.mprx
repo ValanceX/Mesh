@@ -1,0 +1,6 @@
+<page title="Users">
+  <text>{user.name}</text>
+  <avatar src={user.avatar} />
+  <button on.click={select($event)} on.press={save()}>Select</button>
+  <input value={name} on.change={select({ name: $event, active: true })} />
+</page>

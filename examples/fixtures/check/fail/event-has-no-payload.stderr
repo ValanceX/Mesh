@@ -1,0 +1,5 @@
+error[event-has-no-payload]: event "press" of component "button" carries no value, so there is no `$event`
+ --> fixtures/check/fail/event-has-no-payload.mprx:1:26
+  |
+1 | <button on.press={select($event)}>Select</button>
+  |                          ^^^^^^
