@@ -576,7 +576,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "mesh-analysis"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "mesh-manifest",
  "mesh-parser",
@@ -586,7 +586,7 @@ dependencies = [
 
 [[package]]
 name = "mesh-cli"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -606,7 +606,7 @@ dependencies = [
 
 [[package]]
 name = "mesh-compiler"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "jsonschema",
  "mesh-analysis",
@@ -622,7 +622,7 @@ dependencies = [
 
 [[package]]
 name = "mesh-lsp"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "crossbeam-channel",
  "lsp-server",
@@ -638,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "mesh-manifest"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "jsonschema",
  "mesh-syntax",
@@ -648,7 +648,7 @@ dependencies = [
 
 [[package]]
 name = "mesh-parser"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "mesh-syntax",
  "thiserror",
@@ -658,7 +658,7 @@ dependencies = [
 
 [[package]]
 name = "mesh-runtime"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "jsonschema",
  "mesh-analysis",
@@ -673,7 +673,7 @@ dependencies = [
 
 [[package]]
 name = "mesh-runtime-wasm"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "mesh-compiler",
  "mesh-runtime",
@@ -683,18 +683,18 @@ dependencies = [
 
 [[package]]
 name = "mesh-semantic"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "mesh-syntax",
 ]
 
 [[package]]
 name = "mesh-syntax"
-version = "0.4.0"
+version = "0.5.0"
 
 [[package]]
 name = "mesh-template"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "jsonschema",
  "mesh-manifest",
@@ -705,7 +705,7 @@ dependencies = [
 
 [[package]]
 name = "mesh-wasm"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "mesh-compiler",
  "mesh-runtime",
@@ -1203,7 +1203,7 @@ checksum = "ca0d1bf6fdd806e43ae5198f82f527056d359def39e54e67a0f478ac09dac081"
 
 [[package]]
 name = "tree-sitter-mprx"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "cc",
  "tree-sitter",

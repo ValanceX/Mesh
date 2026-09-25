@@ -1,6 +1,6 @@
 # MESH documentation
 
-Documentation for **MESH v0.4**. New here? Start with *Getting started*.
+Documentation for **MESH v0.5**. New here? Start with *Getting started*.
 
 ## Guides
 
@@ -26,7 +26,7 @@ Reference material for when you need exact details.
 - [**Diagnostics JSON Schema**](../schemas/diagnostics-v1.schema.json): the document `mesh check --format json` prints.
 - [**MPRX Language Spec**](./MPRX-SPEC.md): the canonical grammar and semantics.
 
-**v0.5, in progress.** These are the contracts v0.5's compiler and runtime are built against, and that NEXUS's adapter and PORT's renderers can build against now. The compiler, the Rust runtime (`mesh-runtime`) and `@valancex/mesh-runtime` implement them:
+**Templates and the runtime.** These are the contracts NEXUS's adapter and PORT's renderers build against. The compiler, the Rust runtime (`mesh-runtime`) and `@valancex/mesh-runtime` implement them:
 
 - [**Evaluation and the boundary**](./MPRX-SPEC.md#97-evaluation): §9.7 and §9.8 of the spec, with the normative [number-to-text table](./tables/number-to-text.tsv) and its [reference generator](./tables/number_to_text.py).
 - [**Templates and programs**](./manual/templates.md): the compiled form of a template, the model fingerprint, and the assembly rules. Also a [JSON Schema](../schemas/template-v1.schema.json). `mesh compile` and `compile()` emit templates; `mesh check-program` and `checkProgram()` check programs.
@@ -35,7 +35,7 @@ Reference material for when you need exact details.
 ## Background
 
 - [**Architecture**](./ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance.
-- Release notes for [**v0.4**](./releases/v0.4.md), [**v0.3**](./releases/v0.3.md), [**v0.2**](./releases/v0.2.md) and [**v0.1**](./releases/v0.1.md), and the [**CHANGELOG**](../CHANGELOG.md).
+- Release notes for [**v0.5**](./releases/v0.5.md), [**v0.4**](./releases/v0.4.md), [**v0.3**](./releases/v0.3.md), [**v0.2**](./releases/v0.2.md) and [**v0.1**](./releases/v0.1.md), and the [**CHANGELOG**](../CHANGELOG.md).
 
 ## For contributors
 
