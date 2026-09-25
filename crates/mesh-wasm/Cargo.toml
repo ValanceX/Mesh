@@ -1,0 +1,23 @@
+[package]
+name = "mesh-wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "The MESH compiler for WebAssembly: the check operation behind @valancex/mesh-compiler, with no semantics of its own."
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# A panicking export and a live-allocation count, for the package's
+# failure and memory tests. Never in the shipped module.
+test-hooks = []
+
+[dependencies]
+mesh-compiler.workspace = true

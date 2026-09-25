@@ -616,6 +616,13 @@ name = "mesh-syntax"
 version = "0.3.0"
 
 [[package]]
+name = "mesh-wasm"
+version = "0.3.0"
+dependencies = [
+ "mesh-compiler",
+]
+
+[[package]]
 name = "micromap"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
