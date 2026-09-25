@@ -1,8 +1,6 @@
 # The MESH runtime
 
-> **Status: v0.5, in progress.** This manual is the contract v0.5's runtime, `@valancex/mesh-runtime`, NEXUS's adapter and PORT's renderers are built against (outline: `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, D3–D6). The Rust runtime, the `mesh-runtime` crate, and `@valancex/mesh-runtime`, the same runtime in WebAssembly for JavaScript hosts, implement it. The keys, handler identifiers and program identities in its examples are illustrative, though their layout is the runtime's.
-
-The runtime evaluates a **program** of templates (`docs/manual/templates.md`) against a **host**'s values. It produces a **render tree**, which a renderer draws, and turns the events a renderer reports into **command intents** for the host. It is one Rust implementation, compiled natively and to WebAssembly. It implements MPRX's evaluation (§9.7) and the boundary (§9.8) exactly once. It has no I/O, no clock, no randomness and no global state: identical inputs give identical results.
+The runtime evaluates a **program** of templates (`docs/manual/templates.md`) against a **host**'s values. It produces a **render tree**, which a renderer draws, and turns the events a renderer reports into **command intents** for the host. It is one Rust implementation, compiled natively (the `mesh-runtime` crate) and to WebAssembly (`@valancex/mesh-runtime`). It implements MPRX's evaluation (§9.7) and the boundary (§9.8) exactly once. It has no I/O, no clock, no randomness and no global state: identical inputs give identical results.
 
 It accepts no MPRX source, only templates, and it resolves no names: every resolution is already in the templates. It uses the model for one thing only, to validate values.
 
@@ -44,9 +42,20 @@ A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any p
 - Only the host knows which render the renderer had drawn. **Keeping renders, and pairing each event with its render, is the host's obligation.**
 - Dispatch with a render of an earlier program is valid, and its result is that program's intent.
 
+## Calling the runtime
+
+**From Rust,** `mesh_runtime::render(&program, model, &snapshot)` returns a `Render` or the diagnostics, and `mesh_runtime::dispatch(&render, handler, payload)` returns an `Intent` or the diagnostics. A `Program` is the root's name and the templates' texts; the model is the manifest's text; a snapshot is a `HostRecord` (`HostRecord::from_json` reads one). A host that keeps a render's program, model and snapshot rather than the `Render` itself calls `mesh_runtime::dispatch_from` with them, which validates them all again, as dispatch always does. `mesh_runtime::to_json` writes diagnostics as the document below.
+
+**From JavaScript,** `@valancex/mesh-runtime` has the same two operations: `render({ program: { root, templates }, model, snapshot })` resolves to `{ render }` or `{ diagnostics }`, and `dispatch(render, handler, payload?)` to `{ intent }` or `{ diagnostics }`. `render.tree` is the render tree, frozen. Its [README](../../packages/mesh-runtime/README.md) has the details. What a JavaScript host needs to know about its values (§9.8.6):
+- The package **encodes, and never judges.** Every value reaches the runtime, which reports what it can't accept: NaN, the infinities, a hole or `undefined` in an array, an unpaired surrogate, a `Map`, a `Date`, a class instance, a function, a `bigint` or a value that contains itself. So a JavaScript host gets exactly the diagnostics a native host gets for the same values.
+- A missing property and a property that is `undefined` are both absent. A payload that isn't given is absent too.
+- `-0` crosses in as `-0`, and never comes out (§9.8.2).
+- A render keeps its snapshot as it was encoded when `render` was called, so changing the host's objects afterwards changes nothing.
+- A problem with the host's values is a diagnostic, never an exception. The promises reject only with a `TypeError` for arguments of the wrong JavaScript type, or a `render` the package didn't make; with `MeshVersionError` for a module of another version; and with `MeshInternalError` if the runtime itself fails.
+
 ## The render tree
 
-The render tree is [`schemas/render-v1.schema.json`](../../schemas/render-v1.schema.json). It contains exactly primitive component names, prop names with values from the boundary data model (§9.8.1), text runs as strings, event names each with a handler identifier, and keys. It contains nothing else: no expression, scope name, command, argument, composite name, template, span or `$event`.
+The render tree is [`schemas/render-v1.schema.json`](../../schemas/render-v1.schema.json). The keys, handler identifiers and program identities in this manual's examples are illustrative, though their layout is the runtime's. It contains exactly primitive component names, prop names with values from the boundary data model (§9.8.1), text runs as strings, event names each with a handler identifier, and keys. It contains nothing else: no expression, scope name, command, argument, composite name, template, span or `$event`.
 
 - **A node** is a primitive occurrence: `{ "type": "node", "key", "component", "props", "events", "children" }`.
   - `props` maps each written prop to its value. An absent value is an omitted prop; `null` is `null`.
@@ -185,6 +194,13 @@ A **host**:
 - tells its renderer when a new tree comes from a different program than the one drawn, so the renderer draws it afresh instead of reconciling by key;
 - shapes its values to the manifest: records are exact, so a record with more fields than its type declares is refused (§9.8.4);
 - maps intents to its own commands, and treats diagnostics as errors in its inputs or its program, not as messages for end users.
+
+## Number to text
+
+Text for a number is §9.7.7.1's, and nothing else decides it: the shortest digits that read back as the number, the nearest of those, and the even one of two equally near. The runtime generates these digits with its own exact code (`mesh_runtime::number_to_text`), and reproduces every row of the normative table, [`docs/tables/number-to-text.tsv`](../tables/number-to-text.tsv), natively and in WebAssembly.
+- **It doesn't use Rust's standard formatting,** which rounds the equally near cases up: on Rust 1.98.1 it fails 4 of the table's 82 finite rows, all such ties. Its layout differs too: it never uses an exponent.
+- **It doesn't use `ryu`** in v0.5, because there is no citable evidence that it chooses the nearest candidate and breaks ties to even. A library could replace MESH's code only with that evidence.
+- **It isn't a JavaScript engine's `String(x)`.** ECMA-262 leaves the last digit open, so an engine may differ from MESH without breaking ECMA-262. A differential test compares MESH with V8, and found no difference over 1,000,000 values on Node 22, but V8 is not the authority. A renderer draws MESH's text as given, and never formats a number itself.
 
 ## Diagnostics
 

@@ -7,7 +7,7 @@ MPRX (MeshExpr) is the declarative UI language at the heart of [MESH](../README.
 - **Want a gentler introduction?** The [Writing MPRX guide](./guides/writing-mprx.md) covers the same ground with examples and common mistakes.
 - **Implementing something?** Write against this spec rather than inventing syntax inline. The plans in `docs/superpowers/plans/` build it out step by step.
 
-This is a **living document**. It was updated as each pass shipped and now describes MESH v0.4, whose language is v0.2's: §2–§8 are the syntax and its representation, and §9 is what a file means when it's checked against a component manifest. §9.7 and §9.8, what a checked file does when it runs and how values cross into and out of it, are specified for v0.5 and not yet implemented. The "Introduced in" column in §8 shows which pass added each node kind.
+This is a **living document**. It was updated as each pass shipped and now describes MESH v0.5, whose syntax is v0.2's: §2–§8 are the syntax and its representation, and §9 is what a file means when it's checked against a component manifest, and, in §9.7 and §9.8, what a checked file does when it runs and how values cross into and out of it. The "Introduced in" column in §8 shows which pass added each node kind.
 
 ---
 
@@ -65,15 +65,15 @@ v0.4 doesn't change them either: it builds the same compiler for WebAssembly, as
 
 v0.5 adds no syntax. It adds MPRX's evaluation (§9.7) and the boundary between the runtime and its host (§9.8), and two check-time errors that follow from them (outlined in `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`):
 
-| v0.5 pass | What it adds | Status |
+| v0.5 pass | What it added | Status |
 |---|---|---|
-| 0 | §9.7 and §9.8, the number-to-text table, and the template, render-tree and runtime-diagnostics formats | ✅ Specified |
-| 1 | Compiling a checked template to `template-v1`; `content-not-text` and `number-literal-out-of-range` | ✅ Implemented |
-| 2 | The runtime, natively: render and dispatch, for programs of one template and, as built, of several | ✅ Implemented |
-| 3 | The program check, and the runtime in JavaScript | ✅ Implemented |
-| 4 | Documentation and release | Planned |
+| 0 | §9.7 and §9.8, the number-to-text table, and the template, render-tree and runtime-diagnostics formats | ✅ Shipped |
+| 1 | Compiling a checked template to `template-v1`; `content-not-text` and `number-literal-out-of-range` | ✅ Shipped |
+| 2 | The runtime, natively: render and dispatch, for programs of one template and, as built, of several | ✅ Shipped |
+| 3 | The program check, and the runtime in JavaScript | ✅ Shipped |
+| 4 | Documentation and release | ✅ Shipped |
 
-*Last updated 2026-09-25. v0.4 is released as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them. Any further grammar or semantics work starts a new spec.*
+*Last updated 2026-09-26. v0.5 is released as v0.5.0, v0.4 as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.5](./releases/v0.5.md), [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them and whose later passes implemented them. Any further grammar or semantics work starts a new spec.*
 
 ---
 
@@ -535,7 +535,7 @@ Anywhere else, such as an object literal where `any` or a primitive is expected,
 
 ### 9.7 Evaluation
 
-*Added in v0.5, as the contract for its runtime (outlined in `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, D8). Specified; the runtime that implements it arrives in v0.5's later passes.* This section is MPRX's dynamic semantics: what a checked template's expressions produce when the MESH runtime evaluates them against values. It is the language's definition, and MESH implements it exactly once, in its Rust runtime.
+*Added in v0.5, as the contract for its runtime (outlined in `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, D8), and implemented by `mesh-runtime`.* This section is MPRX's dynamic semantics: what a checked template's expressions produce when the MESH runtime evaluates them against values. It is the language's definition, and MESH implements it exactly once, in its Rust runtime.
 
 Where a rule matches a standard, the standard is named and is normative: **IEEE 754-2019** for numbers, and **ECMA-262, 16th edition (ECMAScript 2025)**, Number::toString, for turning a number into text. Where MPRX deliberately departs from what a host language happens to do, the rule says so.
 
@@ -668,7 +668,7 @@ An interpolation whose static type is a list, a record, `list<nothing>`, or an o
 
 ### 9.8 The boundary
 
-*Added in v0.5, as the contract for its runtime. Specified; not yet implemented.* A **boundary** is a place where values leave or enter the runtime. The inputs are the host's snapshot and event payloads. The outputs are primitive props, text runs and command arguments. `docs/manual/runtime.md` describes the host interface around them.
+*Added in v0.5, as the contract for its runtime, and implemented by `mesh-runtime` and, for JavaScript hosts, `@valancex/mesh-runtime`.* A **boundary** is a place where values leave or enter the runtime. The inputs are the host's snapshot and event payloads. The outputs are primitive props, text runs and command arguments. `docs/manual/runtime.md` describes the host interface around them.
 
 #### 9.8.1 The boundary data model
 
@@ -804,3 +804,10 @@ A host that holds its values as JSON maps them as follows.
   its reference generator computes from §9.7.7.1. §9.2 now defers the
   representation of absence to §9.8, and §10 narrows composition to
   what v0.5 still leaves out: slots, children and composite events.
+- **v0.5 (2026-09-26)**, as released, changes no rule of §9.7 or §9.8.
+  Passes 1–3 implemented them: `mesh-runtime` reproduces every row of
+  the number-to-text table with MESH's own digit generator
+  (`crates/mesh-runtime/tests/text.rs`), and its WebAssembly build does
+  too. A differential comparison with V8, over 1,000,000 values, found no
+  difference. §9.7 and §9.8 lose their "specified" status, and the
+  introduction now describes v0.5.
