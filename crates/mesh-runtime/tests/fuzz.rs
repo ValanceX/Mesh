@@ -1,8 +1,8 @@
 //! A seeded fuzzer over render and dispatch: mutated MPRX (compiled when
 //! it still compiles), mutated template JSON, snapshots with hostile
-//! values, forged handler identifiers and hostile payloads. Every call
-//! must return a result or diagnostics, never panic, and what it returns
-//! must match its schema.
+//! values, mutated roots and template lists, forged handler identifiers
+//! and hostile payloads. Every call must return a result or diagnostics,
+//! never panic, and what it returns must match its schema.
 //!
 //! `MESH_FUZZ_ITERATIONS` (default 300) and `MESH_FUZZ_SEED` as in the
 //! compiler's fuzzer.
@@ -193,9 +193,24 @@ fn render_and_dispatch_never_panic() {
         if rng.below(4) == 0 {
             template = mutate_text(&mut rng, &template);
         }
-        let templates = [template.as_str(), card.as_str()];
+        // The program itself: sometimes another root, or a template list
+        // with one dropped, repeated or out of order.
+        let mut templates = vec![template.as_str(), card.as_str()];
+        match rng.below(8) {
+            0 => {
+                templates.remove(rng.below(templates.len()));
+            }
+            1 => templates.push(templates[rng.below(templates.len())]),
+            2 => templates.reverse(),
+            _ => {}
+        }
+        let root = if rng.below(6) == 0 {
+            ["card", "page", "nope", "", "view "][rng.below(5)]
+        } else {
+            "view"
+        };
         let program = Program {
-            root: "view",
+            root,
             templates: &templates,
         };
         let snapshot = mutate_snapshot(&mut rng, &base);

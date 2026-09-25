@@ -19,6 +19,8 @@
 //! `MESH_PROPERTY_SNAPSHOTS` (default 100 per template) and
 //! `MESH_PROPERTY_SEED`.
 
+mod common;
+
 use mesh_compiler::check;
 use mesh_manifest::{Manifest, Type};
 use mesh_runtime::{HostKey, HostRecord, HostValue, Node, Program, TreeChild};
@@ -315,13 +317,114 @@ fn structure(node: &Node, depth: usize, out: &mut String) {
     }
 }
 
+/// A program under test, and what it may stop at.
+struct Case<'a> {
+    label: String,
+    model: &'a str,
+    manifest: &'a Manifest,
+    root: &'a str,
+    templates: Vec<String>,
+}
+
+#[derive(Default)]
+struct Counts {
+    renders: u64,
+    stops: u64,
+}
+
+/// The evaluation diagnostics `case` may stop at: those whose source is
+/// present in one of its templates (outside handlers), or, for the `any`
+/// checks, in the scope of one of its templates' components.
+fn allowed(case: &Case<'_>) -> Vec<&'static str> {
+    let mut found = Sources::default();
+    let mut any = false;
+    for template in &case.templates {
+        let json: Value = serde_json::from_str(template).unwrap();
+        sources_in(&json, &mut found);
+        let component = json["component"].as_str().unwrap();
+        any |= case.manifest.components()[component]
+            .scope
+            .values()
+            .any(|ty| contains_any(case.manifest, ty, &mut BTreeSet::new()));
+    }
+    let mut allowed = Vec::new();
+    if found.arithmetic {
+        allowed.push("runtime-non-finite-output");
+    }
+    if found.list {
+        allowed.push("runtime-absent-element-output");
+    }
+    if any {
+        allowed.extend(ANY_CHECKS);
+    }
+    allowed
+}
+
+/// Renders `snapshots` generated snapshots of `case`'s root's scope, and
+/// checks every result.
+fn run(
+    case: &Case<'_>,
+    snapshots: u64,
+    rng: &mut Rng,
+    validator: &jsonschema::Validator,
+    counts: &mut Counts,
+) {
+    let allowed = allowed(case);
+    let texts: Vec<&str> = case.templates.iter().map(String::as_str).collect();
+    let program = Program {
+        root: case.root,
+        templates: &texts,
+    };
+    let scope = &case.manifest.components()[case.root].scope;
+    let label = &case.label;
+    let mut shape: Option<String> = None;
+    for _ in 0..snapshots {
+        let mut fields: Vec<(HostKey, HostValue)> = scope
+            .iter()
+            .filter_map(|(name, ty)| {
+                fitting(case.manifest, rng, ty, 0).map(|v| (HostKey::Text(name.clone()), v))
+            })
+            .collect();
+        shuffle(rng, &mut fields);
+        let snapshot = HostRecord(fields);
+        match mesh_runtime::render(&program, case.model, &snapshot) {
+            Ok(render) => {
+                counts.renders += 1;
+                let document: Value = serde_json::from_str(&render.tree().to_json()).unwrap();
+                assert!(validator.is_valid(&document), "{label}: {document}");
+                let mut this = String::new();
+                structure(&render.tree().root, 0, &mut this);
+                match &shape {
+                    None => shape = Some(this),
+                    Some(shape) => {
+                        assert_eq!(shape, &this, "{label}: every render has one structure")
+                    }
+                }
+            }
+            Err(diagnostics) => {
+                counts.stops += 1;
+                assert_eq!(
+                    diagnostics.len(),
+                    1,
+                    "{label}: evaluation reports one error: {diagnostics:#?}\n{snapshot:?}"
+                );
+                assert!(
+                    allowed.contains(&diagnostics[0].code),
+                    "{label}: {} has no source in the program (allowed {allowed:?}): {diagnostics:#?}\n{snapshot:?}",
+                    diagnostics[0].code
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn generated_snapshots_render_or_stop_at_a_present_source() {
     let snapshots = env("MESH_PROPERTY_SNAPSHOTS", 100);
     let seed = env("MESH_PROPERTY_SEED", 0x4d45_5348_7072_6f70);
     let mut rng = Rng(seed);
     let validator = validator();
-    let (mut programs, mut refused, mut renders, mut stops) = (0, 0, 0u64, 0u64);
+    let (mut programs, mut refused, mut counts) = (0, 0, Counts::default());
     for (path, model_path, component) in corpus() {
         let model_text = read(&root().join(model_path));
         let model = check::Model::load(&model_text, &component).expect("the model loads");
@@ -329,35 +432,25 @@ fn generated_snapshots_render_or_stop_at_a_present_source() {
         let Some(template) = compiled.template else {
             continue;
         };
-        let template = mesh_template::to_json(&template);
         let manifest = mesh_manifest::load(&model_text).expect("the manifest loads");
-        let scope = &manifest.components()[&component].scope;
-
-        let mut found = Sources::default();
-        sources_in(&serde_json::from_str(&template).unwrap(), &mut found);
-        let any = scope
-            .values()
-            .any(|ty| contains_any(&manifest, ty, &mut BTreeSet::new()));
-        let mut allowed: Vec<&str> = Vec::new();
-        if found.arithmetic {
-            allowed.push("runtime-non-finite-output");
-        }
-        if found.list {
-            allowed.push("runtime-absent-element-output");
-        }
-        if any {
-            allowed.extend(ANY_CHECKS);
-        }
-
-        let templates = [template.as_str()];
-        let program = Program {
+        let case = Case {
+            label: path.display().to_string(),
+            model: &model_text,
+            manifest: &manifest,
             root: &component,
-            templates: &templates,
+            templates: vec![mesh_template::to_json(&template)],
         };
         // A template that uses its own component (`examples/page.mprx`)
         // isn't a program on its own: assembly refuses it, whatever the
         // snapshot.
-        let refusal = mesh_runtime::check_program(&program, &model_text);
+        let texts: Vec<&str> = case.templates.iter().map(String::as_str).collect();
+        let refusal = mesh_runtime::check_program(
+            &Program {
+                root: &component,
+                templates: &texts,
+            },
+            &model_text,
+        );
         if !refusal.is_empty() {
             let codes: Vec<&str> = refusal.iter().map(|d| d.code).collect();
             assert_eq!(codes, ["assembly-cycle"], "{}", path.display());
@@ -365,59 +458,60 @@ fn generated_snapshots_render_or_stop_at_a_present_source() {
             continue;
         }
         programs += 1;
-        let mut shape: Option<String> = None;
-        for _ in 0..snapshots {
-            let mut fields: Vec<(HostKey, HostValue)> = scope
-                .iter()
-                .filter_map(|(name, ty)| {
-                    fitting(&manifest, &mut rng, ty, 0).map(|v| (HostKey::Text(name.clone()), v))
-                })
-                .collect();
-            shuffle(&mut rng, &mut fields);
-            let snapshot = HostRecord(fields);
-            match mesh_runtime::render(&program, &model_text, &snapshot) {
-                Ok(render) => {
-                    renders += 1;
-                    let document: Value = serde_json::from_str(&render.tree().to_json()).unwrap();
-                    assert!(
-                        validator.is_valid(&document),
-                        "{}: {document}",
-                        path.display()
-                    );
-                    let mut this = String::new();
-                    structure(&render.tree().root, 0, &mut this);
-                    match &shape {
-                        None => shape = Some(this),
-                        Some(shape) => assert_eq!(
-                            shape,
-                            &this,
-                            "{}: every render has one structure",
-                            path.display()
-                        ),
-                    }
-                }
-                Err(diagnostics) => {
-                    stops += 1;
-                    assert_eq!(
-                        diagnostics.len(),
-                        1,
-                        "{}: evaluation reports one error: {diagnostics:#?}\n{snapshot:?}",
-                        path.display()
-                    );
-                    assert!(
-                        allowed.contains(&diagnostics[0].code),
-                        "{}: {} has no source in the template (allowed {allowed:?}): {diagnostics:#?}\n{snapshot:?}",
-                        path.display(),
-                        diagnostics[0].code
-                    );
-                }
-            }
-        }
+        run(&case, snapshots, &mut rng, &validator, &mut counts);
     }
     assert!(programs >= 20, "only {programs} corpus programs compiled");
     println!(
         "property: {programs} programs × {snapshots} snapshots of seed {seed}: \
-         {renders} rendered, {stops} stopped at a present source; \
-         {refused} refused at assembly"
+         {} rendered, {} stopped at a present source; \
+         {refused} refused at assembly",
+        counts.renders, counts.stops
+    );
+}
+
+/// The same property over programs of several templates: every program
+/// under `tests/programs/`, each `.mprx` the template of the component it
+/// names, against the tests' model, with `view` as the root.
+#[test]
+fn generated_snapshots_of_composed_programs() {
+    let snapshots = env("MESH_PROPERTY_SNAPSHOTS", 100);
+    let seed = env("MESH_PROPERTY_SEED", 0x4d45_5348_7072_6f70);
+    let mut rng = Rng(seed);
+    let validator = validator();
+    let model_text = common::MODEL.to_string();
+    let manifest = mesh_manifest::load(&model_text).expect("the manifest loads");
+    let mut counts = Counts::default();
+    let mut composed = 0;
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/programs");
+    let mut dirs: Vec<PathBuf> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.is_dir())
+        .collect();
+    dirs.sort();
+    for dir in dirs {
+        let templates: Vec<String> = sources(&dir.to_string_lossy())
+            .iter()
+            .map(|path| {
+                let component = path.file_stem().unwrap().to_string_lossy().into_owned();
+                let model = check::Model::load(&model_text, &component).unwrap();
+                let compiled = check::template(&read(path), &model);
+                mesh_template::to_json(&compiled.template.expect("a program's template compiles"))
+            })
+            .collect();
+        composed += usize::from(templates.len() > 1);
+        let case = Case {
+            label: dir.display().to_string(),
+            model: &model_text,
+            manifest: &manifest,
+            root: "view",
+            templates,
+        };
+        run(&case, snapshots, &mut rng, &validator, &mut counts);
+    }
+    assert!(composed >= 1, "no program of several templates");
+    println!(
+        "property (composed): {} rendered, {} stopped at a present source",
+        counts.renders, counts.stops
     );
 }
