@@ -85,6 +85,8 @@ A template holds each name as the declaration it resolved to, so it needs no sep
 - a `scope` expression's `name` is a scope declaration of the template's own component;
 - `$event` is the payload of the event its handler is bound to.
 
+Two rules go beyond what the schema can say: a template never repeats a prop, event binding or record field name (duplicates are resolved before compiling, §3, §9.4), and a number literal is never `-0`. A template that breaks either is malformed, like one the schema rejects.
+
 The runtime checks every name against its model once, when it validates the program. A name the model doesn't declare, with the kind the template gives it, makes the template malformed (`assembly-malformed-template`).
 
 ### An example
@@ -433,7 +435,7 @@ A program must satisfy these rules. Each broken rule is an **assembly error**. T
 |---|---|---|---|
 | 1 | At most one template per component. | `assembly-duplicate-template` | 4 |
 | 2 | The root component has a template in the program. | `assembly-missing-root` | 4 |
-| 3a | Every template is well-formed: valid against `template-v1`, and every name in it declared by the model with the kind it's given ([Names](#names)). | `assembly-malformed-template` | 2 |
+| 3a | Every template is well-formed: valid against `template-v1`, with no repeated names and no `-0` literal, and every name in it declared by the model with the kind it's given ([Names](#names)). | `assembly-malformed-template` | 2 |
 | 3b | Every template has a format version the runtime supports. | `assembly-unsupported-format-version` | 2 |
 | 3c | Every template has the fingerprint of the given model. So all of a program's templates share one. | `assembly-fingerprint-mismatch` | 3 |
 | 4a | Every scope name of every composite used as an occurrence is bound by a prop of the same name. | `assembly-unbound-scope-name` | 4 |

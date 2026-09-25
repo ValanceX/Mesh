@@ -1,0 +1,22 @@
+[package]
+name = "mesh-template"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "The MESH template format (template-v1): one checked MPRX component, compiled, and the model fingerprint that says which model it was checked against."
+
+[lints]
+workspace = true
+
+[dependencies]
+mesh-manifest.workspace = true
+serde = { version = "1", features = ["derive"] }
+# `float_roundtrip`: a template's numbers are exact binary64 values, and
+# must read back as exactly the value written (docs/manual/templates.md).
+serde_json = { version = "1", features = ["float_roundtrip"] }
+sha2 = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+jsonschema = { version = "0.57", default-features = false }
