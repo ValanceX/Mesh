@@ -461,3 +461,61 @@ fn json_output_agrees_with_human_output_for_every_corpus_run() {
     assert!(runs.len() >= 90, "only {} runs", runs.len());
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
+
+/// The value of `--<flag>` in `extra`, if given.
+fn flag<'a>(extra: &'a [String], flag: &str) -> Option<&'a str> {
+    extra
+        .iter()
+        .position(|arg| arg == flag)
+        .map(|at| extra[at + 1].as_str())
+}
+
+/// The CLI is a host of `mesh_compiler::check` (outline D3, I7): for
+/// every run in every corpus, `check::run` with the same explicit inputs
+/// renders the document `mesh check --format json` prints. Both are
+/// parsed, so this compares what they say, not how it's spelled.
+#[test]
+fn the_check_operation_agrees_with_mesh_check() {
+    use mesh_compiler::check::{self, ModelInput, Request};
+
+    let runs = every_corpus_run();
+    let mut failures = Vec::new();
+    for (file, extra) in &runs {
+        let path = file.to_str().expect("a UTF-8 path");
+        let source = fs::read_to_string(examples_dir().join(file)).expect("should read");
+        let model = flag(extra, "--model").map(|manifest| {
+            let text = fs::read_to_string(examples_dir().join(manifest)).expect("should read");
+            let component = flag(extra, "--component").map_or_else(
+                || {
+                    file.file_stem()
+                        .expect("a stem")
+                        .to_string_lossy()
+                        .into_owned()
+                },
+                str::to_string,
+            );
+            (text, manifest, component)
+        });
+        let mut request = Request::new(&source, path);
+        if let Some((text, manifest, component)) = &model {
+            request = request.with_model(ModelInput::new(text, manifest, component));
+        }
+        let rendered = check::run(&request).render_json(&request);
+
+        let mut args: Vec<&str> = extra.iter().map(String::as_str).collect();
+        args.extend(["--format", "json"]);
+        let printed = check(file, &args);
+        let parse = |text: &str| -> serde_json::Value {
+            serde_json::from_str(text.trim_end()).expect("a JSON document")
+        };
+        let printed = parse(&String::from_utf8_lossy(&printed.stdout));
+        if parse(&rendered) != printed {
+            failures.push(format!(
+                "{} {path}\n--- check::run ---\n{rendered}\n--- mesh check ---\n{printed}",
+                extra.join(" ")
+            ));
+        }
+    }
+    assert!(runs.len() >= 90, "only {} runs", runs.len());
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}

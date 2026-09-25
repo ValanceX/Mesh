@@ -7,6 +7,7 @@
 //! analyzed against it (`mesh-analysis`), and this crate's diagnostic
 //! layer turns what analysis found into diagnostics.
 
+pub mod check;
 mod diagnose;
 pub mod editor;
 mod json;
