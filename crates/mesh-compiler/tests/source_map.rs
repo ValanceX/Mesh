@@ -186,3 +186,38 @@ fn round_trips_every_byte() {
         }
     }
 }
+
+#[test]
+fn utf16_offsets_count_code_units_from_the_start() {
+    // The BOM is 1 unit, `é` 1, `😀` 2, and `\r\n` 2, so `x` is at 6.
+    let source = "\u{feff}é😀\r\nx";
+    let map = SourceMap::new(source);
+    let x = source.find('x').unwrap();
+    assert_eq!(map.utf16_offset(source, 0), 0);
+    assert_eq!(map.utf16_offset(source, 3), 1);
+    assert_eq!(map.utf16_offset(source, x), 6);
+    // Inside `😀` floors to its start; past the end clamps to the end.
+    assert_eq!(map.utf16_offset(source, source.find('😀').unwrap() + 2), 2);
+    assert_eq!(map.utf16_offset(source, source.len() + 5), 7);
+}
+
+#[test]
+fn utf16_offsets_round_trip_every_character() {
+    let sources = [
+        "\u{feff}<p a=\"é\">日本😀</p>\r\n<q />\n\n  x𝄞y\r\n",
+        "plain\nascii\n",
+        "😀😀\r\n😀",
+        "",
+    ];
+    for source in sources {
+        let map = SourceMap::new(source);
+        for byte in 0..=source.len() + 2 {
+            let floored = source.floor_char_boundary(byte);
+            assert_eq!(
+                map.utf16_offset(source, byte),
+                source[..floored].encode_utf16().count(),
+                "{source:?} byte {byte}"
+            );
+        }
+    }
+}

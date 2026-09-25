@@ -7,6 +7,8 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 ### Added
 
 - **Rust API: `mesh_compiler::check`, the whole check `mesh check` does,** for any program that hosts MESH: `Model::load` loads a manifest and looks up a component (reporting every manifest error, or a missing component, against the manifest), `check::source` checks a source against it or without a model, and `check::run` does both, returning a `Report` that renders itself as the diagnostics document against the right text and path. The `mesh` CLI is now a host of it; its output hasn't changed.
+- **UTF-16 positions in `mesh check --format json`.** Every position also gives `utf16`, the same place as `byte` counted in UTF-16 code units (what a JavaScript string indexes, so `source.slice(start.utf16, end.utf16)` is the span's text), and `utf16Column`, its column in UTF-16 code units. The document's `version` is still 1, as its promise allows, and the schema lists both.
+- **Rust API: `SourceMap::utf16_offset`,** the UTF-16 offset of a byte.
 
 ## [0.3.0] - 2026-09-24
 

@@ -124,7 +124,7 @@ The full list of codes and messages is in the [diagnostics reference](./diagnost
 
 ```console
 $ mesh check --format json --model examples/fixtures/check/components.json --component template examples/fixtures/check/fail/unknown-reference.mprx
-{"version":1,"diagnostics":[{"severity":"error","code":"unknown-reference","message":"unknown reference \"usr\": it isn't in the template's scope","path":"examples/fixtures/check/fail/unknown-reference.mprx","span":{"start":{"byte":13,"line":1,"column":14},"end":{"byte":16,"line":1,"column":17}},"suggestions":[{"replacement":"user","span":{"start":{"byte":13,"line":1,"column":14},"end":{"byte":16,"line":1,"column":17}}}]}]}
+{"version":1,"diagnostics":[{"severity":"error","code":"unknown-reference","message":"unknown reference \"usr\": it isn't in the template's scope","path":"examples/fixtures/check/fail/unknown-reference.mprx","span":{"start":{"byte":13,"line":1,"column":14,"utf16":13,"utf16Column":14},"end":{"byte":16,"line":1,"column":17,"utf16":16,"utf16Column":17}},"suggestions":[{"replacement":"user","span":{"start":{"byte":13,"line":1,"column":14,"utf16":13,"utf16Column":14},"end":{"byte":16,"line":1,"column":17,"utf16":16,"utf16Column":17}}}]}]}
 ```
 
 The same document, indented for reading:
@@ -139,15 +139,15 @@ The same document, indented for reading:
       "message": "unknown reference \"usr\": it isn't in the template's scope",
       "path": "examples/fixtures/check/fail/unknown-reference.mprx",
       "span": {
-        "start": { "byte": 13, "line": 1, "column": 14 },
-        "end": { "byte": 16, "line": 1, "column": 17 }
+        "start": { "byte": 13, "line": 1, "column": 14, "utf16": 13, "utf16Column": 14 },
+        "end": { "byte": 16, "line": 1, "column": 17, "utf16": 16, "utf16Column": 17 }
       },
       "suggestions": [
         {
           "replacement": "user",
           "span": {
-            "start": { "byte": 13, "line": 1, "column": 14 },
-            "end": { "byte": 16, "line": 1, "column": 17 }
+            "start": { "byte": 13, "line": 1, "column": 14, "utf16": 13, "utf16Column": 14 },
+            "end": { "byte": 16, "line": 1, "column": 17, "utf16": 16, "utf16Column": 17 }
           }
         }
       ]
@@ -174,10 +174,12 @@ Each diagnostic has:
 | `span` | Where the problem is: a `start` and an `end` position. `end` is just past the span's last character, so it may be on a later line. |
 | `suggestions` | Replacements that would probably fix the problem, best first: each has a `replacement` and the `span` it replaces. Usually empty; never missing. |
 
-A position has three numbers:
+A position has five numbers:
 
 - `byte`: a 0-based offset into the file's bytes. A leading byte-order mark counts, as its three bytes.
 - `line` and `column`: 1-based, exactly as the human format's `-->` line shows them. Columns count characters (Unicode scalar values), and a byte-order mark or a line's `\r` is never a column.
+- `utf16`: the same place as `byte`, as a 0-based offset in UTF-16 code units, which is how a JavaScript string indexes text: `source.slice(start.utf16, end.utf16)` is the text the span covers. A leading byte-order mark counts, as one unit.
+- `utf16Column`: the 1-based column in UTF-16 code units, with `column`'s rules, which is what editors such as Monaco take with `line`.
 
 The document's shape is published as a JSON Schema in [`schemas/diagnostics-v1.schema.json`](../../schemas/diagnostics-v1.schema.json).
 

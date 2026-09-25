@@ -6,7 +6,7 @@
 //! `schemas/diagnostics-v1.schema.json`.
 
 use crate::position::locate;
-use crate::source_map::SourceMap;
+use crate::source_map::{ColumnUnit, SourceMap};
 use mesh_syntax::{Diagnostic, Span};
 use serde::Serialize;
 
@@ -47,6 +47,9 @@ struct Position {
     byte: usize,
     line: usize,
     column: usize,
+    utf16: usize,
+    #[serde(rename = "utf16Column")]
+    utf16_column: usize,
 }
 
 impl JsonSpan {
@@ -65,6 +68,8 @@ impl Position {
             byte,
             line: located.line,
             column: located.column,
+            utf16: map.utf16_offset(source, byte),
+            utf16_column: map.line_column(source, byte, ColumnUnit::Utf16).column + 1,
         }
     }
 }
@@ -75,17 +80,22 @@ impl Position {
 /// ```json
 /// {"version":1,"diagnostics":[{"severity":"error","code":"unknown-reference",
 ///  "message":"unknown reference \"usr\": it isn't in the template's scope",
-///  "path":"card.mprx","span":{"start":{"byte":12,"line":1,"column":13},
-///  "end":{"byte":15,"line":1,"column":16}},"suggestions":[{"replacement":"user",
-///  "span":{"start":{"byte":12,"line":1,"column":13},"end":{"byte":15,"line":1,"column":16}}}]}]}
+///  "path":"card.mprx","span":{"start":{"byte":12,"line":1,"column":13,"utf16":12,"utf16Column":13},
+///  "end":{"byte":15,"line":1,"column":16,"utf16":15,"utf16Column":16}},"suggestions":[{"replacement":"user",
+///  "span":{"start":{"byte":12,"line":1,"column":13,"utf16":12,"utf16Column":13},
+///  "end":{"byte":15,"line":1,"column":16,"utf16":15,"utf16Column":16}}}]}]}
 /// ```
 ///
 /// (wrapped here for reading). Diagnostics keep the order given. Each
 /// span gives its start and end as a byte offset into `source` and as a
 /// 1-based line and column, computed exactly as [`render_diagnostic`]
 /// computes the `-->` location: columns count `char`s, and a leading
-/// byte-order mark and a line's `\r` are not columns. `suggestions` is
-/// always present, and usually empty.
+/// byte-order mark and a line's `\r` are not columns. For JavaScript,
+/// each position also gives `utf16`, the offset in UTF-16 code units
+/// that corresponds to `byte` (a byte-order mark counts), and
+/// `utf16Column`, the column in UTF-16 code units, with `column`'s rules.
+/// Both come from [`SourceMap`]. `suggestions` is always present, and
+/// usually empty.
 ///
 /// [`render_diagnostic`]: crate::render_diagnostic
 pub fn render_json(source: &str, path: &str, diagnostics: &[Diagnostic]) -> String {

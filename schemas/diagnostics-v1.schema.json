@@ -83,9 +83,19 @@
           "description": "The 1-based column, counting Unicode scalar values from the start of the line. A byte-order mark and a line's `\\r` are not columns.",
           "type": "integer",
           "minimum": 1
+        },
+        "utf16": {
+          "description": "A 0-based offset in UTF-16 code units into the file's text, the one that corresponds to `byte`: what a JavaScript string holding the same text indexes, as in `source.slice(start.utf16, end.utf16)`. A byte-order mark counts, as one unit.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "utf16Column": {
+          "description": "The 1-based column, counting UTF-16 code units from the start of the line, with `column`'s rules: a byte-order mark and a line's `\\r` are not columns.",
+          "type": "integer",
+          "minimum": 1
         }
       },
-      "required": ["byte", "line", "column"],
+      "required": ["byte", "line", "column", "utf16", "utf16Column"],
       "additionalProperties": false
     }
   }
