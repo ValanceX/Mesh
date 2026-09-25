@@ -213,47 +213,53 @@ const RUNTIME_CODES: [&str; 30] = [
     "runtime-key-collision",
 ];
 
-/// Until the code that emits them exists, v0.5's runtime and assembly
-/// codes are documented in the runtime manual, not in the diagnostics
-/// reference, which must list exactly the codes MESH can emit
-/// (`crates/mesh-cli/tests/diagnostics_reference.rs`). The check codes
-/// moved there in Pass 1; Pass 2 moves the rest.
+/// Since v0.5 Pass 2, every new code exists, so each is in the
+/// diagnostics reference (which `diagnostics_reference.rs` keeps exact),
+/// and the runtime manual points there rather than repeating them. The
+/// check codes are named in §9.7 too.
 #[test]
-fn every_new_code_is_documented_once() {
+fn every_new_code_is_in_the_reference() {
     let runtime = read("docs/manual/runtime.md");
     let reference = read("docs/manual/diagnostics.md");
     let spec = read("docs/MPRX-SPEC.md");
-    let headings: Vec<&str> = runtime
-        .lines()
-        .filter_map(|line| line.strip_prefix("### `")?.strip_suffix('`'))
-        .collect();
-    let mut expected = RUNTIME_CODES.to_vec();
-    expected.sort_unstable();
-    let mut found = headings.clone();
-    found.sort_unstable();
-    assert_eq!(
-        found, expected,
-        "runtime.md should have one heading per runtime and assembly code"
-    );
-    // The check codes exist since v0.5 Pass 1, so they are in the
-    // reference (which `diagnostics_reference.rs` keeps exact), and §9.7
-    // names them.
     for code in CHECK_CODES {
         assert!(
             spec.contains(&format!("`{code}`")),
             "§9.7 should name `{code}`"
         );
+    }
+    for code in CHECK_CODES.iter().chain(RUNTIME_CODES.iter()) {
         assert!(
             reference.contains(&format!("### `{code}`")),
             "`{code}` should be in the diagnostics reference"
         );
-    }
-    for code in RUNTIME_CODES {
         assert!(
-            !reference.contains(&format!("### `{code}`")),
-            "`{code}` is in the diagnostics reference before MESH can emit it"
+            !runtime.contains(&format!("### `{code}`")),
+            "`{code}` is documented in the runtime manual as well as the reference"
         );
     }
+}
+
+/// The runtime and assembly codes' entries in the diagnostics reference.
+fn runtime_entries() -> Vec<(String, String)> {
+    let reference = read("docs/manual/diagnostics.md");
+    reference
+        .split("\n### `")
+        .skip(1)
+        .filter_map(|section| {
+            let code = section.split('`').next()?.to_string();
+            RUNTIME_CODES.contains(&code.as_str()).then(|| {
+                (
+                    code,
+                    section
+                        .split("\n### ")
+                        .next()
+                        .unwrap_or_default()
+                        .to_string(),
+                )
+            })
+        })
+        .collect()
 }
 
 /// The six location forms of a runtime diagnostic (Pass 0, Decision 28).
@@ -303,16 +309,12 @@ fn the_runtime_manual_defines_exactly_the_six_location_forms() {
     assert_eq!(sorted(forms), LOCATION_FORMS.map(String::from));
 }
 
-/// Every code's entry names exactly one location form, and it is one of
-/// the six.
+/// Every runtime and assembly code's entry names exactly one location
+/// form, and it is one of the six.
 #[test]
 fn every_runtime_code_has_exactly_one_location_form() {
-    let runtime = read("docs/manual/runtime.md");
-    let mut sections = runtime.split("\n### `").skip(1);
-    let mut seen = 0;
-    for section in sections.by_ref() {
-        let code = section.split('`').next().unwrap_or_default();
-        let body = section.split("\n### ").next().unwrap_or_default();
+    let entries = runtime_entries();
+    for (code, body) in &entries {
         let forms: Vec<&str> = body
             .lines()
             .filter_map(|line| line.strip_prefix("Location: `")?.split('`').next())
@@ -326,9 +328,8 @@ fn every_runtime_code_has_exactly_one_location_form() {
             LOCATION_FORMS.contains(&forms[0]),
             "`{code}` has an unknown location form"
         );
-        seen += 1;
     }
-    assert_eq!(seen, RUNTIME_CODES.len());
+    assert_eq!(entries.len(), RUNTIME_CODES.len());
 }
 
 #[test]

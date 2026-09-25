@@ -12,8 +12,30 @@
 //! on every call (I14). It has no I/O, no clock, no randomness and no
 //! global state: identical inputs give identical results.
 
+mod boundary;
 mod diagnostic;
+mod dispatch;
+mod eval;
 mod number;
+mod program;
+mod render;
+mod tree;
+mod types;
+mod value;
 
 pub use diagnostic::{to_json, Form, Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
+pub use dispatch::dispatch;
 pub use number::number_to_text;
+pub use program::Program;
+pub use render::{render, Render};
+pub use tree::{Intent, Node, Tree, TreeChild};
+pub use value::{HostKey, HostRecord, HostValue};
+
+/// Validates `program` against `model` as render and dispatch do before
+/// anything else (D3's program validation: the model, then the templates,
+/// then their fingerprints, then the assembly rules), and returns what it
+/// finds: empty when the program is valid. The compiler's program check
+/// is this.
+pub fn check_program(program: &Program<'_>, model: &str) -> Vec<RuntimeDiagnostic> {
+    program::validate(program, model).err().unwrap_or_default()
+}

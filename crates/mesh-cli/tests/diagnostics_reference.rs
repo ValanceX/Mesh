@@ -1,9 +1,20 @@
 //! Keeps the diagnostics reference (`docs/manual/diagnostics.md`) in step
-//! with the codes MESH can emit: every code has a `` ### `code` `` heading,
-//! and every code-shaped heading names a real code. It and the guide to
+//! with the codes MESH can emit, the compiler's and the runtime's: every
+//! code has a `` ### `code` `` heading, and every code-shaped heading
+//! names a real code. It and the guide to
 //! checking against a component model show only output the fixtures pin.
 
+use mesh_runtime::RuntimeCode;
 use mesh_syntax::DiagnosticCode;
+
+/// Every code MESH can emit: the compiler's, and the runtime's.
+fn all_codes() -> Vec<&'static str> {
+    DiagnosticCode::ALL
+        .iter()
+        .map(|code| code.as_str())
+        .chain(RuntimeCode::ALL.iter().map(|code| code.as_str()))
+        .collect()
+}
 use std::fs;
 use std::path::Path;
 
@@ -27,9 +38,8 @@ fn code_headings(reference: &str) -> Vec<&str> {
 fn every_code_has_a_reference_entry() {
     let reference = reference();
     let headings = code_headings(&reference);
-    let missing: Vec<&str> = DiagnosticCode::ALL
-        .iter()
-        .map(|code| code.as_str())
+    let missing: Vec<&str> = all_codes()
+        .into_iter()
         .filter(|code| !headings.contains(code))
         .collect();
     assert!(
@@ -43,11 +53,7 @@ fn every_reference_entry_is_a_real_code() {
     let reference = reference();
     let unknown: Vec<&str> = code_headings(&reference)
         .into_iter()
-        .filter(|heading| {
-            !DiagnosticCode::ALL
-                .iter()
-                .any(|code| code.as_str() == *heading)
-        })
+        .filter(|heading| !all_codes().contains(heading))
         .collect();
     assert!(
         unknown.is_empty(),

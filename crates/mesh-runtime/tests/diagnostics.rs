@@ -23,13 +23,16 @@ fn validator() -> jsonschema::Validator {
 }
 
 /// Every assembly and runtime code Pass 0 specified (Decision 27), with
-/// the one location form `docs/manual/runtime.md` gives it.
+/// the one location form the diagnostics reference gives it.
 #[test]
 fn the_codes_are_pass_0s_each_with_its_manuals_form() {
-    let manual = read("docs/manual/runtime.md");
+    let reference = read("docs/manual/diagnostics.md");
     let mut documented = Vec::new();
-    for section in manual.split("\n### `").skip(1) {
+    for section in reference.split("\n### `").skip(1) {
         let code = section.split('`').next().unwrap().to_string();
+        if !(code.starts_with("assembly-") || code.starts_with("runtime-")) {
+            continue;
+        }
         let body = section.split("\n### ").next().unwrap();
         let form = body
             .lines()
