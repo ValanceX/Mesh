@@ -1,3 +1,8 @@
+# Every text file is LF in every checkout, Windows included: tests read
+# docs and fixtures and compare their text, and `core.autocrlf=true` would
+# otherwise hand them CRLF.
+* text=auto eol=lf
+
 # Fixture sources and their expected `.stderr` output are compared byte for
 # byte (after trimming trailing whitespace). Keep them LF everywhere, even
 # on checkouts with `core.autocrlf=true`, so the fixtures pass on Windows.

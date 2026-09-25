@@ -41,6 +41,8 @@ $ cargo test --workspace
 $ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 ```
 
+CI runs `cargo test --workspace` on Linux, macOS and Windows, so keep tests free of platform assumptions: build paths with `Path`, and don't expect `/` in a printed path. Every text file checks out with LF line endings on every platform (`.gitattributes`).
+
 If you change `grammar/tree-sitter-mprx/grammar.js`, regenerate the parser with `npx tree-sitter generate` in that directory and commit `src/`; CI checks that it's up to date.
 
 Expected CLI output lives next to each file in `examples/fixtures/`. If you change a diagnostic, update the matching `.stderr` file.

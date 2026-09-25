@@ -4,12 +4,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Lets a branch be run on every OS without a pull request.
+  workflow_dispatch:
 
 # The `@v7` actions run on the runner's Node 24 runtime, not the deprecated
 # Node 20 one. That is separate from `node-version: 22` below, which only
 # installs the Node used by the grammar's own npm tests.
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -22,8 +24,6 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Test
-        run: cargo test --workspace
       # Broken intra-doc links and malformed doc comments fail the build,
       # as warnings do everywhere else.
       - name: Docs
@@ -49,6 +49,22 @@ jobs:
         run: |
           npx tree-sitter generate
           git diff --exit-code -- src/
+
+  # The whole workspace suite, natively, once per OS (outline v0.4 D9):
+  # one runner each, on whatever architecture it has. Shipped binaries are
+  # built and exercised per architecture elsewhere.
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust
+        run: rustup toolchain install
+      - name: Test
+        run: cargo test --workspace
 
   # Checks the declared `rust-version`: the workspace, with its committed
   # Cargo.lock, still compiles on 1.91. (This shows 1.91 works; it doesn't
