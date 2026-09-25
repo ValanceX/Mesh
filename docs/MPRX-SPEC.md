@@ -70,7 +70,7 @@ v0.5 adds no syntax. It adds MPRX's evaluation (§9.7) and the boundary between 
 | 0 | §9.7 and §9.8, the number-to-text table, and the template, render-tree and runtime-diagnostics formats | ✅ Specified |
 | 1 | Compiling a checked template to `template-v1`; `content-not-text` and `number-literal-out-of-range` | ✅ Implemented |
 | 2 | The runtime, natively: render and dispatch, for programs of one template and, as built, of several | ✅ Implemented |
-| 3 | Composition, and the runtime in JavaScript | Planned |
+| 3 | The program check, and the runtime in JavaScript | ✅ Implemented |
 | 4 | Documentation and release | Planned |
 
 *Last updated 2026-09-25. v0.4 is released as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them. Any further grammar or semantics work starts a new spec.*

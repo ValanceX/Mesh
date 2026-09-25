@@ -1,6 +1,6 @@
 # The MESH runtime
 
-> **Status: v0.5, in progress.** This manual is the contract v0.5's runtime, `@valancex/mesh-runtime`, NEXUS's adapter and PORT's renderers are built against (outline: `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, D3–D6). The Rust runtime, the `mesh-runtime` crate, implements it; `@valancex/mesh-runtime`, the runtime in JavaScript, is not implemented yet. The keys, handler identifiers and program identities in its examples are illustrative, though their layout is the runtime's.
+> **Status: v0.5, in progress.** This manual is the contract v0.5's runtime, `@valancex/mesh-runtime`, NEXUS's adapter and PORT's renderers are built against (outline: `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, D3–D6). The Rust runtime, the `mesh-runtime` crate, and `@valancex/mesh-runtime`, the same runtime in WebAssembly for JavaScript hosts, implement it. The keys, handler identifiers and program identities in its examples are illustrative, though their layout is the runtime's.
 
 The runtime evaluates a **program** of templates (`docs/manual/templates.md`) against a **host**'s values. It produces a **render tree**, which a renderer draws, and turns the events a renderer reports into **command intents** for the host. It is one Rust implementation, compiled natively and to WebAssembly. It implements MPRX's evaluation (§9.7) and the boundary (§9.8) exactly once. It has no I/O, no clock, no randomness and no global state: identical inputs give identical results.
 

@@ -91,11 +91,13 @@ jobs:
           npm run typecheck
           npm test -w @valancex/mesh-lsp
 
-  # The compiler in WebAssembly, and @valancex/mesh-compiler around it
-  # (outline v0.4 Pass 1), on each Node LTS release the package supports:
-  # agreement with a native `mesh` built here, determinism, positions,
-  # failure, memory, version, nesting, size, packing, and headless
-  # Chromium.
+  # The compiler and the runtime in WebAssembly, and
+  # @valancex/mesh-compiler and @valancex/mesh-runtime around them, on each
+  # Node LTS release the packages support: agreement with a native `mesh`
+  # built here, parity with the native runtime (through its harness, and
+  # replaying every call the native property test makes), the V8
+  # number-to-text comparison, determinism, positions, failure, memory,
+  # version, nesting, size, packing, the slice, and headless Chromium.
   wasm:
     strategy:
       fail-fast: false
@@ -108,8 +110,12 @@ jobs:
         run: |
           rustup toolchain install
           rustup target add wasm32-unknown-unknown
-      - name: Build the native mesh to compare with
-        run: cargo build --locked -p mesh-cli
+      - name: Build the native mesh and runtime harness to compare with
+        run: cargo build --locked -p mesh-cli -p mesh-runtime-wasm --example harness
+      # Writes every call it makes to target/mesh-runtime-property/, for
+      # the runtime package's parity test.
+      - name: The native property test's requests
+        run: cargo test --locked -p mesh-runtime --test property
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
@@ -118,6 +124,7 @@ jobs:
         run: |
           npm ci
           npm run build:wasm -w @valancex/mesh-compiler
+          npm run build:wasm -w @valancex/mesh-runtime
           npm run build
           npm run typecheck
       - name: Install Chromium
@@ -125,7 +132,9 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Test
         working-directory: packages
-        run: npm test -w @valancex/mesh-compiler
+        run: |
+          npm test -w @valancex/mesh-compiler
+          npm test -w @valancex/mesh-runtime
 
   # Every shipped mesh-lsp binary, built and exercised on a runner of its
   # own OS and architecture (outline v0.4 D8, D9): the transport tests run
@@ -199,4 +208,4 @@ jobs:
       - name: Build for WebAssembly on the MSRV
         run: |
           rustup target add wasm32-unknown-unknown --toolchain 1.91.0
-          cargo +1.91.0 build --locked -p mesh-wasm --target wasm32-unknown-unknown
+          cargo +1.91.0 build --locked -p mesh-wasm -p mesh-runtime-wasm --target wasm32-unknown-unknown
