@@ -597,6 +597,7 @@ dependencies = [
  "mesh-parser",
  "mesh-semantic",
  "mesh-syntax",
+ "mesh-template",
  "predicates",
  "serde_json",
  "tempfile",
@@ -612,6 +613,7 @@ dependencies = [
  "mesh-parser",
  "mesh-semantic",
  "mesh-syntax",
+ "mesh-template",
  "serde",
  "serde_json",
 ]

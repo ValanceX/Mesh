@@ -273,3 +273,26 @@ fn a_negative_zero_literal_is_malformed() {
     let text = document.to_string().replace("12345", "-0.0");
     assert_eq!(malformed_text(&text).len(), 1);
 }
+
+/// An object literal's key may be quoted, so any string (§5): a record
+/// field's name isn't restricted to an identifier, unlike a member
+/// access's field.
+#[test]
+fn a_record_field_name_is_any_string() {
+    let s = span();
+    let one = json!({ "kind": "literal", "value": 1, "span": s });
+    let mut document = example();
+    document["root"]["props"][0]["value"] = json!({ "kind": "record", "span": s, "fields": [
+        { "name": "display-name", "value": one, "span": s },
+        { "name": "", "value": one, "span": s },
+        { "name": "with space", "value": one, "span": s } ] });
+    assert!(validator().is_valid(&document));
+    from_json(&document.to_string()).expect("any string is a field name");
+    let mut member = example();
+    member["root"]["props"][0]["value"]["field"] = json!("display-name");
+    assert_eq!(
+        malformed(&member).len(),
+        1,
+        "a member access's field is an identifier"
+    );
+}

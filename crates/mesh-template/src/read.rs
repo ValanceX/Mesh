@@ -280,8 +280,9 @@ fn check_expression(
         }
         Expression::Record { fields, .. } => {
             for (index, field) in fields.iter().enumerate() {
+                // A key may be any string (`{ "display-name": x }`, §5), so
+                // only its uniqueness is checked.
                 let at = format!("{path}/fields/{index}");
-                check_identifier(&field.name, &format!("{at}/name"), problems);
                 check_expression(&field.value, &format!("{at}/value"), in_handler, problems);
             }
             check_unique(

@@ -69,7 +69,7 @@ The format is [`schemas/template-v1.schema.json`](../../schemas/template-v1.sche
   | `binary` | `operator`, `left`, `right` | `operator` is one of `add`, `subtract`, `multiply`, `divide`, `remainder`, `equal`, `not-equal`, `less`, `less-equal`, `greater`, `greater-equal`, `and`, `or` |
   | `conditional` | `condition`, `consequent`, `alternate` | `c ? a : b` |
   | `list` | `elements` | a list literal |
-  | `record` | `fields`: `[{ "name", "value", "span" }]` | a record literal; shadowed keys (§9.4) are omitted |
+  | `record` | `fields`: `[{ "name", "value", "span" }]` | a record literal; shadowed keys (§9.4) are omitted. A field's `name` is any string, since an object key may be quoted (`{ "display-name": x }`), and names are unique |
   | `event` | | `$event` (in `argument` expressions only) |
 
 - **Numbers** are JSON numbers holding exactly the binary64 value. A writer writes text that reads back as that value; a reader must convert with correct rounding (in Rust, `serde_json` with `float_roundtrip`; JavaScript's `JSON.parse` already does).

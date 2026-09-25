@@ -55,6 +55,12 @@ impl Model {
     pub fn component(&self) -> &str {
         &self.component
     }
+
+    /// The model's fingerprint, which every template compiled against it
+    /// carries (docs/manual/templates.md).
+    pub fn fingerprint(&self) -> mesh_template::Fingerprint {
+        mesh_template::fingerprint(&self.manifest)
+    }
 }
 
 /// Checks `source` as the template of `model`'s component, or with no
@@ -70,6 +76,44 @@ pub fn source(source: &str, model: Option<&Model>) -> Vec<Diagnostic> {
                 .expect("Model::load checked that the manifest declares its component");
             compile_with(source, &CompileOptions::with_template(template)).diagnostics
         }
+    }
+}
+
+/// What compiling one source gave: [`template`]'s result.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq)]
+pub struct Compiled {
+    /// Every diagnostic: exactly what [`source`] reports for the same
+    /// source and model.
+    pub diagnostics: Vec<Diagnostic>,
+    /// The template, exactly when `diagnostics` has no error.
+    pub template: Option<mesh_template::Template>,
+}
+
+/// Checks `source` as the template of `model`'s component, and, only if
+/// the check has no errors, compiles it to a template (v0.5 D2).
+/// Warnings don't stop it.
+///
+/// This is the only way from MPRX source to a template: a source whose
+/// check has an error never gives one (I12).
+pub fn template(source: &str, model: &Model) -> Compiled {
+    let template_of = model
+        .manifest
+        .template(&model.component)
+        .expect("Model::load checked that the manifest declares its component");
+    let result = compile_with(source, &CompileOptions::with_template(template_of));
+    let template = match (&result.ir, has_errors(&result.diagnostics)) {
+        (Some(ir), false) => Some(crate::emit::template(
+            source,
+            ir,
+            &model.component,
+            model.fingerprint(),
+        )),
+        _ => None,
+    };
+    Compiled {
+        diagnostics: result.diagnostics,
+        template,
     }
 }
 

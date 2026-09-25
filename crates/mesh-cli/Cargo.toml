@@ -21,6 +21,7 @@ clap = { version = "4.6.7", features = ["derive"] }
 
 [dev-dependencies]
 mesh-manifest.workspace = true
+mesh-template.workspace = true
 mesh-parser.workspace = true
 mesh-semantic.workspace = true
 mesh-lsp = { path = "../mesh-lsp" }

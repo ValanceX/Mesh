@@ -10,6 +10,7 @@
 pub mod check;
 mod diagnose;
 pub mod editor;
+mod emit;
 mod json;
 mod position;
 mod render;

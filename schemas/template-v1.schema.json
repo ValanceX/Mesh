@@ -442,7 +442,8 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "$ref": "#/$defs/identifier"
+                    "description": "The field's name: any string, since an object literal's key may be quoted (§5). Names are unique within the record.",
+                    "type": "string"
                   },
                   "value": {
                     "$ref": "#/$defs/expression"
@@ -684,7 +685,8 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "$ref": "#/$defs/identifier"
+                    "description": "The field's name: any string, since an object literal's key may be quoted (§5). Names are unique within the record.",
+                    "type": "string"
                   },
                   "value": {
                     "$ref": "#/$defs/argument"
