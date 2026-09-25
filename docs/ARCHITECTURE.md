@@ -109,7 +109,7 @@ Over time the compiler will understand component names, props, local variables, 
 This is where the constraints pay off. When an AI model (or any other untrusted source) produces UI, it goes through the same checks as hand-written code:
 
 ```text
-AI → MPRX source → Parser → MESH AST → Semantic validation → Compilation → PORT
+AI → MPRX source → Parser → MESH AST → Semantic validation → Template → Runtime → Render tree → PORT
 ```
 
 Valance never blindly executes generated UI. The compiler rejects invalid syntax, unknown components or properties, bad references, malformed command calls, type errors, and unsupported constructs.
@@ -180,6 +180,6 @@ These invariants hold for everything in this repo:
 8. **Component references and bindings should be statically verifiable.**
 9. **MPRX has one evaluator: the Rust runtime.** Nothing outside it evaluates an expression, turns a value into text, coerces or normalizes a value, fills in for absence, decides whether a component is a composite, resolves a handler identifier, or judges a host's value. Everything else only carries values, and a renderer only draws them.
 10. **Only what checked runs.** The compiler emits a template only from source with no errors, and the runtime accepts only templates, validates every program before running it, and fails closed on any value that doesn't fit.
-11. **Renderers see values, never MPRX.** A render tree holds primitive component names, final prop values, text, handler identifiers and keys, and nothing else. Keys and handler identifiers are opaque, but not secret.
+11. **Renderers see values, never MPRX.** A render tree holds primitive component names, final prop values, text, handler identifiers and keys, and nothing else. Keys and handler identifiers are opaque: they don't reveal those names to anyone without the templates. But they're not secret.
 12. **The host is checked, not trusted.** The model, the templates, the snapshot, every payload, every handler identifier and every render are validated on every call.
-13. **Dependencies point one way.** No MESH crate or package depends on NEXUS, PORT or Effect. NEXUS's adapter depends on `@valancex/mesh-runtime`, and PORT's renderers on MESH's render-tree types. Any program can be a host.
+13. **Dependencies point one way.** No MESH crate or package depends on NEXUS, PORT or Effect. NEXUS's adapter depends on `@valancex/mesh-runtime`, and PORT's renderers on MESH's render-tree types. NEXUS and PORT don't depend on each other. Any program can be a host, and MESH's own tests use one.

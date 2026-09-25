@@ -31,7 +31,7 @@ Keys and handler identifiers are **opaque, but not secret.** Compare them only f
 
 A change of values is a new render: the runtime evaluates the whole program again and gives a complete new tree. It doesn't say what changed; finding that is the renderer's job.
 
-**Every tree from one program has the same keys.** So a renderer matches the new tree against the one it drew, key by key, and updates only the props and text that differ. A key in only the new tree is new; a key in only the old one is gone.
+**Every tree from one program has the same keys.** So a renderer matches the new tree against the one it drew, key by key, and updates only the props and text that differ. Within one program that never happens; if it ever does, treat a key in only the new tree as new, and a key in only the old one as gone.
 
 **Keys change when the program does,** by design. The host tells the renderer when a tree comes from a different program (a template recompiled, added or removed), and the renderer draws that tree afresh, never matching it against the old one by key.
 

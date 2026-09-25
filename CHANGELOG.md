@@ -10,6 +10,8 @@ MESH renders: templates, and the MESH runtime, natively and as `@valancex/mesh-r
 
 ### Added
 
+- **Two guides,** [Integrating MESH with NEXUS](./docs/guides/integrating-mesh-with-nexus.md), for a host, and [Rendering MESH output](./docs/guides/rendering-mesh-output.md), for a renderer, each with an example a test runs. The release workflow now publishes `@valancex/mesh-runtime` too, eight packages in all.
+
 - **The slice,** `examples/slice/`: a page that uses the composite `user-card` twice, with its committed tree, rendering, intent and changes, checked natively and in Node.
 - **`@valancex/mesh-runtime`: the MESH runtime in JavaScript,** as a new package with no dependencies. `render({ program, model, snapshot })` returns `{ render }`, whose frozen `tree` a renderer draws, or `{ diagnostics }`; `dispatch(render, handler, payload?)` returns `{ intent }` or `{ diagnostics }`, against the snapshot the render was made from. It runs the Rust runtime in WebAssembly (`mesh-runtime.wasm`, 184,751 bytes gzipped), and only encodes and transports values: every JavaScript value, a `Map`, a hole, NaN or a cycle included, reaches the runtime, which judges it. It works in Node 22 and later and in browsers (after `init()`), and exports the render tree, intent and runtime diagnostics types.
 - **`mesh check-program`:** checks a program of compiled templates (`--model`, `--root`, then the templates in order): the manifest, each template, their fingerprints and the assembly rules. It writes nothing. Its diagnostics, codes and locations are exactly what the runtime's `render` reports for the same program, because it runs the runtime's own program validation. `--format json` prints the runtime diagnostics document.

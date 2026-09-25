@@ -36,6 +36,7 @@ Keys and handler identifiers are stable across renders of one program, and chang
 
 - **The snapshot is open; records are exact.** A snapshot may hold names the root template doesn't declare, and the runtime ignores them. But a record, anywhere in a value, may hold only the fields its type declares. A NEXUS selector that returns a user with more fields than the manifest's `User` is refused, with `runtime-unknown-field` at the extra field. Shape the value to the manifest in the adapter.
 - **Absence is a missing property.** A missing property, and one that is `undefined`, are both absent, and absence is allowed only where the type is optional. `null` is a value, not absence. An array may not hold `undefined` or a hole.
+- **Payloads are checked too.** A payload must fit its event's payload type in the manifest (the slice's avatar click carries a `Press`, `{ x, y }`), and an event with no payload type takes none. Pass the renderer's payload through as it is; a mismatch is a diagnostic.
 - **Only plain data crosses:** `null`, booleans, finite numbers, strings, arrays and plain objects. A `Date`, a `Map`, a class instance, NaN or a string with an unpaired surrogate is reported, never converted. Turn an `Option` into a present value or a missing property, and a `Date` into a string or a number, before rendering.
 
 ## Mapping intents to commands
@@ -44,7 +45,7 @@ An intent names a command by the component whose template declares it and the co
 
 ## Diagnostics
 
-`render()` and `dispatch()` return diagnostics instead of a result when something is wrong: the program, the manifest, the snapshot, the payload or the handler identifier. They're errors in the host's inputs or in the program. They're for the developer, and never something to show an end user as it is. Log them with their `code` and `location`, and treat them as bugs. They never throw: the promises reject only for arguments of the wrong JavaScript type, or if the runtime itself fails.
+`render()` and `dispatch()` return diagnostics instead of a result when something is wrong: the program, the manifest, the snapshot, the payload or the handler identifier. They're errors in the host's inputs or in the program. They're for the developer, and never something to show an end user as it is. Log them with their `code` and `location`, and treat them as bugs. They never throw: the promises reject only for arguments of the wrong JavaScript type or a render the package didn't make (`TypeError`), a module of another version (`MeshVersionError`), or a failure of the runtime itself (`MeshInternalError`).
 
 ## A host, end to end
 
