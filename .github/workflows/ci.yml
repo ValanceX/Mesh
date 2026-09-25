@@ -63,8 +63,10 @@ jobs:
       - uses: actions/checkout@v7
       - name: Install Rust
         run: rustup toolchain install
+      # Every failing test binary, not just the first: one run on a new
+      # platform reports everything it found.
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
 
   # The npm workspace builds and typechecks.
   packages:

@@ -77,7 +77,17 @@ fn files(relative_dir: &str, extension: &str) -> Vec<PathBuf> {
         .unwrap_or_else(|err| panic!("should read examples/{relative_dir}: {err}"))
         .map(|entry| entry.expect("should read a directory entry").path())
         .filter(|path| path.is_file() && path.extension().is_some_and(|ext| ext == extension))
-        .map(|path| Path::new(relative_dir).join(path.file_name().expect("has a file name")))
+        .map(|path| {
+            // Joined with `/`, not `Path::join`: `mesh check` prints a path
+            // exactly as it's given, and the expected `.stderr` files spell
+            // it with `/`, which Windows accepts too.
+            let name = path.file_name().expect("has a file name").to_string_lossy();
+            PathBuf::from(if relative_dir.is_empty() {
+                name.into_owned()
+            } else {
+                format!("{relative_dir}/{name}")
+            })
+        })
         .collect();
     files.sort();
     // Guards against a moved/renamed directory making the test pass vacuously.
