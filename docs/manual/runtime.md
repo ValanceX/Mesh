@@ -175,3 +175,242 @@ A **host**:
 - keeps each render while its tree is on screen, and dispatches each event with the render whose tree the renderer had drawn;
 - shapes its values to the manifest: records are exact, so a record with more fields than its type declares is refused (§9.8.4);
 - maps intents to its own commands, and treats diagnostics as errors in its inputs or its program, not as messages for end users.
+
+## Diagnostics
+
+When render or dispatch can't produce its result, it returns diagnostics instead: a **runtime diagnostics document**, [`schemas/runtime-diagnostics-v1.schema.json`](../../schemas/runtime-diagnostics-v1.schema.json). `mesh check-program` prints the same document. Every diagnostic is an error.
+
+```json runtime-diagnostics
+{
+  "version": 1,
+  "diagnostics": [
+    { "severity": "error", "code": "runtime-missing-value", "message": "the snapshot has no value for `user`, which is required", "location": { "kind": "input", "path": ["user"] } },
+    { "severity": "error", "code": "runtime-value-mismatch", "message": "`users[1].active` is a string, but must be a boolean", "location": { "kind": "input", "path": ["users", 1, "active"] } }
+  ]
+}
+```
+
+### Phases
+
+Each operation runs these phases in order. A phase that reports any diagnostic ends the operation, and no later phase runs.
+
+1. **Program validation.** Its steps run in order, and a step that reports anything ends the phase. Each step reports every problem it finds.
+   1. The model must be a valid manifest (the `manifest-*` codes of `docs/manual/diagnostics.md`).
+   2. Every template must be well-formed and of a supported format version.
+   3. Every template's fingerprint must equal the model's.
+   4. The program must satisfy the assembly rules (`docs/manual/templates.md`).
+2. **Input validation.**
+   - For render: the snapshot. Every mismatch is reported.
+   - For dispatch: first the handler identifier. If it's invalid, that is the phase's only diagnostic, because the payload's type depends on the handler. Otherwise, every mismatch in the render's snapshot and the payload is reported.
+3. **Evaluation.** Exactly one diagnostic, the first in §9.7.5's order, is reported, and evaluation stops.
+
+### Identity and locations
+
+A diagnostic's identity is its **code** and its **location**. Codes are stable and part of the contract; message wording is not. A location has one of six forms:
+
+| `kind` | Other properties | Used for |
+|---|---|---|
+| `model` | `span`: start and end positions in the manifest's text, as the diagnostics document gives them (`byte`, `line`, `column`, `utf16`, `utf16Column`) | manifest diagnostics |
+| `program` | | a missing root template |
+| `template` | `index`: the template's 0-based position in the host's list; `component`, when it can be read | template-level validation |
+| `source` | `component`, and `span` in template-v1's form (`byte` and `utf16` offsets into the template's source) | other assembly diagnostics, and evaluation diagnostics |
+| `input` | `path`: a scope name then field names and list indices; or `$event` then field names and list indices | input diagnostics about the snapshot and payload |
+| `handler` | | an invalid handler identifier |
+
+### Order
+
+- **Program validation:** manifest diagnostics in the manifest's order. Assembly diagnostics: first the one located at the `program`; then those located at a `template`, by `index`; then those at a `source`, by component in code-point order, then by the span's start, then by code.
+- **Input validation:** by path. The snapshot's paths come before the payload's. Paths compare segment by segment: names by code point, list indices numerically, and a path comes before its own extensions.
+- **Evaluation:** one diagnostic.
+
+### Assembly codes
+
+These are reported by program validation, and by `mesh check-program`, with the same codes and locations.
+
+### `assembly-malformed-template`
+
+A template isn't valid against `template-v1`, or names something the model doesn't declare with the kind the template gives it. Location: `template`. Also reported for a template that isn't JSON, or whose `format` isn't `mesh-template`.
+
+### `assembly-unsupported-format-version`
+
+A template's `version` is a number this runtime doesn't support. Location: `template`.
+
+### `assembly-fingerprint-mismatch`
+
+A template's fingerprint isn't the model's: it was checked against another model. Recompile it. Location: `template`.
+
+### `assembly-duplicate-template`
+
+The program has more than one template for a component. Location: `source`, the root element of each template of that component after the first.
+
+### `assembly-missing-root`
+
+The program has no template for its root component. Location: `program`.
+
+### `assembly-unbound-scope-name`
+
+A composite used as a composite occurrence has a scope name that no prop of the same name binds. Location: `source`, each such occurrence.
+
+### `assembly-unsound-binding`
+
+A prop binds a composite's scope name unsoundly: its type isn't assignable to the scope name's, or it's optional and the scope name isn't. Location: `source`, each such occurrence.
+
+### `assembly-cycle`
+
+A composite expands itself, directly or through others. Location: `source`, every composite occurrence on the cycle.
+
+### `assembly-composite-event`
+
+A composite declares events in the model; v0.5 has no composite events. Location: `source`, every composite occurrence of it.
+
+### `assembly-composite-children`
+
+A composite occurrence has children, text or elements; v0.5 has no children or slots for composites. Location: `source`, the occurrence.
+
+### Input codes
+
+These are reported by input validation, at an `input` location unless they say otherwise.
+
+### `runtime-missing-value`
+
+A value that must be present is absent: a scope name whose type isn't optional, a record field that doesn't read as optional, or a payload for an event that has one and a type that isn't optional.
+
+### `runtime-value-mismatch`
+
+A present value doesn't fit its type (§9.7.2). It is reported at the deepest path where it stops fitting: a list's element, a record's field.
+
+### `runtime-unknown-field`
+
+A record has a field its type doesn't declare. Records are exact (§9.8.4). Location: the field's path.
+
+### `runtime-absent-element`
+
+A list holds an absent element: JavaScript's `undefined`, or a hole. Location: the element's path.
+
+### `runtime-number-out-of-range`
+
+A JSON number too large for binary64: its nearest value would be infinite.
+
+### `runtime-non-finite-input`
+
+A number that is NaN or an infinity, which JavaScript can express and JSON can't.
+
+### `runtime-unpaired-surrogate`
+
+A string, or a record field's name, that isn't a sequence of Unicode scalar values: it has an unpaired UTF-16 surrogate.
+
+### `runtime-unsupported-value`
+
+A JavaScript value outside the boundary data model: a function, a symbol, a `bigint`, an object that isn't a plain object or an array, or a cycle. The message names its kind (§9.8.6).
+
+### `runtime-unexpected-payload`
+
+A payload was given for an event declared without one. Location: `$event`.
+
+### `runtime-handler-other-program`
+
+Dispatch was given a handler identifier made by another program, or one that isn't a handler identifier at all. Location: `handler`.
+
+### `runtime-unknown-handler`
+
+Dispatch was given a handler identifier of the render's program that names no handler in it. Location: `handler`.
+
+### Evaluation codes
+
+These are reported by evaluation, one per call, at a `source` location: the span of the value checked (§9.7.6). A clean check guarantees none of the type checks can fail, except where a value has type `any` or `any?`.
+
+### `runtime-operand-mismatch`
+
+An operand isn't of the kind its operator needs: a boolean for `!`, `&&`, `||` or a conditional's condition; a number for unary `-`, arithmetic or a comparison.
+
+### `runtime-not-a-record`
+
+Member access on a value that isn't a record.
+
+### `runtime-missing-member`
+
+Member access, on a value of type `any`, to a field that's absent.
+
+### `runtime-content-not-text`
+
+An interpolation of type `any` or `any?` whose value is a list or a record (§9.7.8).
+
+### `runtime-prop-mismatch`
+
+A prop's value, at a primitive or composite occurrence, doesn't fit the prop's declared type, or is absent where the type isn't optional.
+
+### `runtime-argument-mismatch`
+
+A command argument doesn't fit its parameter's type.
+
+### `runtime-non-finite-output`
+
+NaN or an infinity would reach an output: a primitive prop, a text run or a command argument, at any depth.
+
+### `runtime-absent-element-output`
+
+A list holding an absent element would reach an output, at any depth.
+
+### Internal codes
+
+### `runtime-key-collision`
+
+Two nodes or text runs of one tree would share a key. It can't happen in practice (keys are 128-bit), and it would be a bug to report. Location: `source`, the later of the two.
+
+### Every case the v0.5 contract names
+
+| Case (outline, Definition of Done) | Code |
+|---|---|
+| a broken model | `manifest-*` |
+| a malformed template; a template of an unsupported version | `assembly-malformed-template`; `assembly-unsupported-format-version` |
+| a template checked against another model (mixed fingerprints) | `assembly-fingerprint-mismatch` |
+| two templates for one component; a missing root template | `assembly-duplicate-template`; `assembly-missing-root` |
+| an unbound scope name; a binding whose types don't fit; an optional prop bound to a scope name that isn't optional | `assembly-unbound-scope-name`; `assembly-unsound-binding`; `assembly-unsound-binding` |
+| a direct or indirect cycle | `assembly-cycle` |
+| a composite that declares events; a composite occurrence with children | `assembly-composite-event`; `assembly-composite-children` |
+| a missing required scope name; `null` where absence is expected; absence where `null` is expected | `runtime-missing-value`; `runtime-value-mismatch`; `runtime-missing-value` |
+| a wrong-kind value at depth | `runtime-value-mismatch` at its path |
+| a record with an undeclared field; one missing a field that doesn't read as optional | `runtime-unknown-field`; `runtime-missing-value` |
+| an out-of-range number; NaN or an infinity from JavaScript | `runtime-number-out-of-range`; `runtime-non-finite-input` |
+| an unpaired surrogate | `runtime-unpaired-surrogate` |
+| `undefined` in an array, a hole | `runtime-absent-element` |
+| a function, a symbol, a `bigint`, a class instance, a `Map`, a `Date`, a cycle | `runtime-unsupported-value` |
+| a payload that doesn't fit; one given for an event with none; a missing one where one is required | `runtime-value-mismatch`; `runtime-unexpected-payload`; `runtime-missing-value` |
+| a handler identifier from another program; one naming no handler | `runtime-handler-other-program`; `runtime-unknown-handler` |
+| each `any` check failing: an operand, member access, content, a prop, an argument | `runtime-operand-mismatch`; `runtime-not-a-record` or `runtime-missing-member`; `runtime-content-not-text`; `runtime-prop-mismatch`; `runtime-argument-mismatch` |
+| a composite prop from `any` that doesn't fit | `runtime-prop-mismatch` |
+| a non-finite number reaching a prop, a text run, an argument | `runtime-non-finite-output` |
+| an absent list element reaching an output | `runtime-absent-element-output` |
+| a list or record interpolated where its static type says so; a literal too large to be finite | `content-not-text`; `number-literal-out-of-range` (check-time, §9.7) |
+
+More example documents, one per remaining location form:
+
+```json runtime-diagnostics
+{ "version": 1, "diagnostics": [
+  { "severity": "error", "code": "runtime-non-finite-output", "message": "`1 / count` is Infinity, which can't reach a prop", "location": { "kind": "source", "component": "user-card", "span": { "start": { "byte": 20, "utf16": 20 }, "end": { "byte": 29, "utf16": 29 } } } } ] }
+```
+
+```json runtime-diagnostics
+{ "version": 1, "diagnostics": [
+  { "severity": "error", "code": "assembly-missing-root", "message": "the program has no template for its root, `users`", "location": { "kind": "program" } },
+  { "severity": "error", "code": "assembly-fingerprint-mismatch", "message": "the template of `user-card` was checked against another model", "location": { "kind": "template", "index": 1, "component": "user-card" } } ] }
+```
+
+```json runtime-diagnostics
+{ "version": 1, "diagnostics": [
+  { "severity": "error", "code": "runtime-unknown-handler", "message": "the handler identifier names no handler in this program", "location": { "kind": "handler" } } ] }
+```
+
+```json runtime-diagnostics
+{ "version": 1, "diagnostics": [
+  { "severity": "error", "code": "manifest-missing-property", "message": "a prop needs `required`", "location": { "kind": "model", "span": {
+    "start": { "byte": 40, "line": 3, "column": 5, "utf16": 40, "utf16Column": 5 },
+    "end": { "byte": 60, "line": 3, "column": 25, "utf16": 60, "utf16Column": 25 } } } } ] }
+```
+
+The runtime has no warnings:
+
+```json runtime-diagnostics-invalid
+{ "version": 1, "diagnostics": [
+  { "severity": "warning", "code": "runtime-missing-value", "message": "…", "location": { "kind": "input", "path": ["user"] } } ] }
+```

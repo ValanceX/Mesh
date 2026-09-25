@@ -162,3 +162,89 @@ fn the_runtime_manuals_intents_match_the_intent_definition() {
         (1, 1),
     );
 }
+
+#[test]
+fn runtime_diagnostics_v1_is_a_valid_schema() {
+    validator("schemas/runtime-diagnostics-v1.schema.json");
+}
+
+#[test]
+fn the_runtime_manuals_diagnostics_match_runtime_diagnostics_v1() {
+    check_examples(
+        "docs/manual/runtime.md",
+        "schemas/runtime-diagnostics-v1.schema.json",
+        "runtime-diagnostics",
+        (5, 1),
+    );
+}
+
+/// Every code v0.5 adds (Pass 0, Decision 27), by family.
+const CHECK_CODES: [&str; 2] = ["content-not-text", "number-literal-out-of-range"];
+const RUNTIME_CODES: [&str; 30] = [
+    "assembly-malformed-template",
+    "assembly-unsupported-format-version",
+    "assembly-fingerprint-mismatch",
+    "assembly-duplicate-template",
+    "assembly-missing-root",
+    "assembly-unbound-scope-name",
+    "assembly-unsound-binding",
+    "assembly-cycle",
+    "assembly-composite-event",
+    "assembly-composite-children",
+    "runtime-missing-value",
+    "runtime-value-mismatch",
+    "runtime-unknown-field",
+    "runtime-absent-element",
+    "runtime-number-out-of-range",
+    "runtime-non-finite-input",
+    "runtime-unpaired-surrogate",
+    "runtime-unsupported-value",
+    "runtime-unexpected-payload",
+    "runtime-handler-other-program",
+    "runtime-unknown-handler",
+    "runtime-operand-mismatch",
+    "runtime-not-a-record",
+    "runtime-missing-member",
+    "runtime-content-not-text",
+    "runtime-prop-mismatch",
+    "runtime-argument-mismatch",
+    "runtime-non-finite-output",
+    "runtime-absent-element-output",
+    "runtime-key-collision",
+];
+
+/// Until the code that emits them exists, v0.5's new codes are documented
+/// in the runtime manual and the spec, not in the diagnostics reference,
+/// which must list exactly the codes MESH can emit
+/// (`crates/mesh-cli/tests/diagnostics_reference.rs`). Passes 1 and 2
+/// move them, and shrink these lists.
+#[test]
+fn every_new_code_is_documented_once() {
+    let runtime = read("docs/manual/runtime.md");
+    let reference = read("docs/manual/diagnostics.md");
+    let spec = read("docs/MPRX-SPEC.md");
+    let headings: Vec<&str> = runtime
+        .lines()
+        .filter_map(|line| line.strip_prefix("### `")?.strip_suffix('`'))
+        .collect();
+    let mut expected = RUNTIME_CODES.to_vec();
+    expected.sort_unstable();
+    let mut found = headings.clone();
+    found.sort_unstable();
+    assert_eq!(
+        found, expected,
+        "runtime.md should have one heading per runtime and assembly code"
+    );
+    for code in CHECK_CODES {
+        assert!(
+            spec.contains(&format!("`{code}`")),
+            "§9.7 should name `{code}`"
+        );
+    }
+    for code in CHECK_CODES.iter().chain(RUNTIME_CODES.iter()) {
+        assert!(
+            !reference.contains(&format!("### `{code}`")),
+            "`{code}` is in the diagnostics reference before MESH can emit it"
+        );
+    }
+}
