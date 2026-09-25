@@ -2,7 +2,9 @@
 
 The [MESH](https://github.com/ValanceX/Mesh) compiler, built for WebAssembly. Check MPRX, with or without a component manifest, and get back exactly the diagnostics `mesh check --format json` prints for the same inputs.
 
-It's the Rust compiler itself, compiled to WebAssembly, not a reimplementation: this package adds no rule of its own. It returns diagnostics only.
+Or compile it, and also get the component's **template**, exactly what `mesh compile` writes: the checked MPRX with every name resolved and no values, which the MESH runtime renders.
+
+It's the Rust compiler itself, compiled to WebAssembly, not a reimplementation: this package adds no rule of its own.
 
 ```js
 import { check } from "@valancex/mesh-compiler";
@@ -28,6 +30,7 @@ The [Using MESH from JavaScript](https://github.com/ValanceX/Mesh/blob/main/docs
 ## The API
 
 - **`check(input)`** returns a promise of the diagnostics document, the one [`schemas/diagnostics-v1.schema.json`](https://github.com/ValanceX/Mesh/blob/main/schemas/diagnostics-v1.schema.json) describes. Anything wrong with your MPRX or your manifest is a diagnostic in it, never an exception. Diagnostics about the manifest carry the manifest's `path`. Each position has a `byte` offset, a 1-based `line` and `column`, and, for JavaScript, `utf16` (an offset into your string) and `utf16Column`.
+- **`compile(input)`** takes `check`'s input, with `model` required, and returns a promise of `{ diagnostics, template? }`. `diagnostics` is the document `check` returns for the same input. `template` is the `template-v1` document ([`schemas/template-v1.schema.json`](https://github.com/ValanceX/Mesh/blob/main/schemas/template-v1.schema.json)), present exactly when the diagnostics have no error; warnings don't stop it. A template is data to store and pass to the runtime, not to interpret. The `Template` type describes it.
 - **`init(module)`** loads the WebAssembly module: a URL, its bytes, or a compiled `WebAssembly.Module`. In Node you don't need it; the package loads its own. In a browser, call it once before the first check, with the URL of `@valancex/mesh-compiler/mesh.wasm` as your setup serves it. Automatic loading by bundlers isn't part of this package's contract.
 - **`version`**: the package's version.
 - **`MeshVersionError`**: the WebAssembly module isn't this version's. No check runs against it.

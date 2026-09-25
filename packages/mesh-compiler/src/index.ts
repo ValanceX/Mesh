@@ -1,7 +1,8 @@
 /**
  * The MESH compiler, in WebAssembly: check MPRX against a component
  * manifest, and get back exactly the diagnostics `mesh check --format
- * json` prints for the same inputs.
+ * json` prints for the same inputs; or compile it, and get the template
+ * `mesh compile` writes too.
  *
  * ```js
  * import { check } from "@valancex/mesh-compiler";
@@ -20,8 +21,8 @@
  * @packageDocumentation
  */
 
-import { check as checkWith, init as initWith } from "./engine.js";
-import type { CheckInput, ModuleSource } from "./engine.js";
+import { check as checkWith, compile as compileWith, init as initWith } from "./engine.js";
+import type { CheckInput, CompileInput, CompileResult, ModuleSource } from "./engine.js";
 import type { DiagnosticsDocument } from "./document.js";
 
 export type {
@@ -32,7 +33,15 @@ export type {
   Span,
   Suggestion,
 } from "./document.js";
-export type { CheckInput, ModuleSource } from "./engine.js";
+export type { CheckInput, CompileInput, CompileResult, ModuleSource } from "./engine.js";
+export type {
+  Offset,
+  Template,
+  TemplateChild,
+  TemplateElement,
+  TemplateExpression,
+  TemplateSpan,
+} from "./template.js";
 export { MeshInternalError, MeshVersionError } from "./engine.js";
 export { version } from "./version.js";
 
@@ -48,6 +57,20 @@ export { version } from "./version.js";
  */
 export function check(input: CheckInput): Promise<DiagnosticsDocument> {
   return checkWith(input);
+}
+
+/**
+ * Checks `input.source` as the template of `input.model.component`, as
+ * {@link check} does, and, only when that finds no error, compiles it to
+ * a template (`template-v1`): exactly what `mesh compile` reports and
+ * writes for the same inputs. Warnings don't stop it. A model is
+ * required, since a template is always a component's.
+ *
+ * `diagnostics` is the document `check` returns; `template` is absent
+ * when it has an error. It rejects as `check` does.
+ */
+export function compile(input: CompileInput): Promise<CompileResult> {
+  return compileWith(input);
 }
 
 /**

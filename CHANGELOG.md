@@ -6,6 +6,7 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ### Added
 
+- **`@valancex/mesh-compiler`: `compile()`.** It takes `check()`'s input, with the model required, and returns `{ diagnostics, template? }`: the document `check()` returns and, only when it has no error, the template, exactly as `mesh compile` reports and writes them. The package exports `Template` and related types for it.
 - **`mesh compile`:** checks a file as `mesh check --model` does, with the same diagnostics and exit status, and, only when it finds no error, writes the component's template (`template-v1`) to `--output` or stdout. With an error it writes nothing. `--format json` prints the diagnostics document on stdout, and needs `--output`.
 - **Rust API: compiling,** `mesh_compiler::check::template(source, &model)`: the check `check::source` does, and, only when it finds no error, the source's template (`template-v1`). Warnings don't stop it. `Model::fingerprint` gives the fingerprint templates compiled against a model carry.
 - **Two new check errors** (spec §9.7): `content-not-text`, for an interpolation in content whose type is a list or a record (or an optional of one), which has no text form; and `number-literal-out-of-range`, for a number literal too large to be a finite binary64 value (309 digits or more), reported with or without a component model. `mesh-lsp` reports both too.
