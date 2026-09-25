@@ -127,6 +127,7 @@ The [documentation index](./docs/README.md) lists everything. The most useful pl
 - [**Checking against a component model**](./docs/guides/checking-against-a-component-model.md): manifests, types, and why absence isn't `null`
 - [**`mesh` CLI manual**](./docs/manual/mesh-cli.md), [**Diagnostics reference**](./docs/manual/diagnostics.md) and [**Manifest reference**](./docs/manual/manifest.md)
 - [**Editor setup**](./docs/guides/editor-setup.md) and the [**`mesh-lsp` manual**](./docs/manual/mesh-lsp.md): MESH in your editor
+- [**Using MESH from JavaScript**](./docs/guides/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`
 - [**Embedding the compiler**](./docs/guides/embedding-the-compiler.md): use MESH from Rust
 - [**MPRX Language Spec**](./docs/MPRX-SPEC.md): the exact syntax and semantics
 - [**Architecture**](./docs/ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance

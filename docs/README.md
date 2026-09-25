@@ -10,6 +10,7 @@ Learning-oriented walkthroughs.
 - [**Writing MPRX**](./guides/writing-mprx.md): a tour of everything the language supports, plus common mistakes and their fixes.
 - [**Checking against a component model**](./guides/checking-against-a-component-model.md): declare your components in a manifest and check what a file means, not just its shape; requiredness, absence and `any`, explained.
 - [**Editor setup**](./guides/editor-setup.md): diagnostics, hover, go to definition, completion and syntax highlighting in your editor, with a configuration verified in Neovim.
+- [**Using MESH from JavaScript**](./guides/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`, and a generate-check-repair loop that applies MESH's suggestions.
 - [**Embedding the compiler**](./guides/embedding-the-compiler.md): call MESH from Rust, handle diagnostics, and walk the Semantic IR.
 
 ## Manuals

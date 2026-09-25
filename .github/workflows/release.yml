@@ -1,0 +1,156 @@
+name: Release
+
+# Builds a MESH release from its tag and publishes it (outline v0.4 D10):
+# every mesh-lsp binary on its own OS and architecture's runner, the
+# WebAssembly module, and the seven @valancex npm packages, published with
+# provenance, then a GitHub release with the binaries and tarballs.
+#
+# - A pushed `v*` tag publishes. Tagging is the maintainer's step.
+# - A manual run publishes only with `publish` set, and only from a tag;
+#   otherwise it's a dry run: everything but the publishing.
+# - A pull request that changes this workflow runs the dry run.
+#
+# Publishing needs the `NPM_ACCESS_TOKEN` secret: an npm granular access
+# token that can publish to the @valancex organisation. It expires; a
+# release needs a current one.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to npm and make the GitHub release (only from a tag)"
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .github/scripts/publish.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  # All of CI, on the commit being released.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  # Each binary built and tested on its own runner, exactly as CI's
+  # native-binaries job does, then packed into its platform package.
+  binaries:
+    needs: ci
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { target: linux-x64, runner: ubuntu-24.04, triple: x86_64-unknown-linux-musl, exe: "" }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm, triple: aarch64-unknown-linux-musl, exe: "" }
+          - { target: darwin-x64, runner: macos-15-intel, triple: x86_64-apple-darwin, exe: "" }
+          - { target: darwin-arm64, runner: macos-15, triple: aarch64-apple-darwin, exe: "" }
+          - { target: win32-x64, runner: windows-2025, triple: x86_64-pc-windows-msvc, exe: ".exe" }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      RUSTFLAGS: ${{ startsWith(matrix.target, 'win32') && '-C target-feature=+crt-static' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install musl
+        if: startsWith(matrix.target, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          echo "CC_$(echo '${{ matrix.triple }}' | tr - _)=musl-gcc" >> "$GITHUB_ENV"
+      - name: Install Rust
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.triple }}
+      - name: Build mesh-lsp
+        run: cargo build --release --locked -p mesh-lsp --target ${{ matrix.triple }}
+      - name: Transport tests, against the binary
+        run: cargo test --release --locked --target ${{ matrix.triple }} -p mesh-lsp --test transport
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Pack the platform package
+        run: |
+          binary="target/${{ matrix.triple }}/release/mesh-lsp${{ matrix.exe }}"
+          package="packages/mesh-lsp-${{ matrix.target }}"
+          mkdir -p "$package/bin" out
+          cp "$binary" "$package/bin/mesh-lsp${{ matrix.exe }}"
+          chmod 755 "$package/bin/mesh-lsp${{ matrix.exe }}"
+          (cd "$package" && npm pack --pack-destination ../../out)
+          cp "$binary" "out/mesh-lsp-${{ matrix.target }}${{ matrix.exe }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.target }}
+          path: out/
+          if-no-files-found: error
+
+  # The WebAssembly module, and the two JavaScript packages.
+  javascript:
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust
+        run: |
+          rustup toolchain install
+          rustup target add wasm32-unknown-unknown
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Build and pack
+        working-directory: packages
+        run: |
+          npm ci
+          npm run build:wasm -w @valancex/mesh-compiler
+          npm run build
+          mkdir -p ../out
+          npm pack -w @valancex/mesh-compiler -w @valancex/mesh-lsp --pack-destination ../out
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-javascript
+          path: out/
+          if-no-files-found: error
+
+  publish:
+    needs: [binaries, javascript]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the GitHub release
+      id-token: write # npm provenance
+    env:
+      PUBLISH: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: out
+          merge-multiple: true
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
+        run: |
+          ls -l out
+          if [ "$PUBLISH" = "true" ]; then
+            node .github/scripts/publish.mjs out --publish
+          else
+            node .github/scripts/publish.mjs out
+          fi
+      - name: GitHub release
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes="docs/releases/v$(echo "$version" | cut -d. -f1,2).md"
+          gh release create "$GITHUB_REF_NAME" --title "MESH $GITHUB_REF_NAME" --notes-file "$notes" --verify-tag out/*
