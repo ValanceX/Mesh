@@ -18,18 +18,18 @@ MESH owns the first one. It's a small language toolchain, with a grammar, parser
 
 ## How source becomes UI
 
-MESH is more than an AST. Tree-sitter parses the source, but its tree is only an intermediate step. What the rest of Valance actually consumes is the **MESH Semantic IR**.
+MESH is more than an AST. Tree-sitter parses the source, but its tree is only an intermediate step. What the rest of Valance actually consumes is **templates**, which the compiler emits, and the **runtime**, which evaluates them.
 
 ```text
-MPRX Source → Tree-sitter → Concrete Syntax Tree → MESH Semantic AST/IR
-  → Semantic Analysis → Validation/Transformation → Runtime/PORT
+MPRX Source → Tree-sitter → Concrete Syntax Tree → MESH Semantic IR
+  → Analysis against the component manifest → Template (one per component)
+
+Program (a root and its templates) + snapshot → MESH runtime → render tree → PORT
+Handler identifier + payload + the render   → MESH runtime → command intent → NEXUS
 ```
 
-Long-term, the Rust compiler produces the IR, and runtimes for different languages consume it:
-
-```text
-MPRX → Rust MESH Compiler → MESH Semantic IR → Target Adapter/Runtime → NEXUS + PORT
-```
+- **NEXUS** holds the state and runs the commands. Its adapter is a MESH **host**: it renders a program against a snapshot of its state, keeps each render, and dispatches the events a renderer reports with the render they came from. See [Integrating MESH with NEXUS](./guides/integrating-mesh-with-nexus.md).
+- **PORT** draws. Its renderers get render trees: primitive components with final values, and nothing to evaluate. See [Rendering MESH output](./guides/rendering-mesh-output.md).
 
 Whatever changes, MESH stays **renderer-independent**. It never assumes a DOM, a canvas, or a particular device.
 
@@ -109,7 +109,7 @@ Over time the compiler will understand component names, props, local variables, 
 This is where the constraints pay off. When an AI model (or any other untrusted source) produces UI, it goes through the same checks as hand-written code:
 
 ```text
-AI → MPRX source → Parser → MESH AST → Semantic validation → Compilation → PORT
+AI → MPRX source → Parser → MESH AST → Semantic validation → Template → Runtime → Render tree → PORT
 ```
 
 Valance never blindly executes generated UI. The compiler rejects invalid syntax, unknown components or properties, bad references, malformed command calls, type errors, and unsupported constructs.
@@ -128,12 +128,17 @@ mesh/
 │   ├── mesh-semantic/
 │   ├── mesh-manifest/
 │   ├── mesh-analysis/
+│   ├── mesh-template/
 │   ├── mesh-compiler/
+│   ├── mesh-runtime/
+│   ├── mesh-runtime-wasm/
+│   ├── mesh-wasm/
 │   ├── mesh-lsp/
 │   └── mesh-cli/
 ├── grammar/
 │   └── tree-sitter-mprx/     the grammar, and its highlighting queries
 ├── editors/                  verified editor configurations
+├── packages/                 @valancex/mesh-compiler, @valancex/mesh-runtime, @valancex/mesh-lsp
 └── Cargo.toml
 ```
 
@@ -143,28 +148,23 @@ Crate boundaries can change as we learn more.
 
 - **mesh-language**: the MPRX grammar, Tree-sitter parser, syntax nodes, AST types, source locations, expression grammar, basic semantic model, and AST traversal.
 - **mesh-compiler**: semantic analysis, type checking, component and binding resolution, template compilation, diagnostics, transformation, optimization, and code generation.
+- **mesh-template**: the template format, `template-v1`, and the model fingerprint. It has no parser, so the runtime can depend on it.
+- **mesh-runtime**: MPRX's one evaluator. It validates a program, its model and the host's values, renders a tree, and dispatches an event to a command intent. It accepts templates, never source. `mesh-runtime-wasm` builds it for WebAssembly, and `@valancex/mesh-runtime` wraps that for JavaScript, encoding values and nothing more.
 - **mesh-lsp**: diagnostics and quick fixes, hover, go-to-definition, and completion. It is **a client of the compiler**, which stays the single semantic authority: its diagnostics are the compiler's own, and it has no parser or type system of its own, so the editor and the build can't disagree. Its npm package only launches it.
 
   An open document has three kinds of state, and they never mix. **Canonical state** is exactly what `mesh_compiler::compile_with` returns for its text: its diagnostics, and for a file that parses, its IR and analysis. **Editor recovery state** exists only for a file with a syntax error: `mesh_compiler::editor::recover` keeps the parts that parse and analyzes them with the same analysis code, so hover and go-to-definition still work there. It has no diagnostics, so it can never be published or mistaken for the compiler's verdict. **Presentation** turns either into protocol messages (ranges, hover text, quick fixes) and adds nothing of its own.
 
 - **Highlighting** comes from the grammar's Tree-sitter queries, which editors load directly. They colour text and decide nothing: no MESH feature reads a query capture, so they may be approximate where the compiler may not.
 
-### A language-neutral IR (long-term)
+### Language-neutral formats
 
-The Semantic IR describes UI without tying it to any runtime language:
+The runtime's inputs and outputs are JSON documents with published schemas, so no consumer depends on Rust:
+- a **template** ([`template-v1`](../schemas/template-v1.schema.json)) is one checked component, every name resolved, no values. It's compatible with a runtime by its format version and its model fingerprint, never by the compiler's version;
+- a **render tree** ([`render-v1`](../schemas/render-v1.schema.json)) is what a renderer draws;
+- a **command intent** is what a host receives;
+- **runtime diagnostics** ([`runtime-diagnostics-v1`](../schemas/runtime-diagnostics-v1.schema.json)) say why a render or dispatch failed.
 
-```text
-Component("user-card")
-  .bind("user", Reference("user"))
-  .bind("compact", Member("layout", "compact"))
-  .event("select", Command("selectUser", EventValue))
-```
-
-```text
-MPRX → Rust MESH Compiler → MESH Semantic IR → {TypeScript, WASM, Native} Runtime → PORT
-```
-
-We're intentionally *not* locking down a binary or serialized IR format yet. Semantic correctness and runtime boundaries come first.
+The Semantic IR itself stays internal to the compiler. The [templates manual](./manual/templates.md) and the [runtime manual](./manual/runtime.md) are the contracts.
 
 ## The rules
 
@@ -178,3 +178,8 @@ These invariants hold for everything in this repo:
 6. **The MESH compiler and tooling must not require NEXUS.**
 7. **The LSP and compiler share one language implementation.**
 8. **Component references and bindings should be statically verifiable.**
+9. **MPRX has one evaluator: the Rust runtime.** Nothing outside it evaluates an expression, turns a value into text, coerces or normalizes a value, fills in for absence, decides whether a component is a composite, resolves a handler identifier, or judges a host's value. Everything else only carries values, and a renderer only draws them.
+10. **Only what checked runs.** The compiler emits a template only from source with no errors, and the runtime accepts only templates, validates every program before running it, and fails closed on any value that doesn't fit.
+11. **Renderers see values, never MPRX.** A render tree holds primitive component names, final prop values, text, handler identifiers and keys, and nothing else. Keys and handler identifiers are opaque: they don't reveal those names to anyone without the templates. But they're not secret.
+12. **The host is checked, not trusted.** The model, the templates, the snapshot, every payload, every handler identifier and every render are validated on every call.
+13. **Dependencies point one way.** No MESH crate or package depends on NEXUS, PORT or Effect. NEXUS's adapter depends on `@valancex/mesh-runtime`, and PORT's renderers on MESH's render-tree types. NEXUS and PORT don't depend on each other. Any program can be a host, and MESH's own tests use one.

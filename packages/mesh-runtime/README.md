@@ -36,6 +36,12 @@ A problem with your values is a diagnostic, never an exception. The promises rej
 - **Tell your renderer when a tree comes from a different program.** Keys are stable within one program, and change when the program does.
 - **Give values as plain data:** `null`, booleans, finite numbers, strings, arrays and plain objects. A missing property and one that is `undefined` are both absent. Anything else (a `Map`, a `Date`, a class instance, a function, a `bigint`, NaN, a hole in an array, a string with an unpaired surrogate, a cycle) reaches the runtime as it is, and the runtime reports it.
 
+## Guides
+
+- [Integrating MESH with NEXUS](https://github.com/ValanceX/Mesh/blob/main/docs/guides/integrating-mesh-with-nexus.md): a host, end to end.
+- [Rendering MESH output](https://github.com/ValanceX/Mesh/blob/main/docs/guides/rendering-mesh-output.md): a renderer, end to end.
+- [The runtime manual](https://github.com/ValanceX/Mesh/blob/main/docs/manual/runtime.md): the whole contract.
+
 ## Support
 
 Node 22 and later, and current browsers.

@@ -237,7 +237,7 @@ A pipeline's exit status is its last command's, here `jq`'s, so a gate that pipe
 
 ```console
 $ mesh compile examples/page.mprx --model examples/components.json
-{"format":"mesh-template","version":1,"component":"page","fingerprint":"sha256:9ed6ba44b5a2857861db263d53d2e18afd06c70fed9aca93c785c7aba26e4a80","compiler":"0.4.0","root":{"component":"page","props":[{"prop":"title","value":{"kind":"literal","value":"Users","span":{"start":{"byte":12,"utf16":12},"end":{"byte":19,"utf16":19}}},"span":{"start":{"byte":6,"utf16":6},"end":{"byte":19,"utf16":19}}}],"events":[],"children":[],"span":{"start":{"byte":0,"utf16":0},"end":{"byte":22,"utf16":22}}}}
+{"format":"mesh-template","version":1,"component":"page","fingerprint":"sha256:9ed6ba44b5a2857861db263d53d2e18afd06c70fed9aca93c785c7aba26e4a80","compiler":"0.5.0","root":{"component":"page","props":[{"prop":"title","value":{"kind":"literal","value":"Users","span":{"start":{"byte":12,"utf16":12},"end":{"byte":19,"utf16":19}}},"span":{"start":{"byte":6,"utf16":6},"end":{"byte":19,"utf16":19}}}],"events":[],"children":[],"span":{"start":{"byte":0,"utf16":0},"end":{"byte":22,"utf16":22}}}}
 ```
 
 - **`--model` is required.** A template is always a component's, and carries its model's fingerprint. `--component` defaults to the file's name without its extension, as for `mesh check`.
@@ -276,7 +276,7 @@ error[assembly-cycle]: `card` expands `card` again, through its template: a cycl
 
 ## `mesh help`, `--help` and `--version`
 
-`mesh help` and `--help` print usage for `mesh` or for a single command. `mesh --version` (or `-V`) prints the version, such as `mesh 0.4.0`, and exits `0`.
+`mesh help` and `--help` print usage for `mesh` or for a single command. `mesh --version` (or `-V`) prints the version, such as `mesh 0.5.0`, and exits `0`.
 
 ## Limitations
 

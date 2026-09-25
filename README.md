@@ -69,11 +69,16 @@ Concrete syntax tree
 MESH AST
     ↓  mesh-semantic (lowering + validation)
 MESH Semantic IR
+    ↓  mesh-analysis (checked against the component manifest)
+Template (template-v1), one per component
+    ↓  a program: a root and its templates
+mesh-runtime: render  ──▶  render tree (render-v1)  ──▶  PORT renderer
+mesh-runtime: dispatch ◀── handler identifier, payload ◀─┘
     ↓
-NEXUS runtime  +  PORT renderer
+command intent  ──▶  NEXUS
 ```
 
-Tree-sitter is an implementation detail. What the rest of Valance consumes is the **Semantic IR**, a stable, renderer-independent description of the UI.
+Tree-sitter is an implementation detail. What the rest of Valance consumes is **templates**, which the compiler emits, and the **runtime**, which evaluates them: a host such as NEXUS's adapter renders a program against its state and gets a render tree for a renderer to draw, then turns the events the renderer reports into command intents. The [NEXUS](./docs/guides/integrating-mesh-with-nexus.md) and [PORT](./docs/guides/rendering-mesh-output.md) guides show both sides.
 
 ## Inside the repo
 
@@ -85,14 +90,19 @@ mesh/
 │   ├── mesh-semantic/        semantic model, lowering, structural validation
 │   ├── mesh-manifest/        component manifest loading and validation
 │   ├── mesh-analysis/        checking templates against a component manifest
+│   ├── mesh-template/        the template format (template-v1) and the model fingerprint
 │   ├── mesh-compiler/        compile API, diagnostics, and rendering
+│   ├── mesh-runtime/         the runtime: render and dispatch, MPRX's one evaluator
+│   ├── mesh-runtime-wasm/    the runtime, built for WebAssembly
 │   ├── mesh-lsp/             the language server, a client of the compiler
+│   ├── mesh-wasm/            the compiler, built for WebAssembly
 │   └── mesh-cli/             the `mesh` command-line tool
 ├── grammar/
 │   └── tree-sitter-mprx/     the MPRX Tree-sitter grammar and its highlighting queries
 ├── editors/                verified editor configurations (Neovim)
 └── packages/               npm packages (an npm workspace, published as @valancex/*)
     ├── mesh-compiler/        @valancex/mesh-compiler: the compiler, built for WebAssembly
+    ├── mesh-runtime/         @valancex/mesh-runtime: the runtime, built for WebAssembly
     └── mesh-lsp/             @valancex/mesh-lsp: starts the native mesh-lsp
 ```
 
@@ -100,11 +110,11 @@ mesh/
 
 - MESH never depends on [NEXUS](https://github.com/ValanceX/Nexus). The compiler and tooling work on their own.
 - The language server reuses `mesh-parser` and `mesh-compiler`. There is never a second parser or type system for editor tooling.
-- Other layers (NEXUS, PORT, other runtimes) consume MESH through the Semantic IR, never through Rust compiler internals.
+- Other layers (NEXUS, PORT) consume MESH through its formats (templates, render trees, command intents) and the runtime's two operations, never through Rust compiler internals. MESH evaluates MPRX exactly once, in its runtime; JavaScript only encodes values and carries results.
 
 ## Status
 
-**v0.4.0 released** (2026-09-25). See the [release notes](./docs/releases/v0.4.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.5.0 released** (2026-09-26). See the [release notes](./docs/releases/v0.5.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), and event bindings (`on.click={...}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings
@@ -115,10 +125,12 @@ mesh/
 - Syntax highlighting from the grammar's Tree-sitter queries, and an [editor setup guide](./docs/guides/editor-setup.md) verified in Neovim
 - MESH in JavaScript: `@valancex/mesh-compiler` is the compiler in WebAssembly, for Node and browsers, returning exactly what `mesh check --format json` prints (see [Using MESH from JavaScript](./docs/guides/using-mesh-from-javascript.md))
 - `mesh-lsp` from npm: `npm install -g @valancex/mesh-lsp` installs the native server for Linux, macOS or Windows
+- Compiling to templates: `mesh compile`, and `compile()` in `@valancex/mesh-compiler`, emit a checked component's template (see the [templates manual](./docs/manual/templates.md)); `mesh check-program` and `checkProgram()` check a program of them
+- The runtime: `mesh-runtime` in Rust, and `@valancex/mesh-runtime` in Node and browsers, render a program against a snapshot to a render tree, and dispatch an event to a command intent, with MPRX's evaluation specified in [§9.7 of the spec](./docs/MPRX-SPEC.md) (see the [runtime manual](./docs/manual/runtime.md))
 
-Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. Editor configuration is per editor, and only Neovim's is verified. The JavaScript API returns diagnostics only, not the compiled tree.
+Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. Editor configuration is per editor, and only Neovim's is verified. Composites have no events, children or slots. A list holding an absent element can't be rendered or passed as an argument. Every template must be recompiled after any change of meaning to the component model. MESH ships no NEXUS adapter or PORT renderer: those belong to their repositories.
 
-Next: a serialized Semantic IR, designed with NEXUS and PORT, and a thin VS Code extension over the npm-installed server.
+Next: NEXUS's adapter and PORT's renderers, in their own repositories, and a thin VS Code extension over the npm-installed server.
 
 ## Learn more
 
@@ -131,6 +143,7 @@ The [documentation index](./docs/README.md) lists everything. The most useful pl
 - [**Editor setup**](./docs/guides/editor-setup.md) and the [**`mesh-lsp` manual**](./docs/manual/mesh-lsp.md): MESH in your editor
 - [**Using MESH from JavaScript**](./docs/guides/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`
 - [**Embedding the compiler**](./docs/guides/embedding-the-compiler.md): use MESH from Rust
+- [**Integrating MESH with NEXUS**](./docs/guides/integrating-mesh-with-nexus.md) and [**Rendering MESH output**](./docs/guides/rendering-mesh-output.md): render and dispatch MESH templates, as a host and as a renderer
 - [**MPRX Language Spec**](./docs/MPRX-SPEC.md): the exact syntax and semantics
 - [**Architecture**](./docs/ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance
 

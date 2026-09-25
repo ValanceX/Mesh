@@ -1,13 +1,16 @@
-//! Keeps v0.5's specified formats honest before any code implements them
-//! (v0.5 Pass 0, Decision 1): each new schema is a valid draft 2020-12
-//! schema, every example document a manual shows validates against it,
-//! and every counter-example the manual shows is rejected.
+//! Keeps the manuals' examples of v0.5's formats honest (v0.5 Pass 0,
+//! Decision 1): each schema is a valid draft 2020-12 schema, every example
+//! document a manual shows validates against it, and every counter-example
+//! the manual shows is rejected.
 //!
 //! A manual marks its examples by the info string of a fenced block:
 //! ```` ```json template-v1 ```` is a valid `template-v1` document, and
-//! ```` ```json template-v1-invalid ```` one the schema must reject. As
-//! the formats gain their implementations (v0.5 Passes 1–3), these tests
-//! move to the crates that own them.
+//! ```` ```json template-v1-invalid ```` one the schema must reject. The
+//! tests stay here, in the one crate that depends on every format's crate,
+//! so they share one reader of fenced blocks. The format crates' own
+//! tests check the implementations against the same manuals
+//! (`mesh-template`'s `format.rs`, `mesh-runtime`'s `diagnostics.rs` and
+//! `render.rs`).
 
 use serde_json::Value;
 use std::fs;

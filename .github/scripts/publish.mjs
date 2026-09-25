@@ -1,5 +1,5 @@
-// Publishes the seven packed npm packages of a MESH release (outline v0.4
-// D10), from the tarballs the release workflow built on its runners.
+// Publishes the eight packed npm packages of a MESH release (outline v0.4
+// D10, and v0.5), from the tarballs the release workflow built on its runners.
 //
 //   node .github/scripts/publish.mjs <tarball-dir> [--publish]
 //
@@ -7,8 +7,9 @@
 // --dry-run`. It checks that the tag (GITHUB_REF_NAME, on a tag push) is
 // the workspace version, that there is exactly one tarball per package at
 // that version, and then publishes the platform packages first, then the
-// launcher that depends on them, then the compiler. A version the registry
-// already has is skipped, so a failed run can be run again.
+// launcher that depends on them, then the compiler and the runtime. A
+// version the registry already has is skipped, so a failed run can be run
+// again.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -55,6 +56,7 @@ const PACKAGES = [
   "mesh-lsp-win32-x64",
   "mesh-lsp",
   "mesh-compiler",
+  "mesh-runtime",
 ];
 
 const tarballs = PACKAGES.map((name) => {

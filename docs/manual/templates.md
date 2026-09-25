@@ -1,8 +1,8 @@
 # Templates and programs
 
-> **Status: v0.5, in progress.** This manual is the contract v0.5's compiler and runtime are built against (outline: `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, D1 and D7). Compiling is implemented: `mesh compile`, `compile()` in `@valancex/mesh-compiler`, and `mesh_compiler::check::template` emit templates, and `mesh-template` reads them. Programs are implemented too: the runtime validates and renders them, and `mesh check-program`, `checkProgram()` and `mesh_compiler::check::program` check them.
-
 A **template** is one component's MPRX, checked clean against a component model and compiled. A **program** is a root component and a set of templates. The MESH runtime renders a program against the host's values (`docs/manual/runtime.md`).
+
+`mesh compile`, `compile()` in `@valancex/mesh-compiler` and `mesh_compiler::check::template` emit templates, and the `mesh-template` crate reads them. `mesh check-program`, `checkProgram()` and `mesh_compiler::check::program` check a program without rendering it.
 
 MPRX goes through three stages: **source syntax → semantic resolution → runtime evaluation.** A template is the product of the first two and holds nothing from the third. Every name in it is resolved, and it holds no values.
 

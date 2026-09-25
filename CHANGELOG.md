@@ -4,7 +4,13 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-26
+
+MESH renders: templates, and the MESH runtime, natively and as `@valancex/mesh-runtime`. See the [v0.5 release notes](./docs/releases/v0.5.md) for an overview.
+
 ### Added
+
+- **Two guides,** [Integrating MESH with NEXUS](./docs/guides/integrating-mesh-with-nexus.md), for a host, and [Rendering MESH output](./docs/guides/rendering-mesh-output.md), for a renderer, each with an example a test runs. The release workflow now publishes `@valancex/mesh-runtime` too, eight packages in all.
 
 - **The slice,** `examples/slice/`: a page that uses the composite `user-card` twice, with its committed tree, rendering, intent and changes, checked natively and in Node.
 - **`@valancex/mesh-runtime`: the MESH runtime in JavaScript,** as a new package with no dependencies. `render({ program, model, snapshot })` returns `{ render }`, whose frozen `tree` a renderer draws, or `{ diagnostics }`; `dispatch(render, handler, payload?)` returns `{ intent }` or `{ diagnostics }`, against the snapshot the render was made from. It runs the Rust runtime in WebAssembly (`mesh-runtime.wasm`, 184,751 bytes gzipped), and only encodes and transports values: every JavaScript value, a `Map`, a hole, NaN or a cycle included, reaches the runtime, which judges it. It works in Node 22 and later and in browsers (after `init()`), and exports the render tree, intent and runtime diagnostics types.
@@ -19,7 +25,7 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 - **Two new check errors** (spec §9.7): `content-not-text`, for an interpolation in content whose type is a list or a record (or an optional of one), which has no text form; and `number-literal-out-of-range`, for a number literal too large to be a finite binary64 value (309 digits or more), reported with or without a component model. `mesh-lsp` reports both too.
 - **Rust API: the `mesh-template` crate,** the template format in Rust: `from_json` reads a `template-v1` document, refusing one that is malformed (with every problem, at a JSON Pointer) or of an unsupported version; `to_json` writes one, compactly and deterministically; and `fingerprint` computes a manifest's model fingerprint, which depends on the model's meaning only. It has no parser, so the runtime can depend on it. `serde_json` is now built with `float_roundtrip` across the workspace, so every JSON number reads as its exact nearest binary64 value.
 - **MPRX's evaluation is specified** (`docs/MPRX-SPEC.md` §9.7): values and absence, the one runtime type relation (*fits*), IEEE 754 numbers with a truncated `%`, strict equality, evaluation order, the runtime checks, and text. Number-to-text conversion is pinned by a normative table, `docs/tables/number-to-text.tsv`, computed from the rule by an exact reference generator. `mesh-runtime` implements it.
-- **The template format is specified** (`schemas/template-v1.schema.json`, `docs/manual/templates.md`): one checked component with every name resolved and no values, its compatibility rule (format version and model fingerprint only), the fingerprint's exact byte layout, and a template's canonical digest. Nothing emits one yet.
+- **The template format is specified** (`schemas/template-v1.schema.json`, `docs/manual/templates.md`): one checked component with every name resolved and no values, its compatibility rule (format version and model fingerprint only), the fingerprint's exact byte layout, and a template's canonical digest.
 - **Programs and their assembly rules are specified** (`docs/manual/templates.md`): a root and a set of templates; a component is a composite exactly when the program has its template; how a composite's props bind its scope; and seven rules (one template per component, the root's template, well-formed templates of one model, sound bindings, no cycles, no composite events, no composite children), with their codes and order.
 - **The render tree and the command intent are specified** (`schemas/render-v1.schema.json`, `docs/manual/runtime.md`): what a renderer draws (primitive nodes, final prop values, text runs, handler identifiers and keys, and nothing else), what a host receives from dispatch, the host's dispatch lifecycle, and the encodings of keys, handler identifiers and program identity.
 - **Runtime diagnostics are specified** (`schemas/runtime-diagnostics-v1.schema.json`, `docs/manual/runtime.md`): three phases (program validation, input validation, evaluation), every new `assembly-*` and `runtime-*` code with its location, and their order.
@@ -150,6 +156,7 @@ The first release. See the [v0.1 release notes](./docs/releases/v0.1.md) for an 
 - No component-model or type checking yet.
 - `mesh-lsp` and the npm packages are placeholders.
 
+[0.5.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.2.0
