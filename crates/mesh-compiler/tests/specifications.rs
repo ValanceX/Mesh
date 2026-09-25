@@ -213,11 +213,11 @@ const RUNTIME_CODES: [&str; 30] = [
     "runtime-key-collision",
 ];
 
-/// Until the code that emits them exists, v0.5's new codes are documented
-/// in the runtime manual and the spec, not in the diagnostics reference,
-/// which must list exactly the codes MESH can emit
-/// (`crates/mesh-cli/tests/diagnostics_reference.rs`). Passes 1 and 2
-/// move them, and shrink these lists.
+/// Until the code that emits them exists, v0.5's runtime and assembly
+/// codes are documented in the runtime manual, not in the diagnostics
+/// reference, which must list exactly the codes MESH can emit
+/// (`crates/mesh-cli/tests/diagnostics_reference.rs`). The check codes
+/// moved there in Pass 1; Pass 2 moves the rest.
 #[test]
 fn every_new_code_is_documented_once() {
     let runtime = read("docs/manual/runtime.md");
@@ -235,13 +235,20 @@ fn every_new_code_is_documented_once() {
         found, expected,
         "runtime.md should have one heading per runtime and assembly code"
     );
+    // The check codes exist since v0.5 Pass 1, so they are in the
+    // reference (which `diagnostics_reference.rs` keeps exact), and §9.7
+    // names them.
     for code in CHECK_CODES {
         assert!(
             spec.contains(&format!("`{code}`")),
             "§9.7 should name `{code}`"
         );
+        assert!(
+            reference.contains(&format!("### `{code}`")),
+            "`{code}` should be in the diagnostics reference"
+        );
     }
-    for code in CHECK_CODES.iter().chain(RUNTIME_CODES.iter()) {
+    for code in RUNTIME_CODES {
         assert!(
             !reference.contains(&format!("### `{code}`")),
             "`{code}` is in the diagnostics reference before MESH can emit it"

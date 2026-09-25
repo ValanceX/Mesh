@@ -234,8 +234,10 @@ fn dedupe_last_wins<'a, T>(
 /// Lowers an AST [`mesh_syntax::Element`] into its Semantic IR form.
 ///
 /// This copies each node's source spans into the IR, deduplicates
-/// shadowed attributes and event bindings (last occurrence wins), and
-/// flags mismatched closing tags. Resolving names against a component
+/// shadowed attributes and event bindings (last occurrence wins), flags
+/// mismatched closing tags, and reports number literals too large to be
+/// finite (`number-literal-out-of-range`, in the kept attributes, the
+/// kept handlers and the content). Resolving names against a component
 /// model is `mesh-analysis`'s job, not this one's.
 ///
 /// `ir` is always `Some(..)`: no lowering diagnostic, regardless of
@@ -284,9 +286,26 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
         }
     }
 
+    let attributes: Vec<Attribute> = attributes.into_iter().map(lower_attribute).collect();
+    let event_bindings: Vec<EventBinding> = event_bindings
+        .into_iter()
+        .map(lower_event_binding)
+        .collect();
+    for attribute in &attributes {
+        if let AttributeValue::Expression(expression) = &attribute.value {
+            out_of_range_literals(expression, &mut diagnostics);
+        }
+    }
+    for binding in &event_bindings {
+        out_of_range_literals(&binding.handler, &mut diagnostics);
+    }
+
     let mut children = Vec::new();
     for child in &ast.children {
         let (lowered, child_diagnostics) = lower_child(child);
+        if let Some(Child::Expression(expression)) = &lowered {
+            out_of_range_literals(expression, &mut diagnostics);
+        }
         children.extend(lowered);
         diagnostics.extend(child_diagnostics);
     }
@@ -294,16 +313,72 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
     let element = Element {
         name: ast.name.clone(),
         name_span: ast.name_span,
-        attributes: attributes.into_iter().map(lower_attribute).collect(),
-        event_bindings: event_bindings
-            .into_iter()
-            .map(lower_event_binding)
-            .collect(),
+        attributes,
+        event_bindings,
         children,
         span: ast.span,
     };
 
     (element, diagnostics)
+}
+
+/// Reports each number literal in `expression` whose nearest binary64
+/// value would be infinite (§9.7.3), in source order. Literals are
+/// unsigned and `digit+ ('.' digit+)?`, so Rust's correctly rounded parse
+/// always succeeds, and gives an infinity exactly when the literal is out
+/// of range.
+fn out_of_range_literals(expression: &Expression, diagnostics: &mut Vec<mesh_syntax::Diagnostic>) {
+    match expression {
+        Expression::Literal {
+            value: Literal::Number(text),
+            span,
+        } => {
+            if text.parse::<f64>().is_ok_and(f64::is_infinite) {
+                diagnostics.push(mesh_syntax::Diagnostic {
+                    severity: mesh_syntax::Severity::Error,
+                    code: mesh_syntax::DiagnosticCode::NUMBER_LITERAL_OUT_OF_RANGE,
+                    message: "this number is too large: the largest number MPRX can represent is about 1.8e308"
+                        .to_string(),
+                    span: *span,
+                    suggestions: Vec::new(),
+                });
+            }
+        }
+        Expression::Literal { .. }
+        | Expression::Reference { .. }
+        | Expression::EventValue { .. } => {}
+        Expression::MemberAccess { object, .. } => out_of_range_literals(object, diagnostics),
+        Expression::Unary { operand, .. } => out_of_range_literals(operand, diagnostics),
+        Expression::Binary { left, right, .. } => {
+            out_of_range_literals(left, diagnostics);
+            out_of_range_literals(right, diagnostics);
+        }
+        Expression::Conditional {
+            condition,
+            consequent,
+            alternate,
+            ..
+        } => {
+            out_of_range_literals(condition, diagnostics);
+            out_of_range_literals(consequent, diagnostics);
+            out_of_range_literals(alternate, diagnostics);
+        }
+        Expression::Array { elements, .. } => {
+            for element in elements {
+                out_of_range_literals(element, diagnostics);
+            }
+        }
+        Expression::Object { members, .. } => {
+            for member in members {
+                out_of_range_literals(&member.value, diagnostics);
+            }
+        }
+        Expression::Command { arguments, .. } => {
+            for argument in arguments {
+                out_of_range_literals(argument, diagnostics);
+            }
+        }
+    }
 }
 
 fn lower_attribute(attribute: &mesh_syntax::Attribute) -> Attribute {

@@ -228,6 +228,16 @@ error[mismatched-closing-tag]: mismatched closing tag: opened with "title", clos
 
 **Fix:** make the closing tag match the opening tag.
 
+### `number-literal-out-of-range`
+
+A number literal so large that its nearest binary64 value would be infinite: more than about `1.8e308`, which takes 309 digits (spec §9.7.3). Points at the literal. Like `mismatched-closing-tag`, it's reported during validation, with or without a component model, and the file still gets its other diagnostics.
+
+```text
+error[number-literal-out-of-range]: this number is too large: the largest number MPRX can represent is about 1.8e308
+```
+
+**Fix:** use a smaller number. MPRX numbers are binary64, as in JavaScript.
+
 ---
 
 ## Warnings
@@ -784,10 +794,10 @@ An object literal has the same key more than once. As with a duplicate attribute
 
 ```text
 error[duplicate-object-key]: duplicate object key "first": this occurrence is shadowed by a later one
- --> examples/fixtures/check/fail/duplicate-object-key.mprx:1:10
+ --> examples/fixtures/check/fail/duplicate-object-key.mprx:1:20
   |
-1 | <text>{{ first: name, first: "Ada" }}</text>
-  |          ^^^^^
+1 | <probe anything={{ first: name, first: "Ada" }} />
+  |                    ^^^^^
 ```
 
 The shadowed value is still checked for its own mistakes, but it isn't part of the object, so it isn't checked against a record's field.
@@ -823,6 +833,22 @@ error[missing-required-field]: the object is missing the field "active", which U
 As with props, a required field must be written even when its type is optional.
 
 **Fix:** add the field.
+
+### `content-not-text`
+
+An interpolation in content, `<text>{...}</text>`, whose type is a list or a record (or an optional of one) has no text form, so it can't be content (spec §9.7.8). Points at the interpolated expression.
+
+```text
+error[content-not-text]: a value of type list<User> can't be shown as text: interpolate one of its fields, or a string, number, boolean or null
+ --> examples/fixtures/check/fail/content-not-text.mprx:1:8
+  |
+1 | <text>{users}</text>
+  |        ^^^^^
+```
+
+A value of type `any` isn't checked here: if it turns out to be a list or a record at runtime, the runtime reports it instead.
+
+**Fix:** interpolate a field (`{user.name}`), or pass the value to a component that shows it as a prop.
 
 ---
 

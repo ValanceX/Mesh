@@ -1,1 +1,1 @@
-<text>{{ name: name, "display-name": maybeName, tags: [], nested: { count: count } }}</text>
+<probe anything={{ name: name, "display-name": maybeName, tags: [], nested: { count: count } }} />

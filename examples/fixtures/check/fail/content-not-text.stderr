@@ -1,0 +1,5 @@
+error[content-not-text]: a value of type list<User> can't be shown as text: interpolate one of its fields, or a string, number, boolean or null
+ --> fixtures/check/fail/content-not-text.mprx:1:8
+  |
+1 | <text>{users}</text>
+  |        ^^^^^

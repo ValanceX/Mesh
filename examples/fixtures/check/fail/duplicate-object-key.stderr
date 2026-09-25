@@ -1,5 +1,5 @@
 error[duplicate-object-key]: duplicate object key "first": this occurrence is shadowed by a later one
- --> fixtures/check/fail/duplicate-object-key.mprx:1:10
+ --> fixtures/check/fail/duplicate-object-key.mprx:1:20
   |
-1 | <text>{{ first: name, first: "Ada" }}</text>
-  |          ^^^^^
+1 | <probe anything={{ first: name, first: "Ada" }} />
+  |                    ^^^^^

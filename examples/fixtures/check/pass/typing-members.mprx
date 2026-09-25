@@ -1,3 +1,4 @@
 <page title={user.name}>
-  <text>{user.avatar} {layout.compact} {users} {anything.deeply.nested}</text>
+  <text>{user.avatar} {layout.compact} {anything.deeply.nested}</text>
+  <probe users={users} />
 </page>

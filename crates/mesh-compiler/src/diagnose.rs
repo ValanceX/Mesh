@@ -199,6 +199,11 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
             format!("the object is missing the field {field:?}, which {record} requires"),
             Vec::new(),
         ),
+        Fact::ContentNotText { ty, .. } => (
+            DiagnosticCode::CONTENT_NOT_TEXT,
+            format!("a value of type {ty} can't be shown as text: interpolate one of its fields, or a string, number, boolean or null"),
+            Vec::new(),
+        ),
     };
     Diagnostic {
         severity: Severity::Error,

@@ -1,1 +1,3 @@
-<text>{flag ? name : maybeName} {count > 0 ? users : []} {anything ? 1 : 2}</text>
+<probe users={count > 0 ? users : []}>
+  <text>{flag ? name : maybeName} {(count > 0 ? users : []) == users} {anything ? 1 : 2}</text>
+</probe>
