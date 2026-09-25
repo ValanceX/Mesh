@@ -7,6 +7,7 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 ### Added
 
 - **MPRX's evaluation is specified** (`docs/MPRX-SPEC.md` §9.7): values and absence, the one runtime type relation (*fits*), IEEE 754 numbers with a truncated `%`, strict equality, evaluation order, the runtime checks, and text. Number-to-text conversion is pinned by a normative table, `docs/tables/number-to-text.tsv`, computed from the rule by an exact reference generator. The runtime that implements it arrives in later v0.5 passes.
+- **The template format is specified** (`schemas/template-v1.schema.json`, `docs/manual/templates.md`): one checked component with every name resolved and no values, its compatibility rule (format version and model fingerprint only), the fingerprint's exact byte layout, and a template's canonical digest. Nothing emits one yet.
 - **The boundary between the runtime and its host is specified** (§9.8): which values may cross, how absence, `-0`, NaN and unpaired surrogates are treated, open snapshots, exact records, and how JSON and JavaScript values map onto them.
 
 ## [0.4.0] - 2026-09-25
