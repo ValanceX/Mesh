@@ -7,7 +7,7 @@ MPRX (MeshExpr) is the declarative UI language at the heart of [MESH](../README.
 - **Want a gentler introduction?** The [Writing MPRX guide](./guides/writing-mprx.md) covers the same ground with examples and common mistakes.
 - **Implementing something?** Write against this spec rather than inventing syntax inline. The plans in `docs/superpowers/plans/` build it out step by step.
 
-This is a **living document**. It was updated as each pass shipped and now describes MESH v0.4, whose language is v0.2's: §2–§8 are the syntax and its representation, and §9 is what a file means when it's checked against a component manifest. The "Introduced in" column in §8 shows which pass added each node kind.
+This is a **living document**. It was updated as each pass shipped and now describes MESH v0.4, whose language is v0.2's: §2–§8 are the syntax and its representation, and §9 is what a file means when it's checked against a component manifest. §9.7 and §9.8, what a checked file does when it runs and how values cross into and out of it, are specified for v0.5 and not yet implemented. The "Introduced in" column in §8 shows which pass added each node kind.
 
 ---
 
@@ -63,7 +63,17 @@ v0.3 changes neither the syntax nor the semantics: it adds the `mesh-lsp` langua
 
 v0.4 doesn't change them either: it builds the same compiler for WebAssembly, as `@valancex/mesh-compiler`, and ships `mesh-lsp` through npm (outlined in `docs/superpowers/specs/2026-09-25-mesh-v0.4-outline.md`). The JSON diagnostics gain UTF-16 positions, an addition to their format, not to MPRX.
 
-*Last updated 2026-09-25. v0.4 is released as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. Any grammar or semantics work beyond v0.2 (v0.3 and v0.4 have none) starts a new spec.*
+v0.5 adds no syntax. It adds MPRX's evaluation (§9.7) and the boundary between the runtime and its host (§9.8), and two check-time errors that follow from them (outlined in `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`):
+
+| v0.5 pass | What it adds | Status |
+|---|---|---|
+| 0 | §9.7 and §9.8, the number-to-text table, and the template, render-tree and runtime-diagnostics formats | ✅ Specified |
+| 1 | Compiling a checked template to `template-v1`; `content-not-text` and `number-literal-out-of-range` | Planned |
+| 2 | The runtime, for programs of one template: render and dispatch | Planned |
+| 3 | Composition, and the runtime in JavaScript | Planned |
+| 4 | Documentation and release | Planned |
+
+*Last updated 2026-09-25. v0.4 is released as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them. Any further grammar or semantics work starts a new spec.*
 
 ---
 
@@ -411,7 +421,7 @@ Everything here is an **error**, and nothing is checked more loosely to let a fi
 
 Two more types exist only inside the checker and can't be written in a manifest: `void`, the type of a command invocation, which fits nowhere, not even `any`; and `nothing`, the element type of `[]`, which fits everywhere.
 
-**Absence** is the lack of a value. `T?` means "`T`, or absent", not "`T` or `null`". MPRX has no literal for absence and no presence test, so an absent value can only come from the manifest (a `T?` scope name, field or payload, or a field that isn't required), and can only go where `T?` (or `any?`) is accepted. How a runtime represents absence is up to it; it must not be `null`.
+**Absence** is the lack of a value. `T?` means "`T`, or absent", not "`T` or `null`". MPRX has no literal for absence and no presence test, so an absent value can only come from the manifest (a `T?` scope name, field or payload, or a field that isn't required), and can only go where `T?` (or `any?`) is accepted. Absence is never `null`: how it crosses into and out of the runtime is §9.8's.
 
 **Requiredness** belongs to a prop's or field's declaration, not to its type, and is independent of absence:
 
@@ -523,6 +533,211 @@ An unknown prop's value, and the arguments of an unknown command or of one given
 
 Anywhere else, such as an object literal where `any` or a primitive is expected, the literal is typed as §9.4 says and compared whole.
 
+### 9.7 Evaluation
+
+*Added in v0.5, as the contract for its runtime (outlined in `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, D8). Specified; the runtime that implements it arrives in v0.5's later passes.* This section is MPRX's dynamic semantics: what a checked template's expressions produce when the MESH runtime evaluates them against values. It is the language's definition, and MESH implements it exactly once, in its Rust runtime.
+
+Where a rule matches a standard, the standard is named and is normative: **IEEE 754-2019** for numbers, and **ECMA-262, 16th edition (ECMAScript 2025)**, Number::toString, for turning a number into text. Where MPRX deliberately departs from what a host language happens to do, the rule says so.
+
+#### 9.7.1 Values
+
+A runtime value is exactly one of:
+
+- **absent**: the lack of a value (§9.2), never a kind of `null`;
+- `null`;
+- a **boolean**;
+- a **number**: an IEEE 754 binary64 value (§9.7.3);
+- a **string**: a sequence of Unicode scalar values;
+- a **list** of values;
+- a **record**: a set of named fields, each a present value.
+
+Absent arises only from:
+
+- a snapshot entry, a record field or a payload whose type is optional;
+- a record field that reads as optional (§9.2);
+- an unwritten optional prop bound into a composite's scope (`docs/manual/templates.md`);
+- an expression that yields one of these.
+
+MPRX has no literal for absence. A record literal field whose value is absent is the same as no field at all. A list literal may hold an absent element inside evaluation, but such a list can't leave it (§9.7.10, §9.8).
+
+#### 9.7.2 Fits
+
+One relation, **fits(value, T)**, decides every runtime type check: in §9.7.10, and at the boundary (§9.8). Named types are expanded first.
+
+1. `T?`: the value is absent, or fits `T`.
+2. An absent value fits no type that isn't optional.
+3. `any`: every present value.
+4. `string`, `number`, `boolean`, `null`: a value of that kind. Every binary64 value is a `number`, the non-finite ones included (§9.8 governs the boundary).
+5. `list<U>`: a list whose every element fits `U`.
+6. A record type: a record with no field the type doesn't declare, and in which each declared field is either absent, where the field reads as optional (§9.2), or present and fits its type.
+
+*fits* is to values what `is_assignable` (§9.3) is to types: a value of a type assignable to `T` always fits `T`.
+
+#### 9.7.3 Numbers
+
+1. **Representation.** A number is an IEEE 754 binary64 value.
+2. **Literals** are converted once, when the template is compiled, to the nearest binary64 value, ties to even (IEEE 754 roundTiesToEven, §4.3.1).
+   - A literal whose nearest value would be infinite (more than about 1.8 × 10^308) is a check-time error, `number-literal-out-of-range`, at the literal.
+   - Literals are unsigned (§2), so a literal is never `-0`.
+   - `1`, `1.0` and `1.00` are the same value, and so are `1.5` and `1.50`.
+3. **Arithmetic.** `+`, `-`, `*`, `/` and unary `-` are IEEE 754 binary64 addition, subtraction, multiplication, division and negation (§5.4.1, §5.5.1), under roundTiesToEven.
+   - Overflow gives an infinity. Any NaN operand gives NaN.
+   - `x / ±0` is `±∞`, whose sign is `x`'s sign times zero's sign. `±0 / ±0` is NaN.
+4. **Remainder.** `%` is the **truncated** remainder, as C's `fmod`, JavaScript's `%` and Rust's `%` compute it, and **not** IEEE 754's `remainder` operation, which rounds the quotient to nearest. MPRX chooses this deliberately.
+   - For finite `x` and non-zero finite `y`, `x % y` is exactly `x − y × trunc(x / y)`, computed without rounding. The result is always representable.
+   - Its sign is `x`'s, and its magnitude is less than `|y|`. A zero result has `x`'s sign.
+   - `7 % 2` is `1`, `-7 % 2` is `-1`, `7 % -2` is `1`, `-7 % -2` is `-1`, `7.5 % 2` is `1.5`, `-4 % 2` is `-0`, `-0 % 5` is `-0`.
+   - `x % ±0` is NaN; `±∞ % y` is NaN; `x % ±∞` is `x` for finite `x`; a NaN operand gives NaN.
+5. **Negative zero** exists inside evaluation, from IEEE 754 operations: `-0`, `0 * -1`, `-4 % 2`.
+   - It is `==` to `0`, and not `<` it (§9.7.4).
+   - It is observable only through the sign of an infinity a division produces: `1 / -0` is `−∞`.
+   - At every output it becomes `0`: a prop value or command argument, at any depth, holds `0`, and text shows `0` (§9.7.7).
+6. **Non-finite numbers** (NaN, `+∞`, `−∞`) may exist inside evaluation. They may be compared, discarded by a conditional, or passed into a composite's prop.
+   - A non-finite number reaching an output, at any depth, is an evaluation error (§9.7.6). The outputs are a primitive prop, a text run and a command argument. No renderer and no host ever receives one.
+   - All NaNs behave alike: no NaN's sign or payload is observable.
+
+#### 9.7.4 Equality and comparison
+
+1. `==` and `!=` are strict: there is no coercion, and values of different kinds are unequal (§9.4). `!=` is exactly the negation of `==`.
+   - Numbers compare by IEEE 754 equality. `0 == -0` is `true`. NaN equals nothing, itself included, so `x == x` can be `false`. `∞ == ∞` is `true`.
+   - Strings compare by their sequences of Unicode scalar values. Booleans and `null` compare by value.
+   - Lists are equal when they have the same length and are equal element by element. Records are equal when they have the same fields and are equal field by field. So a list holding NaN is never equal to anything.
+   - Absent equals absent and nothing else, and `null` is not absent.
+   - A value of type `any` compares by its actual value.
+2. `<`, `<=`, `>` and `>=` are IEEE 754 comparisons: every comparison involving NaN is `false`, and `-0 < 0` is `false`.
+
+#### 9.7.5 Evaluation order
+
+1. **Expressions.** Operands are evaluated left to right, each operand before its operator.
+   - `&&` and `||` evaluate the left operand, then the right only if the left doesn't decide the result (§9.4). The result is a boolean.
+   - `c ? a : b` evaluates `c`, then exactly one branch.
+   - List elements and record fields are evaluated in source order. A record literal's shadowed keys (§9.4) are not evaluated.
+2. **Render** evaluates in document order, from the top down. At each occurrence, it evaluates the written attributes §3 keeps, in source order, then the children in order.
+   - At a composite occurrence, it evaluates the props, then the composite's template.
+   - Event handlers are **not** evaluated at render.
+3. **Dispatch** evaluates the props of the composite occurrences on the path to the handler's element, as render did, then the handler's arguments, left to right (`docs/manual/runtime.md`).
+4. Expressions have no side effects, so the order decides only one thing: which evaluation error is reported. It is always the first.
+
+#### 9.7.6 Runtime checks
+
+These are the only points where evaluation can fail. Every other operation is total. A failure stops the render or dispatch with one evaluation error (its code is in `docs/manual/runtime.md`), located at the span of the value checked.
+
+1. **Operands.** `!`, `&&`, `||` and a conditional's condition need a boolean. Unary `-`, the arithmetic operators and `<`, `<=`, `>`, `>=` need numbers. A clean check (§9.4) guarantees these, except where an operand has type `any` or `any?`.
+2. **Member access** `a.f` needs `a` to be a record. On a record type, an absent field gives absent. On `any`, the field must be present.
+3. **Content.** An interpolated value must not be a list or a record (§9.7.8).
+4. **Props.** Each written prop's value, at primitive and composite occurrences alike, must fit the prop's declared type (§9.7.2). An absent value is allowed only where that type is optional.
+5. **Arguments.** Each command argument must fit its parameter's type.
+6. **Outputs:** primitive props, text runs and command arguments. No non-finite number and no absent list element may appear, at any depth. `-0` becomes `0`.
+
+At any one point, the type check (items 1–5) comes before the output check (item 6).
+
+#### 9.7.7 Text
+
+Each interpolation in content is converted to text. A text run is the concatenation of its literal text and interpolations, in order. Literal text is kept exactly as the semantic model keeps it (§3).
+
+1. A string is itself.
+2. A boolean is `true` or `false`.
+3. `null` is `null`.
+4. **Absent is the empty string.**
+5. A finite number is converted by §9.7.7.1. A non-finite number never reaches text: it is stopped at the output check (§9.7.6).
+
+##### 9.7.7.1 Number to text
+
+The text of a finite number `x` is determined by this algorithm, and nothing else determines it:
+
+1. If `x` is `+0` or `-0`, the text is `0`.
+2. If `x` is negative, the text is `-` followed by the text of `−x`.
+3. **Digits.** Let `k` be the smallest number of decimal digits for which some integer `s` with `10^(k−1) ≤ s < 10^k`, and some integer `n`, make `s × 10^(n−k)` round to `x` under roundTiesToEven. If several such `s` exist, choose the one for which `s × 10^(n−k)` is **nearest to the exact value of `x`**. If two are equally near, choose the one that is **even**.
+4. **Layout**, exactly as ECMA-262's Number::toString with radix 10 lays out `k`, `n` and `s` (its steps after step 5):
+   - if `k ≤ n ≤ 21`: the `k` digits of `s`, then `n − k` zeros;
+   - if `0 < n ≤ 21`: the first `n` digits, `.`, then the remaining `k − n` digits;
+   - if `−6 < n ≤ 0`: `0.`, then `−n` zeros, then the `k` digits;
+   - otherwise: the first digit; then, if `k > 1`, `.` and the remaining `k − 1` digits; then `e`, then `+` if `n − 1 ≥ 0` and `-` otherwise, then the decimal digits of `|n − 1|`.
+
+**Why step 3 is MESH's own.** ECMA-262's normative step 5 requires only the shortest `s`. It says that "the least significant digit of `s` is not necessarily uniquely determined" by that, and it *recommends*, for "implementations that provide more accurate conversions", choosing the closest `s` and, between two, the even one. MPRX makes that recommendation normative. So MPRX's text is fully determined where ECMA-262 leaves it open. A conforming ECMAScript engine may differ from MPRX in the last digit without breaking ECMA-262, and no engine is the authority for MPRX's text. The layout is ECMA-262's, and deliberately isn't a host's default formatting (Rust's `Display` for `f64`, for instance, never uses exponents).
+
+**Equally near candidates do occur.** For example, `2^-25` is exactly `2.98023223876953125e-8`: both `2.9802322387695312e-8` and `2.9802322387695313e-8` read back as it and are equally near, and MPRX's text is the first. A search over binary64 exponents found 254 such values among 263,381 constructed candidates (`python3 docs/tables/number_to_text.py --search-ties`). Rust's standard formatting (1.98.1, MESH's pinned toolchain) rounds these halfway cases up. So the runtime must not take its digits from it.
+
+**The normative table.** [`docs/tables/number-to-text.tsv`](./tables/number-to-text.tsv) is part of this section. Each row gives a binary64 value as its bit pattern and the exact text this section requires (or, for NaN and the infinities, the evaluation error that stops them). It covers ordinary values, both zeros, integers around 2^53 and other powers of two, both sides of each layout threshold, the largest and smallest magnitudes, subnormals, values where several shortest candidates read back and the nearest decides, and equally near candidates. Its reference generator, [`docs/tables/number_to_text.py`](./tables/number_to_text.py), computes every row from this section's algorithm with exact rational arithmetic, and never uses a float formatter. `--check` confirms the committed table is what the algorithm gives. A runtime implements this section only if it reproduces every row.
+
+Examples: `1.5`, `100`, `0.1`, `-2.5`; `0.000001` and `1e-7`; `123456789012345680000` and `1e+21`; `0.30000000000000004` for `0.1 + 0.2`; `5e-324` for the smallest subnormal (every one-digit candidate from `3e-324` to `7e-324` reads back as it, and `5` is nearest); `-0` is `0`.
+
+#### 9.7.8 Lists and records in content
+
+An interpolation whose static type is a list, a record, `list<nothing>`, or an optional of one of these is a check-time error, `content-not-text`, at the interpolation: no text form of one is obviously right. Named types are expanded first. An interpolation of type `any` or `any?` whose value turns out to be a list or a record is an evaluation error (§9.7.6, item 3).
+
+### 9.8 The boundary
+
+*Added in v0.5, as the contract for its runtime. Specified; not yet implemented.* A **boundary** is a place where values leave or enter the runtime. The inputs are the host's snapshot and event payloads. The outputs are primitive props, text runs and command arguments. `docs/manual/runtime.md` describes the host interface around them.
+
+#### 9.8.1 The boundary data model
+
+A value may cross a boundary, in either direction, only if it is one of these:
+
+- `null`;
+- a boolean;
+- a **finite** number;
+- a string of Unicode scalar values;
+- a list of such values, with **no absent elements**;
+- a record: a set of named fields, each such a value.
+
+**Absence** crosses only as the omission of a named entry: a scope name, a record field, a prop, or a command argument position. A record's absent field is the same as having no such field.
+
+#### 9.8.2 How each value crosses
+
+| Value | In (snapshot, payload) | Inside evaluation | Out (primitive prop, text run, command argument) |
+|---|---|---|---|
+| absent | no entry for a scope name or record field. A payload that isn't given is absent. | allowed | omitted prop; omitted record field; empty text; absent argument |
+| `null` | `null` | allowed | `null`; text `null` |
+| boolean | as is | allowed | as is; text `true` or `false` |
+| finite number | the exact binary64 value; `-0` is kept | allowed | as is, except that `-0` becomes `0`; text by §9.7.7.1 |
+| NaN, ±∞ | an input error | allowed | an evaluation error (§9.7.6) |
+| string | Unicode scalar values only: an unpaired surrogate is an input error | allowed | as is |
+| list | every element present | may hold absent elements | an absent element, at any depth, is an evaluation error |
+| record | exactly the declared fields (§9.8.4) | allowed | absent fields omitted |
+
+#### 9.8.3 Types at the boundary
+
+Inputs are checked with *fits* (§9.7.2), against the root template's scope types for a snapshot, and against the event's payload type for a payload.
+
+- `any` accepts every present value of any kind, at any depth. A value of type `any` is still subject to the boundary data model.
+- `any?` also accepts absent.
+- `T?` accepts absent, or a value that fits `T`.
+
+#### 9.8.4 Snapshots and payloads
+
+1. **Open scope.** The root template's declared scope must be a subset of the snapshot:
+   - a scope name whose type isn't optional must be present;
+   - each declared name that is present must fit its type;
+   - a declared name whose type is optional may be absent;
+   - **a name the root template doesn't declare is ignored entirely.** It is never validated, never retained and never readable, since every reference is resolved when the template is compiled.
+2. **Exact records.** A record value must have only declared fields, because records are exact (§9.2) and equality compares all their fields. A missing field is absent, which is allowed only where the field reads as optional (§9.2).
+3. **Payloads** are checked the same way, against the payload type of the event the handler is bound to. For an event declared without a payload, the payload must be absent.
+4. Every mismatch in one snapshot and payload is reported, each at its path (`docs/manual/runtime.md`), before anything is evaluated.
+
+#### 9.8.5 JSON
+
+A host that holds its values as JSON maps them as follows.
+
+- JSON `null`, booleans, strings, arrays and objects are `null`, booleans, strings, lists and records. An object member that is missing is absent.
+- A JSON number is the binary64 value nearest its exact decimal value, ties to even, as a literal is (§9.7.3). A number whose nearest value is infinite is an input error, not a malformed document. `-0` is `-0`.
+- A string with an escaped unpaired surrogate (`"\ud800"`) is an input error.
+- An object with a duplicate key is a malformed document, which the host's JSON reader reports before the runtime sees a value.
+- Every output can be written as JSON without loss: every output number is finite and not `-0`, and every string is valid Unicode.
+
+#### 9.8.6 JavaScript
+
+`@valancex/mesh-runtime` encodes JavaScript values structurally and without loss, and makes no judgement about them: every judgement is the runtime's (§9.7). So a JavaScript host and a native host get the same errors for the same values.
+
+- A missing property, and a property whose value is `undefined`, are both absent.
+- An array's `undefined` element, or a hole, is an absent element, and so an input error.
+- A number keeps its exact binary64 value, NaN, the infinities and `-0` included.
+- A string keeps its UTF-16 code units, unpaired surrogates included.
+- Any other value is **unsupported**, which is an input error that names its kind:
+  - `function`, `symbol` and `bigint`;
+  - `object`, for an object that isn't a plain object or an array (a class instance, a `Map`, a `Date`), with its constructor's name when it has one;
+  - `cycle`, for a value that contains itself, so encoding always terminates.
+
 ---
 
 ## 10. Explicitly out of scope
@@ -531,9 +746,11 @@ Anywhere else, such as an object literal where `any` or a primitive is expected,
 - Array/object subscript access (§5)
 - Optional chaining (§7), and any other presence test for a value that
   may be absent (§9.2)
-- Slots, component composition beyond flat props (`docs/ARCHITECTURE.md`
-  §10 calls these out as eventual), and so checking element children
-  against a component (§9.1)
+- Slots and children for composites, and composite events
+  (`docs/ARCHITECTURE.md` §10 calls these out as eventual), and so
+  checking element children against a component (§9.1). v0.5 defines
+  composition without them: a program's composites, whose templates
+  are expanded in place (`docs/manual/templates.md`)
 - Type annotations in MPRX, and types beyond §9.2: unions, nullable types
   separate from absence, generics beyond `list<T>`, function types, open
   records, implicit coercions, and narrowing
@@ -579,3 +796,11 @@ Anywhere else, such as an object literal where `any` or a primitive is expected,
   (D3–D5, D8–D10 and D15) and implemented by the Passes 4–5 plan. It
   changes no syntax. The out-of-scope list becomes §10 and loses
   component-model checking, and this history becomes §11.
+- **v0.5 Pass 0 (2026-09-25)** adds §9.7, MPRX's evaluation, and §9.8,
+  the boundary between the runtime and its host, as settled by
+  `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md` (D5, D8) and
+  specified by its Pass 0 plan. It changes no syntax. Number to text is
+  pinned by a normative table, `docs/tables/number-to-text.tsv`, which
+  its reference generator computes from §9.7.7.1. §9.2 now defers the
+  representation of absence to §9.8, and §10 narrows composition to
+  what v0.5 still leaves out: slots, children and composite events.
