@@ -1,6 +1,6 @@
 # Templates and programs
 
-> **Status: v0.5, in progress.** This manual is the contract v0.5's compiler and runtime are built against (outline: `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, D1 and D7). Compiling is implemented: `mesh compile`, `compile()` in `@valancex/mesh-compiler`, and `mesh_compiler::check::template` emit templates, and `mesh-template` reads them. Programs, and the runtime that renders them, are not implemented yet.
+> **Status: v0.5, in progress.** This manual is the contract v0.5's compiler and runtime are built against (outline: `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, D1 and D7). Compiling is implemented: `mesh compile`, `compile()` in `@valancex/mesh-compiler`, and `mesh_compiler::check::template` emit templates, and `mesh-template` reads them. Programs are implemented in the Rust runtime, `mesh-runtime`, which validates and renders them; the compiler's program check is not implemented yet.
 
 A **template** is one component's MPRX, checked clean against a component model and compiled. A **program** is a root component and a set of templates. The MESH runtime renders a program against the host's values (`docs/manual/runtime.md`).
 

@@ -69,7 +69,7 @@ v0.5 adds no syntax. It adds MPRX's evaluation (§9.7) and the boundary between 
 |---|---|---|
 | 0 | §9.7 and §9.8, the number-to-text table, and the template, render-tree and runtime-diagnostics formats | ✅ Specified |
 | 1 | Compiling a checked template to `template-v1`; `content-not-text` and `number-literal-out-of-range` | ✅ Implemented |
-| 2 | The runtime, for programs of one template: render and dispatch | Planned |
+| 2 | The runtime, natively: render and dispatch, for programs of one template and, as built, of several | ✅ Implemented |
 | 3 | Composition, and the runtime in JavaScript | Planned |
 | 4 | Documentation and release | Planned |
 
