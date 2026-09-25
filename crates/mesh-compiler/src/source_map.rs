@@ -68,6 +68,9 @@ pub struct LineColumn {
 pub struct SourceMap {
     /// The byte offset each line starts at: 0, then one past every `\n`.
     line_starts: Vec<usize>,
+    /// The same starts, as offsets in UTF-16 code units from the start of
+    /// the source, a byte-order mark included.
+    line_starts_utf16: Vec<usize>,
     /// The length of the source, to catch a map used with another text.
     len: usize,
     /// The length of a leading byte-order mark: 0 or 3.
@@ -77,11 +80,19 @@ pub struct SourceMap {
 impl SourceMap {
     /// Maps `source`. O(n) in its length.
     pub fn new(source: &str) -> SourceMap {
-        let line_starts = std::iter::once(0)
-            .chain(source.match_indices('\n').map(|(i, _)| i + 1))
-            .collect();
+        let mut line_starts = vec![0];
+        let mut line_starts_utf16 = vec![0];
+        let mut utf16 = 0;
+        for (index, c) in source.char_indices() {
+            utf16 += c.len_utf16();
+            if c == '\n' {
+                line_starts.push(index + 1);
+                line_starts_utf16.push(utf16);
+            }
+        }
         SourceMap {
             line_starts,
+            line_starts_utf16,
             len: source.len(),
             bom: if source.starts_with(BOM) {
                 BOM.len_utf8()
@@ -128,6 +139,21 @@ impl SourceMap {
             .map(|c| unit.width(c))
             .sum();
         LineColumn { line, column }
+    }
+
+    /// The offset of `byte` in UTF-16 code units from the start of the
+    /// source: what a JavaScript string holding the same text indexes.
+    ///
+    /// Unlike a column, it corresponds to `byte` exactly: a leading
+    /// byte-order mark counts (as one unit), and so do a line's `\r` and
+    /// `\n`. An offset inside a multi-byte character floors to that
+    /// character's start, and one past the end clamps to the end.
+    pub fn utf16_offset(&self, source: &str, byte: usize) -> usize {
+        self.check(source);
+        let byte = source.floor_char_boundary(byte);
+        let line = self.line_starts.partition_point(|&start| start <= byte) - 1;
+        let start = self.line_starts[line];
+        self.line_starts_utf16[line] + source[start..byte].encode_utf16().count()
     }
 
     /// The byte offset of `position`, whose column counts `unit`.

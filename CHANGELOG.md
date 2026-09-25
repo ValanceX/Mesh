@@ -2,6 +2,25 @@
 
 All notable changes to MESH are recorded here. The project follows [Semantic Versioning](https://semver.org). Until 1.0, minor versions may include breaking changes.
 
+## [Unreleased]
+
+### Added
+
+- **Rust API: `mesh_compiler::check`, the whole check `mesh check` does,** for any program that hosts MESH: `Model::load` loads a manifest and looks up a component (reporting every manifest error, or a missing component, against the manifest), `check::source` checks a source against it or without a model, and `check::run` does both, returning a `Report` that renders itself as the diagnostics document against the right text and path. The `mesh` CLI is now a host of it; its output hasn't changed.
+- **UTF-16 positions in `mesh check --format json`.** Every position also gives `utf16`, the same place as `byte` counted in UTF-16 code units (what a JavaScript string indexes, so `source.slice(start.utf16, end.utf16)` is the span's text), and `utf16Column`, its column in UTF-16 code units. The document's `version` is still 1, as its promise allows, and the schema lists both.
+- **Rust API: `SourceMap::utf16_offset`,** the UTF-16 offset of a byte.
+- **The compiler builds for WebAssembly,** as `crates/mesh-wasm`: `cargo build -p mesh-wasm --target wasm32-unknown-unknown --profile wasm`. The module imports nothing, is about 150 KB gzipped, and runs the same check as `mesh check`. It's what `@valancex/mesh-compiler` will ship; its exports are internal.
+- **`@valancex/mesh-compiler`: MESH in JavaScript.** `check({ source, path, model? })` returns the diagnostics document `mesh check --format json` prints for the same inputs, from the compiler itself in WebAssembly; the package adds no rule of its own and returns diagnostics only. It runs in Node 22 and 24, where it loads its own module, and in browsers after `init()` with the module's URL. Paths are identifiers, never read. `MeshVersionError` refuses a module of another version; `MeshInternalError` reports a failure of the compiler itself, after which the next check uses a fresh instance. Unpublished until v0.4.0.
+- **`@valancex/mesh-lsp`: install the language server with npm.** `npm install -g @valancex/mesh-lsp` installs the native `mesh-lsp` for Linux x64 or arm64, macOS x64 or arm64, or Windows x64, from one platform package each (`@valancex/mesh-lsp-linux-x64` and so on), and `mesh-lsp` starts it, passing arguments, streams, exit codes and signals through unchanged. The Linux binaries are static. The editor setup guide shows both installs, and `editors/neovim/verify.sh` checks an npm-installed server with `MESH_LSP`. Unpublished until v0.4.0.
+
+### Changed
+
+- **The npm packages are now `@valancex/mesh-compiler` and `@valancex/mesh-lsp`,** under ValanceX, the project's name, and versioned with the Rust workspace. The `mesh-language` placeholder is gone. None was ever published.
+
+### Fixed
+
+- **`mesh-lsp` on Windows: verbatim and UNC paths.** A path such as `\\?\C:\work\a.mprx`, the form Windows' path canonicalization returns, became a URI no client could read (`file:////%3F/C:/...`); it is now `file:///C:/work/a.mprx`. A network share, `\\server\share\a.mprx`, is now `file://server/share/a.mprx`.
+
 ## [0.3.0] - 2026-09-24
 
 MESH in the editor: the `mesh-lsp` language server, a client of the compiler, and syntax highlighting. See the [v0.3 release notes](./docs/releases/v0.3.md) for an overview.

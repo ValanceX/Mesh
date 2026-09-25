@@ -1,8 +1,8 @@
 //! Native CLI entry point for the MESH toolchain.
 
 use clap::{Parser, Subcommand, ValueEnum};
-use mesh_compiler::CompileOptions;
-use mesh_syntax::{Diagnostic, Severity};
+use mesh_compiler::check;
+use mesh_syntax::Diagnostic;
 use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
@@ -58,16 +58,20 @@ fn main() -> ExitCode {
     }
 }
 
+/// Checks `file` as `mesh_compiler::check` defines a check. This only
+/// reads files, derives the component from the file's stem when
+/// `--component` isn't given, and prints: the check's two phases decide
+/// everything else. The model loads before the file is read, so a broken
+/// manifest is reported even when the file can't be read.
 fn run_check(file: &str, model: Option<&str>, component: Option<&str>, format: Format) -> ExitCode {
-    // The manifest is loaded and validated completely before the file is
-    // read or checked. If it has errors, they are the only ones reported.
-    let manifest = match model {
+    let model = match model {
         Some(path) => {
             let Some(text) = read(path) else {
                 return ExitCode::FAILURE;
             };
-            match mesh_manifest::load(&text) {
-                Ok(manifest) => Some((manifest, text, path)),
+            let name = component.map_or_else(|| file_stem(file), str::to_string);
+            match check::Model::load(&text, &name) {
+                Ok(model) => Some(model),
                 Err(diagnostics) => {
                     let printed = print_diagnostics(format, &text, path, &diagnostics);
                     return exit(printed, ExitCode::FAILURE);
@@ -77,32 +81,13 @@ fn run_check(file: &str, model: Option<&str>, component: Option<&str>, format: F
         None => None,
     };
 
-    let options = match &manifest {
-        Some((manifest, text, path)) => {
-            let name = component.map_or_else(|| file_stem(file), str::to_string);
-            match manifest.template(&name) {
-                Ok(template) => CompileOptions::with_template(template),
-                Err(diagnostic) => {
-                    let printed = print_diagnostics(format, text, path, &[diagnostic]);
-                    return exit(printed, ExitCode::FAILURE);
-                }
-            }
-        }
-        None => CompileOptions::default(),
-    };
-
     let Some(source) = read(file) else {
         return ExitCode::FAILURE;
     };
-    let result = mesh_compiler::compile_with(&source, &options);
-    let printed = print_diagnostics(format, &source, file, &result.diagnostics);
+    let diagnostics = check::source(&source, model.as_ref());
+    let printed = print_diagnostics(format, &source, file, &diagnostics);
 
-    // Only errors fail the check — warnings are reported but non-fatal.
-    let has_errors = result
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.severity == Severity::Error);
-    if has_errors {
+    if check::has_errors(&diagnostics) {
         return exit(printed, ExitCode::FAILURE);
     }
 

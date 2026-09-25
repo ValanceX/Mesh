@@ -9,6 +9,7 @@ members = [
     "crates/mesh-compiler",
     "crates/mesh-lsp",
     "crates/mesh-cli",
+    "crates/mesh-wasm",
     "grammar/tree-sitter-mprx",
 ]
 
@@ -34,3 +35,18 @@ warnings = "deny"
 
 [workspace.lints.clippy]
 all = "deny"
+
+# The WebAssembly build of `mesh-wasm` (outline v0.4 D1, D2):
+# `cargo build -p mesh-wasm --target wasm32-unknown-unknown --profile wasm`.
+# `panic = "abort"` belongs here only: `wasm32-unknown-unknown` can't
+# unwind anyway, while `mesh-lsp` relies on unwinding in `dev` and
+# `release` (it catches a panicking request handler).
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+# Symbol names are two thirds of the module; a trap's stack trace loses
+# them, and the shipped module doesn't need them.
+strip = true

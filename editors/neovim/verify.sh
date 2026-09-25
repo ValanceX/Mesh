@@ -7,6 +7,7 @@
 #   editors/neovim/verify.sh            # uses `nvim` from PATH
 #   NVIM=/path/to/nvim editors/neovim/verify.sh
 #   MESH_LSP=~/.cargo/bin/mesh-lsp editors/neovim/verify.sh   # an installed server
+#   MESH_LSP="$(npm prefix -g)/bin/mesh-lsp" editors/neovim/verify.sh   # installed with npm
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -16,11 +17,13 @@ trap 'rm -rf "$work"' EXIT
 
 "$nvim" --version | head -n 1
 
-# mesh-lsp, on PATH as `cargo install` would put it: MESH_LSP if set (an
-# installed binary), otherwise built from this checkout.
+# mesh-lsp, on PATH as an install would put it: MESH_LSP if set (an
+# installed server), otherwise built from this checkout. An installed one
+# is linked, not copied: npm's `mesh-lsp` finds its binary relative to
+# where it really is.
 mkdir -p "$work/bin"
 if [ -n "${MESH_LSP:-}" ]; then
-  cp "$MESH_LSP" "$work/bin/mesh-lsp"
+  ln -s "$(realpath "$MESH_LSP")" "$work/bin/mesh-lsp"
 else
   cargo build --quiet --manifest-path "$repo/Cargo.toml" -p mesh-lsp
   cp "$repo/target/debug/mesh-lsp" "$work/bin/"

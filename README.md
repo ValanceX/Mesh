@@ -91,10 +91,9 @@ mesh/
 ├── grammar/
 │   └── tree-sitter-mprx/     the MPRX Tree-sitter grammar and its highlighting queries
 ├── editors/                verified editor configurations (Neovim)
-└── packages/               npm wrappers for the Rust/WASM build (placeholders)
-    ├── mesh-language/        @valance/mesh-language
-    ├── mesh-compiler/        @valance/mesh-compiler
-    └── mesh-lsp/             @valance/mesh-lsp
+└── packages/               npm packages (an npm workspace; unpublished until v0.4.0)
+    ├── mesh-compiler/        @valancex/mesh-compiler: the compiler, built for WebAssembly
+    └── mesh-lsp/             @valancex/mesh-lsp: starts the native mesh-lsp
 ```
 
 ## Boundaries
@@ -117,7 +116,7 @@ mesh/
 
 Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. Editor configuration is per editor, and only Neovim's is verified. The npm packages are placeholders.
 
-Next up for v0.4: a WASM build and the `@valance/*` npm packages.
+Next up for v0.4: a WASM build and the `@valancex/*` npm packages.
 
 ## Learn more
 

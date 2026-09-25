@@ -41,6 +41,20 @@ $ cargo test --workspace
 $ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 ```
 
+CI runs `cargo test --workspace` on Linux, macOS and Windows, so keep tests free of platform assumptions: build paths with `Path`, and don't expect `/` in a printed path. Every text file checks out with LF line endings on every platform (`.gitattributes`).
+
+The npm packages under `packages/` are one npm workspace. If you change them, run, in `packages/`:
+
+```console
+$ npm ci
+$ npm run build:wasm -w @valancex/mesh-compiler
+$ npm run build
+$ npm run typecheck
+$ npm test -w @valancex/mesh-compiler
+```
+
+`build:wasm` builds the compiler for WebAssembly with Cargo; add the target once with `rustup target add wasm32-unknown-unknown`. Tree-sitter's C is compiled by `clang`, which needs its WebAssembly backend: LLVM's `clang` has it, and Apple's `clang` on macOS may not, so install LLVM there if the build can't find a `wasm32` target. The tests compare the package with a native `mesh` (`cargo build -p mesh-cli`, or `MESH_BIN`), and the browser test needs Playwright's Chromium (`npx playwright install chromium`, or `MESH_CHROMIUM` pointing at a Chromium).
+
 If you change `grammar/tree-sitter-mprx/grammar.js`, regenerate the parser with `npx tree-sitter generate` in that directory and commit `src/`; CI checks that it's up to date.
 
 Expected CLI output lives next to each file in `examples/fixtures/`. If you change a diagnostic, update the matching `.stderr` file.

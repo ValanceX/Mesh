@@ -1,5 +1,10 @@
 //! The real binary over stdio: how it ends when the client exits, or when
 //! the transport stops under it (outline D7). It must never panic.
+//!
+//! With `MESH_LSP_LAUNCHER` set to the path of an installed
+//! `@valancex/mesh-lsp`'s `dist/cli.js`, every case runs through that
+//! launcher instead, under `node` (outline v0.4 D8, D9): the launcher must
+//! change nothing a client can see.
 
 use serde_json::{json, Value};
 use std::io::{Read, Write};
@@ -7,7 +12,15 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::time::{Duration, Instant};
 
 fn spawn() -> Child {
-    Command::new(env!("CARGO_BIN_EXE_mesh-lsp"))
+    let mut command = match std::env::var_os("MESH_LSP_LAUNCHER") {
+        Some(launcher) => {
+            let mut command = Command::new("node");
+            command.arg(launcher);
+            command
+        }
+        None => Command::new(env!("CARGO_BIN_EXE_mesh-lsp")),
+    };
+    command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

@@ -33,16 +33,45 @@ pub(crate) fn to_path(uri: &str) -> Option<PathBuf> {
 
 /// The `file:` URI of an absolute `path`.
 pub(crate) fn from_path(path: &Path) -> String {
-    let text = path.to_string_lossy();
-    let text = if cfg!(windows) {
+    from_path_text(&path.to_string_lossy(), cfg!(windows))
+}
+
+/// [`from_path`] on a path's text, spelled for Windows or not, so both
+/// spellings are tested on every platform.
+///
+/// On Windows, a path may be a verbatim one, as `Path::canonicalize`
+/// returns it: `\\?\C:\x` is `C:\x`, and `\\?\UNC\server\share` is
+/// `\\server\share`. The prefix only turns off Windows' path parsing; it
+/// isn't part of the location, and a URI with it wouldn't name a file.
+fn from_path_text(text: &str, windows: bool) -> String {
+    let text = if windows {
+        let text = if let Some(unc) = text.strip_prefix(r"\\?\UNC\") {
+            format!(r"\\{unc}")
+        } else {
+            text.strip_prefix(r"\\?\").unwrap_or(text).to_string()
+        };
         text.replace('\\', "/")
     } else {
-        text.into_owned()
+        text.to_string()
     };
     let mut uri = String::from("file://");
+    if let Some(unc) = text.strip_prefix("//").filter(|_| windows) {
+        // A Windows share, `//server/share/x`, is
+        // `file://server/share/x`: the server is the URI's host. (On Unix,
+        // a leading `//` is just a root.)
+        push_escaped(&mut uri, unc);
+        return uri;
+    }
     if !text.starts_with('/') {
         uri.push('/');
     }
+    push_escaped(&mut uri, &text);
+    uri
+}
+
+/// Appends `text` to `uri`, percent-escaping every byte a path segment
+/// can't hold literally.
+fn push_escaped(uri: &mut String, text: &str) {
     for byte in text.bytes() {
         match byte {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' | b':' => {
@@ -51,7 +80,6 @@ pub(crate) fn from_path(path: &Path) -> String {
             _ => uri.push_str(&format!("%{byte:02X}")),
         }
     }
-    uri
 }
 
 /// `path`'s key relative to `root`: its segments below the root, joined
@@ -181,6 +209,32 @@ mod tests {
             assert_eq!(to_path(&uri), Some(PathBuf::from(path)), "{uri}");
         }
         assert_eq!(from_path(Path::new("/a b")), "file:///a%20b");
+    }
+
+    #[test]
+    fn writes_windows_paths_as_uris() {
+        let windows = |path: &str| from_path_text(path, true);
+        assert_eq!(windows(r"C:\x\a b.mprx"), "file:///C:/x/a%20b.mprx");
+        // A verbatim path, as `canonicalize` returns it, names the same file.
+        assert_eq!(windows(r"\\?\C:\x\a.mprx"), "file:///C:/x/a.mprx");
+        assert_eq!(
+            windows(r"\\?\UNC\server\share\a.mprx"),
+            "file://server/share/a.mprx"
+        );
+        assert_eq!(
+            windows(r"\\server\share\a.mprx"),
+            "file://server/share/a.mprx"
+        );
+        assert_eq!(
+            to_path(&windows(r"\\?\C:\x\a.mprx")),
+            Some(PathBuf::from("C:/x/a.mprx"))
+        );
+    }
+
+    #[test]
+    fn a_unix_path_with_two_leading_slashes_is_still_a_root() {
+        let uri = from_path_text("//a/b.mprx", false);
+        assert_eq!(to_path(&uri), Some(PathBuf::from("//a/b.mprx")), "{uri}");
     }
 
     #[test]

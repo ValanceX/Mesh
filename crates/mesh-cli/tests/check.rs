@@ -296,9 +296,9 @@ fn json_prints_one_document_on_stdout_and_exits_as_human_output_does() {
             r#"{"version":1,"diagnostics":[{"severity":"error","code":"unknown-reference","#,
             r#""message":"unknown reference \"usr\": it isn't in the template's scope","#,
             r#""path":"fixtures/check/fail/unknown-reference.mprx","#,
-            r#""span":{"start":{"byte":13,"line":1,"column":14},"end":{"byte":16,"line":1,"column":17}},"#,
+            r#""span":{"start":{"byte":13,"line":1,"column":14,"utf16":13,"utf16Column":14},"end":{"byte":16,"line":1,"column":17,"utf16":16,"utf16Column":17}},"#,
             r#""suggestions":[{"replacement":"user","#,
-            r#""span":{"start":{"byte":13,"line":1,"column":14},"end":{"byte":16,"line":1,"column":17}}}]}]}"#,
+            r#""span":{"start":{"byte":13,"line":1,"column":14,"utf16":13,"utf16Column":14},"end":{"byte":16,"line":1,"column":17,"utf16":16,"utf16Column":17}}}]}]}"#,
             "\n"
         ));
 }

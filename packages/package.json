@@ -1,0 +1,27 @@
+{
+  "name": "@valancex/mesh-packages",
+  "private": true,
+  "description": "The npm workspace of MESH's packages. Not published.",
+  "license": "MIT",
+  "workspaces": [
+    "mesh-compiler",
+    "mesh-lsp"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "ajv": "8.20.0",
+    "playwright": "1.63.0",
+    "typescript": "7.0.2"
+  },
+  "overrides": {
+    "@valancex/mesh-lsp-darwin-arm64": "file:./mesh-lsp-darwin-arm64",
+    "@valancex/mesh-lsp-darwin-x64": "file:./mesh-lsp-darwin-x64",
+    "@valancex/mesh-lsp-linux-arm64": "file:./mesh-lsp-linux-arm64",
+    "@valancex/mesh-lsp-linux-x64": "file:./mesh-lsp-linux-x64",
+    "@valancex/mesh-lsp-win32-x64": "file:./mesh-lsp-win32-x64"
+  }
+}

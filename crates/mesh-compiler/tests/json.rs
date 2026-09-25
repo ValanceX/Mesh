@@ -69,9 +69,9 @@ fn renders_each_diagnostic_on_one_line_in_order() {
         concat!(
             r#"{"version":1,"diagnostics":["#,
             r#"{"severity":"warning","code":"duplicate-attribute","message":"duplicate attribute \"class\"","path":"page.mprx","#,
-            r#""span":{"start":{"byte":5,"line":1,"column":6},"end":{"byte":14,"line":1,"column":15}},"suggestions":[]},"#,
+            r#""span":{"start":{"byte":5,"line":1,"column":6,"utf16":5,"utf16Column":6},"end":{"byte":14,"line":1,"column":15,"utf16":14,"utf16Column":15}},"suggestions":[]},"#,
             r#"{"severity":"error","code":"mismatched-closing-tag","message":"mismatched closing tag","path":"page.mprx","#,
-            r#""span":{"start":{"byte":0,"line":1,"column":1},"end":{"byte":33,"line":2,"column":8}},"suggestions":[]}"#,
+            r#""span":{"start":{"byte":0,"line":1,"column":1,"utf16":0,"utf16Column":1},"end":{"byte":33,"line":2,"column":8,"utf16":33,"utf16Column":8}},"suggestions":[]}"#,
             r#"]}"#
         )
     );
@@ -105,8 +105,8 @@ fn renders_suggestions_with_their_spans() {
         json!([{
             "replacement": "user",
             "span": {
-                "start": { "byte": 12, "line": 1, "column": 13 },
-                "end": { "byte": 15, "line": 1, "column": 16 }
+                "start": { "byte": 12, "line": 1, "column": 13, "utf16": 12, "utf16Column": 13 },
+                "end": { "byte": 15, "line": 1, "column": 16, "utf16": 15, "utf16Column": 16 }
             }
         }])
     );
@@ -161,8 +161,9 @@ fn an_end_position_counts_characters_too() {
     assert_eq!(
         json["diagnostics"][0]["span"],
         json!({
-            "start": { "byte": 3, "line": 1, "column": 1 },
-            "end": { "byte": end, "line": 1, "column": 9 }
+            // The BOM is one UTF-16 unit, and `ö` and `ß` two bytes each.
+            "start": { "byte": 3, "line": 1, "column": 1, "utf16": 1, "utf16Column": 1 },
+            "end": { "byte": end, "line": 1, "column": 9, "utf16": 9, "utf16Column": 9 }
         })
     );
 }
@@ -198,7 +199,12 @@ fn the_schema_rejects_what_render_json_never_prints() {
     unknown_field["diagnostics"][0]["related"] = json!([]);
     let mut other_version = valid.clone();
     other_version["version"] = json!(2);
-    for invalid in [unknown_severity, unknown_field, other_version] {
+    let mut no_utf16 = valid.clone();
+    no_utf16["diagnostics"][0]["span"]["start"]
+        .as_object_mut()
+        .expect("a position")
+        .remove("utf16");
+    for invalid in [unknown_severity, unknown_field, other_version, no_utf16] {
         assert!(!validator.is_valid(&invalid), "{invalid}");
     }
 }
@@ -215,5 +221,90 @@ fn the_schema_accepts_every_code() {
     for code in codes.chain(["code-2"]) {
         document["diagnostics"][0]["code"] = json!(code);
         assert!(validator.is_valid(&document), "{code}");
+    }
+}
+
+/// Sources whose UTF-16 offsets and columns differ from their bytes and
+/// `char` columns: 2-, 3- and 4-byte characters, CRLF, and a leading BOM.
+const UTF16_SOURCES: [&str; 4] = [
+    "\u{feff}<a>{x}</a>",
+    "<p>Größe 😀 {x}</p>",
+    "<a>\r\n  <b title=\"日本\">{x} 😀</b>\r\n</a>",
+    "\u{feff}<a>\r\n😀😀{usr}\r\n</a>",
+];
+
+/// Every span in `document`, the diagnostics' and the suggestions'.
+fn spans(document: &Value) -> Vec<Value> {
+    let mut found = Vec::new();
+    for diagnostic in document["diagnostics"].as_array().expect("a list") {
+        found.push(diagnostic["span"].clone());
+        for suggestion in diagnostic["suggestions"].as_array().expect("a list") {
+            found.push(suggestion["span"].clone());
+        }
+    }
+    found
+}
+
+/// A span over every character of `source`, and one at each boundary, so
+/// every offset is checked, not only the ones diagnostics happen to use.
+fn every_span(source: &str) -> Vec<Diagnostic> {
+    let boundaries: Vec<usize> = source
+        .char_indices()
+        .map(|(index, _)| index)
+        .chain([source.len()])
+        .collect();
+    boundaries
+        .windows(2)
+        .map(|pair| {
+            diagnostic(
+                Severity::Error,
+                DiagnosticCode::SYNTAX_ERROR,
+                "x",
+                (pair[0], pair[1]),
+            )
+        })
+        .collect()
+}
+
+/// `source.slice(start.utf16, end.utf16)`, in JavaScript's terms, is the
+/// text between the two `byte`s (outline D5).
+#[test]
+fn utf16_positions_delimit_the_same_text() {
+    for source in UTF16_SOURCES {
+        let units: Vec<u16> = source.encode_utf16().collect();
+        let mut diagnostics = every_span(source);
+        diagnostics.extend(compile(source).diagnostics);
+        let document = parse(&render_json(source, "f.mprx", &diagnostics));
+        for span in spans(&document) {
+            let at = |end: &str, key: &str| span[end][key].as_u64().expect("a number") as usize;
+            let by_bytes = &source[at("start", "byte")..at("end", "byte")];
+            let by_units = String::from_utf16(&units[at("start", "utf16")..at("end", "utf16")])
+                .expect("whole characters");
+            assert_eq!(by_units, by_bytes, "{source:?}: {span}");
+        }
+    }
+}
+
+/// `utf16Column` is the source map's UTF-16 column, 1-based, as `column`
+/// is its `char` column.
+#[test]
+fn utf16_columns_match_the_source_map() {
+    use mesh_compiler::{ColumnUnit, SourceMap};
+    for source in UTF16_SOURCES {
+        let map = SourceMap::new(source);
+        let document = parse(&render_json(source, "f.mprx", &every_span(source)));
+        for span in spans(&document) {
+            for end in ["start", "end"] {
+                let position = &span[end];
+                let byte = position["byte"].as_u64().expect("a number") as usize;
+                let expected = map.line_column(source, byte, ColumnUnit::Utf16);
+                assert_eq!(position["line"], json!(expected.line + 1), "{source:?}");
+                assert_eq!(
+                    position["utf16Column"],
+                    json!(expected.column + 1),
+                    "{source:?}"
+                );
+            }
+        }
     }
 }
