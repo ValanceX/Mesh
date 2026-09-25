@@ -118,7 +118,9 @@ fn every_clean_source_compiles_to_a_valid_template() {
 fn every_source_with_errors_compiles_to_nothing() {
     let mut refused = 0;
     for (path, text, model) in corpus() {
-        if path.to_string_lossy().contains("/fail/") {
+        // By the directory's name, not a `/fail/` substring, which a
+        // Windows path spells `\fail\`.
+        if path.parent().and_then(|dir| dir.file_name()) == Some("fail".as_ref()) {
             let result = check::template(&text, &model);
             assert!(check::has_errors(&result.diagnostics), "{}", path.display());
             assert!(result.template.is_none(), "{}", path.display());
