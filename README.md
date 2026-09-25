@@ -131,6 +131,7 @@ The [documentation index](./docs/README.md) lists everything. The most useful pl
 - [**Editor setup**](./docs/guides/editor-setup.md) and the [**`mesh-lsp` manual**](./docs/manual/mesh-lsp.md): MESH in your editor
 - [**Using MESH from JavaScript**](./docs/guides/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`
 - [**Embedding the compiler**](./docs/guides/embedding-the-compiler.md): use MESH from Rust
+- [**Integrating MESH with NEXUS**](./docs/guides/integrating-mesh-with-nexus.md) and [**Rendering MESH output**](./docs/guides/rendering-mesh-output.md): render and dispatch MESH templates, as a host and as a renderer
 - [**MPRX Language Spec**](./docs/MPRX-SPEC.md): the exact syntax and semantics
 - [**Architecture**](./docs/ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance
 

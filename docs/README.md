@@ -12,6 +12,8 @@ Learning-oriented walkthroughs.
 - [**Editor setup**](./guides/editor-setup.md): diagnostics, hover, go to definition, completion and syntax highlighting in your editor, with a configuration verified in Neovim.
 - [**Using MESH from JavaScript**](./guides/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`, and a generate-check-repair loop that applies MESH's suggestions.
 - [**Embedding the compiler**](./guides/embedding-the-compiler.md): call MESH from Rust, handle diagnostics, and walk the Semantic IR.
+- [**Integrating MESH with NEXUS**](./guides/integrating-mesh-with-nexus.md): build a host: compile templates, render from your state, pair each event with its render, and map intents to commands.
+- [**Rendering MESH output**](./guides/rendering-mesh-output.md): build a renderer: draw a render tree as given, report events, and update by key.
 
 ## Manuals
 
