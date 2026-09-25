@@ -672,6 +672,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mesh-runtime-wasm"
+version = "0.4.0"
+dependencies = [
+ "mesh-compiler",
+ "mesh-runtime",
+ "mesh-template",
+ "serde_json",
+]
+
+[[package]]
 name = "mesh-semantic"
 version = "0.4.0"
 dependencies = [

@@ -12,6 +12,7 @@ members = [
     "crates/mesh-lsp",
     "crates/mesh-cli",
     "crates/mesh-wasm",
+    "crates/mesh-runtime-wasm",
     "grammar/tree-sitter-mprx",
 ]
 

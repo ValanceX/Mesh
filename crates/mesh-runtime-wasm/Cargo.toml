@@ -1,0 +1,29 @@
+[package]
+name = "mesh-runtime-wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "The MESH runtime for WebAssembly: render and dispatch behind @valancex/mesh-runtime, with no semantics of its own."
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# A panicking export, a live-allocation count and a number-to-text batch,
+# for the package's failure, memory and number tests. Never in the
+# shipped module.
+test-hooks = []
+
+[dependencies]
+mesh-runtime.workspace = true
+
+[dev-dependencies]
+mesh-compiler.workspace = true
+mesh-template.workspace = true
+serde_json = "1"
