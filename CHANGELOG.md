@@ -2,7 +2,9 @@
 
 All notable changes to MESH are recorded here. The project follows [Semantic Versioning](https://semver.org). Until 1.0, minor versions may include breaking changes.
 
-## [Unreleased]
+## [0.4.0] - 2026-09-25
+
+MESH outside Rust: the compiler in JavaScript, as `@valancex/mesh-compiler`, and `mesh-lsp` from npm, as `@valancex/mesh-lsp`. See the [v0.4 release notes](./docs/releases/v0.4.md) for an overview.
 
 ### Added
 
@@ -10,12 +12,13 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 - **UTF-16 positions in `mesh check --format json`.** Every position also gives `utf16`, the same place as `byte` counted in UTF-16 code units (what a JavaScript string indexes, so `source.slice(start.utf16, end.utf16)` is the span's text), and `utf16Column`, its column in UTF-16 code units. The document's `version` is still 1, as its promise allows, and the schema lists both.
 - **Rust API: `SourceMap::utf16_offset`,** the UTF-16 offset of a byte.
 - **The compiler builds for WebAssembly,** as `crates/mesh-wasm`: `cargo build -p mesh-wasm --target wasm32-unknown-unknown --profile wasm`. The module imports nothing, is about 150 KB gzipped, and runs the same check as `mesh check`. It's what `@valancex/mesh-compiler` will ship; its exports are internal.
-- **`@valancex/mesh-compiler`: MESH in JavaScript.** `check({ source, path, model? })` returns the diagnostics document `mesh check --format json` prints for the same inputs, from the compiler itself in WebAssembly; the package adds no rule of its own and returns diagnostics only. It runs in Node 22 and 24, where it loads its own module, and in browsers after `init()` with the module's URL. Paths are identifiers, never read. `MeshVersionError` refuses a module of another version; `MeshInternalError` reports a failure of the compiler itself, after which the next check uses a fresh instance. Unpublished until v0.4.0.
-- **`@valancex/mesh-lsp`: install the language server with npm.** `npm install -g @valancex/mesh-lsp` installs the native `mesh-lsp` for Linux x64 or arm64, macOS x64 or arm64, or Windows x64, from one platform package each (`@valancex/mesh-lsp-linux-x64` and so on), and `mesh-lsp` starts it, passing arguments, streams, exit codes and signals through unchanged. The Linux binaries are static. The editor setup guide shows both installs, and `editors/neovim/verify.sh` checks an npm-installed server with `MESH_LSP`. Unpublished until v0.4.0.
+- **`@valancex/mesh-compiler`: MESH in JavaScript** (see [Using MESH from JavaScript](./docs/guides/using-mesh-from-javascript.md)). `check({ source, path, model? })` returns the diagnostics document `mesh check --format json` prints for the same inputs, from the compiler itself in WebAssembly; the package adds no rule of its own and returns diagnostics only. It runs in Node 22 and 24, where it loads its own module, and in browsers after `init()` with the module's URL. Paths are identifiers, never read. `MeshVersionError` refuses a module of another version; `MeshInternalError` reports a failure of the compiler itself, after which the next check uses a fresh instance.
+- **A release workflow** builds every release from its tag: all of CI on the tagged commit, each `mesh-lsp` binary on its own OS and architecture's runner, the WebAssembly module, then the npm packages, published with provenance, and a GitHub release with the binaries attached.
+- **`@valancex/mesh-lsp`: install the language server with npm.** `npm install -g @valancex/mesh-lsp` installs the native `mesh-lsp` for Linux x64 or arm64, macOS x64 or arm64, or Windows x64, from one platform package each (`@valancex/mesh-lsp-linux-x64` and so on), and `mesh-lsp` starts it, passing arguments, streams, exit codes and signals through unchanged. The Linux binaries are static. The editor setup guide shows both installs, and `editors/neovim/verify.sh` checks an npm-installed server with `MESH_LSP`.
 
 ### Changed
 
-- **The npm packages are now `@valancex/mesh-compiler` and `@valancex/mesh-lsp`,** under ValanceX, the project's name, and versioned with the Rust workspace. The `mesh-language` placeholder is gone. None was ever published.
+- **The npm packages are now `@valancex/mesh-compiler` and `@valancex/mesh-lsp`,** under ValanceX, the project's name, and versioned with the Rust workspace. The `mesh-language` placeholder is gone. None of the old names was ever published.
 
 ### Fixed
 
@@ -124,6 +127,7 @@ The first release. See the [v0.1 release notes](./docs/releases/v0.1.md) for an 
 - No component-model or type checking yet.
 - `mesh-lsp` and the npm packages are placeholders.
 
+[0.4.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.1.0

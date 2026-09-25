@@ -9,7 +9,7 @@ license = "MIT"
 name = "tree-sitter-mprx"
 readme = "README.md"
 repository = "https://github.com/ValanceX/Mesh"
-version = "0.3.0"
+version = "0.4.0"
 
 build = "bindings/rust/build.rs"
 include = [ "bindings/rust/*", "grammar.js", "queries/*", "src/*", "tree-sitter.json", "/LICENSE" ]

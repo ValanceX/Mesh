@@ -8,7 +8,7 @@ Everything the server says comes from the MESH compiler: its diagnostics are exa
 
 ## 1. Install the language server
 
-With npm (from v0.4.0, when the packages are published), on Linux x64 or arm64, macOS x64 or arm64, or Windows x64:
+With npm, on Linux x64 or arm64, macOS x64 or arm64, or Windows x64:
 
 ```console
 $ npm install -g @valancex/mesh-lsp
