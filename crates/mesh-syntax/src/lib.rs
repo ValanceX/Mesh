@@ -3,8 +3,14 @@
 //! This crate owns the shape of the MPRX AST. It does not parse source text
 //! (see `mesh-parser`) and does not perform semantic analysis (see
 //! `mesh-semantic`).
+//!
+//! [`source_map`] turns byte offsets into lines and columns, and into
+//! UTF-16 offsets: the one place that does, for the compiler, the
+//! language server and the runtime alike.
 
 use std::fmt;
+
+pub mod source_map;
 
 /// A byte-offset range into the original source text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
