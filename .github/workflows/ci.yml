@@ -81,6 +81,42 @@ jobs:
           npm run build
           npm run typecheck
 
+  # The compiler in WebAssembly, and @valancex/mesh-compiler around it
+  # (outline v0.4 Pass 1), on each Node LTS release the package supports:
+  # agreement with a native `mesh` built here, determinism, positions,
+  # failure, memory, version, nesting, size, packing, and headless
+  # Chromium.
+  wasm:
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust
+        run: |
+          rustup toolchain install
+          rustup target add wasm32-unknown-unknown
+      - name: Build the native mesh to compare with
+        run: cargo build --locked -p mesh-cli
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Build
+        working-directory: packages
+        run: |
+          npm ci
+          npm run build:wasm -w @valancex/mesh-compiler
+          npm run build
+          npm run typecheck
+      - name: Install Chromium
+        working-directory: packages
+        run: npx playwright install --with-deps chromium
+      - name: Test
+        working-directory: packages
+        run: npm test -w @valancex/mesh-compiler
+
   # Checks the declared `rust-version`: the workspace, with its committed
   # Cargo.lock, still compiles on 1.91. (This shows 1.91 works; it doesn't
   # show that nothing older would.)
@@ -92,3 +128,7 @@ jobs:
         run: rustup toolchain install 1.91.0 --profile minimal
       - name: Check on the MSRV
         run: cargo +1.91.0 check --locked --workspace --all-targets
+      - name: Build for WebAssembly on the MSRV
+        run: |
+          rustup target add wasm32-unknown-unknown --toolchain 1.91.0
+          cargo +1.91.0 build --locked -p mesh-wasm --target wasm32-unknown-unknown

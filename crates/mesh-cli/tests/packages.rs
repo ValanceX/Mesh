@@ -96,3 +96,18 @@ fn packages_depend_on_each_other_by_scope_at_the_workspace_version() {
         }
     }
 }
+
+/// The compiler package's `version.ts` is the version its wrapper expects
+/// the WebAssembly module to report (outline v0.4 I10), so it too is the
+/// workspace's, which is the module's.
+#[test]
+fn the_compiler_wrapper_expects_the_workspace_version() {
+    let path = root().join("packages/mesh-compiler/src/version.ts");
+    let text = fs::read_to_string(&path).expect("should read version.ts");
+    let expected = format!("export const version = \"{}\";", workspace_version());
+    assert!(
+        text.lines().any(|line| line.trim() == expected),
+        "{} should declare {expected}",
+        path.display()
+    );
+}

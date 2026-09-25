@@ -10,6 +10,7 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 - **UTF-16 positions in `mesh check --format json`.** Every position also gives `utf16`, the same place as `byte` counted in UTF-16 code units (what a JavaScript string indexes, so `source.slice(start.utf16, end.utf16)` is the span's text), and `utf16Column`, its column in UTF-16 code units. The document's `version` is still 1, as its promise allows, and the schema lists both.
 - **Rust API: `SourceMap::utf16_offset`,** the UTF-16 offset of a byte.
 - **The compiler builds for WebAssembly,** as `crates/mesh-wasm`: `cargo build -p mesh-wasm --target wasm32-unknown-unknown --profile wasm`. The module imports nothing, is about 150 KB gzipped, and runs the same check as `mesh check`. It's what `@valancex/mesh-compiler` will ship; its exports are internal.
+- **`@valancex/mesh-compiler`: MESH in JavaScript.** `check({ source, path, model? })` returns the diagnostics document `mesh check --format json` prints for the same inputs, from the compiler itself in WebAssembly; the package adds no rule of its own and returns diagnostics only. It runs in Node 22 and 24, where it loads its own module, and in browsers after `init()` with the module's URL. Paths are identifiers, never read. `MeshVersionError` refuses a module of another version; `MeshInternalError` reports a failure of the compiler itself, after which the next check uses a fresh instance. Unpublished until v0.4.0.
 
 ### Changed
 

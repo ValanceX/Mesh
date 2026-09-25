@@ -10,13 +10,35 @@
     "url": "git+https://github.com/ValanceX/Mesh.git",
     "directory": "packages/mesh-compiler"
   },
-  "main": "./dist/index.js",
+  "keywords": [
+    "mesh",
+    "mprx",
+    "valancex",
+    "compiler",
+    "webassembly"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./mesh.wasm": "./dist/mesh.wasm",
+    "./package.json": "./package.json"
+  },
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist/*.js",
+    "dist/*.d.ts",
+    "dist/mesh.wasm"
   ],
   "scripts": {
+    "build:wasm": "node scripts/build-wasm.mjs",
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test --test-concurrency=1 \"test/*.test.mjs\""
   }
 }

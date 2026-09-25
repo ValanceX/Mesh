@@ -5,3 +5,6 @@ dist/
 .DS_Store
 .superpowers/
 .claude/
+
+# The test-only module (outline v0.4 D6); never shipped.
+packages/mesh-compiler/test/build/

@@ -47,9 +47,13 @@ The npm packages under `packages/` are one npm workspace. If you change them, ru
 
 ```console
 $ npm ci
+$ npm run build:wasm -w @valancex/mesh-compiler
 $ npm run build
 $ npm run typecheck
+$ npm test -w @valancex/mesh-compiler
 ```
+
+`build:wasm` builds the compiler for WebAssembly with Cargo; add the target once with `rustup target add wasm32-unknown-unknown`. Tree-sitter's C is compiled by `clang`, which needs its WebAssembly backend: LLVM's `clang` has it, and Apple's `clang` on macOS may not, so install LLVM there if the build can't find a `wasm32` target. The tests compare the package with a native `mesh` (`cargo build -p mesh-cli`, or `MESH_BIN`), and the browser test needs Playwright's Chromium (`npx playwright install chromium`, or `MESH_CHROMIUM` pointing at a Chromium).
 
 If you change `grammar/tree-sitter-mprx/grammar.js`, regenerate the parser with `npx tree-sitter generate` in that directory and commit `src/`; CI checks that it's up to date.
 
