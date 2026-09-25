@@ -389,3 +389,88 @@ The canonical JSON is the JSON Canonicalization Scheme (RFC 8785) applied to the
 - numbers written as §9.7.7.1 writes them. That agrees with RFC 8785's ECMAScript serialization wherever ECMAScript determines the digits, and fixes the last digit where it doesn't.
 
 Spans are part of it: a template recompiled from reformatted source is a different template.
+
+## Programs
+
+A **program** is a root component and a set of templates, at most one per component.
+
+- Its model fingerprint is the one its templates share.
+- It has no document of its own. A host gives the compiler's program check (`mesh check-program`) and the runtime its parts: the root's name, and the list of templates.
+- Every template in the program is subject to the assembly rules, whether or not the root reaches it. A template the root doesn't reach is valid, and ignored when rendering.
+
+### Composite or primitive
+
+Whether an occurrence is composite or primitive is decided **by the program, and only by the program**:
+
+- an occurrence whose component has a template in the program is a **composite occurrence**, and the runtime expands it by evaluating that template in its place;
+- any other occurrence is a **primitive occurrence**, and becomes a node of the render tree (`docs/manual/runtime.md`);
+- **a component with no template in the program is a primitive**, always. That isn't an error, whatever the model declares for it. The manifest has no say: nothing in it marks a component as either.
+
+So leaving a composite's template out of a program silently makes it a primitive, and a renderer receives a node for it. A renderer should surface a node of a component it doesn't know, never drop it.
+
+### Binding a composite's scope
+
+A composite's template reads its own scope names. Those names are bound by the composite occurrence's props. For every composite `C` used as a composite occurrence in any template of the program:
+
+1. every scope name `s` of `C` must be bound by a prop of `C` with the same name;
+2. the binding must be sound. With the prop declared as type `P`, and `s` of type `S`:
+   - if the prop is required, `is_assignable(P, S)` must hold (§9.3);
+   - if it's optional, `is_assignable(P?, S)` must hold (or `is_assignable(P, S)`, when `P` is already optional), because an unwritten prop binds absence.
+
+At runtime, each written prop's value is evaluated in the enclosing template and checked against the prop's declared type (§9.7.6). An unwritten prop binds absent. A prop with no scope name of the same name is evaluated, and then not used.
+
+Only the root template's scope comes from the snapshot. The root component's own props play no part. The root is exempt from the binding rules, unless it is also used as a composite occurrence somewhere, which is then a cycle (rule 5).
+
+**Nesting.** A composite's template may contain composite occurrences, to any depth, as long as the program has no cycle.
+
+**Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. v0.5 has no composite events: a composite can't raise events of its own.
+
+### The assembly rules
+
+A program must satisfy these rules. Each broken rule is an **assembly error**. The runtime checks them before it evaluates anything (its program validation, `docs/manual/runtime.md`), and so does the compiler's program check, with the same codes and locations.
+
+| # | Rule | Code | Program validation step |
+|---|---|---|---|
+| 1 | At most one template per component. | `assembly-duplicate-template` | 4 |
+| 2 | The root component has a template in the program. | `assembly-missing-root` | 4 |
+| 3a | Every template is well-formed: valid against `template-v1`, and every name in it declared by the model with the kind it's given ([Names](#names)). | `assembly-malformed-template` | 2 |
+| 3b | Every template has a format version the runtime supports. | `assembly-unsupported-format-version` | 2 |
+| 3c | Every template has the fingerprint of the given model. So all of a program's templates share one. | `assembly-fingerprint-mismatch` | 3 |
+| 4a | Every scope name of every composite used as an occurrence is bound by a prop of the same name. | `assembly-unbound-scope-name` | 4 |
+| 4b | Every such binding is sound. | `assembly-unsound-binding` | 4 |
+| 5 | **No cycles:** no composite expands itself, directly or through others. Every composite occurrence on a cycle is reported. | `assembly-cycle` | 4 |
+| 6 | **No composite declares events** in the model. | `assembly-composite-event` | 4 |
+| 7 | **No composite occurrence has children,** text or elements. Whitespace-only text isn't a child (§3). | `assembly-composite-children` | 4 |
+
+Program validation's steps run in order, and a step that reports anything ends validation. Step 1 is the model itself (a manifest error). Within a step, every problem is reported.
+
+**Where each is reported.**
+- Rules 3a, 3b and 3c are reported at the template, identified by its position in the list the host gave (with its component, when it can be read), because a malformed template may have no readable component.
+- Rule 2 is reported with no template.
+- The others are reported at a template's component and a span in it: rule 1 at the root element of each template of the component after the first; rules 4a, 4b, 5 and 7 at the composite occurrence; rule 6 at every occurrence of the composite.
+
+**Order.** Assembly errors are listed with the one without a template first (rule 2); then those located by position, in position order; then the rest, by the template's component in code-point order, then by the span's start, then by code.
+
+### Examples
+
+With a model in which `user-card` has the prop `user: User` (required), the scope name `user: User` and the command `selectUser(user: User)`, and `page` and `avatar` are components with no template:
+
+| Program | Result |
+|---|---|
+| root `page`; templates: `page`'s `<page><user-card user={first} /></page>`, `user-card`'s `<avatar src={user.avatar} alt={user.name} on.click={selectUser(user)} />` | valid: `user-card` is a composite, `page` the root, `avatar` a primitive |
+| the same, with a second template for `user-card` | `assembly-duplicate-template` (rule 1) |
+| root `page`, with no template for `page` | `assembly-missing-root` (rule 2) |
+| a template compiled against a model where `avatar`'s `alt` isn't required | `assembly-fingerprint-mismatch` (rule 3c) |
+| a model where `user-card`'s prop is named `person` | `assembly-unbound-scope-name` at the occurrence (rule 4a) |
+| a model where `user-card`'s prop `user` isn't required, and its scope name `user` isn't optional | `assembly-unsound-binding` (rule 4b): an unwritten prop would bind absent |
+| `user-card`'s template containing `<user-card user={user} />` | `assembly-cycle` (rule 5) |
+| a model where `user-card` declares an event `select` | `assembly-composite-event` (rule 6) |
+| `<user-card user={first}>Ada</user-card>` | `assembly-composite-children` (rule 7) |
+| `<user-card user={first}>  </user-card>` | valid: whitespace-only text isn't a child |
+| the valid program plus a template for `badge`, which nothing uses | valid: the unreached template is checked and ignored |
+| the valid program without `user-card`'s template | valid: `user-card` is then a primitive, and the render tree holds a `user-card` node |
+
+### Assembly errors and runtime errors
+
+- Every rule above is decided before evaluation, from the program and the model alone. So each is an assembly error, and nothing is rendered.
+- During evaluation, composition can fail only through §9.7's runtime checks. The one specific to composition is a composite prop whose value, coming from an `any`, doesn't fit the prop's declared type: that is an evaluation error (`runtime-prop-mismatch`).
