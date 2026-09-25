@@ -1,0 +1,6 @@
+{
+  "title": "Team",
+  "first": { "id": "u1", "name": "Ada Lovelace", "avatar": "ada.png", "active": true },
+  "second": { "id": "u2", "name": "Grace Hopper", "active": false },
+  "compact": true
+}

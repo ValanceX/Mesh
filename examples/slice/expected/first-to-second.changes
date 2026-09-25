@@ -1,0 +1,4 @@
+page/page[0] title: "Ada Lovelace" -> "Ada King"
+page/page[0]/avatar[0] alt: "Ada Lovelace" -> "Ada King"
+page/page[0]/avatar[0] src: "ada.png" -> "ada-2.png"
+page/page[0]/text[1]/text[0]: "Ada Lovelace" -> "Ada King"

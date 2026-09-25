@@ -6,8 +6,8 @@
 // The requests: every call the native property test made (it writes them
 // to `target/mesh-runtime-property/`: run `cargo test -p mesh-runtime
 // --test property` first), the test programs' renders and events, every
-// kind of JavaScript value, randomly built JavaScript snapshots, and the
-// normative number-to-text table.
+// kind of JavaScript value, randomly built JavaScript snapshots, the
+// slice, and the normative number-to-text table.
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -95,6 +95,27 @@ test("the test programs' renders and events", async () => {
     }
   }
   console.log(`parity: ${await agree(requests, "programs")} program requests`);
+});
+
+test("the slice", async () => {
+  const slice = join(root, "examples", "slice");
+  const read = (name) => readFileSync(join(slice, name), "utf8");
+  const model = read("components.json");
+  const templates = [];
+  for (const component of ["users", "user-card"]) {
+    templates.push(await template(component, read(`${component}.mprx`), model));
+  }
+  const requests = [];
+  for (const file of ["first.json", "second.json"]) {
+    const render = renderRequest("users", templates, model, JSON.parse(read(`snapshots/${file}`)));
+    requests.push(render);
+    for (const handler of handlersOf(shipped.request(render).result)) {
+      for (const payload of [undefined, { x: 12, y: 34 }, { x: 1 }]) {
+        requests.push(dispatchRequest(render, handler, payload));
+      }
+    }
+  }
+  console.log(`parity: ${await agree(requests, "slice")} slice requests`);
 });
 
 class Point {

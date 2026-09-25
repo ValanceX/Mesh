@@ -1,0 +1,8 @@
+<page title={user.name}>
+  <avatar
+    src={user.avatar}
+    alt={user.name}
+    size={compact == true ? "sm" : "md"}
+    on.click={selectUser(user)} />
+  <text>{user.name}{user.active ? "" : " (inactive)"}</text>
+</page>
