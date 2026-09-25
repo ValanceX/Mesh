@@ -108,7 +108,7 @@ A key is a node's or text run's structural identity. Keys are:
 - **derived only from the program:** from the position, the sequence of child positions from the root template's root, with the component at each step, composites included, so a composite's expansion is part of every key below it;
 - **independent of values:** no snapshot or payload affects a key;
 - **unique:** no two nodes or text runs in one tree share one;
-- **stable:** every render of a program has the same keys at the same positions;
+- **stable within one program:** every render of a program has the same keys at the same positions. They are **not** stable across programs: changing the root or any template (spans included) may change every key. That is intentional, and there is no compatibility guarantee for keys across programs;
 - **opaque:** a renderer may compare keys for equality, and must not interpret them;
 - **not data identity,** nor application identity. A later design for lists may extend them.
 
@@ -120,7 +120,16 @@ A key is a node's or text run's structural identity. Keys are:
 
 The key is `k` followed by the first 16 bytes of `H(string "mesh-key-v1", the program identity (32 bytes), count of steps, each step)`, in unpadded base64url: 22 characters.
 
-The program identity is part of the hash so that a key can't be checked against guessed names: without the program's templates, nobody can compute a key, and so nobody can recover a composite's name from one. As a result, keys change whenever the program changes (any template, spans included). They are stable only within one program, which is what D4 requires. The runtime checks every tree it builds for duplicate keys, and a collision is an internal error, `runtime-key-collision`: at 128 bits it doesn't happen, and the check makes "unique" a guarantee rather than a probability.
+**Why the program identity is in the hash.** The encoding is public. Without the program identity, anyone holding a key could hash guessed paths and component names, such as `user-card`, and confirm a guess, recovering a composite's name, which I13 rules out. With it, confirming a guess needs the program identity, which is a digest of the program's templates. A renderer is given neither: the handler identifiers it sees carry only the identity's first 8 bytes.
+
+**What this does and doesn't provide.** It keeps structural names out of the render tree in a form that can be checked from the tree alone. It is **not** a cryptographic protection of the program:
+- keys are unkeyed SHA-256 digests, truncated to 128 bits. They are neither secret nor authenticated, and they don't hide how many nodes there are, or the tree's shape;
+- anyone who has the program's templates (for instance, a web page that ships them to the browser beside its renderer) can compute every key and handler identifier, and so match them to names;
+- a host must not rely on keys or handler identifiers to keep templates, names or commands confidential, or to authenticate an event. Dispatch validates every handler identifier against the render it's given; that, not secrecy, is what stops a forged one.
+
+**The cost:** keys change whenever the program changes. The tree doesn't say which program it came from, and a renderer mustn't try to infer it (handler identifiers are opaque). The host knows, because it made the render: when it gives the renderer a tree from a different program, it tells the renderer to draw it afresh rather than reconcile it by key.
+
+The runtime checks every tree it builds for duplicate keys, and a collision is an internal error, `runtime-key-collision`. At 128 bits one doesn't happen in practice; the check makes "unique" a guarantee rather than a probability.
 
 ### Program identity
 
@@ -128,7 +137,7 @@ A program's **identity** is `H(string "mesh-program-v1", string root, count of t
 
 ### Handler identifiers
 
-A handler identifier names exactly one handler at one node. It is determined by the program's identity, the node's key and the event's name. So it is unique within a program, the same in every render of it, and independent of values. It is not the command, and it contains nothing from which the command or its arguments can be recovered.
+A handler identifier names exactly one handler at one node. It is determined by the program's identity, the node's key and the event's name. So it is unique within a program, the same in every render of it, and independent of values. It is not the command, and it contains nothing from which the command or its arguments can be recovered without the program's templates. The same limits apply as for keys: it is opaque, not secret, and dispatch's validation, not its unpredictability, is what makes it safe to accept from a renderer.
 
 **Encoding:** `h`, then the first 8 bytes of the program identity in unpadded base64url (11 characters), then `.`, then the first 16 bytes of `H(string "mesh-handler-v1", program identity (32 bytes), string key, string event name)` in unpadded base64url (22 characters).
 
@@ -160,7 +169,7 @@ NEXUS's adapter maps an intent to a NEXUS command (for example, `user-card`'s `s
 ## Updates
 
 - **A change of values is a new render.** The whole program is evaluated again, and the result is a complete new render tree.
-- **Every render of a program has the same structure, keys and handler identifiers,** so a renderer can match a new tree against the one it drew, node by node, by key, and update in place.
+- **Every render of a program has the same structure, keys and handler identifiers,** so a renderer can match a new tree against the one it drew, node by node, by key, and update in place. A tree from a **different** program (a template changed or was added) may have entirely different keys: a renderer draws it afresh, and never matches it against the old tree by key.
 - **Finding what changed is the renderer's job,** by comparing prop values and text at equal keys. The runtime does no dependency tracking, no caching of evaluation, and no diffing.
 
 ## What renderers and hosts must do
@@ -168,11 +177,12 @@ NEXUS's adapter maps an intent to a NEXUS command (for example, `user-card`'s `s
 A **renderer**:
 - draws each node's component with its props, and each text run's text, **as given**. It computes nothing: it doesn't format numbers, supply a missing prop, or convert values. Values are final;
 - reports an event as its handler identifier and payload, and never interprets either;
-- compares keys only for equality;
+- compares keys only for equality, and reconciles by key only between trees its host says come from one program;
 - surfaces a node of a component it doesn't know, rather than dropping it (a composite whose template a program left out arrives as a node of its name).
 
 A **host**:
 - keeps each render while its tree is on screen, and dispatches each event with the render whose tree the renderer had drawn;
+- tells its renderer when a new tree comes from a different program than the one drawn, so the renderer draws it afresh instead of reconciling by key;
 - shapes its values to the manifest: records are exact, so a record with more fields than its type declares is refused (§9.8.4);
 - maps intents to its own commands, and treats diagnostics as errors in its inputs or its program, not as messages for end users.
 
@@ -206,16 +216,16 @@ Each operation runs these phases in order. A phase that reports any diagnostic e
 
 ### Identity and locations
 
-A diagnostic's identity is its **code** and its **location**. Codes are stable and part of the contract; message wording is not. A location has one of six forms:
+A diagnostic's identity is its **code** and its **location**. Codes are stable and part of the contract; message wording is not. A location has exactly one of these six forms, and each code always uses the same form (stated in its entry below):
 
 | `kind` | Other properties | Used for |
 |---|---|---|
-| `model` | `span`: start and end positions in the manifest's text, as the diagnostics document gives them (`byte`, `line`, `column`, `utf16`, `utf16Column`) | manifest diagnostics |
-| `program` | | a missing root template |
-| `template` | `index`: the template's 0-based position in the host's list; `component`, when it can be read | template-level validation |
-| `source` | `component`, and `span` in template-v1's form (`byte` and `utf16` offsets into the template's source) | other assembly diagnostics, and evaluation diagnostics |
-| `input` | `path`: a scope name then field names and list indices; or `$event` then field names and list indices | input diagnostics about the snapshot and payload |
-| `handler` | | an invalid handler identifier |
+| `model` | `span`: start and end positions in the manifest's text, as the diagnostics document gives them (`byte`, `line`, `column`, `utf16`, `utf16Column`) | manifest diagnostics (`manifest-*`) |
+| `program` | | the program as a whole, where there is no template to point to: a missing root template |
+| `template` | `index`: the template's 0-based position in the host's list; `component`, when it can be read | template-level validation: a malformed template, an unsupported version, a fingerprint mismatch |
+| `source` | `component`, and `span` in template-v1's form (`byte` and `utf16` offsets into the template's source) | every other assembly diagnostic, evaluation diagnostics, and a key collision |
+| `input` | `path`: a scope name then field names and list indices, into the snapshot; or `$event` then field names and list indices, into the payload | input diagnostics about the snapshot and payload |
+| `handler` | | a handler identifier that dispatch can't accept: there is no meaningful source span or input path to point to |
 
 ### Order
 
@@ -229,133 +239,193 @@ These are reported by program validation, and by `mesh check-program`, with the 
 
 ### `assembly-malformed-template`
 
-A template isn't valid against `template-v1`, or names something the model doesn't declare with the kind the template gives it. Location: `template`. Also reported for a template that isn't JSON, or whose `format` isn't `mesh-template`.
+A template isn't valid against `template-v1`, or names something the model doesn't declare with the kind the template gives it. Also reported for a template that isn't JSON, or whose `format` isn't `mesh-template`.
+
+Location: `template`.
 
 ### `assembly-unsupported-format-version`
 
-A template's `version` is a number this runtime doesn't support. Location: `template`.
+A template's `version` is a number this runtime doesn't support.
+
+Location: `template`.
 
 ### `assembly-fingerprint-mismatch`
 
-A template's fingerprint isn't the model's: it was checked against another model. Recompile it. Location: `template`.
+A template's fingerprint isn't the model's: it was checked against another model. Recompile it.
+
+Location: `template`.
 
 ### `assembly-duplicate-template`
 
-The program has more than one template for a component. Location: `source`, the root element of each template of that component after the first.
+The program has more than one template for a component.
+
+Location: `source`, the root element of each template of that component after the first.
 
 ### `assembly-missing-root`
 
-The program has no template for its root component. Location: `program`.
+The program has no template for its root component.
+
+Location: `program`.
 
 ### `assembly-unbound-scope-name`
 
-A composite used as a composite occurrence has a scope name that no prop of the same name binds. Location: `source`, each such occurrence.
+A composite used as a composite occurrence has a scope name that no prop of the same name binds.
+
+Location: `source`, each such composite occurrence.
 
 ### `assembly-unsound-binding`
 
-A prop binds a composite's scope name unsoundly: its type isn't assignable to the scope name's, or it's optional and the scope name isn't. Location: `source`, each such occurrence.
+A prop binds a composite's scope name unsoundly: its type isn't assignable to the scope name's, or it's optional and the scope name isn't.
+
+Location: `source`, each such composite occurrence.
 
 ### `assembly-cycle`
 
-A composite expands itself, directly or through others. Location: `source`, every composite occurrence on the cycle.
+A composite expands itself, directly or through others.
+
+Location: `source`, every composite occurrence on the cycle.
 
 ### `assembly-composite-event`
 
-A composite declares events in the model; v0.5 has no composite events. Location: `source`, every composite occurrence of it.
+A composite declares events in the model; v0.5 has no composite events.
+
+Location: `source`, every composite occurrence of it.
 
 ### `assembly-composite-children`
 
-A composite occurrence has children, text or elements; v0.5 has no children or slots for composites. Location: `source`, the occurrence.
+A composite occurrence has children, text or elements; v0.5 has no children or slots for composites.
+
+Location: `source`, the occurrence.
 
 ### Input codes
 
-These are reported by input validation, at an `input` location unless they say otherwise.
+These are reported by input validation.
 
 ### `runtime-missing-value`
 
 A value that must be present is absent: a scope name whose type isn't optional, a record field that doesn't read as optional, or a payload for an event that has one and a type that isn't optional.
 
+Location: `input`, the path of the missing value; a missing payload is `["$event"]`.
+
 ### `runtime-value-mismatch`
 
 A present value doesn't fit its type (§9.7.2). It is reported at the deepest path where it stops fitting: a list's element, a record's field.
 
+Location: `input`, the deepest path where the value stops fitting.
+
 ### `runtime-unknown-field`
 
-A record has a field its type doesn't declare. Records are exact (§9.8.4). Location: the field's path.
+A record has a field its type doesn't declare. Records are exact (§9.8.4).
+
+Location: `input`, the field's path.
 
 ### `runtime-absent-element`
 
 A list holds an absent element: JavaScript's `undefined`, or a hole. Location: the element's path.
 
+Location: `input`, the element's path.
+
 ### `runtime-number-out-of-range`
 
 A JSON number too large for binary64: its nearest value would be infinite.
+
+Location: `input`, the number's path.
 
 ### `runtime-non-finite-input`
 
 A number that is NaN or an infinity, which JavaScript can express and JSON can't.
 
+Location: `input`, the number's path.
+
 ### `runtime-unpaired-surrogate`
 
 A string, or a record field's name, that isn't a sequence of Unicode scalar values: it has an unpaired UTF-16 surrogate.
+
+Location: `input`, the string's path, or, for a field name, the field's.
 
 ### `runtime-unsupported-value`
 
 A JavaScript value outside the boundary data model: a function, a symbol, a `bigint`, an object that isn't a plain object or an array, or a cycle. The message names its kind (§9.8.6).
 
+Location: `input`, the value's path.
+
 ### `runtime-unexpected-payload`
 
-A payload was given for an event declared without one. Location: `$event`.
+A payload was given for an event declared without one.
+
+Location: `input`, `["$event"]`.
 
 ### `runtime-handler-other-program`
 
-Dispatch was given a handler identifier made by another program, or one that isn't a handler identifier at all. Location: `handler`.
+Dispatch was given a handler identifier made by another program, or one that isn't a handler identifier at all.
+
+Location: `handler`.
 
 ### `runtime-unknown-handler`
 
-Dispatch was given a handler identifier of the render's program that names no handler in it. Location: `handler`.
+Dispatch was given a handler identifier of the render's program that names no handler in it.
+
+Location: `handler`.
 
 ### Evaluation codes
 
-These are reported by evaluation, one per call, at a `source` location: the span of the value checked (§9.7.6). A clean check guarantees none of the type checks can fail, except where a value has type `any` or `any?`.
+These are reported by evaluation, one per call, located at the span of the value checked (§9.7.6). A clean check guarantees none of the type checks can fail, except where a value has type `any` or `any?`.
 
 ### `runtime-operand-mismatch`
 
 An operand isn't of the kind its operator needs: a boolean for `!`, `&&`, `||` or a conditional's condition; a number for unary `-`, arithmetic or a comparison.
 
+Location: `source`.
+
 ### `runtime-not-a-record`
 
 Member access on a value that isn't a record.
+
+Location: `source`.
 
 ### `runtime-missing-member`
 
 Member access, on a value of type `any`, to a field that's absent.
 
+Location: `source`.
+
 ### `runtime-content-not-text`
 
 An interpolation of type `any` or `any?` whose value is a list or a record (§9.7.8).
+
+Location: `source`.
 
 ### `runtime-prop-mismatch`
 
 A prop's value, at a primitive or composite occurrence, doesn't fit the prop's declared type, or is absent where the type isn't optional.
 
+Location: `source`.
+
 ### `runtime-argument-mismatch`
 
 A command argument doesn't fit its parameter's type.
+
+Location: `source`.
 
 ### `runtime-non-finite-output`
 
 NaN or an infinity would reach an output: a primitive prop, a text run or a command argument, at any depth.
 
+Location: `source`.
+
 ### `runtime-absent-element-output`
 
 A list holding an absent element would reach an output, at any depth.
+
+Location: `source`.
 
 ### Internal codes
 
 ### `runtime-key-collision`
 
-Two nodes or text runs of one tree would share a key. It can't happen in practice (keys are 128-bit), and it would be a bug to report. Location: `source`, the later of the two.
+Two nodes or text runs of one tree would share a key. It can't happen in practice (keys are 128-bit), and it would be a bug to report.
+
+Location: `source`, the later of the two.
 
 ### Every case the v0.5 contract names
 
@@ -383,7 +453,13 @@ Two nodes or text runs of one tree would share a key. It can't happen in practic
 | an absent list element reaching an output | `runtime-absent-element-output` |
 | a list or record interpolated where its static type says so; a literal too large to be finite | `content-not-text`; `number-literal-out-of-range` (check-time, §9.7) |
 
-More example documents, one per remaining location form:
+More example documents, covering every location form. A dispatch with a payload whose field doesn't fit, and with one of the render's snapshot values wrong too (the snapshot's paths come first):
+
+```json runtime-diagnostics
+{ "version": 1, "diagnostics": [
+  { "severity": "error", "code": "runtime-value-mismatch", "message": "`user.active` is a string, but must be a boolean", "location": { "kind": "input", "path": ["user", "active"] } },
+  { "severity": "error", "code": "runtime-value-mismatch", "message": "`$event.x` is a string, but must be a number", "location": { "kind": "input", "path": ["$event", "x"] } } ] }
+```
 
 ```json runtime-diagnostics
 { "version": 1, "diagnostics": [
@@ -408,9 +484,23 @@ More example documents, one per remaining location form:
     "end": { "byte": 60, "line": 3, "column": 25, "utf16": 60, "utf16Column": 25 } } } } ] }
 ```
 
-The runtime has no warnings:
+These are **not** runtime diagnostics documents. The runtime has no warnings:
 
 ```json runtime-diagnostics-invalid
 { "version": 1, "diagnostics": [
   { "severity": "warning", "code": "runtime-missing-value", "message": "…", "location": { "kind": "input", "path": ["user"] } } ] }
+```
+
+An input location without its path:
+
+```json runtime-diagnostics-invalid
+{ "version": 1, "diagnostics": [
+  { "severity": "error", "code": "runtime-missing-value", "message": "…", "location": { "kind": "input" } } ] }
+```
+
+A location of a form that doesn't exist (the six forms are all there are):
+
+```json runtime-diagnostics-invalid
+{ "version": 1, "diagnostics": [
+  { "severity": "error", "code": "runtime-unknown-handler", "message": "…", "location": { "kind": "event", "name": "click" } } ] }
 ```

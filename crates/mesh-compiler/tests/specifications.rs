@@ -248,3 +248,97 @@ fn every_new_code_is_documented_once() {
         );
     }
 }
+
+/// The six location forms of a runtime diagnostic (Pass 0, Decision 28).
+const LOCATION_FORMS: [&str; 6] = ["handler", "input", "model", "program", "source", "template"];
+
+fn sorted(mut items: Vec<String>) -> Vec<String> {
+    items.sort_unstable();
+    items
+}
+
+#[test]
+fn the_schema_has_exactly_the_six_location_forms() {
+    let schema: Value =
+        serde_json::from_str(&read("schemas/runtime-diagnostics-v1.schema.json")).expect("JSON");
+    let forms: Vec<String> = schema["$defs"]["location"]["oneOf"]
+        .as_array()
+        .expect("`location` is a oneOf")
+        .iter()
+        .map(|form| {
+            form["properties"]["kind"]["const"]
+                .as_str()
+                .expect("a kind")
+                .to_string()
+        })
+        .collect();
+    assert_eq!(sorted(forms), LOCATION_FORMS.map(String::from));
+}
+
+#[test]
+fn the_runtime_manual_defines_exactly_the_six_location_forms() {
+    let runtime = read("docs/manual/runtime.md");
+    let table = runtime
+        .split("### Identity and locations")
+        .nth(1)
+        .and_then(|rest| rest.split("### Order").next())
+        .expect("runtime.md has an \"Identity and locations\" section");
+    let forms: Vec<String> = table
+        .lines()
+        .filter_map(|line| {
+            line.strip_prefix("| `")?
+                .split('`')
+                .next()
+                .map(String::from)
+        })
+        .filter(|form| form != "kind")
+        .collect();
+    assert_eq!(sorted(forms), LOCATION_FORMS.map(String::from));
+}
+
+/// Every code's entry names exactly one location form, and it is one of
+/// the six.
+#[test]
+fn every_runtime_code_has_exactly_one_location_form() {
+    let runtime = read("docs/manual/runtime.md");
+    let mut sections = runtime.split("\n### `").skip(1);
+    let mut seen = 0;
+    for section in sections.by_ref() {
+        let code = section.split('`').next().unwrap_or_default();
+        let body = section.split("\n### ").next().unwrap_or_default();
+        let forms: Vec<&str> = body
+            .lines()
+            .filter_map(|line| line.strip_prefix("Location: `")?.split('`').next())
+            .collect();
+        assert_eq!(
+            forms.len(),
+            1,
+            "`{code}` should state exactly one location: {forms:?}"
+        );
+        assert!(
+            LOCATION_FORMS.contains(&forms[0]),
+            "`{code}` has an unknown location form"
+        );
+        seen += 1;
+    }
+    assert_eq!(seen, RUNTIME_CODES.len());
+}
+
+#[test]
+fn every_location_form_has_an_example() {
+    let used: Vec<String> = blocks("docs/manual/runtime.md", "runtime-diagnostics")
+        .iter()
+        .flat_map(|text| {
+            let document: Value = serde_json::from_str(text).expect("JSON");
+            document["diagnostics"]
+                .as_array()
+                .expect("diagnostics")
+                .iter()
+                .map(|d| d["location"]["kind"].as_str().expect("a kind").to_string())
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    let mut used = sorted(used);
+    used.dedup();
+    assert_eq!(used, LOCATION_FORMS.map(String::from));
+}

@@ -445,11 +445,12 @@ A program must satisfy these rules. Each broken rule is an **assembly error**. T
 Program validation's steps run in order, and a step that reports anything ends validation. Step 1 is the model itself (a manifest error). Within a step, every problem is reported.
 
 **Where each is reported.**
-- Rules 3a, 3b and 3c are reported at the template, identified by its position in the list the host gave (with its component, when it can be read), because a malformed template may have no readable component.
-- Rule 2 is reported with no template.
-- The others are reported at a template's component and a span in it: rule 1 at the root element of each template of the component after the first; rules 4a, 4b, 5 and 7 at the composite occurrence; rule 6 at every occurrence of the composite.
+Each rule has one location form, of the six `docs/manual/runtime.md` defines:
+- Rules 3a, 3b and 3c are located at the **`template`**: its position in the list the host gave, with its component when it can be read, because a malformed template may have no readable component.
+- Rule 2 is located at the **`program`**: there is no root template to point to.
+- The others are located at a **`source`**, a template's component and a span in it: rule 1 at the root element of each template of the component after the first; rules 4a, 4b, 5 and 7 at the composite occurrence; rule 6 at every occurrence of the composite.
 
-**Order.** Assembly errors are listed with the one without a template first (rule 2); then those located by position, in position order; then the rest, by the template's component in code-point order, then by the span's start, then by code.
+**Order.** Assembly errors are listed with the one located at the `program` first (rule 2); then those located at a `template`, by position; then those located at a `source`, by the template's component in code-point order, then by the span's start, then by code.
 
 ### Examples
 
