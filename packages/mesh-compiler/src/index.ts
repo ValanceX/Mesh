@@ -1,8 +1,9 @@
 /**
  * The MESH compiler, in WebAssembly: check MPRX against a component
  * manifest, and get back exactly the diagnostics `mesh check --format
- * json` prints for the same inputs; or compile it, and get the template
- * `mesh compile` writes too.
+ * json` prints for the same inputs; compile it, and get the template
+ * `mesh compile` writes too; or check a program of templates, as
+ * `mesh check-program` does.
  *
  * ```js
  * import { check } from "@valancex/mesh-compiler";
@@ -21,9 +22,15 @@
  * @packageDocumentation
  */
 
-import { check as checkWith, compile as compileWith, init as initWith } from "./engine.js";
-import type { CheckInput, CompileInput, CompileResult, ModuleSource } from "./engine.js";
+import {
+  check as checkWith,
+  checkProgram as checkProgramWith,
+  compile as compileWith,
+  init as initWith,
+} from "./engine.js";
+import type { CheckInput, CompileInput, CompileResult, ModuleSource, ProgramInput } from "./engine.js";
 import type { DiagnosticsDocument } from "./document.js";
+import type { RuntimeDiagnosticsDocument } from "./runtime-document.js";
 
 export type {
   Diagnostic,
@@ -33,7 +40,16 @@ export type {
   Span,
   Suggestion,
 } from "./document.js";
-export type { CheckInput, CompileInput, CompileResult, ModuleSource } from "./engine.js";
+export type { CheckInput, CompileInput, CompileResult, ModuleSource, ProgramInput } from "./engine.js";
+export type {
+  ModelPosition,
+  ModelSpan,
+  RuntimeDiagnostic,
+  RuntimeDiagnosticsDocument,
+  RuntimeLocation,
+  SourceOffset,
+  SourceSpan,
+} from "./runtime-document.js";
 export type {
   Offset,
   Template,
@@ -71,6 +87,20 @@ export function check(input: CheckInput): Promise<DiagnosticsDocument> {
  */
 export function compile(input: CompileInput): Promise<CompileResult> {
   return compileWith(input);
+}
+
+/**
+ * Checks a program: the manifest `input.model`, then each of
+ * `input.templates` (well-formed, of a format version this MESH reads,
+ * and compiled against this model), then the assembly rules, with
+ * `input.root` as the root component. Returns the runtime diagnostics
+ * document, which is empty when the program is valid: exactly what
+ * `mesh check-program --format json` prints, and what the runtime's
+ * render reports for the same program before it looks at a snapshot.
+ * It produces nothing else. It rejects as `check` does.
+ */
+export function checkProgram(input: ProgramInput): Promise<RuntimeDiagnosticsDocument> {
+  return checkProgramWith(input);
 }
 
 /**

@@ -1,7 +1,7 @@
 //! The module's exports: the internal boundary the wrapper drives.
 //!
 //! One check is: `mesh_alloc` and fill a buffer per input; `mesh_check`
-//! (or `mesh_compile`);
+//! (or `mesh_compile`, or `mesh_check_program`);
 //! `mesh_free` every input buffer; read the document at
 //! `mesh_result_ptr`/`mesh_result_len`; `mesh_result_clear`. After that,
 //! the call holds no memory in the module.
@@ -147,6 +147,44 @@ pub unsafe extern "C" fn mesh_compile(
     };
     let result = crate::respond_compile(source, path, manifest, manifest_path, component);
     RESULT.with(|kept| *kept.borrow_mut() = result.into_bytes());
+    0
+}
+
+/// Runs one program check (`crate::respond_check_program`) and keeps its
+/// document for [`mesh_result_ptr`]. `templates` is a text list
+/// (`mesh_runtime::encoding`). Returns 0; or 1, keeping nothing, if an
+/// input isn't UTF-8 or `templates` isn't a text list.
+///
+/// # Safety
+///
+/// Each pointer must point to its length's initialized bytes, unless that
+/// length is 0.
+#[no_mangle]
+pub unsafe extern "C" fn mesh_check_program(
+    manifest: *const u8,
+    manifest_len: usize,
+    root: *const u8,
+    root_len: usize,
+    templates: *const u8,
+    templates_len: usize,
+) -> u32 {
+    // SAFETY: the caller's guarantee, passed on for each input.
+    let inputs = unsafe { (text(manifest, manifest_len), text(root, root_len)) };
+    let (Some(manifest), Some(root)) = inputs else {
+        mesh_result_clear();
+        return 1;
+    };
+    let templates = if templates_len == 0 {
+        &[][..]
+    } else {
+        // SAFETY: the caller guarantees `templates_len` initialized bytes.
+        unsafe { std::slice::from_raw_parts(templates, templates_len) }
+    };
+    let Some(document) = crate::respond_check_program(manifest, root, templates) else {
+        mesh_result_clear();
+        return 1;
+    };
+    RESULT.with(|kept| *kept.borrow_mut() = document.into_bytes());
     0
 }
 

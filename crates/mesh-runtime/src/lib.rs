@@ -15,6 +15,7 @@
 mod boundary;
 mod diagnostic;
 mod dispatch;
+pub mod encoding;
 mod eval;
 mod number;
 mod program;
@@ -24,7 +25,7 @@ mod types;
 mod value;
 
 pub use diagnostic::{to_json, Form, Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
-pub use dispatch::dispatch;
+pub use dispatch::{dispatch, dispatch_from};
 pub use number::number_to_text;
 pub use program::Program;
 pub use render::{render, Render};

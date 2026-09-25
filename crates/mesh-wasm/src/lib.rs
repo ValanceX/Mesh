@@ -2,8 +2,10 @@
 //!
 //! It has no semantics of its own (outline v0.4 I6). [`respond`] is the
 //! check operation, [`mesh_compiler::check::run`], rendered as the
-//! diagnostics document, and [`respond_compile`] is compiling,
-//! [`mesh_compiler::check::template`], rendered with its template;
+//! diagnostics document, [`respond_compile`] is compiling,
+//! [`mesh_compiler::check::template`], rendered with its template, and
+//! [`respond_check_program`] is the program check,
+//! [`mesh_compiler::check::program`];
 //! everything else only moves bytes across the boundary between
 //! WebAssembly's linear memory and JavaScript.
 //!
@@ -68,6 +70,18 @@ pub fn respond_compile(
     };
     let template = template.map_or_else(|| "null".to_string(), |t| mesh_template::to_json(&t));
     format!("{{\"diagnostics\":{document},\"template\":{template}}}")
+}
+
+/// Runs one program check and renders its result: the runtime
+/// diagnostics document `mesh check-program --format json` prints, for
+/// the program of `root` and the templates `templates` encodes (a text
+/// list, `mesh_runtime::encoding`), against `manifest`. `None` if
+/// `templates` isn't a text list.
+pub fn respond_check_program(manifest: &str, root: &str, templates: &[u8]) -> Option<String> {
+    let templates = mesh_runtime::encoding::decode_texts(templates).ok()?;
+    let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+    let diagnostics = check::program(manifest, root, &texts);
+    Some(mesh_runtime::to_json(&diagnostics, manifest))
 }
 
 #[cfg(target_arch = "wasm32")]

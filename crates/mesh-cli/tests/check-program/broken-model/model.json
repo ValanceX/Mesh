@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "types": {},
+  "components": { "view": { "props": {}, "events": {}, "commands": {}, "scope": { "user": { "kind": "named", "name": "Nobody" } } } }
+}

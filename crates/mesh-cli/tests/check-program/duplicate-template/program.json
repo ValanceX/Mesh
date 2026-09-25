@@ -1,0 +1,8 @@
+{
+  "root": "view",
+  "templates": [
+    "view.mprx",
+    "card.mprx",
+    "card.mprx"
+  ]
+}

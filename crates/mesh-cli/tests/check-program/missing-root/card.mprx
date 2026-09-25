@@ -1,0 +1,3 @@
+<page title={user.name}>
+  <text>{user.name}{compact == true ? " (compact)" : ""}</text>
+</page>

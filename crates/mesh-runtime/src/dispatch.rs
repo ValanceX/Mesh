@@ -9,7 +9,7 @@ use crate::program::{self, Program, Step, Valid, COMPOSITE, NODE};
 use crate::render::{bind, render_children, snapshot_values, statics, Render, RenderChild};
 use crate::tree::Intent;
 use crate::types::fits;
-use crate::value::{HostValue, Value};
+use crate::value::{HostRecord, HostValue, Value};
 use mesh_template::Element;
 use std::collections::BTreeMap;
 
@@ -102,15 +102,36 @@ pub fn dispatch(
     handler: &str,
     payload: Option<&HostValue>,
 ) -> Result<Intent, Vec<RuntimeDiagnostic>> {
-    // 1. Program validation, of the render's own copies (I14).
     let (templates, root) = render.program();
-    let valid = program::validate(
+    dispatch_from(
         &Program {
             root,
             templates: &templates,
         },
         &render.model,
-    )?;
+        &render.snapshot,
+        handler,
+        payload,
+    )
+}
+
+/// [`dispatch`], for a host that keeps a render's inputs itself instead
+/// of its [`Render`]: the program, model and snapshot of a render that
+/// succeeded, exactly as they were given to it. The WebAssembly module is
+/// such a host, since a `Render` can't cross into JavaScript.
+///
+/// It is the same operation: everything is validated again (I14), and
+/// nothing is rendered. Given inputs no render was made from, it gives
+/// what dispatch against such a render would, or diagnostics.
+pub fn dispatch_from(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    handler: &str,
+    payload: Option<&HostValue>,
+) -> Result<Intent, Vec<RuntimeDiagnostic>> {
+    // 1. Program validation, of the render's own copies (I14).
+    let valid = program::validate(program, model)?;
 
     // 2. The handler identifier alone: the payload's type depends on it.
     let prefix = format!("{}.", program::handler_prefix(&valid.identity));
@@ -132,7 +153,7 @@ pub fn dispatch(
 
     // 3. The render's snapshot and the payload, together.
     let mut inputs = Inputs::new(&valid.manifest);
-    let root_values = snapshot_values(&valid, &render.snapshot, &mut inputs);
+    let root_values = snapshot_values(&valid, snapshot, &mut inputs);
     let event = &valid.component(&site.node.component).events[site.event];
     let payload_type = event.payload.as_ref();
     let payload_value = match payload_type {

@@ -1,0 +1,3 @@
+error[assembly-fingerprint-mismatch]: the template of `card` was checked against another model (sha256:5e84ecf74eabcbf4b8a9bf0ab999ff05a24590585a740704e3a99af971e1d8a7, not sha256:4a33df28d7a0d612ae46214d864d7fb67e2544edf1d49da80e6fb581843caa91): recompile it
+  --> card.template.json
+

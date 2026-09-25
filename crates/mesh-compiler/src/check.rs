@@ -117,6 +117,24 @@ pub fn template(source: &str, model: &Model) -> Compiled {
     }
 }
 
+/// Checks a program of templates (v0.5 D2, D7): the manifest `model`,
+/// then each template, their fingerprints, and the assembly rules, with
+/// `root` as the root component. It produces no artifact.
+///
+/// This is the runtime's own program validation
+/// ([`mesh_runtime::check_program`]), so its diagnostics, codes and
+/// locations are exactly what render and dispatch would report for the
+/// same program: the same code decides both. Empty means the program is
+/// valid. [`mesh_runtime::to_json`] renders them as the runtime
+/// diagnostics document.
+pub fn program(
+    model: &str,
+    root: &str,
+    templates: &[&str],
+) -> Vec<mesh_runtime::RuntimeDiagnostic> {
+    mesh_runtime::check_program(&mesh_runtime::Program { root, templates }, model)
+}
+
 /// Every input of one check, for a host that has them all up front.
 ///
 /// Paths only identify documents in the diagnostics; nothing here reads

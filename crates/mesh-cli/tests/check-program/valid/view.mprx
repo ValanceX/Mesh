@@ -1,0 +1,6 @@
+<page title={user.name}>
+  <card user={user} compact={flag} />
+  <card user={user}>
+  </card>
+  <button on.click={save()} />
+</page>

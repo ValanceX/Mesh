@@ -1,0 +1,3 @@
+error[manifest-unknown-type]: unknown type "Nobody": the manifest's "types" doesn't declare it
+  --> model.json:4:118
+

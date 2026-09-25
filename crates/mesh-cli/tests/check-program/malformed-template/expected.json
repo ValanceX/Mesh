@@ -1,0 +1,1 @@
+{"diagnostics":[{"code":"assembly-malformed-template","location":{"index":1,"kind":"template"},"message":"the template is malformed: not a template-v1 document: invalid type: integer `7`, expected a string","severity":"error"}],"version":1}

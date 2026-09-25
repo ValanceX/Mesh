@@ -1,0 +1,7 @@
+{
+  "root": "view",
+  "templates": [
+    "view.mprx"
+  ],
+  "checkModel": "model.json"
+}

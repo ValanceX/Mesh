@@ -1,0 +1,10 @@
+{
+  "root": "view",
+  "templates": [
+    "view.mprx",
+    {
+      "source": "card.mprx",
+      "model": "other.json"
+    }
+  ]
+}

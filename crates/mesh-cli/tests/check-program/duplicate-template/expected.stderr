@@ -1,0 +1,3 @@
+error[assembly-duplicate-template]: a second template for `card`
+  --> card.template.json, the template of `card`, source bytes 0..96
+

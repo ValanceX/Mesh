@@ -1,0 +1,1 @@
+{"diagnostics":[{"code":"assembly-cycle","location":{"component":"card","kind":"source","span":{"end":{"byte":29,"utf16":29},"start":{"byte":9,"utf16":9}}},"message":"`card` expands `card` again, through its template: a cycle","severity":"error"}],"version":1}

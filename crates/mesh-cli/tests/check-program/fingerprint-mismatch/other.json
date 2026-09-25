@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "types": {
+    "User": {
+      "kind": "record",
+      "fields": {
+        "name": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      }
+    }
+  },
+  "components": {
+    "page": {
+      "props": {
+        "title": {
+          "type": {
+            "kind": "string"
+          },
+          "required": false
+        },
+        "subtitle": {
+          "type": {
+            "kind": "string"
+          },
+          "required": false
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "text": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "button": {
+      "props": {},
+      "events": {
+        "click": {}
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "view": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {
+        "user": {
+          "kind": "named",
+          "name": "User"
+        },
+        "flag": {
+          "kind": "boolean"
+        }
+      }
+    },
+    "card": {
+      "props": {
+        "user": {
+          "type": {
+            "kind": "named",
+            "name": "User"
+          },
+          "required": true
+        },
+        "compact": {
+          "type": {
+            "kind": "boolean"
+          },
+          "required": false
+        }
+      },
+      "events": {},
+      "commands": {
+        "select": {
+          "parameters": [
+            {
+              "name": "user",
+              "type": {
+                "kind": "named",
+                "name": "User"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "user": {
+          "kind": "named",
+          "name": "User"
+        },
+        "compact": {
+          "kind": "optional",
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      }
+    },
+    "frame": {
+      "props": {
+        "user": {
+          "type": {
+            "kind": "named",
+            "name": "User"
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "user": {
+          "kind": "named",
+          "name": "User"
+        },
+        "caption": {
+          "kind": "string"
+        }
+      }
+    },
+    "tag": {
+      "props": {
+        "size": {
+          "type": {
+            "kind": "number"
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "size": {
+          "kind": "string"
+        }
+      }
+    },
+    "badge": {
+      "props": {
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": false
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "label": {
+          "kind": "string"
+        }
+      }
+    },
+    "clicker": {
+      "props": {},
+      "events": {
+        "tap": {}
+      },
+      "commands": {},
+      "scope": {}
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{"diagnostics":[{"code":"assembly-missing-root","location":{"kind":"program"},"message":"the program has no template for its root, `view`","severity":"error"}],"version":1}
