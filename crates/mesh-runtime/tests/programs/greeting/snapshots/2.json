@@ -1,0 +1,13 @@
+{
+  "user": { "name": "Ada", "active": false },
+  "name": "Ada",
+  "maybeName": "Countess",
+  "count": 6,
+  "flag": true,
+  "anything": null,
+  "users": [],
+  "numbers": [1, 2.5, 0.1],
+  "maybeNumbers": [],
+  "nothing": null,
+  "ignored": "a name view doesn't declare"
+}

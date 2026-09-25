@@ -1,0 +1,6 @@
+{"arguments":[],"command":{"component":"view","name":"save"}}
+{"arguments":[{"value":{"x":3,"y":0}}],"command":{"component":"view","name":"place"}}
+{"arguments":[{"absent":true}],"command":{"component":"view","name":"setName"}}
+{"arguments":[{"value":"Countess"}],"command":{"component":"view","name":"setName"}}
+{"arguments":[{"value":{"any":["thing",1]}}],"command":{"component":"view","name":"take"}}
+{"diagnostics":[{"code":"runtime-value-mismatch","location":{"kind":"input","path":["$event","x"]},"message":"`$event.x` is a string, but must be a number","severity":"error"},{"code":"runtime-missing-value","location":{"kind":"input","path":["$event","y"]},"message":"`$event.y` is absent, but its field is required","severity":"error"}],"version":1}

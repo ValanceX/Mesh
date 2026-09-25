@@ -1,0 +1,4 @@
+<page title="Users">
+  <card user={user} compact={flag} />
+  <card user={user} />
+</page>

@@ -3,6 +3,9 @@
 
 #![allow(dead_code)]
 
+pub mod host;
+pub mod renderer;
+
 use mesh_compiler::check;
 use mesh_runtime::{HostRecord, HostValue, Intent, Program, Render, RuntimeDiagnostic};
 

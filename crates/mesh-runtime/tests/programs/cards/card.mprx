@@ -1,0 +1,4 @@
+<page title={user.name}>
+  <text>{user.name}{compact == true ? " (compact)" : ""}</text>
+  <probe maybeStr={user.avatar} on.tap={selectUser(user)} />
+</page>

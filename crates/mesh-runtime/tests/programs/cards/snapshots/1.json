@@ -1,0 +1,11 @@
+{
+  "user": { "name": "Ada", "avatar": "ada.png", "active": true },
+  "name": "Ada",
+  "count": 1,
+  "flag": true,
+  "anything": null,
+  "users": [],
+  "numbers": [1, 2.5],
+  "maybeNumbers": [],
+  "nothing": null
+}

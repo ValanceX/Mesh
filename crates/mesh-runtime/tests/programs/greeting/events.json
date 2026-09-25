@@ -1,0 +1,8 @@
+[
+  { "render": 0, "event": "tap", "occurrence": 0, "payload": null },
+  { "render": 0, "event": "click", "occurrence": 0, "payload": { "x": 3, "y": -0 } },
+  { "render": 0, "event": "tap", "occurrence": 1, "payload": null },
+  { "render": 1, "event": "tap", "occurrence": 1, "payload": null },
+  { "render": 0, "event": "pick", "occurrence": 0, "payload": { "any": ["thing", 1] } },
+  { "render": 0, "event": "click", "occurrence": 0, "payload": { "x": "three" } }
+]

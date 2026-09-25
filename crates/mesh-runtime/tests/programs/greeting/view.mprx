@@ -1,0 +1,5 @@
+<page title={name}>
+  <text>Hello, {name}! You have {count} new {count == 1 ? "message" : "messages"}.</text>
+  <probe num={count / 4} maybeStr={maybeName} flag={flag} on.tap={save()} on.click={place($event)} />
+  <probe numbers={numbers} user={user} on.tap={setName(maybeName)} on.pick={take($event)} />
+</page>
