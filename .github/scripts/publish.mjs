@@ -11,11 +11,14 @@
 // already has is skipped, so a failed run can be run again.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
-const [dir, flag] = process.argv.slice(2);
+const [given, flag] = process.argv.slice(2);
+// Absolute, so npm reads each tarball as a file: a relative `out/name.tgz`
+// looks like a GitHub `owner/repo` spec to it.
+const dir = given && resolve(given);
 const publish = flag === "--publish";
-if (!dir || (flag && !publish)) {
+if (!given || (flag && !publish)) {
   throw new Error("usage: node .github/scripts/publish.mjs <tarball-dir> [--publish]");
 }
 
