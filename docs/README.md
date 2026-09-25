@@ -24,6 +24,12 @@ Reference material for when you need exact details.
 - [**Diagnostics JSON Schema**](../schemas/diagnostics-v1.schema.json): the document `mesh check --format json` prints.
 - [**MPRX Language Spec**](./MPRX-SPEC.md): the canonical grammar and semantics.
 
+**Specified for v0.5, not yet implemented.** These are the contracts v0.5's compiler and runtime are being built against, and that NEXUS's adapter and PORT's renderers can build against now:
+
+- [**Evaluation and the boundary**](./MPRX-SPEC.md#97-evaluation): §9.7 and §9.8 of the spec, with the normative [number-to-text table](./tables/number-to-text.tsv) and its [reference generator](./tables/number_to_text.py).
+- [**Templates and programs**](./manual/templates.md): the compiled form of a template, the model fingerprint, and the assembly rules. Also a [JSON Schema](../schemas/template-v1.schema.json).
+- [**The MESH runtime**](./manual/runtime.md): render and dispatch, the host's obligations, the render tree, keys, handler identifiers, command intents, and runtime diagnostics. Also JSON Schemas for [render trees and intents](../schemas/render-v1.schema.json) and [runtime diagnostics](../schemas/runtime-diagnostics-v1.schema.json).
+
 ## Background
 
 - [**Architecture**](./ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance.
