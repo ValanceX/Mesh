@@ -8,6 +8,7 @@ dist/
 
 # The test-only module (outline v0.4 D6); never shipped.
 packages/mesh-compiler/test/build/
+packages/mesh-runtime/test/build/
 
 # The binaries CI builds into the platform packages before packing them.
 packages/mesh-lsp-*/bin/

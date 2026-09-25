@@ -6,8 +6,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Every package v0.4 has, by name, sorted.
-const PACKAGES: [&str; 7] = [
+/// Every package, by name, sorted.
+const PACKAGES: [&str; 8] = [
     "@valancex/mesh-compiler",
     "@valancex/mesh-lsp",
     "@valancex/mesh-lsp-darwin-arm64",
@@ -15,6 +15,7 @@ const PACKAGES: [&str; 7] = [
     "@valancex/mesh-lsp-linux-arm64",
     "@valancex/mesh-lsp-linux-x64",
     "@valancex/mesh-lsp-win32-x64",
+    "@valancex/mesh-runtime",
 ];
 
 /// The five shipped targets (outline D8): npm's `os` and `cpu` for each.
@@ -114,19 +115,21 @@ fn packages_depend_on_each_other_by_scope_at_the_workspace_version() {
     }
 }
 
-/// The compiler package's `version.ts` is the version its wrapper expects
-/// the WebAssembly module to report (outline v0.4 I10), so it too is the
-/// workspace's, which is the module's.
+/// Each WebAssembly package's `version.ts` is the version its wrapper
+/// expects its module to report (I10), so it too is the workspace's,
+/// which is the module's.
 #[test]
-fn the_compiler_wrapper_expects_the_workspace_version() {
-    let path = root().join("packages/mesh-compiler/src/version.ts");
-    let text = fs::read_to_string(&path).expect("should read version.ts");
-    let expected = format!("export const version = \"{}\";", workspace_version());
-    assert!(
-        text.lines().any(|line| line.trim() == expected),
-        "{} should declare {expected}",
-        path.display()
-    );
+fn the_wrappers_expect_the_workspace_version() {
+    for package in ["mesh-compiler", "mesh-runtime"] {
+        let path = root().join(format!("packages/{package}/src/version.ts"));
+        let text = fs::read_to_string(&path).expect("should read version.ts");
+        let expected = format!("export const version = \"{}\";", workspace_version());
+        assert!(
+            text.lines().any(|line| line.trim() == expected),
+            "{} should declare {expected}",
+            path.display()
+        );
+    }
 }
 
 /// The platform package of a target.

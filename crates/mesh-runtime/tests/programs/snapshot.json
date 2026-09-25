@@ -1,0 +1,11 @@
+{
+  "user": { "name": "Ada", "avatar": "ada.png", "active": true },
+  "name": "Ada",
+  "count": 3,
+  "flag": true,
+  "anything": { "deep": [1, "two", null] },
+  "users": [{ "name": "Ada", "active": true }, { "name": "Grace", "active": false }],
+  "numbers": [1, 2.5],
+  "maybeNumbers": [1, 2],
+  "nothing": null
+}

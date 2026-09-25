@@ -10,102 +10,10 @@ use mesh_compiler::check;
 use mesh_runtime::{HostRecord, HostValue, Intent, Program, Render, RuntimeDiagnostic};
 
 /// The model every test uses unless it says otherwise.
-pub const MODEL: &str = r#"{
-  "version": 1,
-  "types": {
-    "User": { "kind": "record", "fields": {
-      "name": { "type": { "kind": "string" }, "required": true },
-      "avatar": { "type": { "kind": "string" }, "required": false },
-      "active": { "type": { "kind": "boolean" }, "required": true }
-    } },
-    "Point": { "kind": "record", "fields": {
-      "x": { "type": { "kind": "number" }, "required": true },
-      "y": { "type": { "kind": "number" }, "required": true }
-    } }
-  },
-  "components": {
-    "page": { "props": { "title": { "type": { "kind": "string" }, "required": false } },
-              "events": {}, "commands": {}, "scope": {} },
-    "text": { "props": {}, "events": {}, "commands": {}, "scope": {} },
-    "probe": {
-      "props": {
-        "any": { "type": { "kind": "any" }, "required": false },
-        "maybeAny": { "type": { "kind": "optional", "type": { "kind": "any" } }, "required": false },
-        "num": { "type": { "kind": "number" }, "required": false },
-        "maybeNum": { "type": { "kind": "optional", "type": { "kind": "number" } }, "required": false },
-        "str": { "type": { "kind": "string" }, "required": false },
-        "maybeStr": { "type": { "kind": "optional", "type": { "kind": "string" } }, "required": false },
-        "flag": { "type": { "kind": "boolean" }, "required": false },
-        "none": { "type": { "kind": "null" }, "required": false },
-        "numbers": { "type": { "kind": "list", "element": { "kind": "number" } }, "required": false },
-        "user": { "type": { "kind": "named", "name": "User" }, "required": false }
-      },
-      "events": {
-        "click": { "payload": { "kind": "named", "name": "Point" } },
-        "tap": {},
-        "pick": { "payload": { "kind": "any" } },
-        "maybe": { "payload": { "kind": "optional", "type": { "kind": "string" } } }
-      },
-      "commands": {}, "scope": {}
-    },
-    "view": {
-      "props": {}, "events": {},
-      "commands": {
-        "select": { "parameters": [{ "name": "user", "type": { "kind": "named", "name": "User" } }] },
-        "save": { "parameters": [] },
-        "setCount": { "parameters": [{ "name": "count", "type": { "kind": "number" } }] },
-        "setName": { "parameters": [{ "name": "name", "type": { "kind": "optional", "type": { "kind": "string" } } }] },
-        "take": { "parameters": [{ "name": "value", "type": { "kind": "any" } }] },
-        "place": { "parameters": [{ "name": "point", "type": { "kind": "named", "name": "Point" } }] }
-      },
-      "scope": {
-        "user": { "kind": "named", "name": "User" },
-        "maybeUser": { "kind": "optional", "type": { "kind": "named", "name": "User" } },
-        "name": { "kind": "string" },
-        "maybeName": { "kind": "optional", "type": { "kind": "string" } },
-        "count": { "kind": "number" },
-        "flag": { "kind": "boolean" },
-        "anything": { "kind": "any" },
-        "maybeAnything": { "kind": "optional", "type": { "kind": "any" } },
-        "users": { "kind": "list", "element": { "kind": "named", "name": "User" } },
-        "numbers": { "kind": "list", "element": { "kind": "number" } },
-        "maybeNumbers": { "kind": "list", "element": { "kind": "optional", "type": { "kind": "number" } } },
-        "nothing": { "kind": "null" }
-      }
-    },
-    "card": {
-      "props": {
-        "user": { "type": { "kind": "named", "name": "User" }, "required": true },
-        "compact": { "type": { "kind": "optional", "type": { "kind": "boolean" } }, "required": false },
-        "extra": { "type": { "kind": "any" }, "required": false }
-      },
-      "events": {},
-      "commands": { "selectUser": { "parameters": [{ "name": "user", "type": { "kind": "named", "name": "User" } }] } },
-      "scope": {
-        "user": { "kind": "named", "name": "User" },
-        "compact": { "kind": "optional", "type": { "kind": "boolean" } }
-      }
-    },
-    "frame": {
-      "props": { "user": { "type": { "kind": "named", "name": "User" }, "required": true } },
-      "events": {}, "commands": {},
-      "scope": { "user": { "kind": "named", "name": "User" } }
-    }
-  }
-}"#;
+pub const MODEL: &str = include_str!("../programs/model.json");
 
 /// A snapshot for `view` in which every value is ordinary.
-pub const SNAPSHOT: &str = r#"{
-  "user": { "name": "Ada", "avatar": "ada.png", "active": true },
-  "name": "Ada",
-  "count": 3,
-  "flag": true,
-  "anything": { "deep": [1, "two", null] },
-  "users": [{ "name": "Ada", "active": true }, { "name": "Grace", "active": false }],
-  "numbers": [1, 2.5],
-  "maybeNumbers": [1, 2],
-  "nothing": null
-}"#;
+pub const SNAPSHOT: &str = include_str!("../programs/snapshot.json");
 
 /// The template of `component` whose source is `source`, compiled against
 /// `model`. Panics if it doesn't compile.

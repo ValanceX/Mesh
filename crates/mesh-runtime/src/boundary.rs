@@ -206,7 +206,10 @@ impl<'m> Inputs<'m> {
             ),
             HostValue::Unsupported(kind) => (
                 RuntimeCode::UNSUPPORTED_VALUE,
-                format!("`{what}` is a {kind}, which MESH values can't be"),
+                format!(
+                    "`{what}` is {}, which MESH values can't be",
+                    unsupported(kind)
+                ),
             ),
             _ => return true,
         };
@@ -356,4 +359,20 @@ fn number_json(number: f64) -> Result<serde_json::Value, NotOutput> {
     Ok(serde_json::Number::from_f64(number)
         .map(serde_json::Value::Number)
         .expect("finite"))
+}
+
+/// How a message names an unsupported value's kind, as a JavaScript host
+/// reports it (§9.8.6): `function`, `symbol`, `bigint`, `cycle`, or
+/// `object`, with `:` and the constructor's name when it has one.
+fn unsupported(kind: &str) -> String {
+    match kind {
+        "function" | "symbol" => format!("a {kind}"),
+        "bigint" => "a `bigint`".to_string(),
+        "cycle" => "a value that contains itself".to_string(),
+        "object" => "an object that isn't a plain object or an array".to_string(),
+        _ => match kind.strip_prefix("object:") {
+            Some(name) => format!("a `{name}` object, which isn't a plain object"),
+            None => format!("a value of kind `{kind}`"),
+        },
+    }
 }
