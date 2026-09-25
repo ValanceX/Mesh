@@ -6,6 +6,7 @@
 
 ```text
 mesh check [--model <MANIFEST> [--component <NAME>]] [--format <human|json>] <FILE>
+mesh compile --model <MANIFEST> [--component <NAME>] [--output <PATH>] [--format <human|json>] <FILE>
 mesh help [COMMAND]
 mesh --help
 mesh --version
@@ -228,6 +229,27 @@ mesh check --format json "$f" |
 ```
 
 A pipeline's exit status is its last command's, here `jq`'s, so a gate that pipes `mesh` loses its failures. In bash, `set -o pipefail` keeps them.
+
+## `mesh compile`
+
+`mesh compile` checks a file exactly as `mesh check --model` does, and, only if the check finds no error, compiles it to a **template**: the component's MPRX with every name resolved and no values, in the `template-v1` format ([Templates and programs](./templates.md)). The MESH runtime renders templates. Warnings don't stop compiling.
+
+```console
+$ mesh compile examples/page.mprx --model examples/components.json
+{"format":"mesh-template","version":1,"component":"page","fingerprint":"sha256:9ed6ba44b5a2857861db263d53d2e18afd06c70fed9aca93c785c7aba26e4a80","compiler":"0.4.0","root":{"component":"page","props":[{"prop":"title","value":{"kind":"literal","value":"Users","span":{"start":{"byte":12,"utf16":12},"end":{"byte":19,"utf16":19}}},"span":{"start":{"byte":6,"utf16":6},"end":{"byte":19,"utf16":19}}}],"events":[],"children":[],"span":{"start":{"byte":0,"utf16":0},"end":{"byte":22,"utf16":22}}}}
+```
+
+- **`--model` is required.** A template is always a component's, and carries its model's fingerprint. `--component` defaults to the file's name without its extension, as for `mesh check`.
+- **Diagnostics** are exactly `mesh check`'s, with the same exit status: rustc-style on stderr with `--format human` (the default), or the diagnostics document on stdout with `--format json`.
+- **The template** is one line of JSON, written to `--output <PATH>` or, without it, to stdout. With `--format json`, stdout holds the diagnostics document, so `--output` is required. `mesh check`'s `no errors` line isn't printed: stdout holds the template instead.
+- **With an error, nothing is written.** No template goes to stdout, and an existing `--output` file is left as it was. A broken manifest is reported exactly as `mesh check` reports it.
+- **Compiling is deterministic:** the same file, manifest and MESH version always give the same bytes. The template's `compiler` property records the MESH version, for provenance only; it never affects whether a template runs.
+
+| Status | Meaning |
+|---|---|
+| `0` | No errors: the template was written. |
+| `1` | At least one error diagnostic, or a file couldn't be read or written. Nothing was written. |
+| `2` | Usage error, such as a missing `--model`, or `--format json` without `--output`. |
 
 ## `mesh help`, `--help` and `--version`
 

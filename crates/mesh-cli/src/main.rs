@@ -34,6 +34,27 @@ enum Command {
         #[arg(long, value_enum, default_value_t = Format::Human)]
         format: Format,
     },
+    /// Check an MPRX file as a component's template and, if it has no
+    /// errors, compile it to a template (`template-v1`).
+    Compile {
+        /// Path to the `.mprx` file to compile.
+        file: String,
+        /// The component manifest (JSON) to check the file against.
+        #[arg(long, value_name = "FILE")]
+        model: String,
+        /// The manifest component whose template the file is. Defaults to
+        /// the file's name without its extension.
+        #[arg(long, value_name = "NAME")]
+        component: Option<String>,
+        /// Where to write the template. Without it, the template goes to
+        /// stdout.
+        #[arg(long, value_name = "PATH")]
+        output: Option<String>,
+        /// How to print diagnostics. `json` prints them on stdout, so it
+        /// needs `--output`.
+        #[arg(long, value_enum, default_value_t = Format::Human, requires_if("json", "output"))]
+        format: Format,
+    },
 }
 
 /// How `mesh check` prints what it found. (The `///` lines on the
@@ -55,6 +76,19 @@ fn main() -> ExitCode {
             component,
             format,
         } => run_check(&file, model.as_deref(), component.as_deref(), format),
+        Command::Compile {
+            file,
+            model,
+            component,
+            output,
+            format,
+        } => run_compile(
+            &file,
+            &model,
+            component.as_deref(),
+            output.as_deref(),
+            format,
+        ),
     }
 }
 
@@ -65,19 +99,10 @@ fn main() -> ExitCode {
 /// manifest is reported even when the file can't be read.
 fn run_check(file: &str, model: Option<&str>, component: Option<&str>, format: Format) -> ExitCode {
     let model = match model {
-        Some(path) => {
-            let Some(text) = read(path) else {
-                return ExitCode::FAILURE;
-            };
-            let name = component.map_or_else(|| file_stem(file), str::to_string);
-            match check::Model::load(&text, &name) {
-                Ok(model) => Some(model),
-                Err(diagnostics) => {
-                    let printed = print_diagnostics(format, &text, path, &diagnostics);
-                    return exit(printed, ExitCode::FAILURE);
-                }
-            }
-        }
+        Some(path) => match load_model(file, path, component, format) {
+            Ok(model) => Some(model),
+            Err(status) => return status,
+        },
         None => None,
     };
 
@@ -98,6 +123,65 @@ fn run_check(file: &str, model: Option<&str>, component: Option<&str>, format: F
         Format::Json => printed,
     };
     exit(printed, ExitCode::SUCCESS)
+}
+
+/// The check's first phase: loads the manifest at `path` and looks up the
+/// component (`component`, or `file`'s stem). On failure, prints the
+/// manifest's diagnostics against it and gives the exit status.
+fn load_model(
+    file: &str,
+    path: &str,
+    component: Option<&str>,
+    format: Format,
+) -> Result<check::Model, ExitCode> {
+    let Some(text) = read(path) else {
+        return Err(ExitCode::FAILURE);
+    };
+    let name = component.map_or_else(|| file_stem(file), str::to_string);
+    check::Model::load(&text, &name).map_err(|diagnostics| {
+        let printed = print_diagnostics(format, &text, path, &diagnostics);
+        exit(printed, ExitCode::FAILURE)
+    })
+}
+
+/// Compiles `file` as `mesh_compiler::check::template` defines it, as
+/// `run_check` checks: the same phases, diagnostics and exit status.
+/// Only when there's no error is the template written: to `output`, or
+/// to stdout. With errors, nothing is written, and an existing `output`
+/// is left alone. In JSON, the diagnostics document is always printed on
+/// stdout, which is why JSON needs `--output`.
+fn run_compile(
+    file: &str,
+    model: &str,
+    component: Option<&str>,
+    output: Option<&str>,
+    format: Format,
+) -> ExitCode {
+    let model = match load_model(file, model, component, format) {
+        Ok(model) => model,
+        Err(status) => return status,
+    };
+    let Some(source) = read(file) else {
+        return ExitCode::FAILURE;
+    };
+    let compiled = check::template(&source, &model);
+    let printed = print_diagnostics(format, &source, file, &compiled.diagnostics);
+    let Some(template) = compiled.template else {
+        return exit(printed, ExitCode::FAILURE);
+    };
+    let document = mesh_template::to_json(&template) + "\n";
+    let written = match output {
+        Some(path) => {
+            if let Err(err) = fs::write(path, &document) {
+                // If stderr is gone, there's no one left to tell.
+                let _ = writeln!(io::stderr().lock(), "error: could not write {path}: {err}");
+                return ExitCode::FAILURE;
+            }
+            printed
+        }
+        None => printed.and_then(|()| io::stdout().lock().write_all(document.as_bytes())),
+    };
+    exit(written, ExitCode::SUCCESS)
 }
 
 /// The exit status once output is written: `status`, the check's own
