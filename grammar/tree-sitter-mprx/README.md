@@ -24,6 +24,15 @@ MESH. It has two users:
   and `MESH_BLESS=1 cargo test -p tree-sitter-mprx` rewrites them after a
   deliberate change.
 
+## Bindings
+
+Only the Rust binding (`bindings/rust`) is built and tested: `mesh-parser`
+uses it, and CI runs its tests. The C, Go, Node, Python and Swift bindings
+under `bindings/` are the Tree-sitter CLI's templates, kept as generated;
+nothing builds or tests them, and the grammar isn't published to any
+registry. Editors build the parser from `src/` (see the editor setup
+guide).
+
 ## Working on it
 
 ```console

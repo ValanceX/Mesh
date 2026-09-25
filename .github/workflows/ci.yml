@@ -6,6 +6,8 @@ on:
   pull_request:
   # Lets a branch be run on every OS without a pull request.
   workflow_dispatch:
+  # The release workflow runs all of CI on the tagged commit first.
+  workflow_call:
 
 # The `@v7` actions run on the runner's Node 24 runtime, not the deprecated
 # Node 20 one. That is separate from `node-version: 22` below, which only

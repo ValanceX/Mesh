@@ -23,6 +23,8 @@ for (const diagnostic of document.diagnostics) {
 }
 ```
 
+The [Using MESH from JavaScript](https://github.com/ValanceX/Mesh/blob/main/docs/guides/using-mesh-from-javascript.md) guide builds a generate-check-repair loop with it.
+
 ## The API
 
 - **`check(input)`** returns a promise of the diagnostics document, the one [`schemas/diagnostics-v1.schema.json`](https://github.com/ValanceX/Mesh/blob/main/schemas/diagnostics-v1.schema.json) describes. Anything wrong with your MPRX or your manifest is a diagnostic in it, never an exception. Diagnostics about the manifest carry the manifest's `path`. Each position has a `byte` offset, a 1-based `line` and `column`, and, for JavaScript, `utf16` (an offset into your string) and `utf16Column`.

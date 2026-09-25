@@ -16,7 +16,7 @@ Syntax highlighting comes from the grammar's Tree-sitter queries, not from the s
 
 ## Installing
 
-With npm (from v0.4.0, when the packages are published), no Rust needed:
+With npm, no Rust needed:
 
 ```console
 $ npm install -g @valancex/mesh-lsp

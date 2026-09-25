@@ -8,12 +8,12 @@ The crates aren't on crates.io yet. Depend on them from git:
 
 ```toml
 [dependencies]
-mesh-compiler = { git = "https://github.com/ValanceX/Mesh", tag = "v0.3.0" }
-mesh-syntax   = { git = "https://github.com/ValanceX/Mesh", tag = "v0.3.0" }
-mesh-semantic = { git = "https://github.com/ValanceX/Mesh", tag = "v0.3.0" }
+mesh-compiler = { git = "https://github.com/ValanceX/Mesh", tag = "v0.4.0" }
+mesh-syntax   = { git = "https://github.com/ValanceX/Mesh", tag = "v0.4.0" }
+mesh-semantic = { git = "https://github.com/ValanceX/Mesh", tag = "v0.4.0" }
 # Only to check against a component manifest, or to use the analysis as data:
-mesh-manifest = { git = "https://github.com/ValanceX/Mesh", tag = "v0.3.0" }
-mesh-analysis = { git = "https://github.com/ValanceX/Mesh", tag = "v0.3.0" }
+mesh-manifest = { git = "https://github.com/ValanceX/Mesh", tag = "v0.4.0" }
+mesh-analysis = { git = "https://github.com/ValanceX/Mesh", tag = "v0.4.0" }
 ```
 
 The parser builds a Tree-sitter grammar written in C, so your build machine needs a C compiler. Rust's standard setup already includes one on most platforms.

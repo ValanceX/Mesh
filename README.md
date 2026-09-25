@@ -91,7 +91,7 @@ mesh/
 ├── grammar/
 │   └── tree-sitter-mprx/     the MPRX Tree-sitter grammar and its highlighting queries
 ├── editors/                verified editor configurations (Neovim)
-└── packages/               npm packages (an npm workspace; unpublished until v0.4.0)
+└── packages/               npm packages (an npm workspace, published as @valancex/*)
     ├── mesh-compiler/        @valancex/mesh-compiler: the compiler, built for WebAssembly
     └── mesh-lsp/             @valancex/mesh-lsp: starts the native mesh-lsp
 ```
@@ -104,7 +104,7 @@ mesh/
 
 ## Status
 
-**v0.3.0 released** (2026-09-24). See the [release notes](./docs/releases/v0.3.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.4.0 released** (2026-09-25). See the [release notes](./docs/releases/v0.4.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), and event bindings (`on.click={...}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings
@@ -113,10 +113,12 @@ mesh/
 - JSON diagnostics (`mesh check --format json`)
 - The `mesh-lsp` language server: the compiler's own diagnostics and quick fixes as you type, hover, go to definition, and completion from the manifest, also on files with syntax errors (see its [manual](./docs/manual/mesh-lsp.md))
 - Syntax highlighting from the grammar's Tree-sitter queries, and an [editor setup guide](./docs/guides/editor-setup.md) verified in Neovim
+- MESH in JavaScript: `@valancex/mesh-compiler` is the compiler in WebAssembly, for Node and browsers, returning exactly what `mesh check --format json` prints (see [Using MESH from JavaScript](./docs/guides/using-mesh-from-javascript.md))
+- `mesh-lsp` from npm: `npm install -g @valancex/mesh-lsp` installs the native server for Linux, macOS or Windows
 
-Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. Editor configuration is per editor, and only Neovim's is verified. The npm packages are placeholders.
+Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. Editor configuration is per editor, and only Neovim's is verified. The JavaScript API returns diagnostics only, not the compiled tree.
 
-Next up for v0.4: a WASM build and the `@valancex/*` npm packages.
+Next: a serialized Semantic IR, designed with NEXUS and PORT, and a thin VS Code extension over the npm-installed server.
 
 ## Learn more
 
@@ -127,6 +129,7 @@ The [documentation index](./docs/README.md) lists everything. The most useful pl
 - [**Checking against a component model**](./docs/guides/checking-against-a-component-model.md): manifests, types, and why absence isn't `null`
 - [**`mesh` CLI manual**](./docs/manual/mesh-cli.md), [**Diagnostics reference**](./docs/manual/diagnostics.md) and [**Manifest reference**](./docs/manual/manifest.md)
 - [**Editor setup**](./docs/guides/editor-setup.md) and the [**`mesh-lsp` manual**](./docs/manual/mesh-lsp.md): MESH in your editor
+- [**Using MESH from JavaScript**](./docs/guides/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`
 - [**Embedding the compiler**](./docs/guides/embedding-the-compiler.md): use MESH from Rust
 - [**MPRX Language Spec**](./docs/MPRX-SPEC.md): the exact syntax and semantics
 - [**Architecture**](./docs/ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance

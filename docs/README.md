@@ -1,6 +1,6 @@
 # MESH documentation
 
-Documentation for **MESH v0.3**. New here? Start with *Getting started*.
+Documentation for **MESH v0.4**. New here? Start with *Getting started*.
 
 ## Guides
 
@@ -10,6 +10,7 @@ Learning-oriented walkthroughs.
 - [**Writing MPRX**](./guides/writing-mprx.md): a tour of everything the language supports, plus common mistakes and their fixes.
 - [**Checking against a component model**](./guides/checking-against-a-component-model.md): declare your components in a manifest and check what a file means, not just its shape; requiredness, absence and `any`, explained.
 - [**Editor setup**](./guides/editor-setup.md): diagnostics, hover, go to definition, completion and syntax highlighting in your editor, with a configuration verified in Neovim.
+- [**Using MESH from JavaScript**](./guides/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`, and a generate-check-repair loop that applies MESH's suggestions.
 - [**Embedding the compiler**](./guides/embedding-the-compiler.md): call MESH from Rust, handle diagnostics, and walk the Semantic IR.
 
 ## Manuals
@@ -26,7 +27,7 @@ Reference material for when you need exact details.
 ## Background
 
 - [**Architecture**](./ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance.
-- Release notes for [**v0.3**](./releases/v0.3.md), [**v0.2**](./releases/v0.2.md) and [**v0.1**](./releases/v0.1.md), and the [**CHANGELOG**](../CHANGELOG.md).
+- Release notes for [**v0.4**](./releases/v0.4.md), [**v0.3**](./releases/v0.3.md), [**v0.2**](./releases/v0.2.md) and [**v0.1**](./releases/v0.1.md), and the [**CHANGELOG**](../CHANGELOG.md).
 
 ## For contributors
 
@@ -43,7 +44,9 @@ $ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 
 CI runs `cargo test --workspace` on Linux, macOS and Windows, so keep tests free of platform assumptions: build paths with `Path`, and don't expect `/` in a printed path. Every text file checks out with LF line endings on every platform (`.gitattributes`).
 
-The npm packages under `packages/` are one npm workspace. If you change them, run, in `packages/`:
+**Releases** are built by `.github/workflows/release.yml` from a `v*` tag: bump every version together (`crates/mesh-cli/tests/packages.rs` checks they agree), then push the tag. Publishing needs the `NPM_ACCESS_TOKEN` repository secret, an npm granular access token for the `@valancex` organisation, and it expires: renew it before a release. A manual run of the workflow, without `publish`, is a dry run.
+
+The npm packages under `packages/` are one npm workspace. Regenerate `packages/package-lock.json` with npm 11 or newer (`npx npm@11 install`), which records the unpublished platform packages npm 11's `npm ci` requires. If you change them, run, in `packages/`:
 
 ```console
 $ npm ci

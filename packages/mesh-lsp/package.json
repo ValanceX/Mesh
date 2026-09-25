@@ -1,6 +1,6 @@
 {
   "name": "@valancex/mesh-lsp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Starts the native mesh-lsp language server for your platform. All language semantics live in the Rust binary.",
   "type": "module",
   "license": "MIT",
@@ -27,11 +27,11 @@
     "dist/*.js"
   ],
   "optionalDependencies": {
-    "@valancex/mesh-lsp-darwin-arm64": "0.3.0",
-    "@valancex/mesh-lsp-darwin-x64": "0.3.0",
-    "@valancex/mesh-lsp-linux-arm64": "0.3.0",
-    "@valancex/mesh-lsp-linux-x64": "0.3.0",
-    "@valancex/mesh-lsp-win32-x64": "0.3.0"
+    "@valancex/mesh-lsp-darwin-arm64": "0.4.0",
+    "@valancex/mesh-lsp-darwin-x64": "0.4.0",
+    "@valancex/mesh-lsp-linux-arm64": "0.4.0",
+    "@valancex/mesh-lsp-linux-x64": "0.4.0",
+    "@valancex/mesh-lsp-win32-x64": "0.4.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
