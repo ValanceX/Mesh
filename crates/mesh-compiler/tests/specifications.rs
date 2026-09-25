@@ -27,6 +27,18 @@ fn validator(schema: &str) -> jsonschema::Validator {
     jsonschema::draft202012::new(&schema).expect("the schema is a valid 2020-12 schema")
 }
 
+/// A validator for one definition of `schema`: the schema with its
+/// top-level constraints replaced by a reference to `$defs/<name>`.
+fn definition_validator(schema: &str, name: &str) -> jsonschema::Validator {
+    let mut schema: Value = serde_json::from_str(&read(schema)).expect("the schema is JSON");
+    let object = schema.as_object_mut().expect("the schema is an object");
+    for key in ["type", "properties", "required", "additionalProperties"] {
+        object.remove(key);
+    }
+    object.insert("$ref".into(), Value::String(format!("#/$defs/{name}")));
+    jsonschema::draft202012::new(&schema).expect("the definition is a valid 2020-12 schema")
+}
+
 /// The text of every fenced block in `doc` whose info string is exactly
 /// `json <tag>`.
 fn blocks(doc: &str, tag: &str) -> Vec<String> {
@@ -52,7 +64,15 @@ fn blocks(doc: &str, tag: &str) -> Vec<String> {
 /// `tag-invalid` block isn't. Each kind must have at least `minimum`
 /// blocks, so an example can't vanish unnoticed.
 fn check_examples(doc: &str, schema: &str, tag: &str, minimum: (usize, usize)) {
-    let validator = validator(schema);
+    check_examples_with(doc, &validator(schema), tag, minimum);
+}
+
+fn check_examples_with(
+    doc: &str,
+    validator: &jsonschema::Validator,
+    tag: &str,
+    minimum: (usize, usize),
+) {
     let valid = blocks(doc, tag);
     let invalid = blocks(doc, &format!("{tag}-invalid"));
     assert!(
@@ -116,4 +136,29 @@ fn the_template_manuals_models_are_valid_manifests() {
         );
         mesh_manifest::load(&text).expect("the model loads");
     }
+}
+
+#[test]
+fn render_v1_is_a_valid_schema() {
+    validator("schemas/render-v1.schema.json");
+}
+
+#[test]
+fn the_runtime_manuals_trees_match_render_v1() {
+    check_examples(
+        "docs/manual/runtime.md",
+        "schemas/render-v1.schema.json",
+        "render-v1",
+        (1, 3),
+    );
+}
+
+#[test]
+fn the_runtime_manuals_intents_match_the_intent_definition() {
+    check_examples_with(
+        "docs/manual/runtime.md",
+        &definition_validator("schemas/render-v1.schema.json", "intent"),
+        "intent",
+        (1, 1),
+    );
 }
