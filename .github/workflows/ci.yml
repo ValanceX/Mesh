@@ -115,7 +115,11 @@ jobs:
           rustup toolchain install
           rustup target add wasm32-unknown-unknown
       - name: Build the native mesh and runtime harness to compare with
-        run: cargo build --locked -p mesh-cli -p mesh-runtime-wasm --example harness
+        # Two builds: `--example` would limit one build to the example,
+        # leaving out the `mesh` binary.
+        run: |
+          cargo build --locked -p mesh-cli
+          cargo build --locked -p mesh-runtime-wasm --example harness
       # Writes every call it makes to target/mesh-runtime-property/, for
       # the runtime package's parity test.
       - name: The native property test's requests
