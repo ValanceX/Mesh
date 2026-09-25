@@ -32,6 +32,11 @@ jobs:
         run: cargo doc --workspace --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
+      # The normative number-to-text table (spec §9.7.7.1) must be exactly
+      # what its reference generator computes from the rule. Standard
+      # library Python only; the runner has python3.
+      - name: Number-to-text table is what the rule gives
+        run: python3 docs/tables/number_to_text.py --check
       # Installs Node 22 for the grammar tests; the action itself runs on
       # the runner's Node 24.
       - uses: actions/setup-node@v7

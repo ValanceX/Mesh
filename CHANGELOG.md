@@ -6,6 +6,7 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ### Added
 
+- **Rust API: the `mesh-runtime` crate,** MPRX's one evaluator, in progress. So far it has its diagnostics (every assembly and runtime code, each with its one location form, and the `runtime-diagnostics-v1` document) and `number_to_text`, MPRX's text for a number (§9.7.7.1). That is MESH's own exact digit generator: the shortest digits that read back, the nearest of those, the even one on a tie. It reproduces every row of the normative table, and uses no float formatter.
 - **`@valancex/mesh-compiler`: `compile()`.** It takes `check()`'s input, with the model required, and returns `{ diagnostics, template? }`: the document `check()` returns and, only when it has no error, the template, exactly as `mesh compile` reports and writes them. The package exports `Template` and related types for it.
 - **`mesh compile`:** checks a file as `mesh check --model` does, with the same diagnostics and exit status, and, only when it finds no error, writes the component's template (`template-v1`) to `--output` or stdout. With an error it writes nothing. `--format json` prints the diagnostics document on stdout, and needs `--output`.
 - **Rust API: compiling,** `mesh_compiler::check::template(source, &model)`: the check `check::source` does, and, only when it finds no error, the source's template (`template-v1`). Warnings don't stop it. `Model::fingerprint` gives the fingerprint templates compiled against a model carry.

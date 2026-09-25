@@ -13,5 +13,7 @@
 //! global state: identical inputs give identical results.
 
 mod diagnostic;
+mod number;
 
 pub use diagnostic::{to_json, Form, Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
+pub use number::number_to_text;
