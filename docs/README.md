@@ -44,7 +44,7 @@ $ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 
 CI runs `cargo test --workspace` on Linux, macOS and Windows, so keep tests free of platform assumptions: build paths with `Path`, and don't expect `/` in a printed path. Every text file checks out with LF line endings on every platform (`.gitattributes`).
 
-**Releases** are built by `.github/workflows/release.yml` from a `v*` tag: bump every version together (`crates/mesh-cli/tests/packages.rs` checks they agree), then push the tag. Publishing needs the `NPM_ACCESS_TOKEN` repository secret, an npm granular access token for the `@valancex` organisation, and it expires: renew it before a release. A manual run of the workflow, without `publish`, is a dry run.
+**Releases** are built by `.github/workflows/release.yml` from a `v*` tag: bump every version together (`crates/mesh-cli/tests/packages.rs` checks they agree), then push the tag. Publishing needs the `@valancex` npm organisation to exist (a token alone isn't enough: v0.4.0's first publish failed with `E404` until it did), and the `NPM_ACCESS_TOKEN` repository secret: an npm granular access token with read and write access to the `@valancex` scope. The token expires 60 days after it's created (the current one around 2026-11-24), and the release workflow's dry run can't tell: before tagging a release, renew it if it's close to expiry, and update the secret. A manual run of the workflow, without `publish`, is a dry run.
 
 The npm packages under `packages/` are one npm workspace. Regenerate `packages/package-lock.json` with npm 11 or newer (`npx npm@11 install`), which records the unpublished platform packages npm 11's `npm ci` requires. If you change them, run, in `packages/`:
 

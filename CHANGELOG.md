@@ -2,6 +2,8 @@
 
 All notable changes to MESH are recorded here. The project follows [Semantic Versioning](https://semver.org). Until 1.0, minor versions may include breaking changes.
 
+## [Unreleased]
+
 ## [0.4.0] - 2026-09-25
 
 MESH outside Rust: the compiler in JavaScript, as `@valancex/mesh-compiler`, and `mesh-lsp` from npm, as `@valancex/mesh-lsp`. See the [v0.4 release notes](./docs/releases/v0.4.md) for an overview.
