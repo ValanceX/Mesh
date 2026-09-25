@@ -1,0 +1,24 @@
+[package]
+name = "mesh-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "The MESH runtime: renders a program of templates against a host's values, and turns events into command intents. MPRX's one evaluator."
+
+[lints]
+workspace = true
+
+[dependencies]
+mesh-syntax.workspace = true
+mesh-manifest.workspace = true
+mesh-template.workspace = true
+mesh-analysis.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip", "raw_value"] }
+sha2 = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+mesh-compiler.workspace = true
+jsonschema = { version = "0.57", default-features = false }

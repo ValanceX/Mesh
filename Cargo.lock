@@ -655,6 +655,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "mesh-runtime"
+version = "0.4.0"
+dependencies = [
+ "jsonschema",
+ "mesh-analysis",
+ "mesh-compiler",
+ "mesh-manifest",
+ "mesh-syntax",
+ "mesh-template",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "mesh-semantic"
 version = "0.4.0"
 dependencies = [

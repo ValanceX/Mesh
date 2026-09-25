@@ -7,6 +7,7 @@ members = [
     "crates/mesh-manifest",
     "crates/mesh-analysis",
     "crates/mesh-template",
+    "crates/mesh-runtime",
     "crates/mesh-compiler",
     "crates/mesh-lsp",
     "crates/mesh-cli",
@@ -30,6 +31,7 @@ mesh-semantic = { path = "crates/mesh-semantic" }
 mesh-manifest = { path = "crates/mesh-manifest" }
 mesh-analysis = { path = "crates/mesh-analysis" }
 mesh-template = { path = "crates/mesh-template" }
+mesh-runtime = { path = "crates/mesh-runtime" }
 mesh-compiler = { path = "crates/mesh-compiler" }
 
 [workspace.lints.rust]
