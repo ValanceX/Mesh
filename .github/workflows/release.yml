@@ -1,8 +1,8 @@
 name: Release
 
-# Builds a MESH release from its tag and publishes it (outline v0.4 D10):
+# Builds a MESH release from its tag and publishes it (outline v0.4 D10, and v0.5):
 # every mesh-lsp binary on its own OS and architecture's runner, the
-# WebAssembly module, and the seven @valancex npm packages, published with
+# WebAssembly modules, and the eight @valancex npm packages, published with
 # provenance, then a GitHub release with the binaries and tarballs.
 #
 # - A pushed `v*` tag publishes. Tagging is the maintainer's step.
@@ -106,11 +106,12 @@ jobs:
       - name: Build and pack
         working-directory: packages
         run: |
-          npm ci
+          npx --yes npm@11 ci
           npm run build:wasm -w @valancex/mesh-compiler
+          npm run build:wasm -w @valancex/mesh-runtime
           npm run build
           mkdir -p ../out
-          npm pack -w @valancex/mesh-compiler -w @valancex/mesh-lsp --pack-destination ../out
+          npm pack -w @valancex/mesh-compiler -w @valancex/mesh-runtime -w @valancex/mesh-lsp --pack-destination ../out
       - uses: actions/upload-artifact@v7
         with:
           name: release-javascript
