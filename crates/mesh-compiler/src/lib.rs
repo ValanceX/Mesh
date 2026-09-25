@@ -10,10 +10,13 @@
 pub mod check;
 mod diagnose;
 pub mod editor;
+mod emit;
 mod json;
 mod position;
 mod render;
-pub mod source_map;
+/// Positions in a source: [`mesh_syntax::source_map`], re-exported here
+/// where it has always been.
+pub use mesh_syntax::source_map;
 
 pub use json::render_json;
 pub use render::render_diagnostic;

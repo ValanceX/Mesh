@@ -4,13 +4,16 @@
  * out of it, and discarding it after a failure.
  *
  * Deliberately boring (outline v0.4 I6): nothing here knows MPRX, the
- * manifest, positions or diagnostics. It transfers UTF-8 in and the
- * diagnostics document out, and checks only that what came out is a
- * document at all. Not public API (D11): the package's `exports` map
+ * manifest, positions, diagnostics or templates. It transfers UTF-8 in
+ * and the result out (a diagnostics document, or for a compile, that
+ * document and a template), and checks only that what came out has that
+ * shape at all. Not public API (D11): the package's `exports` map
  * doesn't expose this file.
  */
 
 import type { DiagnosticsDocument } from "./document.js";
+import type { RuntimeDiagnosticsDocument } from "./runtime-document.js";
+import type { Template } from "./template.js";
 import { version } from "./version.js";
 
 /**
@@ -52,6 +55,43 @@ export interface CheckInput {
   };
 }
 
+/** One compile's inputs: a check's, with the model required. */
+export interface CompileInput {
+  /** The MPRX source text. */
+  source: string;
+  /** An opaque identifier for the source, used only to name it in diagnostics. Never read. */
+  path: string;
+  /** The model to check against: a template is always a component's. */
+  model: {
+    /** The manifest's text. */
+    manifest: string;
+    /** An opaque identifier for the manifest, used only to name it in diagnostics. Never read. */
+    path: string;
+    /** The component whose template the source is. Always explicit. */
+    component: string;
+  };
+}
+
+/**
+ * What a compile gives: the diagnostics document `check` would return for
+ * the same inputs, and, only when it has no error, the template.
+ */
+export interface CompileResult {
+  diagnostics: DiagnosticsDocument;
+  /** The `template-v1` document. Absent when the diagnostics have an error. */
+  template?: Template;
+}
+
+/** One program check's inputs. */
+export interface ProgramInput {
+  /** The manifest's text: the model the templates were compiled against. */
+  model: string;
+  /** The root component: the one the program renders. */
+  root: string;
+  /** The program's templates (`template-v1` documents, as text), in order. */
+  templates: readonly string[];
+}
+
 /** The module's exports this engine uses. They're internal to the package. */
 interface Exports {
   memory: WebAssembly.Memory;
@@ -60,6 +100,8 @@ interface Exports {
   mesh_alloc(len: number): number;
   mesh_free(ptr: number, len: number): void;
   mesh_check(...args: number[]): number;
+  mesh_compile(...args: number[]): number;
+  mesh_check_program(...args: number[]): number;
   mesh_result_ptr(): number;
   mesh_result_len(): number;
   mesh_result_clear(): void;
@@ -69,6 +111,8 @@ const CHECK_EXPORTS = [
   "mesh_alloc",
   "mesh_free",
   "mesh_check",
+  "mesh_compile",
+  "mesh_check_program",
   "mesh_result_ptr",
   "mesh_result_len",
   "mesh_result_clear",
@@ -100,7 +144,7 @@ async function bytesOf(location: URL): Promise<BufferSource> {
   return response.arrayBuffer();
 }
 
-async function compile(source: ModuleSource): Promise<WebAssembly.Module> {
+async function compileModule(source: ModuleSource): Promise<WebAssembly.Module> {
   if (source instanceof WebAssembly.Module) {
     return source;
   }
@@ -160,7 +204,7 @@ export function init(source: ModuleSource): Promise<void> {
   const run = queue.then(async () => {
     compiled = undefined;
     instance = undefined;
-    const module = await compile(source);
+    const module = await compileModule(source);
     instance = await instantiate(module);
     compiled = module;
   });
@@ -178,7 +222,7 @@ async function current(): Promise<Exports> {
         "@valancex/mesh-compiler: call init() with the URL of mesh.wasm before the first check",
       );
     }
-    const module = await compile(new URL("./mesh.wasm", import.meta.url));
+    const module = await compileModule(new URL("./mesh.wasm", import.meta.url));
     instance = await instantiate(module);
     compiled = module;
     return instance;
@@ -204,21 +248,26 @@ function isDocument(value: unknown): value is DiagnosticsDocument {
   );
 }
 
-/** One check on `exports`. Any exception means the instance failed. */
-function transfer(exports: Exports, input: CheckInput): DiagnosticsDocument {
-  const model = input.model;
-  const texts = [
-    input.source,
-    input.path,
-    model?.manifest ?? "",
-    model?.path ?? "",
-    model?.component ?? "",
-  ].map((text) => encoder.encode(text));
-  const buffers = texts.map((bytes) => ({ ptr: put(exports, bytes), len: bytes.length }));
-  const status = exports.mesh_check(
-    ...buffers.flatMap(({ ptr, len }) => [ptr, len]),
-    model ? 1 : 0,
-  );
+function isCompileResult(value: unknown): value is { diagnostics: unknown; template: unknown } {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const { diagnostics, template } = value as { diagnostics?: unknown; template?: unknown };
+  return isDocument(diagnostics) && (template === null || (typeof template === "object" && template !== undefined));
+}
+
+/**
+ * One call on `exports`: copies `inputs` into the module, calls `call`
+ * with each one's address and length, frees them, and returns the
+ * result, parsed. Any exception means the instance failed.
+ */
+function transfer(
+  exports: Exports,
+  inputs: readonly Uint8Array[],
+  call: (pointers: number[]) => number,
+): unknown {
+  const buffers = inputs.map((bytes) => ({ ptr: put(exports, bytes), len: bytes.length }));
+  const status = call(buffers.flatMap(({ ptr, len }) => [ptr, len]));
   for (const { ptr, len } of buffers) {
     exports.mesh_free(ptr, len);
   }
@@ -231,21 +280,76 @@ function transfer(exports: Exports, input: CheckInput): DiagnosticsDocument {
     exports.mesh_result_len(),
   ).slice();
   exports.mesh_result_clear();
-  const document: unknown = JSON.parse(decoder.decode(bytes));
-  if (!isDocument(document)) {
-    throw new MeshInternalError("the compiler's result isn't a diagnostics document");
-  }
-  return document;
+  return JSON.parse(decoder.decode(bytes));
 }
 
-function validate(input: CheckInput): void {
+/** A check's or compile's five texts, as the module takes them. */
+function checkInputs(input: CheckInput): Uint8Array[] {
+  const model = input.model;
+  return [
+    input.source,
+    input.path,
+    model?.manifest ?? "",
+    model?.path ?? "",
+    model?.component ?? "",
+  ].map((text) => encoder.encode(text));
+}
+
+/**
+ * A text list, as the module reads one: a u32 count, then each text as a
+ * u32 byte length and its UTF-8 bytes, little-endian.
+ */
+function textList(texts: readonly string[]): Uint8Array {
+  const encoded = texts.map((text) => encoder.encode(text));
+  const size = 4 + encoded.reduce((sum, bytes) => sum + 4 + bytes.length, 0);
+  const list = new Uint8Array(size);
+  const view = new DataView(list.buffer);
+  view.setUint32(0, encoded.length, true);
+  let at = 4;
+  for (const bytes of encoded) {
+    view.setUint32(at, bytes.length, true);
+    list.set(bytes, at + 4);
+    at += 4 + bytes.length;
+  }
+  return list;
+}
+
+function checkResult(value: unknown): DiagnosticsDocument {
+  if (!isDocument(value)) {
+    throw new MeshInternalError("the compiler's result isn't a diagnostics document");
+  }
+  return value;
+}
+
+function programResult(value: unknown): RuntimeDiagnosticsDocument {
+  if (!isDocument(value)) {
+    throw new MeshInternalError("the compiler's result isn't a runtime diagnostics document");
+  }
+  return value as unknown as RuntimeDiagnosticsDocument;
+}
+
+function compileResult(value: unknown): CompileResult {
+  if (!isCompileResult(value)) {
+    throw new MeshInternalError("the compiler's result isn't a compile result");
+  }
+  const diagnostics = value.diagnostics as DiagnosticsDocument;
+  return value.template === null
+    ? { diagnostics }
+    : { diagnostics, template: value.template as Template };
+}
+
+function validate(input: CheckInput, compiling: boolean): void {
+  const what = compiling ? "compile() takes an object: { source, path, model }" : "check() takes an object: { source, path, model? }";
   if (typeof input !== "object" || input === null) {
-    throw new TypeError("check() takes an object: { source, path, model? }");
+    throw new TypeError(what);
   }
   const strings: [string, unknown][] = [
     ["source", input.source],
     ["path", input.path],
   ];
+  if (compiling && input.model === undefined) {
+    throw new TypeError("compile() needs a model: { manifest, path, component }");
+  }
   if (input.model !== undefined) {
     const model = input.model;
     if (typeof model !== "object" || model === null) {
@@ -264,11 +368,30 @@ function validate(input: CheckInput): void {
   }
 }
 
-async function checkNow(input: CheckInput): Promise<DiagnosticsDocument> {
-  validate(input);
+function validateProgram(input: ProgramInput): void {
+  if (typeof input !== "object" || input === null) {
+    throw new TypeError("checkProgram() takes an object: { model, root, templates }");
+  }
+  if (typeof input.model !== "string") {
+    throw new TypeError("model must be a string");
+  }
+  if (typeof input.root !== "string") {
+    throw new TypeError("root must be a string");
+  }
+  if (!Array.isArray(input.templates) || !input.templates.every((t) => typeof t === "string")) {
+    throw new TypeError("templates must be an array of strings");
+  }
+}
+
+/** One call, on the current instance, discarding it if it fails. */
+async function runNow<T>(
+  inputs: readonly Uint8Array[],
+  call: (exports: Exports, pointers: number[]) => number,
+  shape: (value: unknown) => T,
+): Promise<T> {
   const exports = await current();
   try {
-    return transfer(exports, input);
+    return shape(transfer(exports, inputs, (pointers) => call(exports, pointers)));
   } catch (cause) {
     // The instance may be half-updated: never call it again (outline D6).
     if (instance === exports) {
@@ -281,11 +404,46 @@ async function checkNow(input: CheckInput): Promise<DiagnosticsDocument> {
   }
 }
 
-/** Checks `input`. See the package's `check`. */
-export function check(input: CheckInput): Promise<DiagnosticsDocument> {
-  const run = queue.then(() => checkNow(input));
+function enqueue<T>(work: () => Promise<T>): Promise<T> {
+  const run = queue.then(work);
   queue = run.catch(() => undefined);
   return run;
+}
+
+/** Checks `input`. See the package's `check`. */
+export function check(input: CheckInput): Promise<DiagnosticsDocument> {
+  return enqueue(async () => {
+    validate(input, false);
+    return runNow(
+      checkInputs(input),
+      (exports, pointers) => exports.mesh_check(...pointers, input.model ? 1 : 0),
+      checkResult,
+    );
+  });
+}
+
+/** Compiles `input`. See the package's `compile`. */
+export function compile(input: CompileInput): Promise<CompileResult> {
+  return enqueue(async () => {
+    validate(input, true);
+    return runNow(
+      checkInputs(input),
+      (exports, pointers) => exports.mesh_compile(...pointers),
+      compileResult,
+    );
+  });
+}
+
+/** Checks a program. See the package's `checkProgram`. */
+export function checkProgram(input: ProgramInput): Promise<RuntimeDiagnosticsDocument> {
+  return enqueue(async () => {
+    validateProgram(input);
+    return runNow(
+      [encoder.encode(input.model), encoder.encode(input.root), textList(input.templates)],
+      (exports, pointers) => exports.mesh_check_program(...pointers),
+      programResult,
+    );
+  });
 }
 
 /**

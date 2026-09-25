@@ -1,0 +1,5 @@
+[
+  { "render": 0, "event": "tap", "occurrence": 0, "payload": null },
+  { "render": 0, "event": "tap", "occurrence": 1, "payload": null },
+  { "render": 1, "event": "tap", "occurrence": 1, "payload": null }
+]

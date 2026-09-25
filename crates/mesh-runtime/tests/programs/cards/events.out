@@ -1,0 +1,3 @@
+{"arguments":[{"value":{"active":true,"avatar":"ada.png","name":"Ada"}}],"command":{"component":"card","name":"selectUser"}}
+{"arguments":[{"value":{"active":true,"avatar":"ada.png","name":"Ada"}}],"command":{"component":"card","name":"selectUser"}}
+{"arguments":[{"value":{"active":true,"name":"Grace"}}],"command":{"component":"card","name":"selectUser"}}

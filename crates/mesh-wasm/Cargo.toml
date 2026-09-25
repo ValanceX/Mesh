@@ -21,3 +21,8 @@ test-hooks = []
 
 [dependencies]
 mesh-compiler.workspace = true
+mesh-template.workspace = true
+mesh-runtime.workspace = true
+
+[dev-dependencies]
+serde_json = "1"

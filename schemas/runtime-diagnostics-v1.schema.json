@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/runtime-diagnostics-v1.schema.json",
+  "title": "MESH runtime diagnostics, version 1",
+  "description": "What the MESH runtime's render and dispatch return instead of a result, and what `mesh check-program` prints (see docs/manual/runtime.md): every diagnostic of one call, in the order MESH reports them. A diagnostic's identity is its `code` and its `location`; `message` may change between versions. This schema lists exactly the properties this MESH produces. A later MESH may add properties without changing `version`, so consumers should ignore properties they don't know.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      }
+    }
+  },
+  "required": [
+    "version",
+    "diagnostics"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "diagnostic": {
+      "type": "object",
+      "properties": {
+        "severity": {
+          "description": "Always `error`: the runtime has no warnings.",
+          "const": "error"
+        },
+        "code": {
+          "description": "The diagnostic's stable code: a `manifest-*` code for the model, an `assembly-*` code for the program, or a `runtime-*` code. A code is never renamed or reused for a different meaning; new codes may be added.",
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "message": {
+          "description": "A human-readable message. It may change between versions; match on `code`, not on this.",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message",
+        "location"
+      ],
+      "additionalProperties": false
+    },
+    "location": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "In the model: a manifest diagnostic, with its span in the manifest's text, as the diagnostics document gives one.",
+          "properties": {
+            "kind": {
+              "const": "model"
+            },
+            "span": {
+              "$ref": "#/$defs/modelSpan"
+            }
+          },
+          "required": [
+            "kind",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "The program as a whole (a missing root template).",
+          "properties": {
+            "kind": {
+              "const": "program"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A template as a whole, by its 0-based position in the list the host gave, with its component when it can be read.",
+          "properties": {
+            "kind": {
+              "const": "template"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "component": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+            }
+          },
+          "required": [
+            "kind",
+            "index"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A place in a template: its component, and a span in the source it was compiled from.",
+          "properties": {
+            "kind": {
+              "const": "source"
+            },
+            "component": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+            },
+            "span": {
+              "$ref": "#/$defs/sourceSpan"
+            }
+          },
+          "required": [
+            "kind",
+            "component",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A value the host gave: a path into the snapshot, starting at a scope name, or into the payload, starting at `$event`. Names are strings; list indices are integers.",
+          "properties": {
+            "kind": {
+              "const": "input"
+            },
+            "path": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "The handler identifier dispatch was given.",
+          "properties": {
+            "kind": {
+              "const": "handler"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "modelSpan": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "$ref": "#/$defs/position"
+        },
+        "end": {
+          "$ref": "#/$defs/position"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "object",
+      "properties": {
+        "byte": {
+          "description": "A 0-based byte offset into the file's UTF-8 text, a byte-order mark included.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "line": {
+          "description": "The 1-based line.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "description": "The 1-based column, counting Unicode scalar values from the start of the line. A byte-order mark and a line's `\\r` are not columns.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "utf16": {
+          "description": "A 0-based offset in UTF-16 code units into the file's text, the one that corresponds to `byte`: what a JavaScript string holding the same text indexes, as in `source.slice(start.utf16, end.utf16)`. A byte-order mark counts, as one unit.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "utf16Column": {
+          "description": "The 1-based column, counting UTF-16 code units from the start of the line, with `column`'s rules: a byte-order mark and a line's `\\r` are not columns.",
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "byte",
+        "line",
+        "column",
+        "utf16",
+        "utf16Column"
+      ],
+      "additionalProperties": false
+    },
+    "sourceSpan": {
+      "type": "object",
+      "description": "A span as a template gives one (template-v1).",
+      "properties": {
+        "start": {
+          "type": "object",
+          "properties": {
+            "byte": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "utf16": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "byte",
+            "utf16"
+          ],
+          "additionalProperties": false
+        },
+        "end": {
+          "type": "object",
+          "properties": {
+            "byte": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "utf16": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "byte",
+            "utf16"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

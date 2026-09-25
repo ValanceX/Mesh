@@ -1,0 +1,6 @@
+error[assembly-composite-children]: `card` is a composite, and a composite occurrence can't have children
+  --> view.template.json, the template of `view`, source bytes 9..52
+
+error[assembly-composite-children]: `card` is a composite, and a composite occurrence can't have children
+  --> view.template.json, the template of `view`, source bytes 55..84
+

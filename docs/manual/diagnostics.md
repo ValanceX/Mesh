@@ -228,6 +228,16 @@ error[mismatched-closing-tag]: mismatched closing tag: opened with "title", clos
 
 **Fix:** make the closing tag match the opening tag.
 
+### `number-literal-out-of-range`
+
+A number literal so large that its nearest binary64 value would be infinite: more than about `1.8e308`, which takes 309 digits (spec §9.7.3). Points at the literal. Like `mismatched-closing-tag`, it's reported during validation, with or without a component model, and the file still gets its other diagnostics.
+
+```text
+error[number-literal-out-of-range]: this number is too large: the largest number MPRX can represent is about 1.8e308
+```
+
+**Fix:** use a smaller number. MPRX numbers are binary64, as in JavaScript.
+
 ---
 
 ## Warnings
@@ -784,10 +794,10 @@ An object literal has the same key more than once. As with a duplicate attribute
 
 ```text
 error[duplicate-object-key]: duplicate object key "first": this occurrence is shadowed by a later one
- --> examples/fixtures/check/fail/duplicate-object-key.mprx:1:10
+ --> examples/fixtures/check/fail/duplicate-object-key.mprx:1:20
   |
-1 | <text>{{ first: name, first: "Ada" }}</text>
-  |          ^^^^^
+1 | <probe anything={{ first: name, first: "Ada" }} />
+  |                    ^^^^^
 ```
 
 The shadowed value is still checked for its own mistakes, but it isn't part of the object, so it isn't checked against a record's field.
@@ -823,6 +833,222 @@ error[missing-required-field]: the object is missing the field "active", which U
 As with props, a required field must be written even when its type is optional.
 
 **Fix:** add the field.
+
+### `content-not-text`
+
+An interpolation in content, `<text>{...}</text>`, whose type is a list or a record (or an optional of one) has no text form, so it can't be content (spec §9.7.8). Points at the interpolated expression.
+
+```text
+error[content-not-text]: a value of type list<User> can't be shown as text: interpolate one of its fields, or a string, number, boolean or null
+ --> examples/fixtures/check/fail/content-not-text.mprx:1:8
+  |
+1 | <text>{users}</text>
+  |        ^^^^^
+```
+
+A value of type `any` isn't checked here: if it turns out to be a list or a record at runtime, the runtime reports it instead.
+
+**Fix:** interpolate a field (`{user.name}`), or pass the value to a component that shows it as a prop.
+
+---
+
+## Assembly errors
+
+The runtime reports these before it evaluates anything, when it validates a program (`docs/manual/templates.md`, "The assembly rules"), and so does the compiler's program check, with the same codes and locations. Each is in a runtime diagnostics document.
+
+### `assembly-malformed-template`
+
+A template isn't valid against `template-v1`, or names something the model doesn't declare with the kind the template gives it. Also reported for a template that isn't JSON, or whose `format` isn't `mesh-template`.
+
+Location: `template`.
+
+### `assembly-unsupported-format-version`
+
+A template's `version` is a number this runtime doesn't support.
+
+Location: `template`.
+
+### `assembly-fingerprint-mismatch`
+
+A template's fingerprint isn't the model's: it was checked against another model. Recompile it.
+
+Location: `template`.
+
+### `assembly-duplicate-template`
+
+The program has more than one template for a component.
+
+Location: `source`, the root element of each template of that component after the first.
+
+### `assembly-missing-root`
+
+The program has no template for its root component.
+
+Location: `program`.
+
+### `assembly-unbound-scope-name`
+
+A composite used as a composite occurrence has a scope name that no prop of the same name binds.
+
+Location: `source`, each such composite occurrence.
+
+### `assembly-unsound-binding`
+
+A prop binds a composite's scope name unsoundly: its type isn't assignable to the scope name's, or it's optional and the scope name isn't.
+
+Location: `source`, each such composite occurrence.
+
+### `assembly-cycle`
+
+A composite expands itself, directly or through others.
+
+Location: `source`, every composite occurrence on the cycle.
+
+### `assembly-composite-event`
+
+A composite declares events in the model; v0.5 has no composite events.
+
+Location: `source`, every composite occurrence of it.
+
+### `assembly-composite-children`
+
+A composite occurrence has children, text or elements; v0.5 has no children or slots for composites.
+
+Location: `source`, the occurrence.
+
+## Runtime errors
+
+The runtime reports these while rendering or dispatching (`docs/manual/runtime.md`): input errors about the host's values, evaluation errors from §9.7's checks, and one internal error. Every runtime diagnostic is an error, in a runtime diagnostics document (`schemas/runtime-diagnostics-v1.schema.json`), and its `location` has the form its entry names.
+
+### Input errors
+
+These are reported by input validation.
+
+### `runtime-missing-value`
+
+A value that must be present is absent: a scope name whose type isn't optional, a record field that doesn't read as optional, or a payload for an event that has one and a type that isn't optional.
+
+Location: `input`, the path of the missing value; a missing payload is `["$event"]`.
+
+### `runtime-value-mismatch`
+
+A present value doesn't fit its type (§9.7.2). It is reported at the deepest path where it stops fitting: a list's element, a record's field.
+
+Location: `input`, the deepest path where the value stops fitting.
+
+### `runtime-unknown-field`
+
+A record has a field its type doesn't declare. Records are exact (§9.8.4).
+
+Location: `input`, the field's path.
+
+### `runtime-absent-element`
+
+A list holds an absent element: JavaScript's `undefined`, or a hole. Location: the element's path.
+
+Location: `input`, the element's path.
+
+### `runtime-number-out-of-range`
+
+A JSON number too large for binary64: its nearest value would be infinite.
+
+Location: `input`, the number's path.
+
+### `runtime-non-finite-input`
+
+A number that is NaN or an infinity, which JavaScript can express and JSON can't.
+
+Location: `input`, the number's path.
+
+### `runtime-unpaired-surrogate`
+
+A string, or a record field's name, that isn't a sequence of Unicode scalar values: it has an unpaired UTF-16 surrogate.
+
+Location: `input`, the string's path, or, for a field name, the field's.
+
+### `runtime-unsupported-value`
+
+A JavaScript value outside the boundary data model: a function, a symbol, a `bigint`, an object that isn't a plain object or an array, or a cycle. The message names its kind (§9.8.6).
+
+Location: `input`, the value's path.
+
+### `runtime-unexpected-payload`
+
+A payload was given for an event declared without one.
+
+Location: `input`, `["$event"]`.
+
+### `runtime-handler-other-program`
+
+Dispatch was given a handler identifier made by another program, or one that isn't a handler identifier at all.
+
+Location: `handler`.
+
+### `runtime-unknown-handler`
+
+Dispatch was given a handler identifier of the render's program that names no handler in it.
+
+Location: `handler`.
+
+### Evaluation errors
+
+These are reported by evaluation, one per call, located at the span of the value checked (§9.7.6). A clean check guarantees none of the type checks can fail, except where a value has type `any` or `any?`.
+
+### `runtime-operand-mismatch`
+
+An operand isn't of the kind its operator needs: a boolean for `!`, `&&`, `||` or a conditional's condition; a number for unary `-`, arithmetic or a comparison.
+
+Location: `source`.
+
+### `runtime-not-a-record`
+
+Member access on a value that isn't a record.
+
+Location: `source`.
+
+### `runtime-missing-member`
+
+Member access, on a value of type `any`, to a field that's absent.
+
+Location: `source`.
+
+### `runtime-content-not-text`
+
+An interpolation of type `any` or `any?` whose value is a list or a record (§9.7.8).
+
+Location: `source`.
+
+### `runtime-prop-mismatch`
+
+A prop's value, at a primitive or composite occurrence, doesn't fit the prop's declared type, or is absent where the type isn't optional.
+
+Location: `source`.
+
+### `runtime-argument-mismatch`
+
+A command argument doesn't fit its parameter's type.
+
+Location: `source`.
+
+### `runtime-non-finite-output`
+
+NaN or an infinity would reach an output: a primitive prop, a text run or a command argument, at any depth.
+
+Location: `source`.
+
+### `runtime-absent-element-output`
+
+A list holding an absent element would reach an output, at any depth.
+
+Location: `source`.
+
+### Internal errors
+
+### `runtime-key-collision`
+
+Two nodes or text runs of one tree would share a key. It can't happen in practice (keys are 128-bit), and it would be a bug to report.
+
+Location: `source`, the later of the two.
 
 ---
 

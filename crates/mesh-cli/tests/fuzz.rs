@@ -11,7 +11,7 @@
 //! $ MESH_FUZZ_ITERATIONS=1000000 MESH_FUZZ_SEED=1 cargo test --release -p mesh-cli --test fuzz -- --nocapture
 //! ```
 
-use mesh_compiler::{compile, compile_with, editor, ColumnUnit, CompileOptions, SourceMap};
+use mesh_compiler::{check, compile, compile_with, editor, ColumnUnit, CompileOptions, SourceMap};
 use mesh_lsp::testing::{file_uri, test_options, Client};
 use mesh_manifest::Manifest;
 use serde_json::json;
@@ -187,7 +187,24 @@ fn offsets(rng: &mut Rng, text: &str) -> [usize; 8] {
 }
 
 /// Runs `text` through every library entry point.
-fn through_the_library(manifest: &Manifest, text: &str, offsets: &[usize]) {
+///
+/// Compiling gives a template exactly when the check has no error (I12),
+/// and that template is well-formed: it reads back as itself.
+fn through_the_library(manifest: &Manifest, model: &check::Model, text: &str, offsets: &[usize]) {
+    let compiled_template = check::template(text, model);
+    assert_eq!(
+        compiled_template.template.is_some(),
+        !check::has_errors(&compiled_template.diagnostics),
+        "a template exactly when the check is clean"
+    );
+    if let Some(template) = &compiled_template.template {
+        let written = mesh_template::to_json(template);
+        assert_eq!(
+            mesh_template::from_json(&written).as_ref(),
+            Ok(template),
+            "a compiled template reads back"
+        );
+    }
     let template = manifest.template("users-page").expect("declared");
     let _ = mesh_parser::parse(text);
     let _ = mesh_parser::recover(text);
@@ -261,6 +278,7 @@ fn fuzz(iterations: u64, seed: u64) {
     let manifest_text =
         fs::read_to_string(examples_dir().join("components.json")).expect("the manifest reads");
     let manifest = mesh_manifest::load(&manifest_text).expect("the example manifest loads");
+    let model = check::Model::load(&manifest_text, "users-page").expect("the model loads");
 
     let workspace = tempfile::tempdir().expect("a temp dir");
     fs::write(workspace.path().join("components.json"), &manifest_text).expect("writes");
@@ -288,7 +306,7 @@ fn fuzz(iterations: u64, seed: u64) {
         let offsets = offsets(&mut rng, &text);
         let to_server = iteration % SERVER_EVERY == 0;
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            through_the_library(&manifest, &text, &offsets);
+            through_the_library(&manifest, &model, &text, &offsets);
         }));
         if outcome.is_err() {
             panic!(

@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "types": {
+    "User": {
+      "kind": "record",
+      "fields": {
+        "name": { "type": { "kind": "string" }, "required": true },
+        "avatar": { "type": { "kind": "string" }, "required": false }
+      }
+    }
+  },
+  "components": {
+    "avatar": {
+      "props": {
+        "src": { "type": { "kind": "optional", "type": { "kind": "string" } }, "required": true },
+        "alt": { "type": { "kind": "string" }, "required": true }
+      },
+      "events": { "click": {} },
+      "commands": {},
+      "scope": {}
+    },
+    "user-card": {
+      "props": { "user": { "type": { "kind": "named", "name": "User" }, "required": true } },
+      "events": {},
+      "commands": {
+        "selectUser": { "parameters": [{ "name": "user", "type": { "kind": "named", "name": "User" } }] }
+      },
+      "scope": { "user": { "kind": "named", "name": "User" } }
+    }
+  }
+}

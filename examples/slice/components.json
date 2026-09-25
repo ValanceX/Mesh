@@ -1,0 +1,72 @@
+{
+  "$schema": "../../schemas/manifest-v1.schema.json",
+  "version": 1,
+  "types": {
+    "User": {
+      "kind": "record",
+      "fields": {
+        "id": { "type": { "kind": "string" }, "required": true },
+        "name": { "type": { "kind": "string" }, "required": true },
+        "avatar": { "type": { "kind": "string" }, "required": false },
+        "active": { "type": { "kind": "boolean" }, "required": true }
+      }
+    },
+    "Press": {
+      "kind": "record",
+      "fields": {
+        "x": { "type": { "kind": "number" }, "required": true },
+        "y": { "type": { "kind": "number" }, "required": true }
+      }
+    }
+  },
+  "components": {
+    "page": {
+      "props": { "title": { "type": { "kind": "string" }, "required": true } },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "text": { "props": {}, "events": {}, "commands": {}, "scope": {} },
+    "avatar": {
+      "props": {
+        "src": { "type": { "kind": "optional", "type": { "kind": "string" } }, "required": true },
+        "alt": { "type": { "kind": "string" }, "required": true },
+        "size": { "type": { "kind": "string" }, "required": false }
+      },
+      "events": { "click": { "payload": { "kind": "named", "name": "Press" } } },
+      "commands": {},
+      "scope": {}
+    },
+    "button": {
+      "props": { "disabled": { "type": { "kind": "boolean" }, "required": false } },
+      "events": { "click": {} },
+      "commands": {},
+      "scope": {}
+    },
+    "user-card": {
+      "props": {
+        "user": { "type": { "kind": "named", "name": "User" }, "required": true },
+        "compact": { "type": { "kind": "boolean" }, "required": false }
+      },
+      "events": {},
+      "commands": {
+        "selectUser": { "parameters": [{ "name": "user", "type": { "kind": "named", "name": "User" } }] }
+      },
+      "scope": {
+        "user": { "kind": "named", "name": "User" },
+        "compact": { "kind": "optional", "type": { "kind": "boolean" } }
+      }
+    },
+    "users": {
+      "props": {},
+      "events": {},
+      "commands": { "refresh": { "parameters": [] } },
+      "scope": {
+        "title": { "kind": "string" },
+        "first": { "kind": "named", "name": "User" },
+        "second": { "kind": "named", "name": "User" },
+        "compact": { "kind": "boolean" }
+      }
+    }
+  }
+}

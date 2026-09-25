@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/render-v1.schema.json",
+  "title": "MESH render tree, version 1",
+  "description": "What the MESH runtime's render produces and a renderer draws (see docs/manual/runtime.md): primitive components, their prop values, text, event names with handler identifiers, and keys. Nothing else: no expression, scope name, command, argument, composite, template, span or $event. Values are final, so a renderer computes nothing. This schema lists exactly the properties this MESH produces. A later MESH may add properties without changing `version`; removing one or changing its meaning is a new version. Renderers must ignore properties they don't know. `$defs/intent` is the command intent dispatch produces for a host, under the same promise; a renderer never sees one.",
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "mesh-render"
+    },
+    "version": {
+      "const": 1
+    },
+    "root": {
+      "description": "The root node: the root template's root element, or, if that is a composite occurrence, what its template produced.",
+      "$ref": "#/$defs/node"
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "root"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "key": {
+      "description": "A node's or text run's structural identity: unique in the tree, the same at the same position in every render of the program, and independent of values. Opaque: compare keys for equality, and never interpret them.",
+      "type": "string",
+      "pattern": "^k[A-Za-z0-9_-]{22}$"
+    },
+    "handler": {
+      "description": "An opaque handler identifier. A renderer reports it, with the event's payload, when the event fires, and never interprets it.",
+      "type": "string",
+      "pattern": "^h[A-Za-z0-9_-]{11}\\.[A-Za-z0-9_-]{22}$"
+    },
+    "value": {
+      "description": "A value from the boundary data model (§9.8): null, a boolean, a finite number (never -0), a string, a list of values, or a record of values. An absent value is never here: an absent prop or record field is simply missing.",
+      "type": [
+        "null",
+        "boolean",
+        "number",
+        "string",
+        "array",
+        "object"
+      ],
+      "items": {
+        "$ref": "#/$defs/value"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/value"
+      }
+    },
+    "node": {
+      "type": "object",
+      "description": "A primitive occurrence.",
+      "properties": {
+        "type": {
+          "const": "node"
+        },
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "component": {
+          "description": "The primitive component's name.",
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+        },
+        "props": {
+          "description": "Each written prop's value, by prop name. An absent prop has no member here; a `null` prop is `null`.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        "events": {
+          "description": "For each event binding, its event name and handler identifier.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/handler"
+          }
+        },
+        "children": {
+          "description": "Nodes and text runs, in order.",
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/node"
+              },
+              {
+                "$ref": "#/$defs/text"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "type",
+        "key",
+        "component",
+        "props",
+        "events",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "text": {
+      "type": "object",
+      "description": "A text run: the text of a maximal sequence of adjacent literal text and interpolations. Present even when empty.",
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "key",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "intent": {
+      "type": "object",
+      "description": "A command intent: which command a handler invoked, and its evaluated arguments. Dispatch gives it to the host, never to a renderer.",
+      "properties": {
+        "command": {
+          "type": "object",
+          "description": "The command's identity: its name, and the component whose template declares it.",
+          "properties": {
+            "component": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            }
+          },
+          "required": [
+            "component",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "arguments": {
+          "description": "One entry per parameter, in parameter order.",
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "description": "A present argument.",
+                "properties": {
+                  "value": {
+                    "$ref": "#/$defs/value"
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "description": "An absent argument, where the parameter's type is optional. Distinct from `{ \"value\": null }`.",
+                "properties": {
+                  "absent": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "absent"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "command",
+        "arguments"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

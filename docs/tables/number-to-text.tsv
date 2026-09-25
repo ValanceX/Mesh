@@ -1,0 +1,87 @@
+bits	expected	category	why
+3ff8000000000000	1.5	ordinary	a short fraction
+bff8000000000000	-1.5	ordinary	a short fraction, negated
+4059000000000000	100	ordinary	an integer with trailing zeros
+c059000000000000	-100	ordinary	an integer with trailing zeros, negated
+3fb999999999999a	0.1	ordinary	not exactly representable; the shortest form is one digit
+bfb999999999999a	-0.1	ordinary	not exactly representable; the shortest form is one digit, negated
+4004000000000000	2.5	ordinary	the spec's example -2.5, and its negation
+c004000000000000	-2.5	ordinary	the spec's example -2.5, and its negation, negated
+405edd2f1a9fbe77	123.456	ordinary	an ordinary three-place decimal
+c05edd2f1a9fbe77	-123.456	ordinary	an ordinary three-place decimal, negated
+3ff0000000000000	1	ordinary	one
+bff0000000000000	-1	ordinary	one, negated
+4045000000000000	42	ordinary	an ordinary integer
+c045000000000000	-42	ordinary	an ordinary integer, negated
+3fd5555555555555	0.3333333333333333	ordinary	1/3, seventeen digits
+3fd3333333333334	0.30000000000000004	ordinary	0.1 + 0.2 rounded, which is not 0.3
+0000000000000000	0	zero	+0
+8000000000000000	0	zero	-0 is 0 in text (D8)
+4000000000000000	2	integer-boundary	2^1, where the gap below is half the gap above
+3fffffffffffffff	1.9999999999999998	integer-boundary	the largest value below 2^1
+4000000000000001	2.0000000000000004	integer-boundary	the smallest value above 2^1
+4330000000000000	4503599627370496	integer-boundary	2^52, where the gap below is half the gap above
+432fffffffffffff	4503599627370495.5	integer-boundary	the largest value below 2^52
+4330000000000001	4503599627370497	integer-boundary	the smallest value above 2^52
+4340000000000000	9007199254740992	integer-boundary	2^53, where the gap below is half the gap above
+433fffffffffffff	9007199254740991	integer-boundary	the largest value below 2^53
+4340000000000001	9007199254740994	integer-boundary	the smallest value above 2^53
+4350000000000000	18014398509481984	integer-boundary	2^54, where the gap below is half the gap above
+434fffffffffffff	18014398509481982	integer-boundary	the largest value below 2^54
+4350000000000001	18014398509481988	integer-boundary	the smallest value above 2^54
+43e0000000000000	9223372036854776000	integer-boundary	2^63, where the gap below is half the gap above
+43dfffffffffffff	9223372036854775000	integer-boundary	the largest value below 2^63
+43e0000000000001	9223372036854778000	integer-boundary	the smallest value above 2^63
+43f0000000000000	18446744073709552000	integer-boundary	2^64, where the gap below is half the gap above
+43efffffffffffff	18446744073709550000	integer-boundary	the largest value below 2^64
+43f0000000000001	18446744073709556000	integer-boundary	the smallest value above 2^64
+7fe0000000000000	8.98846567431158e+307	integer-boundary	2^1023, where the gap below is half the gap above
+7fdfffffffffffff	8.988465674311579e+307	integer-boundary	the largest value below 2^1023
+7fe0000000000001	8.988465674311582e+307	integer-boundary	the smallest value above 2^1023
+441ac53a7e04bcda	123456789012345680000	layout-threshold	n = 21: the last plain integer layout
+444b1ae4d6e2ef50	1e+21	layout-threshold	n = 22: the first exponent layout for large numbers
+444b1ae4d6e2ef4f	999999999999999900000	layout-threshold	the largest value below 1e21, still plain
+3eb0c6f7a0b5ed8d	0.000001	layout-threshold	n = -5: the last plain fraction layout
+3e7ad7f29abcaf48	1e-7	layout-threshold	n = -6: the first exponent layout for small numbers
+3eb0c6f7a0b5ed8c	9.999999999999997e-7	layout-threshold	the largest value below 1e-6
+3e7ad7f29abcaf49	1.0000000000000001e-7	layout-threshold	the smallest value above 1e-7
+3e8421f5f40d8376	1.5e-7	layout-threshold	a two-digit mantissa in the negative exponent layout
+462f8def8808b024	1.25e+30	layout-threshold	a three-digit mantissa in the positive exponent layout
+3f5426fe718a86d7	0.00123	layout-threshold	-6 < n <= 0, with leading zeros
+4029000000000000	12.5	layout-threshold	0 < n < k, a point inside the digits
+7fefffffffffffff	1.7976931348623157e+308	magnitude	the largest finite value
+ffefffffffffffff	-1.7976931348623157e+308	magnitude	the most negative finite value
+7fe1ccf385ebc8a0	1e+308	magnitude	a large power of ten
+01a56e1fc2f8f359	1e-300	magnitude	a small power of ten
+0010000000000000	2.2250738585072014e-308	magnitude	the smallest normal value
+000fffffffffffff	2.225073858507201e-308	magnitude	the largest subnormal, just below the smallest normal
+0010000000000001	2.225073858507202e-308	magnitude	just above the smallest normal value
+0000000000000001	5e-324	subnormal	the smallest subnormal: 3e-324 to 7e-324 all read back; 5 is nearest
+0000000000000002	1e-323	subnormal	twice the smallest subnormal
+00091b752265b1f8	1.266519838945359e-308	subnormal	a random subnormal
+000cd613d8f16ae2	1.785098927463498e-308	subnormal	a random subnormal
+0001027cc386bbc7	1.40418326206283e-309	subnormal	a random subnormal
+6cadd7e4f2a4d27b	3.2149505948689126e+215	nearest-choice	4 17-digit candidates read back; the nearest is below the value
+0bb90ce90e7a269f	3.4167944066665937e-252	nearest-choice	5 17-digit candidates read back; the nearest is below the value
+2e37219b15ba2bdd	4.6511546141167654e-86	nearest-choice	7 17-digit candidates read back; the nearest is below the value
+15a48822d5e34124	2.0464426937757188e-204	nearest-choice	4 17-digit candidates read back; the nearest is above the value
+678c117fbc688778	6.2529396729226176e+190	nearest-choice	8 17-digit candidates read back; the nearest is above the value
+2033e1ac4ee207f8	1.4828326574628321e-153	nearest-choice	2 17-digit candidates read back; the nearest is below the value
+66dea3e964be8049	3.3329596101671026e+187	nearest-choice	4 17-digit candidates read back; the nearest is below the value
+6e1c7a8cb91751da	2.5735767646728768e+222	nearest-choice	3 17-digit candidates read back; the nearest is below the value
+41291f43feac7eb7	823201.9974097823	nearest-choice	2 16-digit candidates read back; the nearest is above the value
+1638280f533c9135	1.2327546050429394e-201	nearest-choice	2 17-digit candidates read back; the nearest is above the value
+47aa7c67acaab39e	1.7602937734564428e+37	nearest-choice	2 17-digit candidates read back; the nearest is above the value
+7f61fb592e8d4b8a	3.9460219173305425e+305	nearest-choice	8 17-digit candidates read back; the nearest is above the value
+3f80010000000000	0.007814407348632812	tie	the value is exactly halfway between two shortest candidates; the even one (2) is chosen
+3fc0776000000000	0.12864303588867188	tie	the value is exactly halfway between two shortest candidates; the even one (8) is chosen
+400ffffc00000000	3.9999923706054688	tie	the value is exactly halfway between two shortest candidates; the even one (8) is chosen
+4060000040000000	128.00003051757812	tie	the value is exactly halfway between two shortest candidates; the even one (2) is chosen
+40aa5457e8000000	3370.1716918945312	tie	the value is exactly halfway between two shortest candidates; the even one (2) is chosen
+40ffffffff000000	131071.99975585938	tie	the value is exactly halfway between two shortest candidates; the even one (8) is chosen
+4140000000100000	2097152.0004882812	tie	the value is exactly halfway between two shortest candidates; the even one (2) is chosen
+41929628b0be0000	77957676.18554688	tie	the value is exactly halfway between two shortest candidates; the even one (8) is chosen
+7ff8000000000000	!runtime-non-finite-output	non-finite	a quiet NaN
+fff8000000000001	!runtime-non-finite-output	non-finite	a NaN with a payload and the sign bit set
+7ff0000000000000	!runtime-non-finite-output	non-finite	+infinity
+fff0000000000000	!runtime-non-finite-output	non-finite	-infinity

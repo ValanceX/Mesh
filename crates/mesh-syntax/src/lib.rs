@@ -3,8 +3,14 @@
 //! This crate owns the shape of the MPRX AST. It does not parse source text
 //! (see `mesh-parser`) and does not perform semantic analysis (see
 //! `mesh-semantic`).
+//!
+//! [`source_map`] turns byte offsets into lines and columns, and into
+//! UTF-16 offsets: the one place that does, for the compiler, the
+//! language server and the runtime alike.
 
 use std::fmt;
+
+pub mod source_map;
 
 /// A byte-offset range into the original source text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -161,6 +167,13 @@ impl DiagnosticCode {
     pub const UNKNOWN_FIELD: DiagnosticCode = DiagnosticCode("unknown-field");
     /// An object literal without a field the expected record requires.
     pub const MISSING_REQUIRED_FIELD: DiagnosticCode = DiagnosticCode("missing-required-field");
+    /// A number literal too large to be finite: its nearest binary64 value
+    /// would be infinite (§9.7.3).
+    pub const NUMBER_LITERAL_OUT_OF_RANGE: DiagnosticCode =
+        DiagnosticCode("number-literal-out-of-range");
+    /// An interpolation in content whose type is a list or a record, which
+    /// has no text form (§9.7.8).
+    pub const CONTENT_NOT_TEXT: DiagnosticCode = DiagnosticCode("content-not-text");
 
     /// Every code MESH can emit, in catalogue order. The diagnostics
     /// reference (`docs/manual/diagnostics.md`) documents each one, and a
@@ -211,6 +224,8 @@ impl DiagnosticCode {
         DiagnosticCode::DUPLICATE_OBJECT_KEY,
         DiagnosticCode::UNKNOWN_FIELD,
         DiagnosticCode::MISSING_REQUIRED_FIELD,
+        DiagnosticCode::NUMBER_LITERAL_OUT_OF_RANGE,
+        DiagnosticCode::CONTENT_NOT_TEXT,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -996,6 +1011,8 @@ mod tests {
                 "duplicate-object-key",
                 "unknown-field",
                 "missing-required-field",
+                "number-literal-out-of-range",
+                "content-not-text",
             ]
         );
     }

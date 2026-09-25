@@ -1,0 +1,4 @@
+<page>
+  <card user={user}><text>child</text></card>
+  <card user={user}>text</card>
+</page>

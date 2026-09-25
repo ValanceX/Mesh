@@ -1,0 +1,393 @@
+{
+  "compiler": "0.0.0",
+  "component": "users-page",
+  "fingerprint": "sha256:9ed6ba44b5a2857861db263d53d2e18afd06c70fed9aca93c785c7aba26e4a80",
+  "format": "mesh-template",
+  "root": {
+    "children": [
+      {
+        "element": {
+          "children": [
+            {
+              "expression": {
+                "field": "name",
+                "kind": "member",
+                "object": {
+                  "kind": "scope",
+                  "name": "user",
+                  "span": {
+                    "end": {
+                      "byte": 34,
+                      "utf16": 34
+                    },
+                    "start": {
+                      "byte": 30,
+                      "utf16": 30
+                    }
+                  }
+                },
+                "span": {
+                  "end": {
+                    "byte": 39,
+                    "utf16": 39
+                  },
+                  "start": {
+                    "byte": 30,
+                    "utf16": 30
+                  }
+                }
+              },
+              "kind": "expression"
+            }
+          ],
+          "component": "text",
+          "events": [],
+          "props": [],
+          "span": {
+            "end": {
+              "byte": 47,
+              "utf16": 47
+            },
+            "start": {
+              "byte": 23,
+              "utf16": 23
+            }
+          }
+        },
+        "kind": "element"
+      },
+      {
+        "element": {
+          "children": [],
+          "component": "avatar",
+          "events": [],
+          "props": [
+            {
+              "prop": "src",
+              "span": {
+                "end": {
+                  "byte": 75,
+                  "utf16": 75
+                },
+                "start": {
+                  "byte": 58,
+                  "utf16": 58
+                }
+              },
+              "value": {
+                "field": "avatar",
+                "kind": "member",
+                "object": {
+                  "kind": "scope",
+                  "name": "user",
+                  "span": {
+                    "end": {
+                      "byte": 67,
+                      "utf16": 67
+                    },
+                    "start": {
+                      "byte": 63,
+                      "utf16": 63
+                    }
+                  }
+                },
+                "span": {
+                  "end": {
+                    "byte": 74,
+                    "utf16": 74
+                  },
+                  "start": {
+                    "byte": 63,
+                    "utf16": 63
+                  }
+                }
+              }
+            },
+            {
+              "prop": "alt",
+              "span": {
+                "end": {
+                  "byte": 91,
+                  "utf16": 91
+                },
+                "start": {
+                  "byte": 76,
+                  "utf16": 76
+                }
+              },
+              "value": {
+                "field": "name",
+                "kind": "member",
+                "object": {
+                  "kind": "scope",
+                  "name": "user",
+                  "span": {
+                    "end": {
+                      "byte": 85,
+                      "utf16": 85
+                    },
+                    "start": {
+                      "byte": 81,
+                      "utf16": 81
+                    }
+                  }
+                },
+                "span": {
+                  "end": {
+                    "byte": 90,
+                    "utf16": 90
+                  },
+                  "start": {
+                    "byte": 81,
+                    "utf16": 81
+                  }
+                }
+              }
+            },
+            {
+              "prop": "size",
+              "span": {
+                "end": {
+                  "byte": 120,
+                  "utf16": 120
+                },
+                "start": {
+                  "byte": 92,
+                  "utf16": 92
+                }
+              },
+              "value": {
+                "alternate": {
+                  "kind": "literal",
+                  "span": {
+                    "end": {
+                      "byte": 119,
+                      "utf16": 119
+                    },
+                    "start": {
+                      "byte": 115,
+                      "utf16": 115
+                    }
+                  },
+                  "value": "md"
+                },
+                "condition": {
+                  "kind": "scope",
+                  "name": "compact",
+                  "span": {
+                    "end": {
+                      "byte": 105,
+                      "utf16": 105
+                    },
+                    "start": {
+                      "byte": 98,
+                      "utf16": 98
+                    }
+                  }
+                },
+                "consequent": {
+                  "kind": "literal",
+                  "span": {
+                    "end": {
+                      "byte": 112,
+                      "utf16": 112
+                    },
+                    "start": {
+                      "byte": 108,
+                      "utf16": 108
+                    }
+                  },
+                  "value": "sm"
+                },
+                "kind": "conditional",
+                "span": {
+                  "end": {
+                    "byte": 119,
+                    "utf16": 119
+                  },
+                  "start": {
+                    "byte": 98,
+                    "utf16": 98
+                  }
+                }
+              }
+            }
+          ],
+          "span": {
+            "end": {
+              "byte": 123,
+              "utf16": 123
+            },
+            "start": {
+              "byte": 50,
+              "utf16": 50
+            }
+          }
+        },
+        "kind": "element"
+      },
+      {
+        "element": {
+          "children": [
+            {
+              "kind": "text",
+              "span": {
+                "end": {
+                  "byte": 194,
+                  "utf16": 194
+                },
+                "start": {
+                  "byte": 188,
+                  "utf16": 188
+                }
+              },
+              "value": "Select"
+            }
+          ],
+          "component": "button",
+          "events": [
+            {
+              "arguments": [
+                {
+                  "kind": "event",
+                  "span": {
+                    "end": {
+                      "byte": 185,
+                      "utf16": 185
+                    },
+                    "start": {
+                      "byte": 179,
+                      "utf16": 179
+                    }
+                  }
+                }
+              ],
+              "command": "selectUser",
+              "event": "click",
+              "span": {
+                "end": {
+                  "byte": 187,
+                  "utf16": 187
+                },
+                "start": {
+                  "byte": 158,
+                  "utf16": 158
+                }
+              }
+            }
+          ],
+          "props": [
+            {
+              "prop": "disabled",
+              "span": {
+                "end": {
+                  "byte": 157,
+                  "utf16": 157
+                },
+                "start": {
+                  "byte": 134,
+                  "utf16": 134
+                }
+              },
+              "value": {
+                "kind": "unary",
+                "operand": {
+                  "field": "active",
+                  "kind": "member",
+                  "object": {
+                    "kind": "scope",
+                    "name": "user",
+                    "span": {
+                      "end": {
+                        "byte": 149,
+                        "utf16": 149
+                      },
+                      "start": {
+                        "byte": 145,
+                        "utf16": 145
+                      }
+                    }
+                  },
+                  "span": {
+                    "end": {
+                      "byte": 156,
+                      "utf16": 156
+                    },
+                    "start": {
+                      "byte": 145,
+                      "utf16": 145
+                    }
+                  }
+                },
+                "operator": "not",
+                "span": {
+                  "end": {
+                    "byte": 156,
+                    "utf16": 156
+                  },
+                  "start": {
+                    "byte": 144,
+                    "utf16": 144
+                  }
+                }
+              }
+            }
+          ],
+          "span": {
+            "end": {
+              "byte": 203,
+              "utf16": 203
+            },
+            "start": {
+              "byte": 126,
+              "utf16": 126
+            }
+          }
+        },
+        "kind": "element"
+      }
+    ],
+    "component": "page",
+    "events": [],
+    "props": [
+      {
+        "prop": "title",
+        "span": {
+          "end": {
+            "byte": 19,
+            "utf16": 19
+          },
+          "start": {
+            "byte": 6,
+            "utf16": 6
+          }
+        },
+        "value": {
+          "kind": "literal",
+          "span": {
+            "end": {
+              "byte": 19,
+              "utf16": 19
+            },
+            "start": {
+              "byte": 12,
+              "utf16": 12
+            }
+          },
+          "value": "Users"
+        }
+      }
+    ],
+    "span": {
+      "end": {
+        "byte": 211,
+        "utf16": 211
+      },
+      "start": {
+        "byte": 0,
+        "utf16": 0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,737 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/template-v1.schema.json",
+  "title": "MESH template, version 1",
+  "description": "One component's MPRX, checked clean against a component model and compiled: every name resolved, every literal converted, and no values (see docs/manual/templates.md). The MESH runtime consumes it; a template runs under any runtime that supports its `version` and is given a model with the same `fingerprint`, whatever `compiler` produced it. This schema lists exactly the properties this MESH writes. A later MESH may add properties without changing `version`; removing one or changing its meaning is a new version. Readers must ignore properties they don't know.",
+  "type": "object",
+  "properties": {
+    "format": {
+      "description": "Always `mesh-template`, so a stray JSON document is refused as malformed rather than as a version mismatch.",
+      "const": "mesh-template"
+    },
+    "version": {
+      "description": "The format version: the template's only compatibility version.",
+      "const": 1
+    },
+    "component": {
+      "description": "The component whose template this is.",
+      "$ref": "#/$defs/tagName"
+    },
+    "fingerprint": {
+      "description": "The fingerprint of the model the template was checked against (docs/manual/templates.md). The runtime requires it to equal its model's.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "compiler": {
+      "description": "The version of the compiler that produced the template, for provenance and debugging only. It never affects whether a template runs, and isn't part of the template's canonical digest.",
+      "type": "string",
+      "minLength": 1
+    },
+    "root": {
+      "description": "The template's root element.",
+      "$ref": "#/$defs/element"
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "component",
+    "fingerprint",
+    "compiler",
+    "root"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "description": "A prop, event, command, scope or field name, as the manifest writes one.",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "tagName": {
+      "description": "A component name, as the manifest writes one.",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+    },
+    "offset": {
+      "type": "object",
+      "description": "A place in the template's source: `byte` counts bytes of its UTF-8 text as given, a byte-order mark included, and `utf16` counts UTF-16 code units of the same text, as the diagnostics document does.",
+      "properties": {
+        "byte": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "utf16": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "byte",
+        "utf16"
+      ],
+      "additionalProperties": false
+    },
+    "span": {
+      "type": "object",
+      "description": "Where a construct was in the source, for diagnostics and developer tools. Nothing depends on it for meaning.",
+      "properties": {
+        "start": {
+          "$ref": "#/$defs/offset"
+        },
+        "end": {
+          "$ref": "#/$defs/offset"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "additionalProperties": false
+    },
+    "element": {
+      "type": "object",
+      "description": "An occurrence: an instance of `component`. Whether it is a composite or a primitive is decided by the program, never by the template.",
+      "properties": {
+        "component": {
+          "$ref": "#/$defs/tagName"
+        },
+        "props": {
+          "description": "The attributes §3's duplicate resolution keeps, in source order: each a prop of `component`, with its value.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "prop": {
+                "$ref": "#/$defs/identifier"
+              },
+              "value": {
+                "$ref": "#/$defs/expression"
+              },
+              "span": {
+                "$ref": "#/$defs/span"
+              }
+            },
+            "required": [
+              "prop",
+              "value",
+              "span"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "events": {
+          "description": "The event bindings §3's duplicate resolution keeps, in source order: each an event of `component`, and its handler, a command of the template's own component with its arguments.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "$ref": "#/$defs/identifier"
+              },
+              "command": {
+                "$ref": "#/$defs/identifier"
+              },
+              "arguments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/argument"
+                }
+              },
+              "span": {
+                "$ref": "#/$defs/span"
+              }
+            },
+            "required": [
+              "event",
+              "command",
+              "arguments",
+              "span"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "children": {
+          "description": "The element's children, in order. Whitespace-only text is omitted (§3).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/child"
+          }
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        }
+      },
+      "required": [
+        "component",
+        "props",
+        "events",
+        "children",
+        "span"
+      ],
+      "additionalProperties": false
+    },
+    "child": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Literal text, exactly as the semantic model keeps it.",
+          "properties": {
+            "kind": {
+              "const": "text"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "value",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "An interpolation.",
+          "properties": {
+            "kind": {
+              "const": "expression"
+            },
+            "expression": {
+              "$ref": "#/$defs/expression"
+            }
+          },
+          "required": [
+            "kind",
+            "expression"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A child element.",
+          "properties": {
+            "kind": {
+              "const": "element"
+            },
+            "element": {
+              "$ref": "#/$defs/element"
+            }
+          },
+          "required": [
+            "kind",
+            "element"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "expression": {
+      "description": "An expression outside a handler: `$event` can't appear, and a command is never an expression (§9.5).",
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "A literal. A number is the binary64 value the compiler converted the literal to (§9.7.3): finite, and never `-0`. A quoted attribute value is a string literal.",
+          "properties": {
+            "kind": {
+              "const": "literal"
+            },
+            "value": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "value",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A reference: reads the scope declaration named `name` of the template's own component. Its value comes from the snapshot (the root template) or from the occurrence's props (a composite).",
+          "properties": {
+            "kind": {
+              "const": "scope"
+            },
+            "name": {
+              "$ref": "#/$defs/identifier"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Member access `object.field`.",
+          "properties": {
+            "kind": {
+              "const": "member"
+            },
+            "object": {
+              "$ref": "#/$defs/expression"
+            },
+            "field": {
+              "$ref": "#/$defs/identifier"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "object",
+            "field",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "`!operand` (`not`) or `-operand` (`negate`).",
+          "properties": {
+            "kind": {
+              "const": "unary"
+            },
+            "operator": {
+              "enum": [
+                "not",
+                "negate"
+              ]
+            },
+            "operand": {
+              "$ref": "#/$defs/expression"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "operator",
+            "operand",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A binary operator, named rather than spelt.",
+          "properties": {
+            "kind": {
+              "const": "binary"
+            },
+            "operator": {
+              "enum": [
+                "add",
+                "subtract",
+                "multiply",
+                "divide",
+                "remainder",
+                "equal",
+                "not-equal",
+                "less",
+                "less-equal",
+                "greater",
+                "greater-equal",
+                "and",
+                "or"
+              ]
+            },
+            "left": {
+              "$ref": "#/$defs/expression"
+            },
+            "right": {
+              "$ref": "#/$defs/expression"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "operator",
+            "left",
+            "right",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "`condition ? consequent : alternate`.",
+          "properties": {
+            "kind": {
+              "const": "conditional"
+            },
+            "condition": {
+              "$ref": "#/$defs/expression"
+            },
+            "consequent": {
+              "$ref": "#/$defs/expression"
+            },
+            "alternate": {
+              "$ref": "#/$defs/expression"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "condition",
+            "consequent",
+            "alternate",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A list literal.",
+          "properties": {
+            "kind": {
+              "const": "list"
+            },
+            "elements": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/expression"
+              }
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "elements",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A record literal. Shadowed keys (§9.4) are omitted, so names are unique.",
+          "properties": {
+            "kind": {
+              "const": "record"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "description": "The field's name: any string, since an object literal's key may be quoted (§5). Names are unique within the record.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "$ref": "#/$defs/expression"
+                  },
+                  "span": {
+                    "$ref": "#/$defs/span"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "span"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "fields",
+            "span"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "argument": {
+      "description": "An expression inside a handler's arguments, where `$event` may appear (§9.5).",
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "A literal. A number is the binary64 value the compiler converted the literal to (§9.7.3): finite, and never `-0`. A quoted attribute value is a string literal.",
+          "properties": {
+            "kind": {
+              "const": "literal"
+            },
+            "value": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "value",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A reference: reads the scope declaration named `name` of the template's own component. Its value comes from the snapshot (the root template) or from the occurrence's props (a composite).",
+          "properties": {
+            "kind": {
+              "const": "scope"
+            },
+            "name": {
+              "$ref": "#/$defs/identifier"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Member access `object.field`.",
+          "properties": {
+            "kind": {
+              "const": "member"
+            },
+            "object": {
+              "$ref": "#/$defs/argument"
+            },
+            "field": {
+              "$ref": "#/$defs/identifier"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "object",
+            "field",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "`!operand` (`not`) or `-operand` (`negate`).",
+          "properties": {
+            "kind": {
+              "const": "unary"
+            },
+            "operator": {
+              "enum": [
+                "not",
+                "negate"
+              ]
+            },
+            "operand": {
+              "$ref": "#/$defs/argument"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "operator",
+            "operand",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A binary operator, named rather than spelt.",
+          "properties": {
+            "kind": {
+              "const": "binary"
+            },
+            "operator": {
+              "enum": [
+                "add",
+                "subtract",
+                "multiply",
+                "divide",
+                "remainder",
+                "equal",
+                "not-equal",
+                "less",
+                "less-equal",
+                "greater",
+                "greater-equal",
+                "and",
+                "or"
+              ]
+            },
+            "left": {
+              "$ref": "#/$defs/argument"
+            },
+            "right": {
+              "$ref": "#/$defs/argument"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "operator",
+            "left",
+            "right",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "`condition ? consequent : alternate`.",
+          "properties": {
+            "kind": {
+              "const": "conditional"
+            },
+            "condition": {
+              "$ref": "#/$defs/argument"
+            },
+            "consequent": {
+              "$ref": "#/$defs/argument"
+            },
+            "alternate": {
+              "$ref": "#/$defs/argument"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "condition",
+            "consequent",
+            "alternate",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A list literal.",
+          "properties": {
+            "kind": {
+              "const": "list"
+            },
+            "elements": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/argument"
+              }
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "elements",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A record literal. Shadowed keys (§9.4) are omitted, so names are unique.",
+          "properties": {
+            "kind": {
+              "const": "record"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "description": "The field's name: any string, since an object literal's key may be quoted (§5). Names are unique within the record.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "$ref": "#/$defs/argument"
+                  },
+                  "span": {
+                    "$ref": "#/$defs/span"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "span"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "fields",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "`$event`: the payload of the event the enclosing handler is bound to.",
+          "properties": {
+            "kind": {
+              "const": "event"
+            },
+            "span": {
+              "$ref": "#/$defs/span"
+            }
+          },
+          "required": [
+            "kind",
+            "span"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

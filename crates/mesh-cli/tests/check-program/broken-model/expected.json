@@ -1,0 +1,1 @@
+{"diagnostics":[{"code":"manifest-unknown-type","location":{"kind":"model","span":{"end":{"byte":158,"column":126,"line":4,"utf16":158,"utf16Column":126},"start":{"byte":150,"column":118,"line":4,"utf16":150,"utf16Column":118}}},"message":"unknown type \"Nobody\": the manifest's \"types\" doesn't declare it","severity":"error"}],"version":1}

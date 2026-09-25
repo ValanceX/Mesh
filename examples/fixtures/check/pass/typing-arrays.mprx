@@ -1,1 +1,5 @@
-<text>{[]} {[name, maybeName]} {[[], users]} {[anything, 1]}</text>
+<probe anything={[]}>
+  <probe anything={[name, maybeName]} />
+  <probe anything={[[], users]} />
+  <probe anything={[anything, 1]} />
+</probe>

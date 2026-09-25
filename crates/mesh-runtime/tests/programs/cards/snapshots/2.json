@@ -1,0 +1,17 @@
+{
+  "user": {
+    "name": "Grace",
+    "active": true
+  },
+  "name": "Ada",
+  "count": 1,
+  "flag": false,
+  "anything": null,
+  "users": [],
+  "numbers": [
+    1,
+    2.5
+  ],
+  "maybeNumbers": [],
+  "nothing": null
+}

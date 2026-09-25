@@ -1,0 +1,1 @@
+{"diagnostics":[{"code":"assembly-unsupported-format-version","location":{"component":"card","index":1,"kind":"template"},"message":"the template is format version 2; this runtime reads version 1","severity":"error"}],"version":1}

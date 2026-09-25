@@ -1,0 +1,3 @@
+error[assembly-composite-event]: `clicker` has a template, so it's a composite, but declares events; composites can't raise events
+  --> view.template.json, the template of `view`, source bytes 0..27
+

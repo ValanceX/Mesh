@@ -138,3 +138,22 @@ export function mutate(text, random) {
   }
   return points.join("");
 }
+
+/**
+ * `mesh compile --format json` on files in `examples/`: the diagnostics
+ * document it prints, parsed, and the template it writes, parsed, or
+ * `undefined` if it wrote none.
+ */
+export function cliCompile(file, model, outputDir) {
+  const output = join(outputDir, `${file.replaceAll("/", "_")}.template.json`);
+  const args = [
+    "compile", "--format", "json", "--output", output,
+    "--model", model.manifest, "--component", model.component, file,
+  ];
+  const result = spawnSync(meshBin(), args, { cwd: examples, encoding: "utf8" });
+  if (result.status !== 0 && result.status !== 1) {
+    throw new Error(`mesh ${args.join(" ")}: exit ${result.status}: ${result.stderr}`);
+  }
+  const template = existsSync(output) ? JSON.parse(readFileSync(output, "utf8")) : undefined;
+  return { diagnostics: JSON.parse(result.stdout), template };
+}

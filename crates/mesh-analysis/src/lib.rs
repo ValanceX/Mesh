@@ -334,6 +334,10 @@ pub enum Fact {
         field: String,
         span: Span,
     },
+    /// An interpolation in content whose type `ty` is a list or a record,
+    /// or an optional of one, which has no text form. Span: the
+    /// interpolated expression.
+    ContentNotText { ty: Ty, span: Span },
 }
 
 impl Fact {
@@ -358,7 +362,8 @@ impl Fact {
             | Fact::NoCommonType { span, .. }
             | Fact::DuplicateObjectKey { span, .. }
             | Fact::UnknownField { span, .. }
-            | Fact::MissingRequiredField { span, .. } => *span,
+            | Fact::MissingRequiredField { span, .. }
+            | Fact::ContentNotText { span, .. } => *span,
         }
     }
 }

@@ -1,1 +1,1 @@
-<text>{{ first: name, first: "Ada" }}</text>
+<probe anything={{ first: name, first: "Ada" }} />

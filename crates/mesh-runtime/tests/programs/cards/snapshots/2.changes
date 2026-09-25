@@ -1,0 +1,6 @@
+page/page[0] title: "Ada" -> "Grace"
+page/page[0]/probe[1] maybeStr: "ada.png" -> (absent)
+page/page[0]/text[0]/text[0]: "Ada (compact)" -> "Grace"
+page/page[1] title: "Ada" -> "Grace"
+page/page[1]/probe[1] maybeStr: "ada.png" -> (absent)
+page/page[1]/text[0]/text[0]: "Ada" -> "Grace"

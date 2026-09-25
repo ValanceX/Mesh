@@ -1,0 +1,5 @@
+page/probe[1] maybeStr: (absent) -> "Countess"
+page/probe[1] num: 0.25 -> 1.5
+page/probe[2] numbers: [1,2.5] -> [1,2.5,0.1]
+page/probe[2] user: {"active":true,"avatar":"ada.png","name":"Ada"} -> {"active":false,"name":"Ada"}
+page/text[0]/text[0]: "Hello, Ada! You have 1 new message." -> "Hello, Ada! You have 6 new messages."

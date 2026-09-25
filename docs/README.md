@@ -24,6 +24,12 @@ Reference material for when you need exact details.
 - [**Diagnostics JSON Schema**](../schemas/diagnostics-v1.schema.json): the document `mesh check --format json` prints.
 - [**MPRX Language Spec**](./MPRX-SPEC.md): the canonical grammar and semantics.
 
+**v0.5, in progress.** These are the contracts v0.5's compiler and runtime are built against, and that NEXUS's adapter and PORT's renderers can build against now. The compiler, the Rust runtime (`mesh-runtime`) and `@valancex/mesh-runtime` implement them:
+
+- [**Evaluation and the boundary**](./MPRX-SPEC.md#97-evaluation): §9.7 and §9.8 of the spec, with the normative [number-to-text table](./tables/number-to-text.tsv) and its [reference generator](./tables/number_to_text.py).
+- [**Templates and programs**](./manual/templates.md): the compiled form of a template, the model fingerprint, and the assembly rules. Also a [JSON Schema](../schemas/template-v1.schema.json). Compiling is implemented (`mesh compile`, `compile()`), and so are programs (`mesh check-program`, `checkProgram()`).
+- [**The MESH runtime**](./manual/runtime.md): render and dispatch, the host's obligations, the render tree, keys, handler identifiers, command intents, and runtime diagnostics. Also JSON Schemas for [render trees and intents](../schemas/render-v1.schema.json) and [runtime diagnostics](../schemas/runtime-diagnostics-v1.schema.json).
+
 ## Background
 
 - [**Architecture**](./ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance.
@@ -44,7 +50,7 @@ $ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 
 CI runs `cargo test --workspace` on Linux, macOS and Windows, so keep tests free of platform assumptions: build paths with `Path`, and don't expect `/` in a printed path. Every text file checks out with LF line endings on every platform (`.gitattributes`).
 
-**Releases** are built by `.github/workflows/release.yml` from a `v*` tag: bump every version together (`crates/mesh-cli/tests/packages.rs` checks they agree), then push the tag. Publishing needs the `NPM_ACCESS_TOKEN` repository secret, an npm granular access token for the `@valancex` organisation, and it expires: renew it before a release. A manual run of the workflow, without `publish`, is a dry run.
+**Releases** are built by `.github/workflows/release.yml` from a `v*` tag: bump every version together (`crates/mesh-cli/tests/packages.rs` checks they agree), then push the tag. Publishing needs the `@valancex` npm organisation to exist (a token alone isn't enough: v0.4.0's first publish failed with `E404` until it did), and the `NPM_ACCESS_TOKEN` repository secret: an npm granular access token with read and write access to the `@valancex` scope. The token expires 60 days after it's created (the current one around 2026-11-24), and the release workflow's dry run can't tell: before tagging a release, renew it if it's close to expiry, and update the secret. A manual run of the workflow, without `publish`, is a dry run.
 
 The npm packages under `packages/` are one npm workspace. Regenerate `packages/package-lock.json` with npm 11 or newer (`npx npm@11 install`), which records the unpublished platform packages npm 11's `npm ci` requires. If you change them, run, in `packages/`:
 

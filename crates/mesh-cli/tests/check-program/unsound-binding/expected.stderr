@@ -1,0 +1,6 @@
+error[assembly-unsound-binding]: `tag`'s prop `size` can't bind its scope name `size`: its type isn't assignable
+  --> view.template.json, the template of `view`, source bytes 9..25
+
+error[assembly-unsound-binding]: `badge`'s prop `label` can't bind its scope name `label`: it's optional, and an unwritten prop binds absence
+  --> view.template.json, the template of `view`, source bytes 28..37
+

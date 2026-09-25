@@ -192,10 +192,29 @@ impl<'m> Walker<'m> {
             match child {
                 Child::Text { .. } => {}
                 Child::Expression(expression) => {
-                    self.expression(expression, Place::Value);
+                    if let Some(ty) = self.expression(expression, Place::Value) {
+                        self.content(&ty, expression.span());
+                    }
                 }
                 Child::Element(child) => self.element(child),
             }
+        }
+    }
+
+    /// Content needs a text form (§9.7.8): a value whose type, with named
+    /// references expanded and one optional stripped, is a list or a
+    /// record has none. `any` does, statically; the runtime checks its
+    /// value.
+    fn content(&mut self, ty: &Ty, span: Span) {
+        let present = match relation::expand(self.manifest(), ty) {
+            Ty::Optional(inner) => relation::expand(self.manifest(), &inner),
+            other => other,
+        };
+        if matches!(present, Ty::List(_) | Ty::Record(_)) {
+            self.facts.push(Fact::ContentNotText {
+                ty: ty.clone(),
+                span,
+            });
         }
     }
 

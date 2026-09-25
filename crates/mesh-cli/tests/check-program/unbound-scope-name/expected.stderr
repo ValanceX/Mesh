@@ -1,0 +1,3 @@
+error[assembly-unbound-scope-name]: `frame`'s scope name `caption` has no prop of that name to bind it
+  --> view.template.json, the template of `view`, source bytes 0..21
+

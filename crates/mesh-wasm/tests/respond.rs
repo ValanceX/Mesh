@@ -102,3 +102,51 @@ fn a_run_without_a_model_needs_no_manifest() {
             .render_json(&Request::new("<a></b>", "a.mprx"))
     );
 }
+
+/// `respond_compile` is exactly `check::template`, rendered: the
+/// diagnostics document against the source, and the template (or null).
+#[test]
+fn respond_compile_is_the_compile_operation() {
+    let manifest = read("fixtures/check/components.json");
+    let model = check::Model::load(&manifest, "template").expect("the model loads");
+    let mut runs = files("fixtures/check/pass", "mprx");
+    runs.extend(files("fixtures/check/fail", "mprx"));
+    for file in runs {
+        let source = read(&file);
+        let compiled = check::template(&source, &model);
+        let template = compiled
+            .template
+            .as_ref()
+            .map_or_else(|| "null".to_string(), mesh_template::to_json);
+        let expected = format!(
+            "{{\"diagnostics\":{},\"template\":{template}}}",
+            mesh_compiler::render_json(&source, &file, &compiled.diagnostics)
+        );
+        assert_eq!(
+            mesh_wasm::respond_compile(&source, &file, &manifest, "components.json", "template"),
+            expected,
+            "{file}"
+        );
+    }
+}
+
+#[test]
+fn respond_compile_reports_a_broken_manifest_against_it() {
+    let result: serde_json::Value = serde_json::from_str(&mesh_wasm::respond_compile(
+        "<page />",
+        "page.mprx",
+        "{ not json",
+        "broken.json",
+        "page",
+    ))
+    .expect("the result is JSON");
+    assert_eq!(result["template"], serde_json::Value::Null);
+    assert_eq!(
+        result["diagnostics"]["diagnostics"][0]["path"],
+        "broken.json"
+    );
+    assert_eq!(
+        result["diagnostics"]["diagnostics"][0]["code"],
+        "manifest-syntax-error"
+    );
+}

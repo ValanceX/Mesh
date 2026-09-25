@@ -6,10 +6,13 @@ members = [
     "crates/mesh-semantic",
     "crates/mesh-manifest",
     "crates/mesh-analysis",
+    "crates/mesh-template",
+    "crates/mesh-runtime",
     "crates/mesh-compiler",
     "crates/mesh-lsp",
     "crates/mesh-cli",
     "crates/mesh-wasm",
+    "crates/mesh-runtime-wasm",
     "grammar/tree-sitter-mprx",
 ]
 
@@ -28,6 +31,8 @@ mesh-parser = { path = "crates/mesh-parser" }
 mesh-semantic = { path = "crates/mesh-semantic" }
 mesh-manifest = { path = "crates/mesh-manifest" }
 mesh-analysis = { path = "crates/mesh-analysis" }
+mesh-template = { path = "crates/mesh-template" }
+mesh-runtime = { path = "crates/mesh-runtime" }
 mesh-compiler = { path = "crates/mesh-compiler" }
 
 [workspace.lints.rust]

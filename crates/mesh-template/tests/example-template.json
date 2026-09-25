@@ -1,0 +1,137 @@
+{
+  "format": "mesh-template",
+  "version": 1,
+  "component": "user-card",
+  "fingerprint": "sha256:6fca78440df9c56ff4a3b7e180af554be971083db4bc2eda137f25c0dddd5caf",
+  "compiler": "0.5.0",
+  "root": {
+    "component": "avatar",
+    "props": [
+      {
+        "prop": "src",
+        "value": {
+          "kind": "member",
+          "object": {
+            "kind": "scope",
+            "name": "user",
+            "span": {
+              "start": {
+                "byte": 13,
+                "utf16": 13
+              },
+              "end": {
+                "byte": 17,
+                "utf16": 17
+              }
+            }
+          },
+          "field": "avatar",
+          "span": {
+            "start": {
+              "byte": 13,
+              "utf16": 13
+            },
+            "end": {
+              "byte": 24,
+              "utf16": 24
+            }
+          }
+        },
+        "span": {
+          "start": {
+            "byte": 8,
+            "utf16": 8
+          },
+          "end": {
+            "byte": 25,
+            "utf16": 25
+          }
+        }
+      },
+      {
+        "prop": "alt",
+        "value": {
+          "kind": "member",
+          "object": {
+            "kind": "scope",
+            "name": "user",
+            "span": {
+              "start": {
+                "byte": 31,
+                "utf16": 31
+              },
+              "end": {
+                "byte": 35,
+                "utf16": 35
+              }
+            }
+          },
+          "field": "name",
+          "span": {
+            "start": {
+              "byte": 31,
+              "utf16": 31
+            },
+            "end": {
+              "byte": 40,
+              "utf16": 40
+            }
+          }
+        },
+        "span": {
+          "start": {
+            "byte": 26,
+            "utf16": 26
+          },
+          "end": {
+            "byte": 41,
+            "utf16": 41
+          }
+        }
+      }
+    ],
+    "events": [
+      {
+        "event": "click",
+        "command": "selectUser",
+        "arguments": [
+          {
+            "kind": "scope",
+            "name": "user",
+            "span": {
+              "start": {
+                "byte": 63,
+                "utf16": 63
+              },
+              "end": {
+                "byte": 67,
+                "utf16": 67
+              }
+            }
+          }
+        ],
+        "span": {
+          "start": {
+            "byte": 42,
+            "utf16": 42
+          },
+          "end": {
+            "byte": 69,
+            "utf16": 69
+          }
+        }
+      }
+    ],
+    "children": [],
+    "span": {
+      "start": {
+        "byte": 0,
+        "utf16": 0
+      },
+      "end": {
+        "byte": 72,
+        "utf16": 72
+      }
+    }
+  }
+}

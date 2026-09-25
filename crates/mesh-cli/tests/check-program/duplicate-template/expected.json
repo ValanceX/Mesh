@@ -1,0 +1,1 @@
+{"diagnostics":[{"code":"assembly-duplicate-template","location":{"component":"card","kind":"source","span":{"end":{"byte":96,"utf16":96},"start":{"byte":0,"utf16":0}}},"message":"a second template for `card`","severity":"error"}],"version":1}

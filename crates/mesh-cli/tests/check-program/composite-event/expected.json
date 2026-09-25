@@ -1,0 +1,1 @@
+{"diagnostics":[{"code":"assembly-composite-event","location":{"component":"view","kind":"source","span":{"end":{"byte":27,"utf16":27},"start":{"byte":0,"utf16":0}}},"message":"`clicker` has a template, so it's a composite, but declares events; composites can't raise events","severity":"error"}],"version":1}

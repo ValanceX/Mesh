@@ -32,6 +32,11 @@ jobs:
         run: cargo doc --workspace --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
+      # The normative number-to-text table (spec §9.7.7.1) must be exactly
+      # what its reference generator computes from the rule. Standard
+      # library Python only; the runner has python3.
+      - name: Number-to-text table is what the rule gives
+        run: python3 docs/tables/number_to_text.py --check
       # Installs Node 22 for the grammar tests; the action itself runs on
       # the runner's Node 24.
       - uses: actions/setup-node@v7
@@ -70,7 +75,11 @@ jobs:
       - name: Test
         run: cargo test --workspace --no-fail-fast
 
-  # The npm workspace builds and typechecks.
+  # The npm workspace builds and typechecks. `packages/package-lock.json`
+  # is npm 11's (docs/README.md): with the platform packages published,
+  # npm 10 resolves them from the registry instead of the workspace's
+  # `file:` overrides and rejects the lockfile, so every `npm ci` of the
+  # workspace here runs npm 11.
   packages:
     runs-on: ubuntu-latest
     steps:
@@ -81,16 +90,18 @@ jobs:
       - name: Build, typecheck, and test the launcher
         working-directory: packages
         run: |
-          npm ci
+          npx --yes npm@11 ci
           npm run build
           npm run typecheck
           npm test -w @valancex/mesh-lsp
 
-  # The compiler in WebAssembly, and @valancex/mesh-compiler around it
-  # (outline v0.4 Pass 1), on each Node LTS release the package supports:
-  # agreement with a native `mesh` built here, determinism, positions,
-  # failure, memory, version, nesting, size, packing, and headless
-  # Chromium.
+  # The compiler and the runtime in WebAssembly, and
+  # @valancex/mesh-compiler and @valancex/mesh-runtime around them, on each
+  # Node LTS release the packages support: agreement with a native `mesh`
+  # built here, parity with the native runtime (through its harness, and
+  # replaying every call the native property test makes), the V8
+  # number-to-text comparison, determinism, positions, failure, memory,
+  # version, nesting, size, packing, the slice, and headless Chromium.
   wasm:
     strategy:
       fail-fast: false
@@ -103,16 +114,25 @@ jobs:
         run: |
           rustup toolchain install
           rustup target add wasm32-unknown-unknown
-      - name: Build the native mesh to compare with
-        run: cargo build --locked -p mesh-cli
+      - name: Build the native mesh and runtime harness to compare with
+        # Two builds: `--example` would limit one build to the example,
+        # leaving out the `mesh` binary.
+        run: |
+          cargo build --locked -p mesh-cli
+          cargo build --locked -p mesh-runtime-wasm --example harness
+      # Writes every call it makes to target/mesh-runtime-property/, for
+      # the runtime package's parity test.
+      - name: The native property test's requests
+        run: cargo test --locked -p mesh-runtime --test property
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
       - name: Build
         working-directory: packages
         run: |
-          npm ci
+          npx --yes npm@11 ci
           npm run build:wasm -w @valancex/mesh-compiler
+          npm run build:wasm -w @valancex/mesh-runtime
           npm run build
           npm run typecheck
       - name: Install Chromium
@@ -120,7 +140,9 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Test
         working-directory: packages
-        run: npm test -w @valancex/mesh-compiler
+        run: |
+          npm test -w @valancex/mesh-compiler
+          npm test -w @valancex/mesh-runtime
 
   # Every shipped mesh-lsp binary, built and exercised on a runner of its
   # own OS and architecture (outline v0.4 D8, D9): the transport tests run
@@ -170,7 +192,7 @@ jobs:
       - name: Install the packages from tarballs
         working-directory: packages
         run: |
-          npm ci
+          npx --yes npm@11 ci
           npm run build -w @valancex/mesh-lsp
           node mesh-lsp/scripts/install-local.mjs "../target/${{ matrix.triple }}/release/mesh-lsp${{ matrix.exe }}" "$RUNNER_TEMP/mesh-lsp" | tail -n 1 > "$RUNNER_TEMP/installed.json"
           echo "MESH_LSP_LAUNCHER=$(node -p "require(process.argv[1]).launcher" "$RUNNER_TEMP/installed.json")" >> "$GITHUB_ENV"
@@ -194,4 +216,4 @@ jobs:
       - name: Build for WebAssembly on the MSRV
         run: |
           rustup target add wasm32-unknown-unknown --toolchain 1.91.0
-          cargo +1.91.0 build --locked -p mesh-wasm --target wasm32-unknown-unknown
+          cargo +1.91.0 build --locked -p mesh-wasm -p mesh-runtime-wasm --target wasm32-unknown-unknown

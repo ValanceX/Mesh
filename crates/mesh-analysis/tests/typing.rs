@@ -52,14 +52,24 @@ fn analyze(source: &str) -> Analysis {
 }
 
 /// `expression`, as the content of a `<box>`: its type (as displayed), if
-/// it has one, and every fact reported.
+/// it has one, and every fact reported about typing it.
+///
+/// Content is only the harness here: a list or record in content is also
+/// `content-not-text` (§9.7.8, tested in `content.rs`), which says nothing
+/// about the expression's type, so those facts are left out.
 fn type_of(expression: &str) -> (Option<String>, Vec<Fact>) {
     let source = format!("<box>{{{expression}}}</box>");
     let analysis = analyze(&source);
     let ty = analysis
         .type_at(at(&source, expression))
         .map(|ty| ty.to_string());
-    (ty, analysis.facts().to_vec())
+    let facts = analysis
+        .facts()
+        .iter()
+        .filter(|fact| !matches!(fact, Fact::ContentNotText { .. }))
+        .cloned()
+        .collect();
+    (ty, facts)
 }
 
 /// The type of `expression`, which must type without any fact.

@@ -1,0 +1,5 @@
+<page title={title}>
+  <user-card user={first} compact={compact} />
+  <user-card user={second} />
+  <button on.click={refresh()}>Refresh</button>
+</page>

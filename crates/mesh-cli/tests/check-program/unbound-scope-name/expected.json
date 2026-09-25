@@ -1,0 +1,1 @@
+{"diagnostics":[{"code":"assembly-unbound-scope-name","location":{"component":"view","kind":"source","span":{"end":{"byte":21,"utf16":21},"start":{"byte":0,"utf16":0}}},"message":"`frame`'s scope name `caption` has no prop of that name to bind it","severity":"error"}],"version":1}

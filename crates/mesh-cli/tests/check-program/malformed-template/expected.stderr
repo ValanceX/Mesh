@@ -1,0 +1,3 @@
+error[assembly-malformed-template]: the template is malformed: not a template-v1 document: invalid type: integer `7`, expected a string
+  --> malformed.template.json
+
