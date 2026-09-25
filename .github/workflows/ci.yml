@@ -75,7 +75,11 @@ jobs:
       - name: Test
         run: cargo test --workspace --no-fail-fast
 
-  # The npm workspace builds and typechecks.
+  # The npm workspace builds and typechecks. `packages/package-lock.json`
+  # is npm 11's (docs/README.md): with the platform packages published,
+  # npm 10 resolves them from the registry instead of the workspace's
+  # `file:` overrides and rejects the lockfile, so every `npm ci` of the
+  # workspace here runs npm 11.
   packages:
     runs-on: ubuntu-latest
     steps:
@@ -86,7 +90,7 @@ jobs:
       - name: Build, typecheck, and test the launcher
         working-directory: packages
         run: |
-          npm ci
+          npx --yes npm@11 ci
           npm run build
           npm run typecheck
           npm test -w @valancex/mesh-lsp
@@ -122,7 +126,7 @@ jobs:
       - name: Build
         working-directory: packages
         run: |
-          npm ci
+          npx --yes npm@11 ci
           npm run build:wasm -w @valancex/mesh-compiler
           npm run build:wasm -w @valancex/mesh-runtime
           npm run build
@@ -184,7 +188,7 @@ jobs:
       - name: Install the packages from tarballs
         working-directory: packages
         run: |
-          npm ci
+          npx --yes npm@11 ci
           npm run build -w @valancex/mesh-lsp
           node mesh-lsp/scripts/install-local.mjs "../target/${{ matrix.triple }}/release/mesh-lsp${{ matrix.exe }}" "$RUNNER_TEMP/mesh-lsp" | tail -n 1 > "$RUNNER_TEMP/installed.json"
           echo "MESH_LSP_LAUNCHER=$(node -p "require(process.argv[1]).launcher" "$RUNNER_TEMP/installed.json")" >> "$GITHUB_ENV"
