@@ -1,0 +1,21 @@
+{
+  "name": "@valancex/mesh-lsp-win32-x64",
+  "version": "0.3.0",
+  "description": "The native mesh-lsp language server for win32 x64. Installed by @valancex/mesh-lsp; not meant to be used directly.",
+  "license": "MIT",
+  "author": "Jack Miller <jackmiller0899@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ValanceX/Mesh.git",
+    "directory": "packages/mesh-lsp-win32-x64"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/mesh-lsp.exe"
+  ]
+}

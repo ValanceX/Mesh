@@ -4,7 +4,8 @@
   "description": "The npm workspace of MESH's packages. Not published.",
   "license": "MIT",
   "workspaces": [
-    "mesh-*"
+    "mesh-compiler",
+    "mesh-lsp"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

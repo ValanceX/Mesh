@@ -74,12 +74,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - name: Build and typecheck
+      - name: Build, typecheck, and test the launcher
         working-directory: packages
         run: |
           npm ci
           npm run build
           npm run typecheck
+          npm test -w @valancex/mesh-lsp
 
   # The compiler in WebAssembly, and @valancex/mesh-compiler around it
   # (outline v0.4 Pass 1), on each Node LTS release the package supports:
@@ -116,6 +117,64 @@ jobs:
       - name: Test
         working-directory: packages
         run: npm test -w @valancex/mesh-compiler
+
+  # Every shipped mesh-lsp binary, built and exercised on a runner of its
+  # own OS and architecture (outline v0.4 D8, D9): the transport tests run
+  # against the binary, then through the launcher installed from
+  # tarballs, then npm's install scenarios run. Nothing here is
+  # cross-compiled, and only these tests run per architecture.
+  native-binaries:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux-x64, runner: ubuntu-24.04, triple: x86_64-unknown-linux-musl, exe: "" }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm, triple: aarch64-unknown-linux-musl, exe: "" }
+          - { target: darwin-x64, runner: macos-15-intel, triple: x86_64-apple-darwin, exe: "" }
+          - { target: darwin-arm64, runner: macos-15, triple: aarch64-apple-darwin, exe: "" }
+          - { target: win32-x64, runner: windows-2025, triple: x86_64-pc-windows-msvc, exe: ".exe" }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      # macOS binaries run on macOS 11 and later.
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      # The Windows binary needs no Visual C++ runtime installed.
+      RUSTFLAGS: ${{ startsWith(matrix.target, 'win32') && '-C target-feature=+crt-static' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+      # Linux binaries are static musl builds, so they run on any
+      # distribution; musl-gcc compiles Tree-sitter's C for them.
+      - name: Install musl
+        if: startsWith(matrix.target, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          echo "CC_$(echo '${{ matrix.triple }}' | tr - _)=musl-gcc" >> "$GITHUB_ENV"
+      - name: Install Rust
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.triple }}
+      - name: Build mesh-lsp
+        run: cargo build --release --locked -p mesh-lsp --target ${{ matrix.triple }}
+      - name: Transport tests, against the binary
+        run: cargo test --release --locked --target ${{ matrix.triple }} -p mesh-lsp --test transport
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install the packages from tarballs
+        working-directory: packages
+        run: |
+          npm ci
+          npm run build -w @valancex/mesh-lsp
+          node mesh-lsp/scripts/install-local.mjs "../target/${{ matrix.triple }}/release/mesh-lsp${{ matrix.exe }}" "$RUNNER_TEMP/mesh-lsp" | tail -n 1 > "$RUNNER_TEMP/installed.json"
+          echo "MESH_LSP_LAUNCHER=$(node -p "require(process.argv[1]).launcher" "$RUNNER_TEMP/installed.json")" >> "$GITHUB_ENV"
+      - name: Transport tests, through the installed launcher
+        run: cargo test --release --locked --target ${{ matrix.triple }} -p mesh-lsp --test transport
+      - name: npm's install scenarios
+        working-directory: packages/mesh-lsp
+        run: node test/install.mjs "../../target/${{ matrix.triple }}/release/mesh-lsp${{ matrix.exe }}"
 
   # Checks the declared `rust-version`: the workspace, with its committed
   # Cargo.lock, still compiles on 1.91. (This shows 1.91 works; it doesn't

@@ -8,13 +8,19 @@ Everything the server says comes from the MESH compiler: its diagnostics are exa
 
 ## 1. Install the language server
 
-From the repo:
+With npm (from v0.4.0, when the packages are published), on Linux x64 or arm64, macOS x64 or arm64, or Windows x64:
+
+```console
+$ npm install -g @valancex/mesh-lsp
+```
+
+Or from the repo, anywhere Rust runs:
 
 ```console
 $ cargo install --path crates/mesh-lsp
 ```
 
-This puts `mesh-lsp` in `~/.cargo/bin`, beside `mesh`. Your editor starts it; you don't run it yourself.
+Either puts `mesh-lsp` on your `PATH`: npm's starts the native server it installed for your platform, and `cargo install`'s is the server itself, in `~/.cargo/bin` beside `mesh`. Your editor starts it; you don't run it yourself.
 
 ## 2. Build the parser
 
@@ -98,7 +104,7 @@ Open `examples/users-page.mprx` from a clone of the repo to try it: hover `user.
 - The server's messages (a document with no configured component, a manifest it couldn't read) go to Neovim's LSP log, `:lua vim.cmd.tabnew(vim.lsp.get_log_path())`. Neovim keeps only warnings and errors unless you lower its level with `vim.lsp.log.set_level("info")`.
 - **On Linux and BSD,** Neovim doesn't let servers watch files, so a manifest changed outside Neovim is reloaded when you open it in Neovim or change the settings. Editing it in Neovim takes effect as you type, everywhere.
 
-To check this setup yourself, run `editors/neovim/verify.sh` from the repo. It builds everything into a temporary directory, leaves your own Neovim configuration alone, and checks diagnostics, hover, definition, completion, highlighting and manifest edits.
+To check this setup yourself, run `editors/neovim/verify.sh` from the repo. It builds everything into a temporary directory, leaves your own Neovim configuration alone, and checks diagnostics, hover, definition, completion, highlighting and manifest edits. To check an installed server instead of one built from the repo, point `MESH_LSP` at it: `MESH_LSP="$(npm prefix -g)/bin/mesh-lsp" editors/neovim/verify.sh` for npm's.
 
 ## Helix
 

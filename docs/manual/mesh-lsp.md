@@ -16,13 +16,21 @@ Syntax highlighting comes from the grammar's Tree-sitter queries, not from the s
 
 ## Installing
 
-From a clone of the repo:
+With npm (from v0.4.0, when the packages are published), no Rust needed:
+
+```console
+$ npm install -g @valancex/mesh-lsp
+```
+
+This puts `mesh-lsp` on your `PATH`. npm installs the native server for your platform, one of Linux x64 and arm64, macOS x64 and arm64, and Windows x64, and `mesh-lsp` starts it, changing nothing the editor sees. Don't pass `--omit=optional`: the binary is an optional dependency.
+
+Anywhere else, or from a clone of the repo:
 
 ```console
 $ cargo install --path crates/mesh-lsp
 ```
 
-This installs a binary named `mesh-lsp` into `~/.cargo/bin`. Your editor starts it; you don't run it yourself.
+This installs a binary named `mesh-lsp` into `~/.cargo/bin`. Either way, your editor starts it; you don't run it yourself.
 
 ## Configuring
 

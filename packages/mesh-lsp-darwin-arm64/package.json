@@ -1,0 +1,21 @@
+{
+  "name": "@valancex/mesh-lsp-darwin-arm64",
+  "version": "0.3.0",
+  "description": "The native mesh-lsp language server for darwin arm64. Installed by @valancex/mesh-lsp; not meant to be used directly.",
+  "license": "MIT",
+  "author": "Jack Miller <jackmiller0899@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ValanceX/Mesh.git",
+    "directory": "packages/mesh-lsp-darwin-arm64"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/mesh-lsp"
+  ]
+}
