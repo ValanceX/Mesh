@@ -17,7 +17,9 @@
 //! identifiers.
 //!
 //! `MESH_PROPERTY_SNAPSHOTS` (default 100 per template) and
-//! `MESH_PROPERTY_SEED`.
+//! `MESH_PROPERTY_SEED`. Every call it makes is written, as a request for
+//! the native harness, to `target/mesh-runtime-property/`, where the
+//! runtime package's parity test replays it.
 
 mod common;
 
@@ -330,6 +332,47 @@ struct Case<'a> {
 struct Counts {
     renders: u64,
     stops: u64,
+    /// Every call made, as a request for the native harness
+    /// (`mesh-runtime-wasm`'s example), which the runtime package's parity
+    /// test replays through WebAssembly and natively.
+    requests: Vec<String>,
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    for chunk in bytes.chunks(3) {
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, &b)| n | (u32::from(b) << (16 - 8 * i)));
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(ALPHABET[((n >> (18 - 6 * i)) & 63) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
+/// Writes `counts`' requests to `target/mesh-runtime-property/<name>.jsonl`.
+fn write_requests(name: &str, counts: &Counts) {
+    let dir = root().join("target/mesh-runtime-property");
+    fs::create_dir_all(&dir).unwrap();
+    let mut text = counts.requests.join("\n");
+    text.push('\n');
+    fs::write(dir.join(format!("{name}.jsonl")), text).unwrap();
+}
+
+fn handlers(node: &Node, out: &mut Vec<String>) {
+    out.extend(node.events.values().cloned());
+    for child in &node.children {
+        if let TreeChild::Node(child) = child {
+            handlers(child, out);
+        }
+    }
 }
 
 /// The evaluation diagnostics `case` may stop at: those whose source is
@@ -377,6 +420,7 @@ fn run(
     };
     let scope = &case.manifest.components()[case.root].scope;
     let label = &case.label;
+    let encoded = base64(&mesh_runtime::encoding::encode_texts(&texts));
     let mut shape: Option<String> = None;
     for _ in 0..snapshots {
         let mut fields: Vec<(HostKey, HostValue)> = scope
@@ -387,9 +431,26 @@ fn run(
             .collect();
         shuffle(rng, &mut fields);
         let snapshot = HostRecord(fields);
+        let request = serde_json::json!({
+            "op": "render",
+            "root": case.root,
+            "templates": encoded,
+            "model": case.model,
+            "snapshot": base64(&mesh_runtime::encoding::encode_value(&HostValue::Record(snapshot.clone()))),
+        });
+        counts.requests.push(request.to_string());
         match mesh_runtime::render(&program, case.model, &snapshot) {
             Ok(render) => {
                 counts.renders += 1;
+                let mut found = Vec::new();
+                handlers(&render.tree().root, &mut found);
+                for handler in found {
+                    let mut dispatch = request.clone();
+                    dispatch["op"] = "dispatch".into();
+                    dispatch["handler"] = handler.into();
+                    dispatch["payload"] = Value::Null;
+                    counts.requests.push(dispatch.to_string());
+                }
                 let document: Value = serde_json::from_str(&render.tree().to_json()).unwrap();
                 assert!(validator.is_valid(&document), "{label}: {document}");
                 let mut this = String::new();
@@ -461,6 +522,7 @@ fn generated_snapshots_render_or_stop_at_a_present_source() {
         run(&case, snapshots, &mut rng, &validator, &mut counts);
     }
     assert!(programs >= 20, "only {programs} corpus programs compiled");
+    write_requests("corpus", &counts);
     println!(
         "property: {programs} programs × {snapshots} snapshots of seed {seed}: \
          {} rendered, {} stopped at a present source; \
@@ -510,6 +572,7 @@ fn generated_snapshots_of_composed_programs() {
         run(&case, snapshots, &mut rng, &validator, &mut counts);
     }
     assert!(composed >= 1, "no program of several templates");
+    write_requests("composed", &counts);
     println!(
         "property (composed): {} rendered, {} stopped at a present source",
         counts.renders, counts.stops
