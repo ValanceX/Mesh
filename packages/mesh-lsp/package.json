@@ -1,23 +1,22 @@
 {
-  "name": "@valance/mesh-lsp",
-  "version": "0.0.1",
-  "description": "Launcher for the mesh-lsp language server. It starts the Rust mesh-lsp binary; all language semantics live there, in mesh-compiler.",
+  "name": "@valancex/mesh-lsp",
+  "version": "0.3.0",
+  "description": "Starts the native mesh-lsp language server for your platform. All language semantics live in the Rust binary.",
   "type": "module",
   "license": "MIT",
   "author": "Jack Miller <jackmiller0899@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ValanceX/Mesh.git",
+    "directory": "packages/mesh-lsp"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": {
-    "mesh-lsp": "./dist/cli.js"
-  },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "typescript": "^5.6.0"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   }
 }

@@ -10,6 +10,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 - **UTF-16 positions in `mesh check --format json`.** Every position also gives `utf16`, the same place as `byte` counted in UTF-16 code units (what a JavaScript string indexes, so `source.slice(start.utf16, end.utf16)` is the span's text), and `utf16Column`, its column in UTF-16 code units. The document's `version` is still 1, as its promise allows, and the schema lists both.
 - **Rust API: `SourceMap::utf16_offset`,** the UTF-16 offset of a byte.
 
+### Changed
+
+- **The npm packages are now `@valancex/mesh-compiler` and `@valancex/mesh-lsp`,** under ValanceX, the project's name, and versioned with the Rust workspace. The `mesh-language` placeholder is gone. None was ever published.
+
 ### Fixed
 
 - **`mesh-lsp` on Windows: verbatim and UNC paths.** A path such as `\\?\C:\work\a.mprx`, the form Windows' path canonicalization returns, became a URI no client could read (`file:////%3F/C:/...`); it is now `file:///C:/work/a.mprx`. A network share, `\\server\share\a.mprx`, is now `file://server/share/a.mprx`.

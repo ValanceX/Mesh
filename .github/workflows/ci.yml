@@ -66,6 +66,21 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+  # The npm workspace builds and typechecks.
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Build and typecheck
+        working-directory: packages
+        run: |
+          npm ci
+          npm run build
+          npm run typecheck
+
   # Checks the declared `rust-version`: the workspace, with its committed
   # Cargo.lock, still compiles on 1.91. (This shows 1.91 works; it doesn't
   # show that nothing older would.)

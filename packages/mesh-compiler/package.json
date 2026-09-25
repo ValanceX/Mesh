@@ -1,10 +1,15 @@
 {
-  "name": "@valance/mesh-compiler",
-  "version": "0.0.1",
-  "description": "Semantic analysis, type checking, diagnostics, and compilation for MPRX (thin wrapper over the mesh-compiler Rust crate, native or WASM).",
+  "name": "@valancex/mesh-compiler",
+  "version": "0.3.0",
+  "description": "The MESH compiler, built for WebAssembly: checks MPRX against a component manifest and returns its diagnostics.",
   "type": "module",
   "license": "MIT",
   "author": "Jack Miller <jackmiller0899@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ValanceX/Mesh.git",
+    "directory": "packages/mesh-compiler"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -12,12 +17,6 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@valance/mesh-language": "0.0.1"
-  },
-  "devDependencies": {
-    "typescript": "^5.6.0"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   }
 }
