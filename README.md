@@ -20,7 +20,7 @@ Because MPRX is small, MESH can parse, validate, and compile every UI before it 
 - **Familiar syntax.** Tags, attributes, and `{expressions}` work the way you'd expect if you've used HTML, JSX, Vue, or Svelte.
 - **Checked before it runs.** Invalid syntax is caught at compile time, not in front of users. Against a component manifest, so is every unknown component, prop, event, name or command, and every value of the wrong type.
 - **Safe for generated UI.** MPRX can only express structure, bindings, simple expressions, and *intent*. Something like `selectUser($event)` is a request for NEXUS to handle, not code that MESH runs.
-- **Renderer-independent.** A compiled MESH tree carries no assumptions about DOM, Canvas, or hardware. [PORT](https://github.com/ValanceX/Port) decides how it's drawn.
+- **Renderer-independent.** A compiled MESH tree carries no assumptions about DOM, Canvas, or hardware. [PORT](https://github.com/ValanceX/Port) decides how each target realizes it.
 - **One brain for compiler and editor.** The language server reuses the compiler itself, so your editor and your build always agree.
 
 ## Try it

@@ -29,7 +29,7 @@ Handler identifier + payload + the render   → MESH runtime → command intent 
 ```
 
 - **NEXUS** holds the state and runs the commands. Its adapter is a MESH **host**: it renders a program against a snapshot of its state, keeps each render, and dispatches the events a renderer reports with the render they came from. See [Integrating MESH with NEXUS](./guides/integrating-mesh-with-nexus.md).
-- **PORT** draws. Its renderers get render trees: primitive components with final values, and nothing to evaluate. See [Rendering MESH output](./guides/rendering-mesh-output.md).
+- **PORT** realizes the UI on a target. Today its renderers get render trees: primitive components with final values, and nothing to evaluate. See [Rendering MESH output](./guides/rendering-mesh-output.md).
 
 Whatever changes, MESH stays **renderer-independent**. It never assumes a DOM, a canvas, or a particular device.
 
@@ -166,6 +166,21 @@ The runtime's inputs and outputs are JSON documents with published schemas, so n
 
 The Semantic IR itself stays internal to the compiler. The [templates manual](./manual/templates.md) and the [runtime manual](./manual/runtime.md) are the contracts.
 
+## Direction: semantics, not implementations
+
+Valance is a semantic platform with progressively specialized target implementations. MESH's share of that is **template semantics and semantic correctness**: it says what the UI means, and PORT decides how each target realizes it.
+
+- **Abstract what has stable meaning.** Component structure, bindings, identity, interaction intent, relationships between elements, accessibility intent, update semantics and portable style concepts belong in MESH. DOM internals, widget toolkits, compositors, GPU APIs and target layout machinery don't, even as a lowest-common-denominator model. `on.click` is interaction intent, not a DOM event.
+- **Describe guarantees, not mechanisms.** What MESH hands on should say "this element has stable identity" or "these updates may be batched", not "this node is type 17". Then MESH can change its internals without breaking a PORT. Before changing a published format, ask: *did the semantic contract change, or only the implementation?* Only the first must be visible to consumers, and explicitly.
+- **Keep useful information.** The semantic output should keep what a PORT could use to make better decisions, not flatten everything into a generic node early. New information should improve realization, never become a requirement for correctness, so an older PORT that ignores it stays correct.
+- **No single frozen IR.** MESH output is one representation among several (NEXUS, MESH, PORT, target), each with its own scope. The contract stabilizes meaning, not every data structure. Today that output is templates and render trees; it's expected to grow as the first PORT shows what it needs.
+- **Targets describe themselves.** MESH never keeps an encyclopedia of platforms. A PORT reports what its target can guarantee, and MESH and its tooling may reason about those capabilities.
+- **Styling follows the same split.** MESH may analyze portable style semantics (`padding`, `display: flex`). Target-specific behavior is explicit, as a rule condition like `@target linux { … }` alongside `@media (width < 600px) { … }`, never by pretending every target styles alike. PORT realizes the result.
+- **Inspectable.** A developer should eventually be able to trace an element from MPRX through the MESH output into what a PORT made of it. MESH's part is keeping source locations and stable identity available for that.
+- **Escape hatches are explicit.** Descending to PORT capabilities, target primitives or native APIs has to be visibly marked as leaving the portable layer, never done by quietly letting platform details into MPRX.
+
+None of this is implemented yet beyond templates and render trees. It's the direction later formats and language features should follow.
+
 ## The rules
 
 These invariants hold for everything in this repo:
@@ -183,3 +198,5 @@ These invariants hold for everything in this repo:
 11. **Renderers see values, never MPRX.** A render tree holds primitive component names, final prop values, text, handler identifiers and keys, and nothing else. Keys and handler identifiers are opaque: they don't reveal those names to anyone without the templates. But they're not secret.
 12. **The host is checked, not trusted.** The model, the templates, the snapshot, every payload, every handler identifier and every render are validated on every call.
 13. **Dependencies point one way.** No MESH crate or package depends on NEXUS, PORT or Effect. NEXUS's adapter depends on `@valancex/mesh-runtime`, and PORT's renderers on MESH's render-tree types. NEXUS and PORT don't depend on each other. Any program can be a host, and MESH's own tests use one.
+14. **Abstract semantics, not implementations.** Nothing target-specific enters MESH unless an application marks it as target-specific explicitly.
+15. **Formats carry guarantees, not internals.** Optional information in MESH output improves realization but is never needed for correctness.
