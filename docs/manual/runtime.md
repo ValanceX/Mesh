@@ -28,7 +28,7 @@ A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any p
 **The dispatch lifecycle:**
 1. The host calls render with a program, a model and a snapshot. The result is a render.
 2. The host gives the render's tree to the renderer, and keeps the render.
-3. A primitive's event fires. The renderer reports the handler identifier from the tree it drew, and a payload.
+3. An interaction occurs on the drawn tree. The renderer resolves it to at most one binding (§9.9) and reports that binding's handler identifier, from the tree it drew, with the event's payload. An interaction that resolves to nothing is not reported.
 4. The host calls dispatch with **the render whose tree the renderer had drawn** when the event fired, and with that identifier and payload.
 5. The runtime validates the render's program and model (program validation).
 6. It validates the handler identifier against the render's program, then the render's snapshot and the payload (input validation).
@@ -55,14 +55,17 @@ A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any p
 
 ## The render tree
 
-The render tree is [`schemas/render-v1.schema.json`](../../schemas/render-v1.schema.json). The keys, handler identifiers and program identities in this manual's examples are illustrative, though their layout is the runtime's. It contains exactly primitive component names, prop names with values from the boundary data model (§9.8.1), text runs as strings, event names each with a handler identifier, and keys. It contains nothing else: no expression, scope name, command, argument, composite name, template, span or `$event`.
+The render tree is [`schemas/render-v1.schema.json`](../../schemas/render-v1.schema.json). The keys, handler identifiers and program identities in this manual's examples are illustrative, though their layout is the runtime's. It contains exactly primitive component names, prop names with values from the boundary data model (§9.8.1), the text of each number, boolean and `null` prop, text runs as strings, event names each with a handler identifier, and keys. It contains nothing else: no expression, scope name, command, argument, composite name, template, span or `$event`.
 
-- **A node** is a primitive occurrence: `{ "type": "node", "key", "component", "props", "events", "children" }`.
-  - `props` maps each written prop to its value. An absent value is an omitted prop; `null` is `null`.
+- **A node** is a primitive occurrence: `{ "type": "node", "key", "component", "props", "events", "children" }`, and `"propText"` when it has any.
+  - `props` maps each written prop to its value: a semantic value, evaluated and checked against the prop's declared type, not realized for any target (§9.8.2). An absent value is an omitted prop; `null` is `null`.
+  - `propText` (since v0.6) maps each prop whose value is a number, a boolean or `null` to that value's MESH text (§9.7.7): `"42"`, `"false"`, `"null"`. A string prop has no entry, since its text is its value; a list or record prop has none, since it has no text (§9.7.8); an absent prop has no entry in either map. The member is present exactly when some prop has an entry. A renderer that puts such a prop in a slot that holds only text uses this text (§9.8.7).
   - `events` maps each event binding's event name to its handler identifier.
   - `children` lists nodes and text runs, in order.
 - **Composites never appear.** A composite occurrence is replaced by what its template produced: exactly one node, since a template has one root element.
 - **A text run** is `{ "type": "text", "key", "text" }`: the text (§9.7.7) of a maximal sequence of adjacent literal text and interpolation children. A text run is present even when it's empty.
+
+The example's components are the slice's (`examples/slice/components.json`), and every value in it fits that manifest: `avatar`'s `src` is a `string?` and its `size` a `string`, and `button`'s `disabled` a `boolean`, whose text is in `propText`.
 
 MPRX has no loops and no conditional elements, so **a program's render trees all have the same structure, whatever the snapshot.** Only prop values and text differ.
 
@@ -72,14 +75,20 @@ MPRX has no loops and no conditional elements, so **a program's render trees all
   "version": 1,
   "root": {
     "type": "node", "key": "kD2_VHca9Ag2dUolhbZRbBg", "component": "page",
-    "props": { "title": "Users" },
+    "props": { "title": "Team" },
     "events": {},
     "children": [
-      { "type": "text", "key": "kSPIXXSPi5uAsdGkh9bPbbA", "text": "2 users" },
       { "type": "node", "key": "k3oBD74HDIG2MzUDltfcVfw", "component": "avatar",
-        "props": { "src": null, "alt": "Ada", "size": 48 },
+        "props": { "src": "ada.png", "alt": "Ada Lovelace", "size": "sm" },
         "events": { "click": "hDPuYKw885Yg.jn4fVuysv6d-WkiS01rl6A" },
-        "children": [] }
+        "children": [] },
+      { "type": "node", "key": "kJ0mCg4AmY3XDu2vF9Hq1rw", "component": "button",
+        "props": { "disabled": false },
+        "propText": { "disabled": "false" },
+        "events": { "click": "hDPuYKw885Yg.Tq3oZ8vN1WcI5yXeLr0bKg" },
+        "children": [
+          { "type": "text", "key": "kSPIXXSPi5uAsdGkh9bPbbA", "text": "Refresh" }
+        ] }
     ]
   }
 }
@@ -175,6 +184,18 @@ It is `$defs/intent` in `render-v1.schema.json`:
 
 NEXUS's adapter maps an intent to a NEXUS command (for example, `user-card`'s `selectUser` to `"users.select"`) and its input. That mapping is the adapter's own. **A renderer never receives an intent.**
 
+## Event resolution
+
+Which binding one interaction reaches is MESH's rule (§9.9), the same on every target, and needs only the render tree:
+
+1. Start at the **interacted node**: the innermost node the interaction is on (an interaction on a text run is on its parent node).
+2. If that node's primitive has an **applicable event** for the interaction (the one of its events the interaction constitutes, by the primitive's definition), and the node binds that event, that binding receives the interaction. Stop.
+3. Otherwise go to the parent, towards the root. If no node qualifies, nothing is reported.
+
+So one interaction gives at most one handler identifier, one dispatch and one intent. This is **event resolution, not DOM bubbling**: there are no phases, no event reaches a second binding, and MPRX has no syntax to change any of it.
+
+A renderer implements the rule for its target, and checks itself against `examples/conformance/events/`: real programs and trees, interactions (a node key, and the applicable event per primitive), and the handler identifier and intent each resolves to, or none. From Rust, `mesh_runtime::resolve(&tree, &Interaction { target, applicable })` is the reference implementation: it returns the `Resolved` binding (its node's key, the event and the handler identifier) or `None`, and refuses a target key that isn't in the tree. It evaluates nothing and needs no program, so a renderer needs none of MESH's code to do the same.
+
 ## Updates
 
 - **A change of values is a new render.** The whole program is evaluated again, and the result is a complete new render tree.
@@ -184,8 +205,8 @@ NEXUS's adapter maps an intent to a NEXUS command (for example, `user-card`'s `s
 ## What renderers and hosts must do
 
 A **renderer**:
-- draws each node's component with its props, and each text run's text, **as given**. It computes nothing: it doesn't format numbers, supply a missing prop, or convert values. Values are final;
-- reports an event as its handler identifier and payload, and never interprets either;
+- realizes each node's props, and each text run's text, **as given** (§9.8.7): a prop value natively, in a target slot that holds a value of its kind exactly, or, in a slot that holds only text, as its MESH text: a string prop's value, or the prop's `propText` entry. It computes nothing: it doesn't format numbers, convert or coerce values (by a platform's conversion, a host language's formatting, JSON or anything else), or supply a missing prop. A value with no conforming slot, such as a list or record where only text fits, is the renderer's failure to report, never a value to substitute;
+- resolves each interaction to at most one binding by event resolution (§9.9), and reports that binding's handler identifier and the event's payload, never interpreting either;
 - compares keys only for equality, and reconciles by key only between trees its host says come from one program;
 - surfaces a node of a component it doesn't know, rather than dropping it (a composite whose template a program left out arrives as a node of its name).
 
@@ -197,10 +218,10 @@ A **host**:
 
 ## Number to text
 
-Text for a number is §9.7.7.1's, and nothing else decides it: the shortest digits that read back as the number, the nearest of those, and the even one of two equally near. The runtime generates these digits with its own exact code (`mesh_runtime::number_to_text`), and reproduces every row of the normative table, [`docs/tables/number-to-text.tsv`](../tables/number-to-text.tsv), natively and in WebAssembly.
+Text for a number is §9.7.7.1's, in text runs and in `propText` alike, and nothing else decides it: the shortest digits that read back as the number, the nearest of those, and the even one of two equally near. The runtime generates these digits with its own exact code (`mesh_runtime::number_to_text`), and reproduces every row of the normative table, [`docs/tables/number-to-text.tsv`](../tables/number-to-text.tsv), natively and in WebAssembly.
 - **It doesn't use Rust's standard formatting,** which rounds the equally near cases up: on Rust 1.98.1 it fails 4 of the table's 82 finite rows, all such ties. Its layout differs too: it never uses an exponent.
 - **It doesn't use `ryu`** in v0.5, because there is no citable evidence that it chooses the nearest candidate and breaks ties to even. A library could replace MESH's code only with that evidence.
-- **It isn't a JavaScript engine's `String(x)`.** ECMA-262 leaves the last digit open, so an engine may differ from MESH without breaking ECMA-262. A differential test compares MESH with V8, and found no difference over 1,000,000 values on Node 22, but V8 is not the authority. A renderer draws MESH's text as given, and never formats a number itself.
+- **It isn't a JavaScript engine's `String(x)`.** ECMA-262 leaves the last digit open, so an engine may differ from MESH without breaking ECMA-262. A differential test compares MESH with V8, and found no difference over 1,000,000 values on Node 22, but V8 is not the authority. A renderer draws MESH's text as given (a text run, or a prop's `propText`), and never formats a number itself.
 
 ## Diagnostics
 

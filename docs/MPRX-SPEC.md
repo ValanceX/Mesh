@@ -7,7 +7,7 @@ MPRX (MeshExpr) is the declarative UI language at the heart of [MESH](../README.
 - **Want a gentler introduction?** The [Writing MPRX guide](./guides/writing-mprx.md) covers the same ground with examples and common mistakes.
 - **Implementing something?** Write against this spec rather than inventing syntax inline. The plans in `docs/superpowers/plans/` build it out step by step.
 
-This is a **living document**. It was updated as each pass shipped and now describes MESH v0.5, whose syntax is v0.2's: §2–§8 are the syntax and its representation, and §9 is what a file means when it's checked against a component manifest, and, in §9.7 and §9.8, what a checked file does when it runs and how values cross into and out of it. The "Introduced in" column in §8 shows which pass added each node kind.
+This is a **living document**. It was updated as each pass shipped and now describes MESH v0.6, whose syntax is v0.2's: §2–§8 are the syntax and its representation, and §9 is what a file means when it's checked against a component manifest; in §9.7 and §9.8, what a checked file does when it runs, how values cross into and out of it, and what may be done with them after; and in §9.9, which binding an interaction reaches. The "Introduced in" column in §8 shows which pass added each node kind.
 
 ---
 
@@ -73,7 +73,9 @@ v0.5 adds no syntax. It adds MPRX's evaluation (§9.7) and the boundary between 
 | 3 | The program check, and the runtime in JavaScript | ✅ Shipped |
 | 4 | Documentation and release | ✅ Shipped |
 
-*Last updated 2026-09-26. v0.5 is released as v0.5.0, v0.4 as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.5](./releases/v0.5.md), [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them and whose later passes implemented them. Any further grammar or semantics work starts a new spec.*
+v0.6 adds no syntax either. It settles two questions PORT's first renderer raised (`docs/superpowers/specs/2026-09-27-mesh-port-semantic-resolution.md`): the text of a value applies to props too, delivered in the render tree as `propText` (§9.7.7, §9.7.8, §9.8.2), with the two ways a renderer may realize a value (§9.8.7); and event resolution (§9.9).
+
+*Last updated 2026-09-27; v0.6 is in preparation. v0.5 is released as v0.5.0, v0.4 as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.5](./releases/v0.5.md), [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them and whose later passes implemented them. Any further grammar or semantics work starts a new spec.*
 
 ---
 
@@ -631,19 +633,38 @@ These are the only points where evaluation can fail. Every other operation is to
 
 At any one point, the type check (items 1–5) comes before the output check (item 6).
 
-#### 9.7.7 Text
+#### 9.7.7 The text of a value
 
-Each interpolation in content is converted to text. A text run is the concatenation of its literal text and interpolations, in order. Literal text is kept exactly as the semantic model keeps it (§3).
+*Revised in v0.6: the text of a value applies to props as well as content.*
+
+A value's **text** is its MESH text representation. It is part of MPRX's semantics, and it is defined here and nowhere else:
 
 1. A string is itself.
 2. A boolean is `true` or `false`.
 3. `null` is `null`.
-4. **Absent is the empty string.**
-5. A finite number is converted by §9.7.7.1. A non-finite number never reaches text: it is stopped at the output check (§9.7.6).
+4. A finite number is converted by §9.7.7.1. A non-finite number never reaches an output: it is stopped at the output check (§9.7.6).
+5. A list and a record have **no text** (§9.7.8).
+
+Absence isn't a value, and has no text of its own. Where it can meet text, each use says what it means.
+
+The runtime produces every text, in the two places a value can be presented as text:
+
+- **Content.** Each interpolation in content is converted to its text. A text run is the concatenation of its literal text and interpolations, in order. Literal text is kept exactly as the semantic model keeps it (§3). **Absent is the empty string** in content. A list or record is an error (§9.7.8).
+- **Props.** A primitive prop whose value is a number, a boolean or `null` also carries that value's text in the render tree, as the node's `propText` (§9.8.2, `docs/manual/runtime.md`). A string prop needs no copy, because its text is its value. A list or record prop has none. An absent prop is omitted, so it has neither a value nor a text: an absent prop and a `null` prop (text `null`) are always distinguishable.
+
+Nothing outside the runtime converts a value to text (§9.8.7). The three steps, and who owns each:
+
+```text
+semantic value            the evaluated value, as the render tree gives it   (MESH: §9.7, §9.8)
+  ↓
+MESH text representation  this section; made by the runtime                  (MESH)
+  ↓
+target realization        the value natively, or its text, in a target slot  (PORT: §9.8.7)
+```
 
 ##### 9.7.7.1 Number to text
 
-The text of a finite number `x` is determined by this algorithm, and nothing else determines it:
+The text of a finite number `x` is determined by this algorithm, and nothing else determines it. It is the one text of a number: in content, and in a prop's `propText` alike.
 
 1. If `x` is `+0` or `-0`, the text is `0`.
 2. If `x` is negative, the text is `-` followed by the text of `−x`.
@@ -662,9 +683,12 @@ The text of a finite number `x` is determined by this algorithm, and nothing els
 
 Examples: `1.5`, `100`, `0.1`, `-2.5`; `0.000001` and `1e-7`; `123456789012345680000` and `1e+21`; `0.30000000000000004` for `0.1 + 0.2`; `5e-324` for the smallest subnormal (every one-digit candidate from `3e-324` to `7e-324` reads back as it, and `5` is nearest); `-0` is `0`.
 
-#### 9.7.8 Lists and records in content
+#### 9.7.8 Values without text: lists and records
 
-An interpolation whose static type is a list, a record, `list<nothing>`, or an optional of one of these is a check-time error, `content-not-text`, at the interpolation: no text form of one is obviously right. Named types are expanded first. An interpolation of type `any` or `any?` whose value turns out to be a list or a record is an evaluation error (§9.7.6, item 3).
+A list and a record have no text, anywhere: no text form of one is obviously right.
+
+- **In content,** an interpolation whose static type is a list, a record, `list<nothing>`, or an optional of one of these is a check-time error, `content-not-text`, at the interpolation. Named types are expanded first. An interpolation of type `any` or `any?` whose value turns out to be a list or a record is an evaluation error (§9.7.6, item 3).
+- **As a prop,** a list or record is a valid value, and goes out as is (§9.8.2), but with no `propText`. It can be realized only natively, in a target slot that holds the same structure (§9.8.7), never as text: not as JSON, a joined string or any other invented form.
 
 ### 9.8 The boundary
 
@@ -685,16 +709,18 @@ A value may cross a boundary, in either direction, only if it is one of these:
 
 #### 9.8.2 How each value crosses
 
-| Value | In (snapshot, payload) | Inside evaluation | Out (primitive prop, text run, command argument) |
-|---|---|---|---|
-| absent | no entry for a scope name or record field. A payload that isn't given is absent. | allowed | omitted prop; omitted record field; empty text; absent argument |
-| `null` | `null` | allowed | `null`; text `null` |
-| boolean | as is | allowed | as is; text `true` or `false` |
-| finite number | the exact binary64 value; `-0` is kept | allowed | as is, except that `-0` becomes `0`; text by §9.7.7.1 |
-| NaN, ±∞ | an input error | allowed | an evaluation error (§9.7.6) |
-| string | Unicode scalar values only: an unpaired surrogate is an input error | allowed | as is |
-| list | every element present | may hold absent elements | an absent element, at any depth, is an evaluation error |
-| record | exactly the declared fields (§9.8.4) | allowed | absent fields omitted |
+| Value | In (snapshot, payload) | Inside evaluation | Out: primitive prop and command argument | Out: text (text run, and a primitive prop's `propText`) |
+|---|---|---|---|---|
+| absent | no entry for a scope name or record field. A payload that isn't given is absent. | allowed | omitted prop; omitted record field; absent argument | empty text in a run; no `propText` entry (the prop is omitted) |
+| `null` | `null` | allowed | `null` | `null` |
+| boolean | as is | allowed | as is | `true` or `false` |
+| finite number | the exact binary64 value; `-0` is kept | allowed | as is, except that `-0` becomes `0` | by §9.7.7.1 |
+| NaN, ±∞ | an input error | allowed | an evaluation error (§9.7.6) | an evaluation error (§9.7.6) |
+| string | Unicode scalar values only: an unpaired surrogate is an input error | allowed | as is | itself; no `propText` entry, since the value is its text |
+| list | every element present | may hold absent elements | as is; an absent element, at any depth, is an evaluation error | none (§9.7.8) |
+| record | exactly the declared fields (§9.8.4) | allowed | as is; absent fields omitted | none (§9.7.8) |
+
+A prop value in the render tree is a **semantic value**: evaluated, checked against its prop's declared type (§9.7.6), and not realized for any target or position. Its realization is §9.8.7's.
 
 #### 9.8.3 Types at the boundary
 
@@ -738,6 +764,66 @@ A host that holds its values as JSON maps them as follows.
   - `object`, for an object that isn't a plain object or an array (a class instance, a `Map`, a `Date`), with its constructor's name when it has one;
   - `cycle`, for a value that contains itself, so encoding always terminates.
 
+#### 9.8.7 Realization
+
+*Added in v0.6.* **Realization** is what a renderer (a PORT) does with a render tree: it puts each prop value and text run into its target. It is the last of §9.7.7's three steps, and the only one that isn't MESH's. MESH says what a value is and what its text is; the renderer decides where on its target each prop goes, and puts it there in one of exactly two ways:
+
+1. **Natively.** The value goes into a target slot that holds a value of the **same kind**, and holds this value **exactly**: a string where the target holds a string; a boolean where it holds a boolean state (a flag, a switch, the presence of something); a number where it holds a number that represents this binary64 value exactly; `null` where it holds a null; a list or record where it holds a structure of the same shape, each element or field realized natively by these same rules.
+2. **As its MESH text,** where the target slot holds only text: a text run's `text`, a string prop's value, or a prop's `propText` entry, exactly as given.
+
+Nothing else is realization:
+
+- **No renderer converts a value to text,** or between kinds. A target platform's own coercion (a string slot that stringifies a number, an integer slot that truncates `1.5`), a host language's default formatting, JSON, and any other encoding presented as the value's text are all conversions, and forbidden. A renderer may copy the runtime's text into a text slot; it must never decide that the number `42` is the text `42`.
+- **A lossy mapping isn't native.** A slot that can't hold the value exactly isn't a slot of its kind.
+- **A value with no conforming slot is unrealizable.** The renderer reports that, as its own failure, and substitutes nothing: no default, no omission, no other value. A list or record in a slot that holds only text is always unrealizable (§9.7.8).
+- **An absent prop is realized by omission,** never by a default MESH supplies, and never as `null`.
+
+Which slot a primitive's prop goes to is the renderer's realization of that primitive, not MESH's: MESH never names target slots, and a render tree carries no declared type and no target position. None is needed: both ways depend only on the value's kind, which the tree carries, and the runtime has already checked every value against its prop's declared type.
+
+### 9.9 Event resolution
+
+*Added in v0.6.* An `on.e` binding on an element is, in the render tree, the binding of one primitive occurrence (a node) for the event `e` of its component (§4, §9.1), named by one handler identifier (`docs/manual/runtime.md`). **Event resolution** decides which binding, if any, one interaction reaches. It is MESH's rule, the same on every target.
+
+#### 9.9.1 A primitive's events
+
+- **A primitive's events are the events its component declares** in the manifest, each a name and a payload type. A binding may name only one of them (§9.1).
+- **A primitive defines which interactions constitute each of its events.** That definition belongs to the primitive's contract. For one primitive it is the same on every target, and it depends only on the interaction and the primitive: never on a node's bindings, its ancestors or siblings, or any renderer's implementation.
+- **For one interaction, a primitive has at most one applicable event:** the one of its events the interaction constitutes, or none. So one interaction never constitutes two events of one primitive, and a node binding both `click` and `press` never has both reached by one interaction.
+- **Events of different primitives are unrelated,** whatever their names: `card`'s `click` and `button`'s `click` are two declarations that share a name, and neither is the other.
+- MESH has no built-in components (§9.1) and no vocabulary of interactions, and the manifest doesn't describe interactions. So MESH doesn't say which interactions constitute any particular primitive's event: that is written where the primitive is defined, and each renderer realizes it. Resolution takes the applicable events as given.
+
+Composites have no events (`assembly-composite-event`) and don't appear in the render tree, so composite boundaries play no part in resolution.
+
+#### 9.9.2 The rule
+
+An interaction is on its **interacted node**, the innermost node of the render tree it is on. An interaction on a text run is on the text run's parent node. An interaction on a node's content, its descendants and text runs, is on that node as well as on them.
+
+1. Examine the interacted node.
+2. If its primitive has an applicable event for the interaction, and the node declares a binding for that event, **that binding receives the interaction, and resolution stops.**
+3. Otherwise, examine the node's parent, and continue towards the root.
+4. If no node on the path qualifies, the interaction resolves to nothing, and nothing is reported.
+
+So an interaction reaches **at most one binding**: a renderer reports at most one handler identifier for it, the host dispatches it once, and the application receives **at most one command intent**. No later ancestor's binding is triggered, even one for an event of the same name.
+
+```text
+<card on.click={open()}>
+  <button on.click={save()}>Save</button>
+  <button>Plain</button>
+</card>
+```
+
+With `click` as the applicable event of both `card` and `button`: an interaction on the first `button`, or on its text `Save`, reaches `save()` only. An interaction on the second `button`, which has no `click` binding, reaches `open()`. If the interaction's applicable event for `button` were another event, say `press`, the first `button` would be passed over too, and `open()` would receive it, provided `click` is still the applicable event for `card`.
+
+#### 9.9.3 What event resolution is not
+
+- **It isn't DOM bubbling,** nor any target's event dispatch. It has no capture or bubble phases, relates no two nodes' events by name or by a target's event type, and delivers an interaction once. A target mechanism is at most one way a renderer implements it.
+- **No application controls it.** MPRX has no syntax to stop, redirect or repeat resolution, no `stopPropagation` or equivalent, and needs none. A handler is exactly one command invocation (§9.5), and an application that wants one interaction to do two things invokes one command that does both.
+- **The payload is the receiving node's.** It is the payload of the receiving primitive's event, which the renderer reports with the handler identifier (§9.5, §9.8.4).
+
+#### 9.9.4 Reference and conformance
+
+`mesh_runtime::resolve` is the reference implementation: a pure function of a render tree and an interaction, given as the interacted node's key and the applicable event for each primitive component. It needs no target. A renderer doesn't call it: it implements the rule for its own target, and checks itself against the language-neutral vectors in `examples/conformance/events/`, each a real program, its tree, an interaction, and the handler identifier and intent it resolves to, or none.
+
 ---
 
 ## 10. Explicitly out of scope
@@ -754,6 +840,12 @@ A host that holds its values as JSON maps them as follows.
 - Type annotations in MPRX, and types beyond §9.2: unions, nullable types
   separate from absence, generics beyond `list<T>`, function types, open
   records, implicit coercions, and narrowing
+- Building text in a prop (string concatenation, interpolation in an
+  attribute value): a prop's text is its value's (§9.7.7), and MPRX
+  can't make a string from other values (§9.4)
+- Any control over event resolution (§9.9), such as stopping or
+  repeating it, and a declaration of which interactions constitute a
+  primitive's event (§9.9.1)
 
 ---
 
@@ -811,3 +903,15 @@ A host that holds its values as JSON maps them as follows.
   too. A differential comparison with V8, over 1,000,000 values, found no
   difference. §9.7 and §9.8 lose their "specified" status, and the
   introduction now describes v0.5.
+- **v0.6 (2026-09-27)** settles the semantic questions PORT's first
+  renderer handed to MESH, as resolved by
+  `docs/superpowers/specs/2026-09-27-mesh-port-semantic-resolution.md`.
+  It changes no syntax and no evaluation. §9.7.7 becomes the text of a
+  value, which the runtime now also gives for a primitive prop that is a
+  number, a boolean or `null` (the render tree's `propText`); §9.7.8
+  extends "no text" to list and record props; §9.8.2 separates a
+  value's text from the value; §9.8.7 says how a renderer may realize a
+  value, natively or as its MESH text, and nothing else; and §9.9 adds
+  event resolution: from the innermost interacted node towards the
+  root, the first node whose primitive has the interaction's applicable
+  event, and which binds it, receives the interaction, and no other.

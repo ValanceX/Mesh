@@ -283,3 +283,15 @@ In MESH only. PORT and NEXUS are untouched, and SSR and hydration stay blocked u
 7. **Release:** a minor version. Nothing a conforming renderer or host does today breaks.
 
 Not in this work: SSR, hydration, HTML serialization, event delegation, mismatch handling, any PORT or NEXUS change, and MPRX syntax. That includes text construction in props (F8), a real language limitation that none of the above depends on.
+
+### As built (v0.6, 2026-09-27)
+
+Everything above was built, with these specifics and departures:
+
+- **Spec:** §9.7.7 ("The text of a value", with the value → MESH text → target realization diagram), §9.7.7.1 (one text for content and `propText`), §9.7.8 ("Values without text"), §9.8.2 (a separate text column), §9.8.7 (Realization; E1), and §9.9 (Event resolution; E4 and E5). E1 went to §9.8.7 rather than §9.9, so that §9.9 is only about events.
+- **render-v1:** `propText` on `$defs/node`, optional, `minProperties: 1`, string values. The runtime omits the member when a node has no entry, so string-only trees are byte-identical to v0.5's. No `version` change, as the schema's own promise allows (verified: `CHANGELOG.md` follows SemVer, with breaking changes allowed in pre-1.0 minors, and the schema allows added properties within a version).
+- **Runtime:** one private `text_of` for content and props. `mesh_runtime::resolve`, `Interaction`, `Resolved` and `ResolveError` are new, a pure function of a tree, so the rule is testable without any target. Departure: `Node` (and the new `Resolved` and `ResolveError`) are `#[non_exhaustive]`, following `CompileResult`'s precedent, since adding `prop_text` already breaks struct literals.
+- **Event resolution's input:** an interaction is its target key and, per primitive component, the applicable event: the data form of E5's "primitive definition", with no interaction vocabulary. No manifest change.
+- **Conformance:** `examples/conformance/{values,events}/`, checked by `crates/mesh-runtime/tests/conformance.rs`, by `packages/mesh-runtime/test/conformance.test.mjs` (with a test-only resolver written from §9.9, and nothing of the package's), and by two new parity tests: the conformance programs, and every finite row of the number-to-text table as a prop's `propText`.
+- **Documents:** K1–K4 as E6 says. K2's source sentence stays in the v0.5 outline, with a dated correction beside it; ARCHITECTURE rule 9 carries the rule, and a new rule 16 states event resolution.
+- **Release:** CHANGELOG `[Unreleased]` and draft notes `docs/releases/v0.6.md`. The version bump and tag are the release step, after review.

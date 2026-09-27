@@ -8,7 +8,8 @@ This guide is for whoever builds a renderer for MESH's output, such as one of PO
 
 A render tree ([`schemas/render-v1.schema.json`](../../schemas/render-v1.schema.json)) is a root **node**. Each node has:
 - `component`: a primitive component's name, such as `avatar`. The components a program has templates for, its composites, are already expanded, and never appear;
-- `props`: each prop's final value: `null`, a boolean, a finite number, a string, a list or a record. An unwritten or absent prop has no entry;
+- `props`: each prop's value: `null`, a boolean, a finite number, a string, a list or a record. It's fully evaluated, but it's the value, not text: a number prop is a number. An unwritten or absent prop has no entry;
+- `propText`, when there's any: the MESH text of each prop that is a number, a boolean or `null` (`"42"`, `"false"`, `"null"`). Strings don't need one, and lists and records have none;
 - `events`: each event the node listens for, with its **handler identifier**;
 - `children`: nodes, and **text runs**, each a string to show as it is;
 - `key`: the node's identity. Text runs have keys too.
@@ -17,13 +18,24 @@ That's everything. A tree holds no expression, no scope, no command and no compo
 
 ## Draw what you're given
 
-**Values are final.** Draw each prop and each text run exactly as the tree gives it. Don't format a number (MESH already turned it into text, by its own rule, which a JavaScript engine's `String(x)` or a platform's formatter may not match in the last digit); don't supply a default for a missing prop; don't convert or trim a value. If a value looks wrong, the fix is in the template or the host's values, never in the renderer.
+**Values are final: MESH has evaluated them, and made every text.** A **text run** is already text: MESH turned each number in it into text by its own rule (§9.7.7.1), which a JavaScript engine's `String(x)` or a platform's formatter may not match in the last digit. A **prop** is different: it arrives as its value, so a number prop is a number, not text. You decide where on your target each prop goes, and then realize it in one of two ways (spec §9.8.7):
+
+- **natively,** into a slot that holds a value of the same kind exactly: a number into a numeric property, a boolean into a boolean property or a presence, a list or record into a structure of the same shape;
+- **as its MESH text,** into a slot that holds only text: a string prop's value, or the prop's `propText` entry, as given.
+
+Nothing else. Never make text from a value yourself: not with `String(x)`, a template literal, `JSON.stringify`, or the platform's own conversion (`setAttribute(name, 42)` converts for you, and so is out). A `null` prop's text is `null`, and a `null` prop is never the same as an absent one: absent is omitted, with no text. A list or record has no text at all, so in a slot that holds only text it is unrealizable: report that as your renderer's failure, and don't invent a form for it. Don't supply a default for a missing prop, and don't convert or trim a value. If a value looks wrong, the fix is in the template or the host's values, never in the renderer.
 
 **A component you don't know is shown, not dropped.** If a program leaves out a composite's template, that component arrives as a node of its name, like a primitive. A renderer that silently skips unknown nodes hides that mistake. Surface it: draw a visible placeholder, log it, or fail, as your platform prefers.
 
 ## Report events as handler identifiers
 
-When the user does something, report the node's handler identifier for that event, and the event's payload, to the host. Don't interpret either. The host dispatches them with the render the tree came from, and the runtime turns them into a command intent. **A renderer never sees an intent,** or which command an event invokes.
+When the user does something, **resolve it to at most one binding** (spec §9.9), and report that binding's handler identifier, and the event's payload, to the host. Don't interpret either.
+
+- Start at the innermost node the interaction is on: an interaction on a text run is on its node.
+- If that node's primitive has an applicable event for the interaction (the one of its events the interaction constitutes, by the primitive's definition) and the node binds it, report that binding and stop.
+- Otherwise move to the parent, towards the root. If no node qualifies, report nothing.
+
+So `<card on.click={open()}><button on.click={save()}>Save</button></card>` reports only `save()`'s handler for a click on the button, and `open()`'s only for a click elsewhere on the card, or on a button with no `click` binding. This is **event resolution, not DOM bubbling**: never let a second binding fire for the same interaction, even when your target delivers the interaction to ancestors, and never relate two nodes' events because they share a name. MPRX has no way to stop or repeat resolution, and doesn't need one. Which interactions constitute a primitive's event is part of that primitive's definition, the same on every target, and never depends on the node's bindings or ancestors. `examples/conformance/events/` has language-neutral cases to test your renderer against, with no target needed. The host dispatches them with the render the tree came from, and the runtime turns them into a command intent. **A renderer never sees an intent,** or which command an event invokes.
 
 Keys and handler identifiers are **opaque, but not secret.** Compare them only for equality, and never parse them. Anyone with the templates can compute them. What makes them safe to hand back is the runtime's validation when the host dispatches, not their secrecy.
 
@@ -37,7 +49,7 @@ A change of values is a new render: the runtime evaluates the whole program agai
 
 ## A renderer, end to end
 
-This renderer draws the slice, `examples/slice/` in the MESH repository, as text, then updates it to the slice's second snapshot, in which the first user's name and avatar change. The first half is only there to get two trees; a PORT renderer receives them from its host.
+This renderer draws the slice, `examples/slice/` in the MESH repository, as text for inspection, then updates it to the slice's second snapshot, in which the first user's name and avatar change. The first half is only there to get two trees; a PORT renderer receives them from its host.
 
 ```js
 import { readFileSync } from "node:fs";
@@ -120,7 +132,7 @@ console.log("--");
 console.log(updates(first, second).join("\n"));
 ```
 
-It prints the first tree, then the four updates that turn it into the second:
+**Its printout is for inspection only.** It writes each prop as JSON (`size="sm"`), which is a lossless encoding for comparing trees, not MESH's text of a value, and not a model for a real renderer's output: a renderer that puts a prop in a text slot uses the prop's value if it's a string, or its `propText` entry (see [Draw what you're given](#draw-what-youre-given)). It prints the first tree, then the four updates that turn it into the second:
 
 ```text
 <page title="Team">
@@ -145,7 +157,7 @@ text "Ada Lovelace" -> "Ada King"
 
 ## What a renderer doesn't do
 
-- **Evaluate, format or default anything.** The tree's values are final.
-- **Decide what an event means.** It reports the handler identifier and payload; the host and the runtime do the rest.
+- **Evaluate, format or default anything.** The tree's values are final, and every text it needs is in the tree.
+- **Decide what an event means,** or let one interaction reach two bindings. It resolves the interaction (spec §9.9) and reports one handler identifier and payload; the host and the runtime do the rest.
 - **Reconcile across programs.** Its host says when the program changed, and it draws afresh.
 - **Know about NEXUS.** Intents and commands are the host's.
