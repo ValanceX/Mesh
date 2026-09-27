@@ -2,7 +2,7 @@
   {
     "case": "the child's binding wins over its ancestors' bindings for the same event",
     "interaction": {
-      "target": "ko1m3ntGGk3ZLMV-6MbLOMQ",
+      "target": "kQCuuBFiF9BWFvOA_LAQteA",
       "applicable": {
         "card": "click",
         "row": "click",
@@ -10,9 +10,9 @@
       }
     },
     "expect": {
-      "node": "ko1m3ntGGk3ZLMV-6MbLOMQ",
+      "node": "kQCuuBFiF9BWFvOA_LAQteA",
       "event": "click",
-      "handler": "h9qT9g937b74.p40vKvhRIMS3X80PPUzFFQ",
+      "handler": "hJjG4S6ieM8w.4kvYFwFQx-3T3og1s0qr7w",
       "intent": {
         "command": {
           "component": "screen",
@@ -25,7 +25,7 @@
   {
     "case": "an interaction on a node's text run is the node's",
     "interaction": {
-      "target": "kYqKqyTFtjEuXcmDlGElx8g",
+      "target": "k7IaOqHKFxuGxM80NW6Kk9Q",
       "applicable": {
         "card": "click",
         "row": "click",
@@ -33,9 +33,9 @@
       }
     },
     "expect": {
-      "node": "ko1m3ntGGk3ZLMV-6MbLOMQ",
+      "node": "kQCuuBFiF9BWFvOA_LAQteA",
       "event": "click",
-      "handler": "h9qT9g937b74.p40vKvhRIMS3X80PPUzFFQ",
+      "handler": "hJjG4S6ieM8w.4kvYFwFQx-3T3og1s0qr7w",
       "intent": {
         "command": {
           "component": "screen",
@@ -48,7 +48,7 @@
   {
     "case": "an ancestor receives it when the interacted node has no binding for its applicable event",
     "interaction": {
-      "target": "k4Fuyodae1_JONcWutR81ew",
+      "target": "kCh9X4B_NZvzrf3sE0ZsLCg",
       "applicable": {
         "card": "click",
         "row": "click",
@@ -56,9 +56,9 @@
       }
     },
     "expect": {
-      "node": "k0bSypzAErWLBwwxjPuoC8w",
+      "node": "k18XaeQLBUHfCvFs2IZ179w",
       "event": "click",
-      "handler": "h9qT9g937b74.QlvmQSY_jPNtVWeMBNhP4g",
+      "handler": "hJjG4S6ieM8w.rUvuWo4WBYXjiQSqCCXUkw",
       "intent": {
         "command": {
           "component": "screen",
@@ -71,7 +71,7 @@
   {
     "case": "a node with no events is passed over",
     "interaction": {
-      "target": "kGPTKUowWGDcHzoUsMr-7Tg",
+      "target": "k-twK919Y7kUMSwgQgRy1Tw",
       "applicable": {
         "card": "click",
         "row": "click",
@@ -79,9 +79,9 @@
       }
     },
     "expect": {
-      "node": "k0bSypzAErWLBwwxjPuoC8w",
+      "node": "k18XaeQLBUHfCvFs2IZ179w",
       "event": "click",
-      "handler": "h9qT9g937b74.QlvmQSY_jPNtVWeMBNhP4g",
+      "handler": "hJjG4S6ieM8w.rUvuWo4WBYXjiQSqCCXUkw",
       "intent": {
         "command": {
           "component": "screen",
@@ -94,7 +94,7 @@
   {
     "case": "several ancestors bind events, only the first qualifying one receives it",
     "interaction": {
-      "target": "kQ60gxVvAkijcbkTdiBz89A",
+      "target": "kk-JowlWDmyZk1fuPeUZlJg",
       "applicable": {
         "card": "click",
         "row": "click",
@@ -102,9 +102,9 @@
       }
     },
     "expect": {
-      "node": "kEPAVlmIVBkZqlDzHGToSdg",
+      "node": "kgCLGvdnGAxcGTihkXyZXsA",
       "event": "click",
-      "handler": "h9qT9g937b74.wRrVI4FnjR6fSO1gkAifXQ",
+      "handler": "hJjG4S6ieM8w.jfVTRjDNET6-ihAM-kLtJQ",
       "intent": {
         "command": {
           "component": "screen",
@@ -117,16 +117,16 @@
   {
     "case": "a node binding a different event of its primitive is passed over",
     "interaction": {
-      "target": "kQ60gxVvAkijcbkTdiBz89A",
+      "target": "kk-JowlWDmyZk1fuPeUZlJg",
       "applicable": {
         "row": "select",
         "card": "click"
       }
     },
     "expect": {
-      "node": "kw0YBRIQz2NHNt11VvmoAXw",
+      "node": "kUitlTHNUhQtvqkJ2hvrNOA",
       "event": "select",
-      "handler": "h9qT9g937b74.9Zw11xauK6_47ot7RBdUrg",
+      "handler": "hJjG4S6ieM8w.AlaYU3e2NBu2W6gXOOhOdA",
       "intent": {
         "command": {
           "component": "screen",
@@ -139,7 +139,7 @@
   {
     "case": "a primitive's applicable event decides which of a node's bindings is used",
     "interaction": {
-      "target": "ko1m3ntGGk3ZLMV-6MbLOMQ",
+      "target": "kQCuuBFiF9BWFvOA_LAQteA",
       "applicable": {
         "button": "press",
         "row": "click",
@@ -147,9 +147,9 @@
       }
     },
     "expect": {
-      "node": "ko1m3ntGGk3ZLMV-6MbLOMQ",
+      "node": "kQCuuBFiF9BWFvOA_LAQteA",
       "event": "press",
-      "handler": "h9qT9g937b74.WLla607S1q-dZIUGkuztDw",
+      "handler": "hJjG4S6ieM8w.Nq8FhnxEbk-JNByVC3LqjQ",
       "intent": {
         "command": {
           "component": "screen",
@@ -162,7 +162,7 @@
   {
     "case": "unrelated bindings don't fire: no node binds the applicable events",
     "interaction": {
-      "target": "k4Fuyodae1_JONcWutR81ew",
+      "target": "kCh9X4B_NZvzrf3sE0ZsLCg",
       "applicable": {
         "card": "dismiss",
         "button": "press"
@@ -175,16 +175,16 @@
   {
     "case": "event names are not shared across primitives: a card's click is not the button's",
     "interaction": {
-      "target": "k4Fuyodae1_JONcWutR81ew",
+      "target": "kCh9X4B_NZvzrf3sE0ZsLCg",
       "applicable": {
         "card": "dismiss",
         "row": "select"
       }
     },
     "expect": {
-      "node": "k0bSypzAErWLBwwxjPuoC8w",
+      "node": "k18XaeQLBUHfCvFs2IZ179w",
       "event": "select",
-      "handler": "h9qT9g937b74.s5III7Hx9OQx8UaciR5jUQ",
+      "handler": "hJjG4S6ieM8w.A-PE4XjyG1VneKBIyyR7RA",
       "intent": {
         "command": {
           "component": "screen",
@@ -197,15 +197,15 @@
   {
     "case": "a component with no applicable event is passed over even when it binds that name",
     "interaction": {
-      "target": "ko1m3ntGGk3ZLMV-6MbLOMQ",
+      "target": "kQCuuBFiF9BWFvOA_LAQteA",
       "applicable": {
         "card": "click"
       }
     },
     "expect": {
-      "node": "kEPAVlmIVBkZqlDzHGToSdg",
+      "node": "kgCLGvdnGAxcGTihkXyZXsA",
       "event": "click",
-      "handler": "h9qT9g937b74.wRrVI4FnjR6fSO1gkAifXQ",
+      "handler": "hJjG4S6ieM8w.jfVTRjDNET6-ihAM-kLtJQ",
       "intent": {
         "command": {
           "component": "screen",
@@ -218,7 +218,7 @@
   {
     "case": "a composite boundary plays no part: the binding in the composite's template receives it",
     "interaction": {
-      "target": "kfAzC0RwP_0USNZDtW_O-AA",
+      "target": "kNDeiwFZwCmIjwj9gIZoULA",
       "applicable": {
         "card": "click",
         "row": "click",
@@ -226,9 +226,9 @@
       }
     },
     "expect": {
-      "node": "kfAzC0RwP_0USNZDtW_O-AA",
+      "node": "kNDeiwFZwCmIjwj9gIZoULA",
       "event": "click",
-      "handler": "h9qT9g937b74.5G3LNfvhR7kuPmEm0xr_uA",
+      "handler": "hJjG4S6ieM8w.zHdMYCc1XElpgqqlEkV4uQ",
       "intent": {
         "command": {
           "component": "tile",
@@ -241,16 +241,16 @@
   {
     "case": "inside a composite, the innermost qualifying binding is still the only one",
     "interaction": {
-      "target": "k5XCH0rAHAoYHffdzoVmkwg",
+      "target": "k9KDUzWUCI5kPKTvAtXT_9g",
       "applicable": {
         "button": "click",
         "card": "click"
       }
     },
     "expect": {
-      "node": "kfAzC0RwP_0USNZDtW_O-AA",
+      "node": "kNDeiwFZwCmIjwj9gIZoULA",
       "event": "click",
-      "handler": "h9qT9g937b74.5G3LNfvhR7kuPmEm0xr_uA",
+      "handler": "hJjG4S6ieM8w.zHdMYCc1XElpgqqlEkV4uQ",
       "intent": {
         "command": {
           "component": "tile",
@@ -263,7 +263,7 @@
   {
     "case": "the root receives it when nothing nearer qualifies",
     "interaction": {
-      "target": "kEPAVlmIVBkZqlDzHGToSdg",
+      "target": "kgCLGvdnGAxcGTihkXyZXsA",
       "applicable": {
         "card": "click",
         "row": "click",
@@ -271,9 +271,9 @@
       }
     },
     "expect": {
-      "node": "kEPAVlmIVBkZqlDzHGToSdg",
+      "node": "kgCLGvdnGAxcGTihkXyZXsA",
       "event": "click",
-      "handler": "h9qT9g937b74.wRrVI4FnjR6fSO1gkAifXQ",
+      "handler": "hJjG4S6ieM8w.jfVTRjDNET6-ihAM-kLtJQ",
       "intent": {
         "command": {
           "component": "screen",
@@ -286,7 +286,7 @@
   {
     "case": "no applicable event anywhere resolves to nothing",
     "interaction": {
-      "target": "ko1m3ntGGk3ZLMV-6MbLOMQ",
+      "target": "kQCuuBFiF9BWFvOA_LAQteA",
       "applicable": {}
     },
     "expect": {

@@ -123,6 +123,10 @@ fn values_have_their_committed_props_and_prop_text() {
     let mut failures = Vec::new();
     for case in cases.as_array().unwrap() {
         let name = case["case"].as_str().unwrap();
+        if let Some(states) = case.get("states") {
+            failures.extend(states_differ(name, states, &written(tree)));
+            continue;
+        }
         if let Some(run) = case.get("textRun") {
             let actual = runs
                 .get(run.as_str().unwrap())
@@ -146,6 +150,55 @@ fn values_have_their_committed_props_and_prop_text() {
         }
     }
     assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// Each node of the tree as written, by key: its `props`, and its
+/// `propText` only if the member is there.
+fn written(tree: &Tree) -> BTreeMap<String, Value> {
+    fn walk(node: &Value, out: &mut BTreeMap<String, Value>) {
+        if node["type"] != "node" {
+            return;
+        }
+        let mut exactly = serde_json::json!({ "props": node["props"] });
+        if let Some(text) = node.get("propText") {
+            exactly["propText"] = text.clone();
+        }
+        out.insert(node["key"].as_str().unwrap().to_string(), exactly);
+        node["children"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .for_each(|c| walk(c, out));
+    }
+    let document: Value = serde_json::from_str(&tree.to_json()).unwrap();
+    let mut out = BTreeMap::new();
+    walk(&document["root"], &mut out);
+    out
+}
+
+/// A `states` case: each state's node is exactly as given, and no two
+/// states are written alike, so absent, `null` and a string can't be
+/// confused.
+fn states_differ(name: &str, states: &Value, written: &BTreeMap<String, Value>) -> Vec<String> {
+    let mut failures = Vec::new();
+    let states = states.as_array().unwrap();
+    for state in states {
+        let actual = &written[state["node"].as_str().unwrap()];
+        if *actual != state["exactly"] {
+            failures.push(format!("{name}: {} is {actual}", state["state"]));
+        }
+    }
+    for (index, a) in states.iter().enumerate() {
+        for b in &states[index + 1..] {
+            if a["exactly"] == b["exactly"] {
+                failures.push(format!(
+                    "{name}: {} and {} are alike",
+                    a["state"], b["state"]
+                ));
+            }
+        }
+    }
+    failures
 }
 
 #[test]

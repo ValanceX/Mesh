@@ -1,5 +1,6 @@
 {
   "name": "Ada",
+  "greeting": "hello",
   "count": 42,
   "negativeZero": -0,
   "ratio": 0.30000000000000004,

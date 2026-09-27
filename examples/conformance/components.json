@@ -95,6 +95,22 @@
       "commands": {},
       "scope": {}
     },
+    "cell": {
+      "props": {
+        "value": {
+          "type": {
+            "kind": "optional",
+            "type": {
+              "kind": "any"
+            }
+          },
+          "required": false
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
     "values": {
       "props": {},
       "events": {},
@@ -154,6 +170,15 @@
         },
         "anyRecord": {
           "kind": "any"
+        },
+        "greeting": {
+          "kind": "string"
+        },
+        "missing": {
+          "kind": "optional",
+          "type": {
+            "kind": "any"
+          }
         }
       }
     },

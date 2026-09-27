@@ -189,7 +189,7 @@ NEXUS's adapter maps an intent to a NEXUS command (for example, `user-card`'s `s
 Which binding one interaction reaches is MESH's rule (§9.9), the same on every target, and needs only the render tree:
 
 1. Start at the **interacted node**: the innermost node the interaction is on (an interaction on a text run is on its parent node).
-2. If that node's primitive has an **applicable event** for the interaction (the one of its events the interaction constitutes, by the primitive's definition), and the node binds that event, that binding receives the interaction. Stop.
+2. If that node's primitive has an **applicable event** for the interaction (the one of its events the interaction constitutes, by the PORT's mapping of its target's interactions onto the primitive's MESH event contract), and the node binds that event, that binding receives the interaction. Stop.
 3. Otherwise go to the parent, towards the root. If no node qualifies, nothing is reported.
 
 So one interaction gives at most one handler identifier, one dispatch and one intent. This is **event resolution, not DOM bubbling**: there are no phases, no event reaches a second binding, and MPRX has no syntax to change any of it.

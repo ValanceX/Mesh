@@ -7,4 +7,7 @@
   <field value={negativeZero} label="as written" />
   <field />
   <text>{name}, {count}, {ratio}, {big}, {tiny}, {tie}, {negativeZero}, {on}, {off}, {nothing}, [{maybe}]</text>
+  <cell value={missing} />
+  <cell value={nothing} />
+  <cell value={greeting} />
 </page>

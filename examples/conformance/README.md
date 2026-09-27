@@ -23,6 +23,16 @@ Each case names a node (by key) and a prop, and gives:
 
 They cover strings (no entry: the value is its text), numbers (MESH's text, including the exponent layout, the smallest subnormal, an equally-near tie that only §9.7.7.1's rule decides, and `-0`), booleans, `null` (text `null`), an absent prop (neither entry, unlike `null`), and lists and records, which never have text, directly or through `any`. One case gives a text run, showing content uses the same text.
 
+One case, `states`, pins the three states a prop can be in, each as a whole node: `exactly` is the node's `props`, and its `propText` member only when the tree has one.
+
+| State | `exactly` |
+|---|---|
+| absent | `{ "props": {} }`: no prop, and no `propText` member at all |
+| `null` | `{ "props": { "value": null }, "propText": { "value": "null" } }` |
+| string | `{ "props": { "value": "hello" } }`: its text is its value, so no `propText` copy |
+
+Each node must be exactly as given, and no two states may be written alike: absent ≠ `null`, `null` has the text `null`, and a string needs no copy.
+
 A renderer realizing any of these props in a slot that holds only text must produce exactly the value (for a string) or the `propText` entry, and must refuse a list or record there. It never makes a text itself.
 
 ## `events/`: event resolution (spec §9.9)
@@ -30,7 +40,7 @@ A renderer realizing any of these props in a slot that holds only text must prod
 Each case gives an **interaction** and what it resolves to:
 
 - `interaction.target`: the key of the innermost node, or text run, the interaction is on;
-- `interaction.applicable`: for each primitive component, the one event of it that the interaction constitutes (by the primitive's definition). A component with no entry has none;
+- `interaction.applicable`: for each primitive component, the one event of it that the interaction constitutes: already determined, as a PORT's mapping of its target's interactions onto the primitive's MESH event contract would give it. A component with no entry has none;
 - `expect`: `{ "node", "event", "handler", "intent" }`, the binding that receives the interaction and the intent its handler dispatches to (with no payload), or `{ "none": true }`.
 
 Resolution examines the target node, then each ancestor in turn, and stops at the first node whose component has an applicable event and which binds it. So every case resolves to at most one binding and one intent. The cases cover a child's binding winning over its ancestors', an ancestor receiving the interaction when the child has no applicable binding, text runs, nodes with no events, several ancestors with bindings, unrelated bindings and event names shared across components, a composite boundary, and an interaction that resolves to nothing.

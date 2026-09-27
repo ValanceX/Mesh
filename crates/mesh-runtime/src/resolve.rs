@@ -23,8 +23,10 @@ pub struct Interaction {
     /// A text run's interaction is its parent node's.
     pub target: String,
     /// For each primitive component, the one event of that component the
-    /// interaction constitutes, by the primitive's definition (§9.9). A
-    /// component with no entry has no applicable event.
+    /// interaction constitutes (§9.9.1): already determined, by a PORT
+    /// mapping its target's interactions onto the primitive's MESH event
+    /// contract. Resolution never decides it. A component with no entry
+    /// has no applicable event.
     pub applicable: BTreeMap<String, String>,
 }
 

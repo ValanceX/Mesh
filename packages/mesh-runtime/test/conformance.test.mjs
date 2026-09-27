@@ -63,6 +63,23 @@ test("values: props and propText as committed", async () => {
   const { tree } = await rendered("values");
   const all = nodes(tree.root);
   for (const item of JSON.parse(read("values", "cases.json"))) {
+    if (item.states) {
+      // Each state's node is exactly as given: its props, and its
+      // propText member only when the tree has one. No two are alike.
+      const written = item.states.map(({ node }) => {
+        const found = all.get(node);
+        return Object.hasOwn(found, "propText")
+          ? { props: found.props, propText: found.propText }
+          : { props: found.props };
+      });
+      item.states.forEach((state, index) => assert.deepEqual(written[index], state.exactly, `${item.case}: ${state.state}`));
+      for (let a = 0; a < written.length; a++) {
+        for (let b = a + 1; b < written.length; b++) {
+          assert.notDeepEqual(written[a], written[b], `${item.case}: ${item.states[a].state} and ${item.states[b].state}`);
+        }
+      }
+      continue;
+    }
     if (item.textRun) {
       const run = [...all.values()].flatMap((node) => node.children).find((child) => child.key === item.textRun);
       assert.equal(run.text, item.text, item.case);

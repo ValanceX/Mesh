@@ -786,11 +786,23 @@ Which slot a primitive's prop goes to is the renderer's realization of that prim
 
 #### 9.9.1 A primitive's events
 
-- **A primitive's events are the events its component declares** in the manifest, each a name and a payload type. A binding may name only one of them (§9.1).
-- **A primitive defines which interactions constitute each of its events.** That definition belongs to the primitive's contract. For one primitive it is the same on every target, and it depends only on the interaction and the primitive: never on a node's bindings, its ancestors or siblings, or any renderer's implementation.
+Three layers take part, and each owns one thing:
+
+```text
+MESH                  the semantic event contract of each primitive: its events, what each means, its payload
+  ↓
+PORT                  maps its target's interactions onto that contract
+  ↓
+MESH event resolution chooses the binding (§9.9.2), the same on every target
+```
+
+- **A primitive's event contract is semantic, and it is MESH-level.** A primitive's events are the events its component declares, each a name and a payload type (§9.1, the manifest), and each has one meaning: what the user does to that primitive when the event occurs. That meaning belongs to the primitive, not to any target, so it is one contract, the same wherever the primitive is realized. **No PORT gives a primitive's event a meaning of its own,** and two PORTs never realize the same event of the same primitive with different meanings.
+- **A PORT maps its target's interactions onto that contract.** Which pointer, key, touch or other target interaction constitutes a primitive's event is target-specific, and is the PORT's to decide. Its mapping must realize the contract's meaning: the same user action on the same primitive gives the same event on every target. The mapping depends only on the interaction and the primitive, never on a node's bindings, its ancestors or siblings.
 - **For one interaction, a primitive has at most one applicable event:** the one of its events the interaction constitutes, or none. So one interaction never constitutes two events of one primitive, and a node binding both `click` and `press` never has both reached by one interaction.
 - **Events of different primitives are unrelated,** whatever their names: `card`'s `click` and `button`'s `click` are two declarations that share a name, and neither is the other.
-- MESH has no built-in components (§9.1) and no vocabulary of interactions, and the manifest doesn't describe interactions. So MESH doesn't say which interactions constitute any particular primitive's event: that is written where the primitive is defined, and each renderer realizes it. Resolution takes the applicable events as given.
+- **Resolution starts from the applicable events,** already determined by the PORT's mapping: it is given, for each primitive, the applicable event of the interaction (§9.9.4), and needs nothing from any target.
+
+What v0.6 doesn't have, deliberately: MESH has **no built-in primitive catalog** (§9.1), so the prose meaning of a given primitive's events is stated with the component library its manifest describes, as MESH-level contract, not in a PORT's implementation. MESH has **no universal interaction vocabulary**, and needs none, since resolution takes applicable events rather than interactions. And the manifest records an event's name and payload only: it is **not an interaction registry**. A later MESH may add a catalog or a declaration form for event meaning; neither changes this section's rule.
 
 Composites have no events (`assembly-composite-event`) and don't appear in the render tree, so composite boundaries play no part in resolution.
 

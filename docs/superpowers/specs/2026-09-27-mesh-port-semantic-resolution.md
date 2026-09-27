@@ -224,6 +224,8 @@ an interaction on `child` whose applicable event for `child` is `click` resolves
 - **Containment is MESH's.** An interaction on a node's content, meaning its descendants and text runs, is an interaction on that node for E4's walk. A click on a button's label reaches the button by structure, not by a per-primitive rule.
 - **A primitive defines which interactions constitute each of its events.** This belongs to the primitive's contract, not to the target. For one primitive it is the same on every target (the same meaning, however it's realized), and it depends only on the interaction and the primitive: never on the node's bindings, its ancestors or siblings, or any PORT's implementation. It gives at most one event per interaction (E4 rule 4).
 
+*Tightened before release (2026-09-27): the event contract of a primitive (its events and what each means) is **MESH-level**, one contract for every target. A PORT only maps its target's interactions onto it, and that mapping must realize the same meaning on every target: no PORT gives a primitive's event a meaning of its own. Spec §9.9.1 states the three layers (MESH contract, PORT mapping, MESH resolution). v0.6 still has no primitive catalog, no interaction vocabulary and no interaction registry in the manifest, and `resolve` still takes the already-determined applicable event.*
+
 **Do existing declarations provide it?** Partly, and that is enough for MESH's rule:
 
 - The manifest already declares **which events a primitive defines**: their names and payloads. E4's "whose primitive defines the applicable event" is exactly that declaration. So is a binding: the checker only accepts `on.e` for an event its component declares (§9.1).
