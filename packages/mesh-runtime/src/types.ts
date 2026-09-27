@@ -38,6 +38,18 @@ export interface RenderNode {
   readonly component: string;
   /** Each written prop's value. An absent prop has no member; a `null` prop is `null`. */
   readonly props: { readonly [prop: string]: BoundaryValue };
+  /**
+   * The MESH text (spec §9.7.7) of each prop whose value is a number, a
+   * boolean or `null`, made by the runtime. A renderer that realizes such
+   * a prop in a text-only slot uses this text, and never converts the
+   * value itself: not with `String(x)`, a template literal, JSON or the
+   * platform's coercion (spec §9.8.7). A string prop has no entry (its
+   * text is its value); a list or record prop has none (it has no text,
+   * and can only be realized natively). An absent prop has no entry here
+   * either, while a `null` prop's entry is `"null"`. The member is present
+   * only when some prop has an entry.
+   */
+  readonly propText?: { readonly [prop: string]: string };
   /** Each event binding's handler identifier, by event name. Opaque: report it, never interpret it. */
   readonly events: { readonly [event: string]: string };
   readonly children: readonly (RenderNode | TextRun)[];

@@ -1,0 +1,28 @@
+{
+  "name": "Ada",
+  "count": 42,
+  "negativeZero": -0,
+  "ratio": 0.30000000000000004,
+  "big": 1e21,
+  "tiny": 5e-324,
+  "tie": 2.98023223876953125e-8,
+  "on": true,
+  "off": false,
+  "nothing": null,
+  "tags": [
+    "primary",
+    "wide"
+  ],
+  "point": {
+    "x": 1.5,
+    "y": -2
+  },
+  "anyNumber": 0.1,
+  "anyList": [
+    1,
+    "two"
+  ],
+  "anyRecord": {
+    "a": true
+  }
+}

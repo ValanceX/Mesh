@@ -1,0 +1,226 @@
+{
+  "$schema": "../../schemas/manifest-v1.schema.json",
+  "version": 1,
+  "types": {
+    "Point": {
+      "kind": "record",
+      "fields": {
+        "x": {
+          "type": {
+            "kind": "number"
+          },
+          "required": true
+        },
+        "y": {
+          "type": {
+            "kind": "number"
+          },
+          "required": true
+        }
+      }
+    }
+  },
+  "components": {
+    "page": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "text": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "field": {
+      "props": {
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": false
+        },
+        "value": {
+          "type": {
+            "kind": "number"
+          },
+          "required": false
+        },
+        "flag": {
+          "type": {
+            "kind": "boolean"
+          },
+          "required": false
+        },
+        "empty": {
+          "type": {
+            "kind": "null"
+          },
+          "required": false
+        },
+        "note": {
+          "type": {
+            "kind": "optional",
+            "type": {
+              "kind": "string"
+            }
+          },
+          "required": false
+        },
+        "items": {
+          "type": {
+            "kind": "list",
+            "element": {
+              "kind": "string"
+            }
+          },
+          "required": false
+        },
+        "point": {
+          "type": {
+            "kind": "named",
+            "name": "Point"
+          },
+          "required": false
+        },
+        "extra": {
+          "type": {
+            "kind": "any"
+          },
+          "required": false
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "values": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {
+        "name": {
+          "kind": "string"
+        },
+        "count": {
+          "kind": "number"
+        },
+        "ratio": {
+          "kind": "number"
+        },
+        "big": {
+          "kind": "number"
+        },
+        "tiny": {
+          "kind": "number"
+        },
+        "tie": {
+          "kind": "number"
+        },
+        "negativeZero": {
+          "kind": "number"
+        },
+        "on": {
+          "kind": "boolean"
+        },
+        "off": {
+          "kind": "boolean"
+        },
+        "nothing": {
+          "kind": "null"
+        },
+        "maybe": {
+          "kind": "optional",
+          "type": {
+            "kind": "string"
+          }
+        },
+        "tags": {
+          "kind": "list",
+          "element": {
+            "kind": "string"
+          }
+        },
+        "point": {
+          "kind": "named",
+          "name": "Point"
+        },
+        "anyNumber": {
+          "kind": "any"
+        },
+        "anyList": {
+          "kind": "any"
+        },
+        "anyRecord": {
+          "kind": "any"
+        }
+      }
+    },
+    "card": {
+      "props": {},
+      "events": {
+        "click": {},
+        "dismiss": {}
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "row": {
+      "props": {},
+      "events": {
+        "click": {},
+        "select": {}
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "button": {
+      "props": {},
+      "events": {
+        "click": {},
+        "press": {}
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "label": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "tile": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "tileClicked": {
+          "parameters": []
+        }
+      },
+      "scope": {}
+    },
+    "screen": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "openCard": {
+          "parameters": []
+        },
+        "rowClicked": {
+          "parameters": []
+        },
+        "selectRow": {
+          "parameters": []
+        },
+        "buttonClicked": {
+          "parameters": []
+        },
+        "buttonPressed": {
+          "parameters": []
+        }
+      },
+      "scope": {}
+    }
+  }
+}

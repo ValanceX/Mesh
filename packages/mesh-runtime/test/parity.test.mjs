@@ -202,3 +202,52 @@ test("the normative number-to-text table, through WebAssembly", async () => {
   assert.ok(finite.length >= 80, `only ${finite.length} finite rows`);
   await agree([numbersRequest(numbers)], "table");
 });
+
+test("the conformance programs: props, propText, structure and bindings", async () => {
+  // examples/conformance/: every render, and every handler dispatched.
+  // Byte-identical results mean the same prop values, the same
+  // `propText`, the same nodes and keys, and the same bindings.
+  const conformance = join(root, "examples", "conformance");
+  const model = readFileSync(join(conformance, "components.json"), "utf8");
+  const requests = [];
+  for (const name of ["values", "events"]) {
+    const dir = join(conformance, name);
+    const program = JSON.parse(readFileSync(join(dir, "program.json"), "utf8"));
+    const templates = [];
+    for (const component of program.templates) {
+      templates.push(await template(component, readFileSync(join(dir, `${component}.mprx`), "utf8"), model));
+    }
+    const render = renderRequest(program.root, templates, model, JSON.parse(readFileSync(join(dir, "snapshot.json"), "utf8")));
+    requests.push(render);
+    for (const handler of handlersOf(shipped.request(render).result)) {
+      requests.push(dispatchRequest(render, handler, undefined));
+    }
+  }
+  console.log(`parity: ${await agree(requests, "conformance")} conformance requests`);
+});
+
+test("the normative number-to-text table, as a prop's propText", async () => {
+  // Each finite row's number as a prop: native and WebAssembly give the
+  // same tree, and its `propText` is the row's text. A renderer's text
+  // for a number prop is exactly MESH's, on both.
+  const rows = readFileSync(join(root, "docs", "tables", "number-to-text.tsv"), "utf8")
+    .split("\n")
+    .slice(1)
+    .filter(Boolean)
+    .map((line) => line.split("\t"))
+    .filter(([, expected]) => !expected.startsWith("!"));
+  const templates = [await template("view", "<page title={name}><probe num={count} /></page>")];
+  const requests = [];
+  for (const [bits, expected] of rows) {
+    const number = new DataView(new BigUint64Array([BigInt(`0x${bits}`)]).buffer).getFloat64(0, true);
+    const request = renderRequest("view", templates, MODEL, { ...SNAPSHOT, count: number });
+    const { status, result } = shipped.request(request);
+    assert.equal(status, 0, bits);
+    const probe = JSON.parse(result).tree.root.children[0];
+    assert.equal(probe.propText.num, expected, bits);
+    assert.ok(Object.is(probe.props.num, Object.is(number, -0) ? 0 : number), bits);
+    requests.push(request);
+  }
+  assert.ok(rows.length >= 80, `only ${rows.length} finite rows`);
+  await agree(requests, "table as props");
+});

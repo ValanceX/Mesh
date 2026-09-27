@@ -5,6 +5,13 @@
 //!
 //! It draws what it's given and computes nothing: prop values are printed
 //! as the JSON they are, and text runs as their strings.
+//!
+//! The printout is for inspection and comparison only. JSON is a lossless
+//! encoding of a value, not its MESH text (spec §9.7.7), and this isn't a
+//! realization: a renderer that puts a prop in a text-only slot uses the
+//! prop's string value or its `propText` entry (§9.8.7), never JSON. So it
+//! doesn't print `propText`, and must not be taken as a model for a PORT's
+//! output or serialization.
 
 use mesh_runtime::{Node, Tree, TreeChild};
 use std::collections::BTreeMap;

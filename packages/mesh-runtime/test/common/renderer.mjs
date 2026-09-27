@@ -3,6 +3,9 @@
 // form, so both produce the same committed files. It draws what it's
 // given and computes nothing: prop values print as the JSON they are,
 // and text runs as their strings.
+// For inspection and comparison only: JSON is a lossless encoding, not a
+// value's MESH text (spec §9.7.7), and this isn't a realization (§9.8.7),
+// nor a model for a PORT's output or serialization.
 import { byCodePoint, canonical } from "./json.mjs";
 
 /** The tree as indented, HTML-like text; keys aren't printed. */

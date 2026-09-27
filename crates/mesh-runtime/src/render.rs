@@ -244,6 +244,7 @@ impl Renderer<'_> {
         let key = self.key(path, scope, element.span)?;
         let declared = &self.valid.component(&element.component).props;
         let mut props = BTreeMap::new();
+        let mut prop_text = BTreeMap::new();
         for prop in &element.props {
             let value = scope.eval(&prop.value)?;
             let span = prop.value.span();
@@ -262,8 +263,16 @@ impl Renderer<'_> {
             if matches!(value, Value::Absent) {
                 continue;
             }
-            let value = output(&value).map_err(|why| scope.error(why.code, why.message, span))?;
-            props.insert(prop.prop.clone(), value);
+            let json = output(&value).map_err(|why| scope.error(why.code, why.message, span))?;
+            // The output check has passed, so a number here is finite.
+            // A string's text is itself, and a list or record has none:
+            // neither gets an entry.
+            if matches!(value, Value::Null | Value::Boolean(_) | Value::Number(_)) {
+                if let Some(text) = text_of(&value) {
+                    prop_text.insert(prop.prop.clone(), text);
+                }
+            }
+            props.insert(prop.prop.clone(), json);
         }
         let events = element
             .events
@@ -313,6 +322,7 @@ impl Renderer<'_> {
             key,
             component: element.component.clone(),
             props,
+            prop_text,
             events,
             children,
         })
@@ -326,26 +336,35 @@ impl Renderer<'_> {
         expression: &Expression,
     ) -> Result<String, RuntimeDiagnostic> {
         let span = expression.span();
-        Ok(match scope.eval(expression)? {
-            Value::Absent => String::new(),
-            Value::Null => "null".to_string(),
-            Value::Boolean(value) => value.to_string(),
-            Value::String(text) => text.to_string(),
-            Value::Number(number) if !number.is_finite() => {
-                return Err(scope.error(
-                    RuntimeCode::NON_FINITE_OUTPUT,
-                    "a number that isn't finite (NaN or an infinity) has no text",
-                    span,
-                ))
-            }
-            Value::Number(number) => number_to_text(number),
-            value @ (Value::List(_) | Value::Record(_)) => {
-                return Err(scope.error(
-                    RuntimeCode::CONTENT_NOT_TEXT,
-                    format!("this value is {}, which has no text", value.kind()),
-                    span,
-                ))
-            }
-        })
+        let value = scope.eval(expression)?;
+        match value {
+            Value::Absent => Ok(String::new()),
+            Value::Number(number) if !number.is_finite() => Err(scope.error(
+                RuntimeCode::NON_FINITE_OUTPUT,
+                "a number that isn't finite (NaN or an infinity) has no text",
+                span,
+            )),
+            Value::List(_) | Value::Record(_) => Err(scope.error(
+                RuntimeCode::CONTENT_NOT_TEXT,
+                format!("this value is {}, which has no text", value.kind()),
+                span,
+            )),
+            _ => Ok(text_of(&value).expect("a present scalar has text")),
+        }
+    }
+}
+
+/// The text of a value (§9.7.7), the one conversion from a value to text,
+/// used for content and for props alike: a string is itself, a boolean
+/// `true` or `false`, `null` is `null`, and a finite number is §9.7.7.1's.
+/// A list, a record, absence and a non-finite number have none: the
+/// caller decides what that means where it is.
+fn text_of(value: &Value) -> Option<String> {
+    match value {
+        Value::Null => Some("null".to_string()),
+        Value::Boolean(value) => Some(value.to_string()),
+        Value::String(text) => Some(text.to_string()),
+        Value::Number(number) if number.is_finite() => Some(number_to_text(*number)),
+        Value::Absent | Value::Number(_) | Value::List(_) | Value::Record(_) => None,
     }
 }
