@@ -1,7 +1,7 @@
-# MESH–PORT semantic resolution: values in text positions, and event attribution
+# MESH–PORT semantic resolution: values in text positions, and event resolution
 
 **Date:** 2026-09-27
-**Status:** proposal for review. Nothing here is implemented, and no source, schema or published document is changed by it.
+**Status:** approved for implementation (2026-09-27), with two clarifications made after review, both marked in place: E4 is an event-resolution rule, and E5 states what existing declarations provide. Implemented for v0.6 as recorded in section F.
 **Against:** ValanceX/Mesh `a03733e` (v0.5.0 plus one docs commit). PORT's handoff: ValanceX/Port `claude/focused-keller-jf7dt2` at `8be4d10`, `docs/architecture/2026-09-27-mesh-semantic-handoff.md`, `…-value-realization-audit.md` and `…-event-propagation-audit.md`.
 **Scope:** the questions V-Q0–V-Q5 and E-Q1–E-Q4 of PORT's handoff. SSR, hydration, HTML serialization, event delegation and mismatch handling are out of scope and stay blocked until this is approved. NEXUS plays no part in any of it.
 
@@ -20,9 +20,9 @@ Every question was checked against the grammar (`grammar/tree-sitter-mprx`), the
 | **V-Q4** a target's own conversion (`DOMString` given a number) | **4. Contradiction** | Rule 9 and I11 forbid anything outside the runtime to "convert a value to text", yet I11 also calls "setting a DOM attribute" from a tree's values drawing. |
 | **V-Q5** the guide's "MESH already turned it into text" | **4. Contradiction** | True of text runs, false of props (§9.8.2). |
 | **E-Q1** can one interaction trigger several bindings? | **3. Unspecified** | MESH never mentions a user interaction, only "a primitive's event fires". |
-| **E-Q2** can a descendant's interaction reach an ancestor's binding? | **2. Implied, not contractual** | Events are declared per component, a binding is one node's, and no relation between two nodes' events exists. So no event propagates, but it's never stated. |
+| **E-Q2** can a descendant's interaction reach an ancestor's binding? | **2. Implied, not contractual** | Events are declared per component, a binding is one node's, and no relation between two nodes' events exists. So nothing carries one node's event to an ancestor, but it's never stated. |
 | **E-Q3** which interactions a primitive's event covers | **3. Unspecified** | A manifest event is a name and a payload. MESH has no built-in components (§9.1), so it can't define what any one primitive's event means, and doesn't say who does. |
-| **E-Q4** propagation control in MPRX | **2. Implied, not contractual** | A handler is exactly one command invocation (§9.5), and there is nothing to control if no event propagates. |
+| **E-Q4** propagation control in MPRX | **2. Implied, not contractual** | A handler is exactly one command invocation (§9.5), and nothing needs controlling once an interaction resolves to one binding (E4). |
 
 No question is class 1: MESH answers none of them in so many words.
 
@@ -87,8 +87,8 @@ Existing semantics, stated as MESH would state them. Nothing here is new; sectio
 3. **Lists and records have no text** (F5). MESH decided this for content, for a reason that doesn't depend on content.
 4. **Absent is omission, never a default, and never `null`** (§9.2, §9.8.2, runtime manual).
 5. **A binding belongs to exactly one node, and handles that node's event** (F13, F16, F17). One reported handler identifier is one dispatch and one intent.
-6. **No event of one node is an event of another** (F14, F19). There's no MESH relation between two nodes' events, even with one name, and no composite events that could forward one. So MESH has no propagation.
-7. **MPRX can't express propagation control** (F20), consistent with 6.
+6. **No event of one node is an event of another** (F14, F19). There's no MESH relation between two nodes' events, even with one name, and no composite events that could forward one. So no MESH rule lets one node's event trigger another node's binding.
+7. **MPRX can't express control over which bindings an interaction reaches** (F20), consistent with 6.
 8. **MESH defines no particular component's behaviour** (F15). What a given primitive does, including what its events mean, isn't MPRX semantics.
 
 ---
@@ -188,14 +188,16 @@ This answers **V-Q0** (semantic values, realized by the PORT under these two rul
 - Future PORTs: every PORT, in any language, gets MESH's text from the tree. None needs MESH code.
 - Compatibility: additive and non-breaking for renderers that ignore unknown properties, as render-v1 requires. Tree size grows by one short string per non-string scalar prop.
 
-### E4. Events are emissions; one interaction is attributed to at most one binding (U3; E-Q1, E-Q2, E-Q4)
+### E4. Event resolution: one interaction resolves to at most one binding (U3; E-Q1, E-Q2, E-Q4)
+
+*Clarified after review (2026-09-27): E4 is stated as an **event-resolution rule**. It is not DOM bubbling, has no phases, and isn't defined as the absence of anything.*
 
 **Meaning.**
 
-1. **An event is an emission by one primitive occurrence** (formalizes C5). A binding `on.e` on node N handles `e` emitted by N and nothing else. Each emission yields at most one report (N's handler for `e`, if bound), one dispatch and one intent.
-2. **No propagation** (formalizes C6). An emission by one node is never an emission by another. Events of different nodes are unrelated, whatever their names; there's no bubbling and no capture.
-3. **Attribution.** When a target interaction occurs, its **target node** is the innermost render-tree node the interaction is on, with a text run counting as its parent node's. From the target node towards the root, the **first node that binds one of its events the interaction realizes** (E5) emits that event, and **no other node emits for that interaction**. A node that binds no such event is transparent: the interaction passes it by. Composite boundaries play no part, since composites are expanded (F19).
-4. **One event per node per interaction.** A primitive's realization maps any one interaction to at most one of that primitive's events. So a node binding `tap` and `click` never has both fire from one gesture; if a realization maps both to one gesture, it doesn't conform.
+1. **An event belongs to one primitive occurrence** (formalizes C5). A binding `on.e` on node N is N's binding for N's event `e`. Resolving to it yields exactly one report (its handler identifier), one dispatch and one intent.
+2. **Event resolution.** For an interaction on a primitive node, MESH resolves the applicable binding by examining the **innermost interacted node** (a text run's interaction is its parent node's), and then its ancestors in turn, towards the root. The **first node whose primitive defines the interaction's applicable event (E5), and which declares a binding for that event, receives the interaction.** Resolution stops there: no later ancestor's binding is triggered. A node whose primitive defines no applicable event, or which declares no binding for it, is passed over. Composite boundaries play no part, since composites are expanded (F19). If no node on the path qualifies, the interaction resolves to nothing, and nothing is dispatched.
+3. **Events of different nodes are never related** (formalizes C6). Resolution selects a node, and that node's own event. It never treats one node's event as another's, whatever their names.
+4. **At most one applicable event per primitive per interaction** (E5). So a node binding `tap` and `click` never has both resolved from one interaction.
 
 So one interaction causes **at most one intent**. For
 
@@ -205,24 +207,33 @@ So one interaction causes **at most one intent**. For
 </parent>
 ```
 
-an interaction on `child` that `child`'s `click` covers invokes `child()` only. An interaction on `parent` outside `child` invokes `parent()`. If `child` bound nothing, an interaction on it would reach `parent`, if it realizes `parent`'s `click`.
+an interaction on `child` whose applicable event for `child` is `click` resolves to `child()` only. If `child` has no `click` binding, the same interaction resolves to `parent()`, provided its applicable event for `parent` is `click`.
 
-**Answers.** **E-Q1:** no. One interaction triggers at most one binding, on nested nodes and on one node alike. **E-Q2:** an ancestor's binding is triggered only when no nearer node on the path binds an event the interaction realizes, and then as that ancestor's own event, never as a relation between two nodes' events (none exists). Yes, there is a nearest binding; attribution follows render-tree ancestry, not event names. **E-Q4:** there's nothing to stop, so MPRX needs no syntax. An application that wants one gesture to do two things writes one command that does both; MESH records intent, and the host decides what it does (§6).
+**Answers.** **E-Q1:** no. One interaction resolves to at most one binding, on nested nodes and on one node alike. **E-Q2:** an ancestor's binding is reached only when no nearer node on the path qualifies, and then as that ancestor's own event. There is a nearest binding; resolution follows render-tree ancestry, not event names. **E-Q4:** resolution already stops at the first binding, so MPRX needs no syntax, and none (no `stopPropagation` or equivalent) is added. An application that wants one interaction to do two things writes one command that does both; MESH records intent, and the host decides what it does (§6).
 
-**Why this rule.** It is the only reading consistent with every existing statement (F13–F22): one node, one handler, one dispatch, one intent. It keeps `on.click` interaction *intent* (F21): one user act states one intent. It is decidable from the tree alone, because ancestry and bindings are both in render-v1. And it asks nothing of MPRX. Bubbling would need a cross-component relation between events that MESH deliberately lacks (F14), a payload rule for an ancestor receiving a descendant's interaction, and new syntax to stop it; nothing in MESH supports it (F23). "Target only" makes a primitive with content unusable. A declaration-based variant, where the innermost node that *declares* a matching event absorbs the interaction even when unbound, would need the manifest in the renderer, and would let an unbound avatar silently swallow a click meant for its card.
+**Why this rule.** It is the only reading consistent with every existing statement (F13–F22): one node, one handler, one dispatch, one intent. It keeps `on.click` interaction *intent* (F21): one user act states one intent. It is decidable from the render tree and the interaction alone, because ancestry and bindings are both in render-v1. And it asks nothing of MPRX. Bubbling would need a cross-component relation between events that MESH deliberately lacks (F14), a payload rule for an ancestor receiving a descendant's interaction, and new syntax to stop it; nothing in MESH supports it (F23). "Innermost node only" makes a primitive with content unusable. A variant in which the innermost node whose primitive defines the event absorbs the interaction even when it has no binding would let an unbound avatar silently swallow an interaction meant for its card.
 
-**Effects.** MPRX, the compiler, render-v1 and the runtime: none. Dispatch is per identifier and needs no change. Spec: a new §9.9, "Events", holds rules 1–4; the runtime manual's lifecycle step 3 refers to it. Reference hosts: the test host already dispatches once per event (F22). MESH adds language-neutral conformance vectors: a tree, an interaction target node, which of each node's events the interaction realizes, and the expected single handler identifier or none. They include a nested case, a transparent unbound node, a composite boundary, and one node with two events. Future PORTs: every target implements one hit-test-then-walk rule. On the Web this means not relying on DOM bubbling; how is PORT's business. Compatibility: no MESH program changes meaning, because none nests bindings in a checked or run corpus (F22). The Web PORT's non-contractual bubbling (B-6) becomes non-conforming.
+**Effects.** MPRX, the compiler and render-v1: none. Dispatch is per identifier and needs no change. Spec: a new §9.9 states the rule. Runtime: a reference implementation of resolution over a render tree, `mesh_runtime::resolve`, pure and target-free, so the rule is testable without any target. MESH adds language-neutral conformance vectors: a real program and its tree, an interaction (its innermost node and its applicable event for each primitive), and the expected handler identifier and intent, or none. They cover a nested case, a passed-over node, a composite boundary, several ancestors, unrelated events, and one node with two events. A PORT implements the same rule for its target and checks itself against the vectors; it needs no MESH code to do so. Compatibility: no MESH program changes meaning, because none nests bindings in a checked or run corpus (F22). The Web PORT's non-contractual DOM bubbling (B-6) doesn't conform.
 
 ### E5. What a primitive's event covers (U4; E-Q3)
 
-**Meaning.** Two parts, owned by different layers:
+*Clarified after review (2026-09-27): whether existing declarations suffice, and what, if anything, has to be declared.*
 
-- **Containment is MESH's.** An interaction on a node's content, meaning its descendants and text runs, is an interaction *on* that node for E4's walk. A click on a button's label reaches the button by structure, not by a per-primitive rule.
-- **Which interactions realize a given event of a given primitive is that primitive's definition**, not MPRX's: MESH has no built-in components (F15), and a manifest declares only an event's name and payload. Each PORT realizes that definition for its target. For one primitive, the definition must be the same on every target (the same meaning, however it's realized), and it can't depend on anything outside the node: its bindings, its ancestors or its siblings. It must also satisfy E4 rule 4.
+**Meaning.** Two parts:
 
-So E-Q3 is answered as "left to the primitive, under MESH's generic rules". That isn't PORT inventing MESH semantics: it is PORT defining its own primitives, which MESH never had. MESH's own share, how nested nodes and several bindings combine, is E4.
+- **Containment is MESH's.** An interaction on a node's content, meaning its descendants and text runs, is an interaction on that node for E4's walk. A click on a button's label reaches the button by structure, not by a per-primitive rule.
+- **A primitive defines which interactions constitute each of its events.** This belongs to the primitive's contract, not to the target. For one primitive it is the same on every target (the same meaning, however it's realized), and it depends only on the interaction and the primitive: never on the node's bindings, its ancestors or siblings, or any PORT's implementation. It gives at most one event per interaction (E4 rule 4).
 
-**Effects.** Spec: §9.9 states the split. PORT: its realization tables become the documented definition of each primitive's events (PORT's work, later). MPRX, compiler, render-v1, runtime: none. Target capability descriptions (ARCHITECTURE, "Targets describe themselves") might one day carry these definitions, but nothing needs them now.
+**Do existing declarations provide it?** Partly, and that is enough for MESH's rule:
+
+- The manifest already declares **which events a primitive defines**: their names and payloads. E4's "whose primitive defines the applicable event" is exactly that declaration. So is a binding: the checker only accepts `on.e` for an event its component declares (§9.1).
+- The manifest does **not** say which interactions constitute an event, and MESH has no interaction vocabulary to say it with. Adding one would mean a universal event vocabulary, which is ruled out, and target concepts (pointers, keys) entering MESH.
+
+**The smallest change is therefore specification, not declaration.** §9.9 states the rule above, and MESH's resolution takes the interaction as its input in the only form MESH needs: for each primitive, **the applicable event**, the one event of that primitive (if any) the interaction constitutes. Nothing in the manifest, `template-v1` or render-v1 changes. Each primitive's interaction definition is written down wherever that primitive is defined, and a PORT realizes it; MESH neither invents it nor needs it to be in a MESH format. If a later MESH wants to check those definitions, it will need a declaration form for them, and that is a separate language decision.
+
+So E-Q3 is answered as: containment is MESH's; the interactions behind a primitive's event are the primitive's definition, under MESH's constraints; and combining several nodes and bindings is E4.
+
+**Effects.** Spec: §9.9 states both parts. MPRX, compiler, manifest, render-v1: none. Runtime: `resolve` takes the applicable event per primitive as data. PORT: each realization table becomes the documented realization of each primitive's definition (PORT's work, later).
 
 ### E6. Corrections (U5)
 
