@@ -14,13 +14,20 @@ pub struct Tree {
     pub root: Node,
 }
 
-/// A primitive occurrence.
+/// A primitive occurrence. Non-exhaustive: a later MESH may add
+/// information, as render-v1 allows.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Node {
     pub key: String,
     pub component: String,
     /// Each written prop's value; an absent prop isn't here.
     pub props: BTreeMap<String, Value>,
+    /// The text (§9.7.7) of each prop whose value is a number, a boolean
+    /// or `null`, made by the runtime so that a renderer never makes it.
+    /// A string prop has no entry (its text is itself), nor has a list or
+    /// record prop (it has no text), nor an absent prop.
+    pub prop_text: BTreeMap<String, String>,
     /// Each event binding's event name and handler identifier.
     pub events: BTreeMap<String, String>,
     pub children: Vec<TreeChild>,
@@ -41,7 +48,7 @@ impl Tree {
 }
 
 fn node(node: &Node) -> Value {
-    json!({
+    let mut out = json!({
         "type": "node",
         "key": node.key,
         "component": node.component,
@@ -51,7 +58,13 @@ fn node(node: &Node) -> Value {
             TreeChild::Node(child) => self::node(child),
             TreeChild::Text { key, text } => json!({ "type": "text", "key": key, "text": text }),
         }).collect::<Vec<_>>(),
-    })
+    });
+    // Present exactly when some prop has a text entry, so a node with
+    // none is written as it was before `propText` existed.
+    if !node.prop_text.is_empty() {
+        out["propText"] = json!(node.prop_text);
+    }
+    out
 }
 
 /// A command intent: which command a handler invoked, and its evaluated

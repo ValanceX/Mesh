@@ -1,0 +1,249 @@
+[
+  {
+    "case": "a string prop is its own text, with no propText entry",
+    "node": "khNDUIclbcgV1d1SLYNd8Xg",
+    "prop": "label",
+    "value": {
+      "value": "Ada"
+    },
+    "propText": {
+      "absent": true
+    }
+  },
+  {
+    "case": "a string written as a quoted attribute is the same",
+    "node": "kMb1EoJCcSpiaDk00wy5vgA",
+    "prop": "label",
+    "value": {
+      "value": "as written"
+    },
+    "propText": {
+      "absent": true
+    }
+  },
+  {
+    "case": "a number prop that is an integer",
+    "node": "khNDUIclbcgV1d1SLYNd8Xg",
+    "prop": "value",
+    "value": {
+      "value": 42
+    },
+    "propText": {
+      "text": "42"
+    }
+  },
+  {
+    "case": "a number prop whose shortest digits are long",
+    "node": "k_pI2jZmKXAOyWcRJ47dggA",
+    "prop": "value",
+    "value": {
+      "value": 0.30000000000000004
+    },
+    "propText": {
+      "text": "0.30000000000000004"
+    }
+  },
+  {
+    "case": "a number prop at the exponent layout threshold",
+    "node": "k_2ANZimYdmIkW-fP1GKnDg",
+    "prop": "value",
+    "value": {
+      "value": 1e+21
+    },
+    "propText": {
+      "text": "1e+21"
+    }
+  },
+  {
+    "case": "the smallest subnormal: the nearest one-digit candidate",
+    "node": "klxprakCHuS39cmzpBunYOw",
+    "prop": "value",
+    "value": {
+      "value": 5e-324
+    },
+    "propText": {
+      "text": "5e-324"
+    }
+  },
+  {
+    "case": "equally near candidates: MESH's even one, by §9.7.7.1",
+    "node": "kHFh9DtdWeudrqQRji2wpiw",
+    "prop": "value",
+    "value": {
+      "value": 2.9802322387695312e-08
+    },
+    "propText": {
+      "text": "2.9802322387695312e-8"
+    }
+  },
+  {
+    "case": "negative zero leaves as 0, and its text is 0",
+    "node": "kMb1EoJCcSpiaDk00wy5vgA",
+    "prop": "value",
+    "value": {
+      "value": 0
+    },
+    "propText": {
+      "text": "0"
+    }
+  },
+  {
+    "case": "a number prop through any",
+    "node": "khNDUIclbcgV1d1SLYNd8Xg",
+    "prop": "extra",
+    "value": {
+      "value": 0.1
+    },
+    "propText": {
+      "text": "0.1"
+    }
+  },
+  {
+    "case": "boolean true",
+    "node": "khNDUIclbcgV1d1SLYNd8Xg",
+    "prop": "flag",
+    "value": {
+      "value": true
+    },
+    "propText": {
+      "text": "true"
+    }
+  },
+  {
+    "case": "boolean false",
+    "node": "k_pI2jZmKXAOyWcRJ47dggA",
+    "prop": "flag",
+    "value": {
+      "value": false
+    },
+    "propText": {
+      "text": "false"
+    }
+  },
+  {
+    "case": "null is a value, and its text is null",
+    "node": "khNDUIclbcgV1d1SLYNd8Xg",
+    "prop": "empty",
+    "value": {
+      "value": null
+    },
+    "propText": {
+      "text": "null"
+    }
+  },
+  {
+    "case": "an absent prop: no prop and no propText, unlike null",
+    "node": "khNDUIclbcgV1d1SLYNd8Xg",
+    "prop": "note",
+    "value": {
+      "absent": true
+    },
+    "propText": {
+      "absent": true
+    }
+  },
+  {
+    "case": "an unwritten prop: no prop and no propText",
+    "node": "kp_5P0PPxQzT0W_5Pm65ELA",
+    "prop": "empty",
+    "value": {
+      "absent": true
+    },
+    "propText": {
+      "absent": true
+    }
+  },
+  {
+    "case": "a list prop has no text",
+    "node": "khNDUIclbcgV1d1SLYNd8Xg",
+    "prop": "items",
+    "value": {
+      "value": [
+        "primary",
+        "wide"
+      ]
+    },
+    "propText": {
+      "absent": true
+    }
+  },
+  {
+    "case": "a record prop has no text",
+    "node": "khNDUIclbcgV1d1SLYNd8Xg",
+    "prop": "point",
+    "value": {
+      "value": {
+        "x": 1.5,
+        "y": -2
+      }
+    },
+    "propText": {
+      "absent": true
+    }
+  },
+  {
+    "case": "a list through any has no text",
+    "node": "k_pI2jZmKXAOyWcRJ47dggA",
+    "prop": "extra",
+    "value": {
+      "value": [
+        1,
+        "two"
+      ]
+    },
+    "propText": {
+      "absent": true
+    }
+  },
+  {
+    "case": "a record through any has no text",
+    "node": "k_2ANZimYdmIkW-fP1GKnDg",
+    "prop": "extra",
+    "value": {
+      "value": {
+        "a": true
+      }
+    },
+    "propText": {
+      "absent": true
+    }
+  },
+  {
+    "case": "content uses the same text: each interpolation, and absent as empty",
+    "textRun": "kJulJ9sb2a_qZNAS5OQj8fQ",
+    "text": "Ada, 42, 0.30000000000000004, 1e+21, 5e-324, 2.9802322387695312e-8, 0, true, false, null, []"
+  },
+  {
+    "case": "absent, null and string: three states, none equal to another (absent ≠ null; null has the text null; a string is its own text, with no propText copy)",
+    "states": [
+      {
+        "state": "absent",
+        "node": "kJuRdcS-1576KQTNQIwrbog",
+        "exactly": {
+          "props": {}
+        }
+      },
+      {
+        "state": "null",
+        "node": "k18fbCfpD6mY8auQJsyQN7Q",
+        "exactly": {
+          "props": {
+            "value": null
+          },
+          "propText": {
+            "value": "null"
+          }
+        }
+      },
+      {
+        "state": "string",
+        "node": "kH82gRNx253_CxX5IIyvf8w",
+        "exactly": {
+          "props": {
+            "value": "hello"
+          }
+        }
+      }
+    ]
+  }
+]

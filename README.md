@@ -114,7 +114,7 @@ mesh/
 
 ## Status
 
-**v0.5.0 released** (2026-09-26). See the [release notes](./docs/releases/v0.5.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.6.0 released** (2026-09-27). See the [release notes](./docs/releases/v0.6.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), and event bindings (`on.click={...}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings
@@ -127,10 +127,11 @@ mesh/
 - `mesh-lsp` from npm: `npm install -g @valancex/mesh-lsp` installs the native server for Linux, macOS or Windows
 - Compiling to templates: `mesh compile`, and `compile()` in `@valancex/mesh-compiler`, emit a checked component's template (see the [templates manual](./docs/manual/templates.md)); `mesh check-program` and `checkProgram()` check a program of them
 - The runtime: `mesh-runtime` in Rust, and `@valancex/mesh-runtime` in Node and browsers, render a program against a snapshot to a render tree, and dispatch an event to a command intent, with MPRX's evaluation specified in [§9.7 of the spec](./docs/MPRX-SPEC.md) (see the [runtime manual](./docs/manual/runtime.md))
+- A renderer's contract, settled with PORT: every text a renderer needs is the runtime's (the render tree's `propText` for number, boolean and `null` props), a value is realized natively or as that text and nothing else, and one interaction reaches at most one binding by event resolution ([§9.8.7 and §9.9 of the spec](./docs/MPRX-SPEC.md)), with language-neutral [conformance vectors](./examples/conformance/README.md)
 
 Known limitations: MPRX has no presence test for a value that may be absent, and children aren't checked against components. Editor configuration is per editor, and only Neovim's is verified. Composites have no events, children or slots. A list holding an absent element can't be rendered or passed as an argument. Every template must be recompiled after any change of meaning to the component model. MESH ships no NEXUS adapter or PORT renderer: those belong to their repositories.
 
-Next: NEXUS's adapter and PORT's renderers, in their own repositories, and a thin VS Code extension over the npm-installed server.
+Next: PORT's server rendering and hydration, on v0.6's contract, and NEXUS's adapter, in their own repositories, and a thin VS Code extension over the npm-installed server.
 
 ## Learn more
 

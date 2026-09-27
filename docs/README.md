@@ -1,6 +1,6 @@
 # MESH documentation
 
-Documentation for **MESH v0.5**. New here? Start with *Getting started*.
+Documentation for **MESH v0.6**. New here? Start with *Getting started*.
 
 ## Guides
 
@@ -13,7 +13,7 @@ Learning-oriented walkthroughs.
 - [**Using MESH from JavaScript**](./guides/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`, and a generate-check-repair loop that applies MESH's suggestions.
 - [**Embedding the compiler**](./guides/embedding-the-compiler.md): call MESH from Rust, handle diagnostics, and walk the Semantic IR.
 - [**Integrating MESH with NEXUS**](./guides/integrating-mesh-with-nexus.md): build a host: compile templates, render from your state, pair each event with its render, and map intents to commands.
-- [**Rendering MESH output**](./guides/rendering-mesh-output.md): build a renderer: draw a render tree as given, report events, and update by key.
+- [**Rendering MESH output**](./guides/rendering-mesh-output.md): build a renderer: realize a render tree as given (natively, or with MESH's text), resolve and report events, and update by key. Its [conformance vectors](../examples/conformance/README.md) test one without a target.
 
 ## Manuals
 
@@ -30,12 +30,12 @@ Reference material for when you need exact details.
 
 - [**Evaluation and the boundary**](./MPRX-SPEC.md#97-evaluation): §9.7 and §9.8 of the spec, with the normative [number-to-text table](./tables/number-to-text.tsv) and its [reference generator](./tables/number_to_text.py).
 - [**Templates and programs**](./manual/templates.md): the compiled form of a template, the model fingerprint, and the assembly rules. Also a [JSON Schema](../schemas/template-v1.schema.json). `mesh compile` and `compile()` emit templates; `mesh check-program` and `checkProgram()` check programs.
-- [**The MESH runtime**](./manual/runtime.md): render and dispatch, the host's obligations, the render tree, keys, handler identifiers, command intents, and runtime diagnostics. Also JSON Schemas for [render trees and intents](../schemas/render-v1.schema.json) and [runtime diagnostics](../schemas/runtime-diagnostics-v1.schema.json).
+- [**The MESH runtime**](./manual/runtime.md): render and dispatch, the host's obligations, the render tree and `propText`, event resolution, keys, handler identifiers, command intents, and runtime diagnostics. Also JSON Schemas for [render trees and intents](../schemas/render-v1.schema.json) and [runtime diagnostics](../schemas/runtime-diagnostics-v1.schema.json).
 
 ## Background
 
 - [**Architecture**](./ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance.
-- Release notes for [**v0.5**](./releases/v0.5.md), [**v0.4**](./releases/v0.4.md), [**v0.3**](./releases/v0.3.md), [**v0.2**](./releases/v0.2.md) and [**v0.1**](./releases/v0.1.md), and the [**CHANGELOG**](../CHANGELOG.md).
+- Release notes for [**v0.6**](./releases/v0.6.md), [**v0.5**](./releases/v0.5.md), [**v0.4**](./releases/v0.4.md), [**v0.3**](./releases/v0.3.md), [**v0.2**](./releases/v0.2.md) and [**v0.1**](./releases/v0.1.md), and the [**CHANGELOG**](../CHANGELOG.md).
 
 ## For contributors
 

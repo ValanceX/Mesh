@@ -3,7 +3,10 @@
 //! It renders a **program** of templates (`mesh-template`) against a
 //! host's **snapshot**, producing a render tree for a renderer to draw,
 //! and turns the events a renderer reports into **command intents** for
-//! the host. Its whole surface is two operations, render and dispatch.
+//! the host. Its whole surface is two operations, render and dispatch,
+//! and `resolve`, the reference implementation of event resolution
+//! (§9.9), a pure function of a render tree that renderers implement for
+//! their own targets.
 //!
 //! It implements the spec's §9.7 (evaluation) and §9.8 (the boundary)
 //! exactly once (I11). It accepts no MPRX source, only templates (I12),
@@ -20,6 +23,7 @@ mod eval;
 mod number;
 mod program;
 mod render;
+mod resolve;
 mod tree;
 mod types;
 mod value;
@@ -29,6 +33,7 @@ pub use dispatch::{dispatch, dispatch_from};
 pub use number::number_to_text;
 pub use program::Program;
 pub use render::{render, Render};
+pub use resolve::{resolve, Interaction, ResolveError, Resolved};
 pub use tree::{Intent, Node, Tree, TreeChild};
 pub use value::{HostKey, HostRecord, HostValue};
 

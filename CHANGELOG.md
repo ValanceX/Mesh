@@ -4,6 +4,27 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-27
+
+The semantic questions PORT's first renderer raised, settled. See the [v0.6 release notes](./docs/releases/v0.6.md) for an overview.
+
+### Added
+
+- **`propText` in render trees.** A node now carries, as `propText`, the MESH text (spec §9.7.7) of each prop whose value is a number, a boolean or `null`: `{ "value": 42, "busy": false, "note": null }` comes with `{ "value": "42", "busy": "false", "note": "null" }`. The runtime makes it, with the same rule as text runs (§9.7.7.1 for numbers), so a renderer that puts such a prop in a slot that holds only text never converts a value itself. A string prop has no entry (its text is its value), a list or record prop has none (it has no text), and an absent prop has neither a value nor a text, unlike a `null` one. The member is present only when some prop has an entry. `render-v1` keeps `version: 1`: its schema lets a later MESH add properties, and renderers must ignore properties they don't know. The schema now lists `propText`; every v0.5 tree is still valid against it.
+- **Event resolution** (spec §9.9). One interaction reaches at most one binding: from the innermost interacted node towards the root, the first node whose primitive has the interaction's applicable event, and which binds it, receives the interaction, and no ancestor after it. This is MESH's rule, not a target's event propagation, and MPRX has no syntax to change it. A primitive's event contract (what each of its events means) is MESH-level and the same on every target; a PORT maps its target's interactions onto it, and resolution is given the resulting applicable event per primitive. v0.6 adds no primitive catalog, interaction vocabulary or manifest change for it. Rust API: `mesh_runtime::resolve(&tree, &Interaction)`, the reference implementation, returns `Ok(Some(Resolved))` (the receiving node's key, the event and the handler identifier), `Ok(None)` when nothing qualifies, or `Err(ResolveError::UnknownTarget)` for a target key not in the tree. It evaluates nothing and needs no target. `Interaction`, `Resolved` and `ResolveError` are new; the last two are `#[non_exhaustive]`.
+- **Conformance vectors,** `examples/conformance/`: real programs, their committed trees, and named cases for values and `propText` (`values/`, including one pinning absent, `null` and a string as three distinct node shapes) and for event resolution (`events/`), in JSON and MPRX only, so a renderer in any language can test itself against them without MESH's code. They're checked natively and through `@valancex/mesh-runtime`, and native and WebAssembly give byte-identical results for them, and for every finite number of the normative table as a prop's `propText`.
+- **`@valancex/mesh-runtime`: `RenderNode.propText`,** optional, in the exported types.
+
+### Changed
+
+- **The spec.** §9.7.7 is now the text of a value, for props as well as content; §9.7.8 extends "no text" to list and record props; §9.8.2 separates a value's text from the value; §9.8.7, new, says how a renderer may realize a value: natively, in a slot of its kind that holds it exactly, or as its MESH text in a slot that holds only text, and nothing else (no platform coercion, host formatting or JSON); §9.9, new, is event resolution.
+- **Breaking, Rust API: `mesh_runtime::Node` has a new field, `prop_text`, and is now `#[non_exhaustive]`,** so code outside the crate can no longer build one with a struct literal or destructure it exhaustively. Reading its fields by name is unaffected, and the next field won't break anyone.
+- **Renderers must resolve events** (§9.9). A renderer that lets one interaction reach more than one binding, as a DOM renderer relying on bubbling does, no longer conforms. No existing MESH program changes meaning: none in v0.5's examples, fixtures or test programs nests bindings.
+
+### Fixed
+
+- **The documents' contradictions about text,** found while settling PORT's questions: the rendering guide said numbers arrive as text, which holds only for text runs; the v0.5 outline's I11 both forbade converting a value to text outside the runtime and called setting a DOM attribute from any value "drawing" (ARCHITECTURE rule 9 now says the runtime makes every text and renderers consume it); the reference renderers' JSON printouts are now labelled as inspection output, not realization; and the runtime manual's example tree held values its components' manifest doesn't allow.
+
 ## [0.5.0] - 2026-09-26
 
 MESH renders: templates, and the MESH runtime, natively and as `@valancex/mesh-runtime`. See the [v0.5 release notes](./docs/releases/v0.5.md) for an overview.
@@ -156,6 +177,7 @@ The first release. See the [v0.1 release notes](./docs/releases/v0.1.md) for an 
 - No component-model or type checking yet.
 - `mesh-lsp` and the npm packages are placeholders.
 
+[0.6.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.6.0
 [0.5.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.3.0

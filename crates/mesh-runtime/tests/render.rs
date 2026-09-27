@@ -72,6 +72,65 @@ fn a_tree_is_render_v1() {
 }
 
 #[test]
+fn render_v1_accepts_trees_with_and_without_prop_text_and_refuses_a_malformed_one() {
+    // A v0.5 tree, with no `propText`, is still valid: the member is
+    // optional. A tree with one is valid. A text that isn't a string, and
+    // an empty `propText` (the runtime omits it instead), are not.
+    let node = |extra: &str| {
+        format!(
+            r#"{{"format":"mesh-render","version":1,"root":{{"type":"node","key":"kD2_VHca9Ag2dUolhbZRbBg","component":"meter","props":{{"value":42,"label":"Load"}},{extra}"events":{{}},"children":[]}}}}"#
+        )
+    };
+    let valid = |text: &str| schema().is_valid(&serde_json::from_str::<Value>(text).unwrap());
+    assert!(valid(&node("")));
+    assert!(valid(&node(r#""propText":{"value":"42"},"#)));
+    assert!(!valid(&node(r#""propText":{"value":42},"#)));
+    assert!(!valid(&node(r#""propText":{},"#)));
+    assert!(!valid(&node(r#""propText":{"bad-name":"42"},"#)));
+}
+
+#[test]
+fn prop_text_is_the_text_of_each_number_boolean_and_null_prop_and_nothing_else() {
+    let render = view(
+        r#"<page title={name}>
+  <probe num={count / 4} flag={flag} none={nothing} str={name} maybeStr={maybeName} numbers={numbers} user={user} any={anything} />
+  <probe />
+</page>"#,
+    )
+    .unwrap();
+    let TreeChild::Node(probe) = &render.tree().root.children[0] else {
+        panic!("a probe");
+    };
+    let expected: std::collections::BTreeMap<String, String> =
+        [("flag", "true"), ("none", "null"), ("num", "0.75")]
+            .into_iter()
+            .map(|(prop, text)| (prop.to_string(), text.to_string()))
+            .collect();
+    assert_eq!(probe.prop_text, expected);
+    // `null` is a prop with the text `null`; an absent optional string is
+    // no prop at all, and has no text either.
+    assert_eq!(probe.props.get("none"), Some(&Value::Null));
+    assert_eq!(probe.props.get("str"), Some(&Value::from("Ada")));
+    assert!(!probe.props.contains_key("maybeStr") && !probe.prop_text.contains_key("maybeStr"));
+    // Lists and records have no text, typed or through `any`; neither
+    // has a string, whose text is its value.
+    for prop in ["numbers", "user", "any", "str"] {
+        assert!(probe.props.contains_key(prop), "{prop}");
+    }
+    // A node with no such prop has no `propText` member at all.
+    let TreeChild::Node(empty) = &render.tree().root.children[1] else {
+        panic!("a probe");
+    };
+    assert!(empty.prop_text.is_empty());
+    let document: Value = serde_json::from_str(&render.tree().to_json()).unwrap();
+    assert!(document["root"]["children"][1].get("propText").is_none());
+    assert!(
+        document["root"].get("propText").is_none(),
+        "a string prop has no text entry"
+    );
+}
+
+#[test]
 fn text_runs_join_adjacent_text_and_interpolations_and_are_kept_when_empty() {
     let render = view(PAGE).unwrap();
     let texts: Vec<Vec<String>> = render
@@ -196,7 +255,8 @@ fn no_key_or_handler_identifier_holds_a_name() {
 }
 
 /// I13: a tree holds exactly primitive component names, props with
-/// values, text runs, event names with handler identifiers, and keys.
+/// values, the MESH text of number, boolean and `null` props, text runs,
+/// event names with handler identifiers, and keys.
 #[test]
 fn a_tree_holds_only_what_i13_lists() {
     fn walk(node: &Value) {
@@ -205,10 +265,36 @@ fn a_tree_holds_only_what_i13_lists() {
         keys.sort_unstable();
         match object["type"].as_str().unwrap() {
             "node" => {
-                assert_eq!(
-                    keys,
-                    ["children", "component", "events", "key", "props", "type"]
-                );
+                // `propText` is there exactly when some prop has a text.
+                let props = object["props"].as_object().unwrap();
+                let texts = props
+                    .values()
+                    .filter(|value| value.is_null() || value.is_boolean() || value.is_number())
+                    .count();
+                if texts == 0 {
+                    assert_eq!(
+                        keys,
+                        ["children", "component", "events", "key", "props", "type"]
+                    );
+                } else {
+                    assert_eq!(
+                        keys,
+                        [
+                            "children",
+                            "component",
+                            "events",
+                            "key",
+                            "propText",
+                            "props",
+                            "type"
+                        ]
+                    );
+                    let prop_text = object["propText"].as_object().unwrap();
+                    assert_eq!(prop_text.len(), texts);
+                    for (prop, text) in prop_text {
+                        assert!(props.contains_key(prop) && text.is_string());
+                    }
+                }
                 for handler in object["events"].as_object().unwrap().values() {
                     assert!(handler.is_string());
                 }

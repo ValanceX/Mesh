@@ -1,0 +1,11 @@
+<card on.click={openCard()}>
+  <row on.click={rowClicked()} on.select={selectRow()}>
+    <button on.click={buttonClicked()} on.press={buttonPressed()}>Save</button>
+    <button>Plain</button>
+    <label>Hint</label>
+  </row>
+  <row on.select={selectRow()}>
+    <button>Inner</button>
+  </row>
+  <tile />
+</card>

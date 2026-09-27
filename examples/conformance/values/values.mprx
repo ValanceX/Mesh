@@ -1,0 +1,13 @@
+<page>
+  <field label={name} value={count} flag={on} empty={nothing} note={maybe} items={tags} point={point} extra={anyNumber} />
+  <field value={ratio} flag={off} extra={anyList} />
+  <field value={big} extra={anyRecord} />
+  <field value={tiny} />
+  <field value={tie} />
+  <field value={negativeZero} label="as written" />
+  <field />
+  <text>{name}, {count}, {ratio}, {big}, {tiny}, {tie}, {negativeZero}, {on}, {off}, {nothing}, [{maybe}]</text>
+  <cell value={missing} />
+  <cell value={nothing} />
+  <cell value={greeting} />
+</page>
