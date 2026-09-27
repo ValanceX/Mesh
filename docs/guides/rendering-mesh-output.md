@@ -29,13 +29,13 @@ Nothing else. Never make text from a value yourself: not with `String(x)`, a tem
 
 ## Report events as handler identifiers
 
-When the user does something, **resolve it to at most one binding** (spec §9.9), and report that binding's handler identifier, and the event's payload, to the host. Don't interpret either.
+When the user does something, **resolve it to at most one binding** (spec §9.9), and report that binding's handler identifier, and the event's payload, to the host. Don't interpret either. The host dispatches them with the render the tree came from, and the runtime turns them into a command intent. **A renderer never sees an intent,** or which command an event invokes.
 
 - Start at the innermost node the interaction is on: an interaction on a text run is on its node.
 - If that node's primitive has an applicable event for the interaction (the one of its events the interaction constitutes, by the primitive's definition) and the node binds it, report that binding and stop.
 - Otherwise move to the parent, towards the root. If no node qualifies, report nothing.
 
-So `<card on.click={open()}><button on.click={save()}>Save</button></card>` reports only `save()`'s handler for a click on the button, and `open()`'s only for a click elsewhere on the card, or on a button with no `click` binding. This is **event resolution, not DOM bubbling**: never let a second binding fire for the same interaction, even when your target delivers the interaction to ancestors, and never relate two nodes' events because they share a name. MPRX has no way to stop or repeat resolution, and doesn't need one. Which interactions constitute a primitive's event is part of that primitive's definition, the same on every target, and never depends on the node's bindings or ancestors. `examples/conformance/events/` has language-neutral cases to test your renderer against, with no target needed. The host dispatches them with the render the tree came from, and the runtime turns them into a command intent. **A renderer never sees an intent,** or which command an event invokes.
+So `<card on.click={open()}><button on.click={save()}>Save</button></card>` reports only `save()`'s handler for a click on the button, and `open()`'s only for a click elsewhere on the card, or on a button with no `click` binding. This is **event resolution, not DOM bubbling**: never let a second binding fire for the same interaction, even when your target delivers the interaction to ancestors, and never relate two nodes' events because they share a name. MPRX has no way to stop or repeat resolution, and doesn't need one. Which interactions constitute a primitive's event is part of that primitive's definition, the same on every target, and never depends on the node's bindings or ancestors. `examples/conformance/events/` has language-neutral cases to test your renderer against, with no target needed.
 
 Keys and handler identifiers are **opaque, but not secret.** Compare them only for equality, and never parse them. Anyone with the templates can compute them. What makes them safe to hand back is the runtime's validation when the host dispatches, not their secrecy.
 
