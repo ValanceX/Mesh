@@ -1,7 +1,7 @@
 # MESH–PORT semantic resolution: values in text positions, and event resolution
 
 **Date:** 2026-09-27
-**Status:** approved for implementation (2026-09-27), with two clarifications made after review, both marked in place: E4 is an event-resolution rule, and E5 states what existing declarations provide. Implemented for v0.6 as recorded in section F.
+**Status:** approved for implementation (2026-09-27), with two clarifications made after review, both marked in place: E4 is an event-resolution rule, and E5 states what existing declarations provide. Implemented and released as v0.6.0 (2026-09-27), as recorded in section F.
 **Against:** ValanceX/Mesh `a03733e` (v0.5.0 plus one docs commit). PORT's handoff: ValanceX/Port `claude/focused-keller-jf7dt2` at `8be4d10`, `docs/architecture/2026-09-27-mesh-semantic-handoff.md`, `…-value-realization-audit.md` and `…-event-propagation-audit.md`.
 **Scope:** the questions V-Q0–V-Q5 and E-Q1–E-Q4 of PORT's handoff. SSR, hydration, HTML serialization, event delegation and mismatch handling are out of scope and stay blocked until this is approved. NEXUS plays no part in any of it.
 
@@ -296,4 +296,4 @@ Everything above was built, with these specifics and departures:
 - **Event resolution's input:** an interaction is its target key and, per primitive component, the applicable event: the data form of E5's "primitive definition", with no interaction vocabulary. No manifest change.
 - **Conformance:** `examples/conformance/{values,events}/`, checked by `crates/mesh-runtime/tests/conformance.rs`, by `packages/mesh-runtime/test/conformance.test.mjs` (with a test-only resolver written from §9.9, and nothing of the package's), and by two new parity tests: the conformance programs, and every finite row of the number-to-text table as a prop's `propText`.
 - **Documents:** K1–K4 as E6 says. K2's source sentence stays in the v0.5 outline, with a dated correction beside it; ARCHITECTURE rule 9 carries the rule, and a new rule 16 states event resolution.
-- **Release:** CHANGELOG `[Unreleased]` and draft notes `docs/releases/v0.6.md`. The version bump and tag are the release step, after review.
+- **Release:** v0.6.0, 2026-09-27: every version bumped together, the CHANGELOG dated, and the notes in `docs/releases/v0.6.md`.

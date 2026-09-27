@@ -4,7 +4,9 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
-Planned as 0.6.0: the semantic questions PORT's first renderer raised, settled. See the draft [v0.6 release notes](./docs/releases/v0.6.md).
+## [0.6.0] - 2026-09-27
+
+The semantic questions PORT's first renderer raised, settled. See the [v0.6 release notes](./docs/releases/v0.6.md) for an overview.
 
 ### Added
 
@@ -175,6 +177,7 @@ The first release. See the [v0.1 release notes](./docs/releases/v0.1.md) for an 
 - No component-model or type checking yet.
 - `mesh-lsp` and the npm packages are placeholders.
 
+[0.6.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.6.0
 [0.5.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.3.0
