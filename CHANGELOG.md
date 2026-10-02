@@ -4,19 +4,28 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-02
+
+Node identity for programs whose structure varies: the locked contract (spec §9.10), and the provisional conditional and repeated structure that implements it. See the [v0.7 release notes](./docs/releases/v0.7.md) for an overview.
+
 ### Added (provisional)
 
-- **A conditional tracer for §9.10.** The runtime gives one reserved component, `mesh-if` (declared in the model with a boolean `when`), conditional meaning: one or two element children are its alternatives, and it is never a render node. Each alternative is a distinct site, and a conditional is one slot among its siblings, so a node's key no longer depends on where it lands among the rendered children. Alternatives add a `0x04` step to a key's path; programs without a conditional have exactly the keys and handler identifiers they had. Dispatch accepts a handler only if its node is in the render. The parser, checker, compiler, template format and render-v1 are unchanged, and the spelling is not the language's decision.
+- **Conditional structure, `mesh-if`.** The runtime gives one reserved component, `mesh-if` (declared in the model with a boolean `when`), conditional meaning: one or two element children are its alternatives, and it is never a render node. Each alternative is a distinct site, and a conditional is one slot among its siblings, so a node's key no longer depends on where it lands among the rendered children. Alternatives add a `0x04` step to a key's path. Dispatch accepts a handler only if its node is in the render.
+- **Repeated structure, `mesh-each`.** The runtime gives a second reserved component, `mesh-each` (declared in the model with `items`, `as` and `key`), repetition meaning: its one element child is rendered once per item, each node under a `0x05` step holding the author-declared key (a string or a finite number; `"1"` is not `1`; `0` is `-0`), never the item's index. Keys are evaluated at render, so they are a function of the program and the snapshot; a missing, invalid or duplicate key fails closed with the new codes `runtime-invalid-key` and `runtime-duplicate-key`. The analysis binds `as` to the item's type for `key` and the child, and requires the key's type to be a string, a number or `any` (`type-mismatch`: "a repeat's key must be a string or a number"). Dispatch, for a program with a repeat, records each handler's scope during a render of the stored inputs and evaluates there, so it finds the item by identity, not position.
+- **Identity conformance vectors** (`examples/conformance/identity/`, C1–C10, and `identity/repeat/`, C11–C22): hand-written render-v1 before/after trees with each node's identity and the expected kept, created, removed and moved sets, handler expectations, and the pairing that matching by position would make. They need no MPRX and no compiler. The repeat vectors are also checked against the runtime.
 
-- **A repeated-identity tracer for §9.10.** The runtime gives a second reserved component, `mesh-each` (declared in the model with `items`, `as` and `key`), repetition meaning: its one element child is rendered once per item, each node under a `0x05` step holding the author-declared key (a string or a finite number; `"1"` is not `1`; `0` is `-0`), never the item's index. Keys are evaluated at render, so they are a function of the program and the snapshot; a missing, invalid or duplicate key fails closed (`runtime-invalid-key`, `runtime-duplicate-key`). The analysis binds `as` to the item's type for `key` and the child, and requires the key's type to be a string, a number or `any` (`type-mismatch`). Dispatch, for a program with a repeat, records each handler's scope during a render of the stored inputs and evaluates there, so it finds the item by identity, not position. Programs without a repeat have exactly the keys and handler identifiers they had. render-v1, the template format and the syntax are unchanged, and the spelling is not the language's decision.
+Both are **provisional**: the spelling is not the language's decision, no MPRX syntax changed, and the key encoding is an implementation detail. A program that uses neither has exactly the keys and handler identifiers it had in 0.6.0. render-v1 and template-v1 are unchanged.
+
+### Changed
+
+- **A manifest that declares a component named `mesh-if` or `mesh-each` gives it these meanings.** No earlier manifest is known to; one that does would now be refused or render differently.
+- **Rust API:** `mesh_analysis::Expectation` has a new variant, `RepeatKey`, and `mesh_runtime::RuntimeCode` has `INVALID_KEY` and `DUPLICATE_KEY` (in `RuntimeCode::ALL`). Code that matches `Expectation` exhaustively must handle the new variant.
+- **Diagnostics reference:** `runtime-invalid-key` and `runtime-duplicate-key` are documented in `docs/manual/diagnostics.md`.
 
 ### Documented
 
-- **Repeated identity (spec §9.10, amended).** §9.10.3 now says a key's type is checked in the template where types can say it (string, number or `any` accepted; boolean, `null`, list, record and possibly absent refused) with the render checking every value; §9.10.6 says that an identity that leaves and returns is a new occurrence and that identity is a name and not a handle; §9.10.7 says dispatch derives a repeated item's scope from the program and the snapshot, with the mechanism left to the runtime; §9.10.12 marks the encoding an implementation detail. `examples/conformance/identity/repeat/` holds the language-neutral vectors C11–C22.
-- **Node identity contract (spec §9.10).** The runtime manual said every render of a program has the same structure, keys and handler identifiers. That holds for every program MESH compiles today, because MPRX has no conditional or repeated elements, but it is a fact about MPRX and not a rule the render tree has to keep. §9.10 states what identity must mean once structure can vary: an identity is a sequence of (site, instance) steps, a site being a template place and an instance a key the application declares at a repeated site, so keys are never rendered positions or values MESH infers; equal identity is the same node, whatever order its siblings come in; identities are unique and a duplicate fails closed; an absent node's occurrence ends and a returning one is new; a handler's identity is its node's identity and its event; and identity stays within one program, so update and draw keep their meaning. Keys, handler identifiers and the encoding for static programs are unchanged. The runtime manual, the two guides and the package README no longer state the old invariant without qualification.
-- **Identity conformance vectors** (`examples/conformance/identity/`): hand-written render-v1 before/after trees with each node's identity and the expected kept, created, removed and moved sets, handler expectations, and the pairing that matching by position would make. They need no MPRX and no compiler, and are checked only for validity and consistency.
-
-No syntax, compiler, runtime, schema or behavior changed.
+- **Node identity contract (spec §9.10).** An identity is a sequence of (site, instance) steps, a site being a template place and an instance a key the application declares at a repeated site, so keys are never rendered positions or values MESH infers; equal identity is the same node, whatever order its siblings come in; identities are unique and a duplicate or invalid key fails closed; a key's type is checked in the template where types can say it, and every value at render; an absent node's occurrence ends and a returning one is new, identity being a name and not a handle to a realization; a handler's identity is its node's identity and its event, and dispatch derives a repeated item's scope from the program and the snapshot; and identity stays within one program, so update and draw keep their meaning.
+- The runtime manual, the rendering guide and the spec no longer say a program's structure never changes: that is true of a static program, and a program that uses `mesh-if` or `mesh-each` varies.
 
 ## [0.6.0] - 2026-09-27
 
@@ -191,6 +200,7 @@ The first release. See the [v0.1 release notes](./docs/releases/v0.1.md) for an 
 - No component-model or type checking yet.
 - `mesh-lsp` and the npm packages are placeholders.
 
+[0.7.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.6.0
 [0.5.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.4.0

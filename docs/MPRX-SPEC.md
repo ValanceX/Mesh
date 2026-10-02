@@ -75,7 +75,7 @@ v0.5 adds no syntax. It adds MPRX's evaluation (§9.7) and the boundary between 
 
 v0.6 adds no syntax either. It settles two questions PORT's first renderer raised (`docs/superpowers/specs/2026-09-27-mesh-port-semantic-resolution.md`): the text of a value applies to props too, delivered in the render tree as `propText` (§9.7.7, §9.7.8, §9.8.2), with the two ways a renderer may realize a value (§9.8.7); and event resolution (§9.9).
 
-*Last updated 2026-09-27. v0.6 is released as v0.6.0, v0.5 as v0.5.0, v0.4 as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.6](./releases/v0.6.md), [v0.5](./releases/v0.5.md), [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them and whose later passes implemented them. Any further grammar or semantics work starts a new spec.*
+*Last updated 2026-10-02. v0.7 is prepared as v0.7.0 (node identity, §9.10, with provisional conditional and repeated structure), v0.6 is released as v0.6.0, v0.5 as v0.5.0, v0.4 as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.7](./releases/v0.7.md), [v0.6](./releases/v0.6.md), [v0.5](./releases/v0.5.md), [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them and whose later passes implemented them. Any further grammar or semantics work starts a new spec.*
 
 ---
 
@@ -840,7 +840,7 @@ With `click` as the applicable event of both `card` and `button`: an interaction
 
 ### 9.10 Node identity
 
-*A contract, written ahead of the syntax it governs.* No MPRX construct can yet make an element conditional or repeated, so every program this MESH compiles is **static** (§9.10.10), and for a static program this section changes nothing the compiler or runtime does: its keys and handler identifiers are the ones `docs/manual/runtime.md` encodes. What this section fixes is what any construct that lets one program's renders differ in structure **must preserve**. It adds no syntax and no schema member.
+*A contract, and the provisional constructs that implement it.* MPRX has no syntax for a conditional or repeated element. The runtime gives two reserved components, `mesh-if` and `mesh-each`, those meanings as provisional tracers (§9.10.12), and every program that uses neither is **static** (§9.10.10). For a static program this section changes nothing the compiler or runtime does: its keys and handler identifiers are the ones `docs/manual/runtime.md` encodes. What this section fixes is what any construct that lets one program's renders differ in structure **must preserve**, and the tracers keep it. It adds no syntax and no schema member.
 
 #### 9.10.1 Semantic identity
 
@@ -975,10 +975,11 @@ The syntax for conditional and repeated elements, and for declaring a key; the c
 - Any control over event resolution (§9.9), such as stopping or
   repeating it, and a declaration of which interactions constitute a
   primitive's event (§9.9.1)
-- Conditional elements, repeated elements, and the syntax that declares
-  an item's key. §9.10 states the identity any such construct must
-  preserve; it is a contract, not a feature, and none of it can be
-  written in MPRX yet
+- Syntax for conditional elements, repeated elements, and the declaration
+  of an item's key. §9.10 states the identity any such construct must
+  preserve, and the runtime's provisional `mesh-if` and `mesh-each`
+  (§9.10.12) keep it; neither is MPRX syntax, and their spelling is not
+  decided
 
 ---
 
