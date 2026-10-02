@@ -6,8 +6,8 @@ use crate::boundary::{output, Inputs};
 use crate::diagnostic::{Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
 use crate::eval::Scope;
 use crate::program::{
-    self, alternatives, uses_conditional, Program, Step, Valid, ALTERNATIVES, COMPOSITE,
-    CONDITIONAL, NODE,
+    self, alternatives, uses_conditional, uses_repeat, Program, Step, Valid, ALTERNATIVES,
+    COMPOSITE, CONDITIONAL, NODE,
 };
 use crate::render::{bind, render_children, snapshot_values, statics, Render, RenderChild};
 use crate::tree::Intent;
@@ -25,6 +25,9 @@ struct Site<'v> {
     component: &'v str,
     node: &'v Element,
     event: &'v str,
+    /// The scope's values at the node, when a render recorded them: a
+    /// repeated node's include its item, which the program alone can't say.
+    values: Option<&'v BTreeMap<String, Value>>,
 }
 
 /// Every handler of the program, by identifier: a walk of its structure,
@@ -87,6 +90,7 @@ fn walk<'v>(
                 component,
                 node: element,
                 event: &binding.event,
+                values: None,
             },
         );
     }
@@ -108,7 +112,10 @@ fn walk<'v>(
                     path.pop();
                 }
             }
-            RenderChild::Run(_) => {}
+            // A repeat's sites are per item, and an item's key needs values:
+            // the walk has none. `dispatch_from` takes a render's record for
+            // a program that has one.
+            RenderChild::Repeat(_) | RenderChild::Run(_) => {}
         }
     }
     path.pop();
@@ -172,8 +179,33 @@ pub fn dispatch_from(
             Location::Handler,
         )]);
     }
-    let sites = sites(&valid);
-    let Some(site) = sites.get(handler) else {
+    // A program with a repeat has handlers per item, and which items there
+    // are is the snapshot's to say (spec §9.10.7): its handlers are the
+    // render's, with the scope each had. Without one, they are a function of
+    // the program, found without values.
+    let repeats = uses_repeat(&valid.templates);
+    let recorded;
+    let sites;
+    let site = if repeats {
+        recorded = crate::render::tree(&valid, snapshot, true)?.1;
+        recorded.get(handler).map(|found| Site {
+            composites: Vec::new(),
+            component: &found.component,
+            node: found.node,
+            event: found.event,
+            values: Some(&found.values),
+        })
+    } else {
+        sites = self::sites(&valid);
+        sites.get(handler).map(|found| Site {
+            composites: found.composites.clone(),
+            component: found.component,
+            node: found.node,
+            event: found.event,
+            values: None,
+        })
+    };
+    let Some(site) = site.as_ref() else {
         return Err(vec![RuntimeDiagnostic::new(
             RuntimeCode::UNKNOWN_HANDLER,
             "this handler identifier names no handler in this render's program",
@@ -199,7 +231,10 @@ pub fn dispatch_from(
 
     // 3. The render's snapshot and the payload, together.
     let mut inputs = Inputs::new(&valid.manifest);
-    let root_values = snapshot_values(&valid, snapshot, &mut inputs);
+    let mut root_values = snapshot_values(&valid, snapshot, &mut inputs);
+    if let Some(values) = site.values {
+        root_values = values.clone();
+    }
     let event = &valid.component(&site.node.component).events[site.event];
     let payload_type = event.payload.as_ref();
     let payload_value = match payload_type {

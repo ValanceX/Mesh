@@ -151,16 +151,32 @@ fn undeclared(manifest: &Manifest, template: &Template) -> Vec<String> {
     let Some(own) = manifest.components().get(&template.component) else {
         return vec![format!("no component `{}`", template.component)];
     };
-    if template.root.component == CONDITIONAL_COMPONENT {
-        problems.push(format!(
-            "a template's root can't be a `{CONDITIONAL_COMPONENT}`: a render has exactly one root node"
-        ));
+    for reserved in [CONDITIONAL_COMPONENT, REPEAT_COMPONENT] {
+        if template.root.component == reserved {
+            problems.push(format!(
+                "a template's root can't be a `{reserved}`: a render has exactly one root node"
+            ));
+        }
     }
-    walk_names(manifest, own, &template.root, &mut problems);
+    walk_names(
+        manifest,
+        own,
+        &template.root,
+        &mut Vec::new(),
+        &mut problems,
+    );
     problems
 }
 
-fn walk_names(manifest: &Manifest, own: &Component, element: &Element, problems: &mut Vec<String>) {
+/// `loops` is the names the enclosing `mesh-each` elements bind, innermost
+/// last: references to them are not scope names.
+fn walk_names(
+    manifest: &Manifest,
+    own: &Component,
+    element: &Element,
+    loops: &mut Vec<String>,
+    problems: &mut Vec<String>,
+) {
     let components = manifest.components();
     let Some(component) = components.get(&element.component) else {
         problems.push(format!("no component `{}`", element.component));
@@ -169,14 +185,36 @@ fn walk_names(manifest: &Manifest, own: &Component, element: &Element, problems:
     if element.component == CONDITIONAL_COMPONENT {
         conditional_problems(element, problems);
     }
-    for prop in &element.props {
+    let repeated = element.component == REPEAT_COMPONENT;
+    if repeated {
+        repeat_problems(element, problems);
+    }
+    let mut bound = false;
+    // `items` is read outside the binding; everything else inside it.
+    let mut props: Vec<&_> = element.props.iter().collect();
+    if repeated {
+        props.sort_by_key(|prop| prop.prop != "items");
+    }
+    for prop in props {
         if !component.props.contains_key(&prop.prop) {
             problems.push(format!(
                 "`{}` has no prop `{}`",
                 element.component, prop.prop
             ));
         }
-        scope_names(own, &prop.value, problems);
+        if repeated && prop.prop != "items" && !bound {
+            if let Some(name) = repeat_name(element) {
+                loops.push(name.to_string());
+                bound = true;
+            }
+        }
+        scope_names(own, loops, &prop.value, problems);
+    }
+    if repeated && !bound {
+        if let Some(name) = repeat_name(element) {
+            loops.push(name.to_string());
+            bound = true;
+        }
     }
     for binding in &element.events {
         match component.events.get(&binding.event) {
@@ -206,15 +244,72 @@ fn walk_names(manifest: &Manifest, own: &Component, element: &Element, problems:
             Some(_) => {}
         }
         for argument in &binding.arguments {
-            scope_names(own, argument, problems);
+            scope_names(own, loops, argument, problems);
         }
     }
     for child in &element.children {
         match child {
             Child::Text { .. } => {}
-            Child::Expression { expression } => scope_names(own, expression, problems),
-            Child::Element { element } => walk_names(manifest, own, element, problems),
+            Child::Expression { expression } => scope_names(own, loops, expression, problems),
+            Child::Element { element } => walk_names(manifest, own, element, loops, problems),
         }
+    }
+    if bound {
+        loops.pop();
+    }
+}
+
+/// The name a `mesh-each` binds: its `as`, a string literal.
+pub(crate) fn repeat_name(element: &Element) -> Option<&str> {
+    element
+        .props
+        .iter()
+        .find_map(|prop| match (&prop.value, prop.prop.as_str()) {
+            (
+                Expression::Literal {
+                    value: mesh_template::Literal::String(name),
+                    ..
+                },
+                "as",
+            ) => Some(name.as_str()),
+            _ => None,
+        })
+}
+
+/// What a repeat must be (provisional): `items`, `key` and a literal `as`, no
+/// events, and exactly one element child, which is neither a conditional nor
+/// a repeat (nested dynamic structures are not part of the tracer).
+fn repeat_problems(element: &Element, problems: &mut Vec<String>) {
+    for needed in ["items", "key"] {
+        if !element.props.iter().any(|prop| prop.prop == needed) {
+            problems.push(format!("`{REPEAT_COMPONENT}` has no `{needed}`"));
+        }
+    }
+    if repeat_name(element).is_none_or(str::is_empty) {
+        problems.push(format!(
+            "`{REPEAT_COMPONENT}` needs `as`, a non-empty string literal naming the item"
+        ));
+    }
+    if !element.events.is_empty() {
+        problems.push(format!("`{REPEAT_COMPONENT}` can't have events"));
+    }
+    let only_elements = element
+        .children
+        .iter()
+        .all(|child| matches!(child, Child::Element { .. }));
+    let items = alternatives(element);
+    if !only_elements || items.len() != 1 {
+        problems.push(format!(
+            "`{REPEAT_COMPONENT}` needs exactly one element child, and nothing else"
+        ));
+    }
+    if items
+        .iter()
+        .any(|item| item.component == CONDITIONAL_COMPONENT || item.component == REPEAT_COMPONENT)
+    {
+        problems.push(format!(
+            "the child of `{REPEAT_COMPONENT}` can't be a `{CONDITIONAL_COMPONENT}` or a `{REPEAT_COMPONENT}`"
+        ));
     }
 }
 
@@ -255,10 +350,15 @@ fn uses_event(expression: &Expression) -> bool {
     found
 }
 
-fn scope_names(own: &Component, expression: &Expression, problems: &mut Vec<String>) {
+fn scope_names(
+    own: &Component,
+    loops: &[String],
+    expression: &Expression,
+    problems: &mut Vec<String>,
+) {
     visit(expression, &mut |e| {
         if let Expression::Scope { name, .. } = e {
-            if !own.scope.contains_key(name) {
+            if !own.scope.contains_key(name) && !loops.contains(name) {
                 problems.push(format!("no scope name `{name}`"));
             }
         }
@@ -617,6 +717,29 @@ pub(crate) fn uses_conditional(templates: &BTreeMap<String, Template>) -> bool {
         elements(&template.root, &mut all);
         all.iter()
             .any(|element| element.component == CONDITIONAL_COMPONENT)
+    })
+}
+
+/// A repeat's instance (spec §9.10.2): one step for the item's declared key,
+/// then the node's own step at position 0. Unlike every other step it is
+/// not a function of the template alone: `component` holds the key,
+/// canonically, and the position is the repeat's slot, not the item's index.
+pub(crate) const REPEAT: u8 = 0x05;
+
+/// PROVISIONAL, for the §9.10 repeated-identity tracer: the component the
+/// runtime gives repetition meaning, as `mesh-if` has conditionals. It is
+/// declared in the model with props `items`, `as` and `key`; the compiler
+/// binds `as` for `key` and the children, and the runtime evaluates `key`
+/// per item. Never a node. Its spelling is not the language's decision.
+pub(crate) const REPEAT_COMPONENT: &str = "mesh-each";
+
+/// Whether any template of the program uses a repeat.
+pub(crate) fn uses_repeat(templates: &BTreeMap<String, Template>) -> bool {
+    templates.values().any(|template| {
+        let mut all = Vec::new();
+        elements(&template.root, &mut all);
+        all.iter()
+            .any(|element| element.component == REPEAT_COMPONENT)
     })
 }
 

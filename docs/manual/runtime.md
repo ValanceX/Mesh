@@ -162,6 +162,20 @@ The runtime checks every tree it builds for duplicate keys, and a collision is a
 
 Not decided: the spelling, whether the compiler should check the shape, nested conditionals, and the encoding of the step above.
 
+### Repeated structure (provisional)
+
+*A second tracer for spec §9.10, not a language feature.* MPRX has no repetition syntax, and nothing here decides one. As `mesh-if` does for conditionals, the reserved component `mesh-each` shows that identity can keep the §9.10 rules when one site yields many nodes. It is declared in the model with three props: `items` (a list), `as` (a string) and `key`. `<mesh-each items={todos} as="todo" key={todo.id}><row on.tap={toggle(todo.id)}>{todo.title}</row></mesh-each>` is an ordinary element to the parser, and the checker and compiler give two things only: they type `items` as any list prop, and they bind the name `as` writes (a literal) to the item's type, in `key` and in the child.
+
+- **One node per item,** in the order of the items. The element is never a node; an empty list produces nothing, and the slot is still one slot among its siblings, so the siblings after it keep their positions and keys.
+- **A node's identity is its site and its declared key.** The step is the repeat's slot and the key, as a string or a finite number (kind `0x05`, the slot, and the key as `s:` and the string, or `n:` and the number's text). The item's index is never in it, so reordering, inserting before and removing others leave an item's key and handler identifiers alone. Two repeats are two sites: equal keys under them are different identities.
+- **The key is evaluated at render, for each item, with the item bound.** Only the runtime has the value, so keys are a function of the program and the snapshot together, and are deterministic in them. It must be a string or a finite number; `"1"` and `1` are different keys, `1` and `1.0` the same, `0` and `-0` the same.
+- **A bad key fails closed.** A key that is absent, `null`, a boolean, a list or a record is `runtime-invalid-key`; two items of one repeat with the same key are `runtime-duplicate-key`. Nothing is rendered: the runtime never substitutes a position, and never picks one of two items.
+- **Dispatch needs the snapshot to find a repeated node.** A handler identifier is a hash of the node's identity, so it can't be turned back into an item. For a program with a repeat, dispatch renders from the render's program, model and snapshot (all of which a render keeps), records each handler with the scope it had, which has the item, and evaluates the handler's arguments there. An identifier whose item isn't in the snapshot is `runtime-unknown-handler`; if the snapshot can't be rendered (a duplicate key, say) dispatch reports why. Without a repeat, dispatch needs no values to find a handler, as before.
+- **A malformed repeat is refused** by program validation, with `assembly-malformed-template`: no `items`, `key` or non-empty literal `as`, events, anything but exactly one element child, a conditional or another repeat as that child, or a repeat as a template's root. Nested dynamic structures are not part of the tracer.
+- **render-v1 is unchanged.** A repeated node is a node with a key; the order of its parent's `children` is the order of the items.
+
+Not decided: the spelling, whether the checker should enforce a key's type (with `key: any` it already refuses a field that may be absent), nested repeats, the encoding of the step above, and what a renderer does with an item that leaves and returns.
+
 ### Identity, realization and lifetime
 
 A key names a node. It is not the target's object for that node. Three things have three owners (spec §9.10.6):

@@ -89,6 +89,9 @@ impl RuntimeCode {
         RuntimeCode("runtime-non-finite-output", Form::Source);
     pub const ABSENT_ELEMENT_OUTPUT: RuntimeCode =
         RuntimeCode("runtime-absent-element-output", Form::Source);
+    // Repeated structure (PROVISIONAL, §9.10 tracer).
+    pub const INVALID_KEY: RuntimeCode = RuntimeCode("runtime-invalid-key", Form::Source);
+    pub const DUPLICATE_KEY: RuntimeCode = RuntimeCode("runtime-duplicate-key", Form::Source);
     // Internal.
     pub const KEY_COLLISION: RuntimeCode = RuntimeCode("runtime-key-collision", Form::Source);
 
@@ -123,6 +126,8 @@ impl RuntimeCode {
         RuntimeCode::ARGUMENT_MISMATCH,
         RuntimeCode::NON_FINITE_OUTPUT,
         RuntimeCode::ABSENT_ELEMENT_OUTPUT,
+        RuntimeCode::INVALID_KEY,
+        RuntimeCode::DUPLICATE_KEY,
         RuntimeCode::KEY_COLLISION,
     ];
 

@@ -29,6 +29,7 @@ impl<'m> Walker<'m> {
             facts: Vec::new(),
             resolutions: Vec::new(),
             types: Vec::new(),
+            loops: Vec::new(),
         }
     }
 
@@ -79,7 +80,15 @@ struct Walker<'m> {
     facts: Vec<Fact>,
     resolutions: Vec<Resolution>,
     types: Vec<Typed>,
+    /// PROVISIONAL (§9.10 repeated-identity tracer): the names bound by the
+    /// enclosing `mesh-each` elements, innermost last, each with its item
+    /// type. A name here shadows a scope declaration and resolves to
+    /// nothing a tool could navigate to.
+    loops: Vec<(String, Ty)>,
 }
+
+/// The reserved component whose `as` names the item its children see.
+const REPEAT_COMPONENT: &str = "mesh-each";
 
 impl<'m> Walker<'m> {
     fn manifest(&self) -> &'m Manifest {
@@ -113,7 +122,21 @@ impl<'m> Walker<'m> {
             self.missing_props(element, name, component);
         }
 
-        for attribute in &element.attributes {
+        let repeating = element.name == REPEAT_COMPONENT;
+        let mut pushed = false;
+        let mut bound: Option<String> = None;
+        let mut attributes: Vec<&_> = element.attributes.iter().collect();
+        if repeating {
+            // `items` first, so `key` sees the binding whatever the order written.
+            attributes.sort_by_key(|attribute| attribute.name != "items");
+            bound = element.attributes.iter().find_map(|attribute| {
+                match (&attribute.value, attribute.name.as_str()) {
+                    (AttributeValue::String { value, .. }, "as") => Some(value.clone()),
+                    _ => None,
+                }
+            });
+        }
+        for attribute in attributes {
             // The prop's declared type, if the prop resolves.
             let mut expected = None;
             if let Some((name, component)) = component {
@@ -146,7 +169,14 @@ impl<'m> Walker<'m> {
                 }
                 (AttributeValue::String { .. }, None) => {}
                 (AttributeValue::Expression(expression), Some((expected, expectation))) => {
-                    self.check(expression, Place::Value, &expected, expectation);
+                    let ty = self.check(expression, Place::Value, &expected, expectation);
+                    if repeating && attribute.name == "items" {
+                        if let (Some(name), Some(ty)) = (&bound, ty) {
+                            let ty = self.item_of(&ty);
+                            self.loops.push((name.clone(), ty));
+                            pushed = true;
+                        }
+                    }
                 }
                 (AttributeValue::Expression(expression), None) => {
                     self.expression(expression, Place::Value);
@@ -198,6 +228,23 @@ impl<'m> Walker<'m> {
                 }
                 Child::Element(child) => self.element(child),
             }
+        }
+        if pushed {
+            self.loops.pop();
+        }
+    }
+
+    /// The type of one item of a list type (an optional list's too); `any`
+    /// when the type isn't a list, which the prop check has already reported.
+    fn item_of(&self, ty: &Ty) -> Ty {
+        let expanded = relation::expand(self.manifest(), ty);
+        let list = match expanded {
+            Ty::Optional(inner) => relation::expand(self.manifest(), &inner),
+            other => other,
+        };
+        match list {
+            Ty::List(item) => *item,
+            _ => Ty::Any,
         }
     }
 
@@ -483,6 +530,17 @@ impl<'m> Walker<'m> {
                 Literal::Boolean(_) => Ty::Boolean,
                 Literal::Null => Ty::Null,
             }),
+            Expression::Reference { name, span }
+                if self.loops.iter().any(|(bound, _)| bound == name) =>
+            {
+                let (_, ty) = self
+                    .loops
+                    .iter()
+                    .rev()
+                    .find(|(bound, _)| bound == name)
+                    .expect("just found");
+                Some(ty.clone())
+            }
             Expression::Reference { name, span } => {
                 let scope = &self.template.component().scope;
                 match scope.get_key_value(name) {
