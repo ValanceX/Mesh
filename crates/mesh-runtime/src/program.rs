@@ -151,6 +151,11 @@ fn undeclared(manifest: &Manifest, template: &Template) -> Vec<String> {
     let Some(own) = manifest.components().get(&template.component) else {
         return vec![format!("no component `{}`", template.component)];
     };
+    if template.root.component == CONDITIONAL_COMPONENT {
+        problems.push(format!(
+            "a template's root can't be a `{CONDITIONAL_COMPONENT}`: a render has exactly one root node"
+        ));
+    }
     walk_names(manifest, own, &template.root, &mut problems);
     problems
 }
@@ -161,6 +166,9 @@ fn walk_names(manifest: &Manifest, own: &Component, element: &Element, problems:
         problems.push(format!("no component `{}`", element.component));
         return;
     };
+    if element.component == CONDITIONAL_COMPONENT {
+        conditional_problems(element, problems);
+    }
     for prop in &element.props {
         if !component.props.contains_key(&prop.prop) {
             problems.push(format!(
@@ -207,6 +215,35 @@ fn walk_names(manifest: &Manifest, own: &Component, element: &Element, problems:
             Child::Expression { expression } => scope_names(own, expression, problems),
             Child::Element { element } => walk_names(manifest, own, element, problems),
         }
+    }
+}
+
+/// What a conditional must be (provisional): a written `when`, no events, and
+/// one or two element children, none of them a conditional.
+fn conditional_problems(element: &Element, problems: &mut Vec<String>) {
+    if !element.props.iter().any(|prop| prop.prop == "when") {
+        problems.push(format!("`{CONDITIONAL_COMPONENT}` has no `when`"));
+    }
+    if !element.events.is_empty() {
+        problems.push(format!("`{CONDITIONAL_COMPONENT}` can't have events"));
+    }
+    let only_elements = element
+        .children
+        .iter()
+        .all(|child| matches!(child, Child::Element { .. }));
+    let alternatives = alternatives(element);
+    if !only_elements || !(1..=2).contains(&alternatives.len()) {
+        problems.push(format!(
+            "`{CONDITIONAL_COMPONENT}` needs one or two element children, and nothing else"
+        ));
+    }
+    if alternatives
+        .iter()
+        .any(|alternative| alternative.component == CONDITIONAL_COMPONENT)
+    {
+        problems.push(format!(
+            "an alternative of `{CONDITIONAL_COMPONENT}` can't be a `{CONDITIONAL_COMPONENT}`"
+        ));
     }
 }
 
@@ -538,10 +575,50 @@ pub(crate) struct Step {
     pub component: String,
 }
 
-/// A node, a composite expansion, or a text run.
+/// A node, a composite expansion, a text run, or a conditional alternative.
 pub(crate) const NODE: u8 = 0x01;
 pub(crate) const TEXT: u8 = 0x02;
 pub(crate) const COMPOSITE: u8 = 0x03;
+/// A conditional alternative (spec §9.10.2): one step for the alternative a
+/// node is in, then the node's own step at position 0, as a composite
+/// expansion adds two. The alternatives of one conditional are distinct
+/// sites, so this step names which one, not where the node ended up.
+pub(crate) const CONDITIONAL: u8 = 0x04;
+
+/// PROVISIONAL, for the §9.10 conditional tracer: the one component the
+/// runtime gives conditional meaning. It is declared in the model like any
+/// other (its `when` prop, a boolean, is checked by the compiler as any
+/// prop is), so no syntax, grammar or checker changed. It is never a node:
+/// the render tree has what it chose, or nothing. Its spelling is not the
+/// language's decision.
+pub(crate) const CONDITIONAL_COMPONENT: &str = "mesh-if";
+
+/// The names of a conditional's alternatives, in the order of its element
+/// children: the first is chosen when `when` is true, the second, if there
+/// is one, when it is false.
+pub(crate) const ALTERNATIVES: [&str; 2] = ["consequent", "alternate"];
+
+/// A conditional's alternatives: its element children, in order.
+pub(crate) fn alternatives(conditional: &Element) -> Vec<&Element> {
+    conditional
+        .children
+        .iter()
+        .filter_map(|child| match child {
+            Child::Element { element } => Some(element.as_ref()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Whether any template of the program uses a conditional.
+pub(crate) fn uses_conditional(templates: &BTreeMap<String, Template>) -> bool {
+    templates.values().any(|template| {
+        let mut all = Vec::new();
+        elements(&template.root, &mut all);
+        all.iter()
+            .any(|element| element.component == CONDITIONAL_COMPONENT)
+    })
+}
 
 /// The key at `path` in the program whose identity is `identity`.
 pub(crate) fn key(identity: &[u8; 32], path: &[Step]) -> String {

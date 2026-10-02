@@ -943,6 +943,8 @@ Matching by position gives the same answer only where position determines identi
 
 #### 9.10.12 What is not decided
 
+A provisional tracer implements conditional sites with a reserved component, `mesh-if`, to show the identity rules can be kept (`docs/manual/runtime.md`, "Conditionals (provisional)"). It is not the language's conditional.
+
 The syntax for conditional and repeated elements, and for declaring a key; the compiler's implementation; the encoding of an identity into a key, and what happens if two collide; whether other kinds of value may be keys; any change to render-v1; how a renderer reconciles; how hydration transports identity; how dispatch finds the item an identifier names; and whether a target may cache a realization across an absence.
 
 ---

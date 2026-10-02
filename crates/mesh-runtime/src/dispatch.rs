@@ -5,7 +5,10 @@
 use crate::boundary::{output, Inputs};
 use crate::diagnostic::{Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
 use crate::eval::Scope;
-use crate::program::{self, Program, Step, Valid, COMPOSITE, NODE};
+use crate::program::{
+    self, alternatives, uses_conditional, Program, Step, Valid, ALTERNATIVES, COMPOSITE,
+    CONDITIONAL, NODE,
+};
 use crate::render::{bind, render_children, snapshot_values, statics, Render, RenderChild};
 use crate::tree::Intent;
 use crate::types::fits;
@@ -88,11 +91,38 @@ fn walk<'v>(
         );
     }
     for (index, child) in render_children(element).into_iter().enumerate() {
-        if let RenderChild::Element(child) = child {
-            walk(valid, component, child, index, path, composites, found);
+        match child {
+            RenderChild::Element(child) => {
+                walk(valid, component, child, index, path, composites, found);
+            }
+            // Every alternative is a site, whichever a snapshot would choose:
+            // identity is a function of the program, not of the values.
+            RenderChild::Conditional(conditional) => {
+                for (alternative, element) in alternatives(conditional).into_iter().enumerate() {
+                    path.push(Step {
+                        position: index,
+                        kind: CONDITIONAL,
+                        component: ALTERNATIVES[alternative].to_string(),
+                    });
+                    walk(valid, component, element, 0, path, composites, found);
+                    path.pop();
+                }
+            }
+            RenderChild::Run(_) => {}
         }
     }
     path.pop();
+}
+
+/// Every handler identifier in a tree.
+fn handlers(node: &crate::tree::Node) -> std::collections::BTreeSet<String> {
+    let mut found: std::collections::BTreeSet<String> = node.events.values().cloned().collect();
+    for child in &node.children {
+        if let crate::tree::TreeChild::Node(child) = child {
+            found.extend(handlers(child));
+        }
+    }
+    found
 }
 
 /// Dispatches the event whose handler is `handler`, with `payload`
@@ -150,6 +180,22 @@ pub fn dispatch_from(
             Location::Handler,
         )]);
     };
+    // With a conditional, a program has handlers its render may not: an
+    // identifier is valid against the render only if its node is in the tree
+    // (spec §9.10.7). Presence is rendering's to say, so ask it. When the
+    // inputs can't be rendered there is no tree to check against, and step 3
+    // reports what is wrong with them.
+    if uses_conditional(&valid.templates) {
+        if let Ok(rendered) = crate::render::render(program, model, snapshot) {
+            if !handlers(&rendered.tree().root).contains(handler) {
+                return Err(vec![RuntimeDiagnostic::new(
+                    RuntimeCode::UNKNOWN_HANDLER,
+                    "this handler identifier names no handler in this render: its node isn't in the tree",
+                    Location::Handler,
+                )]);
+            }
+        }
+    }
 
     // 3. The render's snapshot and the payload, together.
     let mut inputs = Inputs::new(&valid.manifest);

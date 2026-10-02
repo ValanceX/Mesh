@@ -5,7 +5,10 @@ use crate::boundary::{output, Inputs};
 use crate::diagnostic::{PathSegment, RuntimeCode, RuntimeDiagnostic};
 use crate::eval::Scope;
 use crate::number::number_to_text;
-use crate::program::{self, Program, Step, Valid, COMPOSITE, NODE, TEXT};
+use crate::program::{
+    self, alternatives, Program, Step, Valid, ALTERNATIVES, COMPOSITE, CONDITIONAL,
+    CONDITIONAL_COMPONENT, NODE, TEXT,
+};
 use crate::tree::{Node, Tree, TreeChild};
 use crate::types::{fits, Statics};
 use crate::value::{HostRecord, Value};
@@ -93,12 +96,17 @@ pub(crate) fn snapshot_values(
     values
 }
 
-/// An element's children as the render tree has them: maximal runs of
-/// text and interpolations, and elements. A child's position in the
-/// render tree is its index here.
+/// An element's children as a **template** has them: maximal runs of text
+/// and interpolations, elements, and conditionals. A child's position is its
+/// index here: its *site's* position (spec §9.10.2), a function of the
+/// template alone. A conditional is one slot whether or not it produces a
+/// node, so the children after it keep their positions either way, and a
+/// child's position in the render tree is not its position here.
 pub(crate) enum RenderChild<'t> {
     Run(Vec<&'t Child>),
     Element(&'t Element),
+    /// PROVISIONAL (§9.10 tracer): zero or one of its alternatives.
+    Conditional(&'t Element),
 }
 
 pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
@@ -110,7 +118,11 @@ pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
                 if !run.is_empty() {
                     children.push(RenderChild::Run(std::mem::take(&mut run)));
                 }
-                children.push(RenderChild::Element(element));
+                children.push(if element.component == CONDITIONAL_COMPONENT {
+                    RenderChild::Conditional(element)
+                } else {
+                    RenderChild::Element(element)
+                });
             }
             text_or_expression => run.push(text_or_expression),
         }
@@ -316,6 +328,20 @@ impl Renderer<'_> {
                         scope.values,
                     )?));
                 }
+                RenderChild::Conditional(conditional) => {
+                    // The slot is `position` whether or not a node comes of it.
+                    if let Some((alternative, chosen)) = self.choose(scope, conditional)? {
+                        path.push(Step {
+                            position,
+                            kind: CONDITIONAL,
+                            component: ALTERNATIVES[alternative].to_string(),
+                        });
+                        let rendered =
+                            self.occurrence(scope.component, chosen, 0, path, scope.values);
+                        path.pop();
+                        children.push(TreeChild::Node(rendered?));
+                    }
+                }
             }
         }
         Ok(Node {
@@ -326,6 +352,42 @@ impl Renderer<'_> {
             events,
             children,
         })
+    }
+
+    /// Which alternative of `conditional` the snapshot chooses, if any: the
+    /// first when `when` is true, the second, if there is one, when it is
+    /// false. `when` is checked as any prop is, and must be a boolean.
+    fn choose<'t>(
+        &self,
+        scope: &Scope<'_, '_>,
+        conditional: &'t Element,
+    ) -> Result<Option<(usize, &'t Element)>, RuntimeDiagnostic> {
+        let when = conditional
+            .props
+            .iter()
+            .find(|prop| prop.prop == "when")
+            .expect("validated: a conditional has a `when`");
+        let span = when.value.span();
+        let value = scope.eval(&when.value)?;
+        let declared = &self.valid.component(CONDITIONAL_COMPONENT).props["when"].ty;
+        let chosen = match value {
+            Value::Boolean(true) if fits(&self.valid.manifest, &value, declared) => 0,
+            Value::Boolean(false) if fits(&self.valid.manifest, &value, declared) => 1,
+            _ => {
+                return Err(scope.error(
+                    RuntimeCode::PROP_MISMATCH,
+                    format!(
+                        "this value, {}, can't choose between a conditional's alternatives: `when` is a boolean",
+                        value.kind()
+                    ),
+                    span,
+                ))
+            }
+        };
+
+        Ok(alternatives(conditional)
+            .get(chosen)
+            .map(|element| (chosen, *element)))
     }
 
     /// An interpolation's text (§9.7.7): the content check, then the

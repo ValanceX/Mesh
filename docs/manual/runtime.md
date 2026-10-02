@@ -31,7 +31,7 @@ A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any p
 3. An interaction occurs on the drawn tree. The renderer resolves it to at most one binding (§9.9) and reports that binding's handler identifier, from the tree it drew, with the event's payload. An interaction that resolves to nothing is not reported.
 4. The host calls dispatch with **the render whose tree the renderer had drawn** when the event fired, and with that identifier and payload.
 5. The runtime validates the render's program and model (program validation).
-6. It validates the handler identifier against the render's program, then the render's snapshot and the payload (input validation).
+6. It validates the handler identifier against the render's program, and, when the program has a conditional, against the render's tree: an identifier whose node isn't in it is unknown (§9.10.7). Then it validates the render's snapshot and the payload (input validation).
 7. It finds the handler, and re-derives the scope of each composite on the path to it, by evaluating those occurrences' props against the render's snapshot, exactly as the render did.
 8. It evaluates the handler's arguments, applying §9.7's checks.
 9. The result is a command intent, or diagnostics.
@@ -133,8 +133,9 @@ A key is the render-v1 token for a node's or text run's **identity** (spec §9.1
 **Encoding of a static program's keys.** `H` is SHA-256; strings and counts are written as in the fingerprint (`docs/manual/templates.md`: a string is its 32-bit big-endian UTF-8 byte length and its bytes; a count is 32-bit big-endian). A **path** is the list of steps from the root. Each step is a position (a count), a kind byte, and a component name (a string):
 
 - the root is step `(0, 0x01, its component)`;
-- the child at position `i` of a node's `children`, in the render tree, is `(i, 0x01, its component)` for a node, or `(i, 0x02, "")` for a text run;
-- a composite occurrence adds two steps: `(i, 0x03, the composite)`, then `(0, 0x01, the component of its template's root element)`, and further expansions nest the same way.
+- the child whose **site** is at position `i` among a node's template children (spec §9.10.2) is `(i, 0x01, its component)` for a node, or `(i, 0x02, "")` for a text run. A maximal run of text and interpolations is one site, an element is one, and a [conditional](#conditionals-provisional) is one whether or not it produces a node. Without a conditional that is the child's index in the render tree's `children`, which is why every static program's keys are as they were;
+- a composite occurrence adds two steps: `(i, 0x03, the composite)`, then `(0, 0x01, the component of its template's root element)`, and further expansions nest the same way;
+- a conditional alternative adds a step, `(i, 0x04, "consequent")` or `(i, 0x04, "alternate")`, where `i` is the conditional's site position, then the alternative's own steps at position `0`, as a composite's expansion does. This step is provisional (below).
 
 The key is `k` followed by the first 16 bytes of `H(string "mesh-key-v1", the program identity (32 bytes), count of steps, each step)`, in unpadded base64url: 22 characters. This is the static case of identity. How an identity that has an instance is encoded is not decided (spec §9.10.10, §9.10.12).
 
@@ -148,6 +149,18 @@ The key is `k` followed by the first 16 bytes of `H(string "mesh-key-v1", the pr
 **The cost:** keys change whenever the program changes. The tree doesn't say which program it came from, and a renderer mustn't try to infer it (handler identifiers are opaque). The host knows, because it made the render: when it gives the renderer a tree from a different program, it tells the renderer to draw it afresh rather than reconcile it by key.
 
 The runtime checks every tree it builds for duplicate keys, and a collision is an internal error, `runtime-key-collision`. At 128 bits one doesn't happen in practice; the check makes "unique" a guarantee rather than a probability. That is a different failure from two nodes with the *same identity* (the same declared key at one repeated site): spec §9.10.4 makes that a diagnostic, fail closed, with no render tree. Its code is not decided.
+
+### Conditionals (provisional)
+
+*A tracer for spec §9.10, not a language feature.* MPRX has no conditional syntax, and nothing here decides one. To show that identity can keep the §9.10 rules when structure varies, the runtime gives one reserved component, `mesh-if`, conditional meaning. It is declared in the model like any component (with a required boolean `when`), so the parser, the checker and the compiler are unchanged: `<mesh-if when={show}>…</mesh-if>` is an ordinary element to them, and `when` is checked as any boolean prop is.
+
+- **Alternatives.** Its one or two element children are its alternatives. The first is chosen when `when` is true, the second, if there is one, when it is false. With one child, a false `when` produces nothing.
+- **It is never a node.** The render tree has what was chosen, or nothing, like a composite's expansion.
+- **Each alternative is a distinct site,** even when two are the same component in the same place. The conditional is one slot among its siblings, so the siblings after it keep their positions, and so their keys, whether or not it produced a node. A node's identity does not depend on where it lands among the rendered children.
+- **A program's handlers include its alternatives'.** Dispatch accepts an identifier only if its node is in the render it is given (§9.10.7); another alternative's identifier is `runtime-unknown-handler`.
+- **A malformed conditional is refused** by program validation, with `assembly-malformed-template`: no `when`, events, anything but one or two element children, a conditional as an alternative, or a conditional as a template's root.
+
+Not decided: the spelling, whether the compiler should check the shape, nested conditionals, and the encoding of the step above.
 
 ### Identity, realization and lifetime
 

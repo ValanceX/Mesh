@@ -4,6 +4,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Added (provisional)
+
+- **A conditional tracer for §9.10.** The runtime gives one reserved component, `mesh-if` (declared in the model with a boolean `when`), conditional meaning: one or two element children are its alternatives, and it is never a render node. Each alternative is a distinct site, and a conditional is one slot among its siblings, so a node's key no longer depends on where it lands among the rendered children. Alternatives add a `0x04` step to a key's path; programs without a conditional have exactly the keys and handler identifiers they had. Dispatch accepts a handler only if its node is in the render. The parser, checker, compiler, template format and render-v1 are unchanged, and the spelling is not the language's decision.
+
 ### Documented
 
 - **Node identity contract (spec §9.10).** The runtime manual said every render of a program has the same structure, keys and handler identifiers. That holds for every program MESH compiles today, because MPRX has no conditional or repeated elements, but it is a fact about MPRX and not a rule the render tree has to keep. §9.10 states what identity must mean once structure can vary: an identity is a sequence of (site, instance) steps, a site being a template place and an instance a key the application declares at a repeated site, so keys are never rendered positions or values MESH infers; equal identity is the same node, whatever order its siblings come in; identities are unique and a duplicate fails closed; an absent node's occurrence ends and a returning one is new; a handler's identity is its node's identity and its event; and identity stays within one program, so update and draw keep their meaning. Keys, handler identifiers and the encoding for static programs are unchanged. The runtime manual, the two guides and the package README no longer state the old invariant without qualification.

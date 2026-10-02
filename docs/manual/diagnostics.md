@@ -986,7 +986,7 @@ Location: `handler`.
 
 ### `runtime-unknown-handler`
 
-Dispatch was given a handler identifier of the render's program that names no handler in it.
+Dispatch was given a handler identifier of the render's program that names no handler in it or, in a program with a conditional, whose node isn't in the render (spec §9.10.7).
 
 Location: `handler`.
 
