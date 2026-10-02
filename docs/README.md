@@ -13,7 +13,7 @@ Learning-oriented walkthroughs.
 - [**Using MESH from JavaScript**](./guides/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`, and a generate-check-repair loop that applies MESH's suggestions.
 - [**Embedding the compiler**](./guides/embedding-the-compiler.md): call MESH from Rust, handle diagnostics, and walk the Semantic IR.
 - [**Integrating MESH with NEXUS**](./guides/integrating-mesh-with-nexus.md): build a host: compile templates, render from your state, pair each event with its render, and map intents to commands.
-- [**Rendering MESH output**](./guides/rendering-mesh-output.md): build a renderer: realize a render tree as given (natively, or with MESH's text), resolve and report events, and update by key. Its [conformance vectors](../examples/conformance/README.md) test one without a target.
+- [**Rendering MESH output**](./guides/rendering-mesh-output.md): build a renderer: realize a render tree as given (natively, or with MESH's text), resolve and report events, and update by key. Its [conformance vectors](../examples/conformance/README.md) test one without a target, and the [identity vectors](../examples/conformance/identity/README.md) pin what a key means when structure varies (spec §9.10).
 
 ## Manuals
 

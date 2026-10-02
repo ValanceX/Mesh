@@ -67,7 +67,7 @@ The render tree is [`schemas/render-v1.schema.json`](../../schemas/render-v1.sch
 
 The example's components are the slice's (`examples/slice/components.json`), and every value in it fits that manifest: `avatar`'s `src` is a `string?` and its `size` a `string`, and `button`'s `disabled` a `boolean`, whose text is in `propText`.
 
-MPRX has no loops and no conditional elements, so **a program's render trees all have the same structure, whatever the snapshot.** Only prop values and text differ.
+MPRX has no loops and no conditional elements, so **every program this version compiles is static: its render trees all have the same structure, whatever the snapshot.** Only prop values and text differ. That is a fact about MPRX today, not about the render tree, which can carry children that differ from one render to the next. What a key means when they do is the identity contract of spec §9.10, summarized under [Keys](#keys).
 
 ```json render-v1
 {
@@ -122,21 +122,21 @@ A text run without a key:
 
 ### Keys
 
-A key is a node's or text run's structural identity. Keys are:
-- **derived only from the program:** from the position, the sequence of child positions from the root template's root, with the component at each step, composites included, so a composite's expansion is part of every key below it;
-- **independent of values:** no snapshot or payload affects a key;
+A key is the render-v1 token for a node's or text run's **identity** (spec §9.10): two nodes in renders of one program have the same key if and only if they have the same identity. An identity is a sequence of *(site, instance)* steps from the root. A **site** is a place in the program's templates, named by template positions and components, not by a position in a render tree. An **instance** exists only at a *repeated* site, where it is a key the application declares. MPRX has no conditional or repeated sites yet, so for every program this MESH compiles an identity is its sites alone, and the encoding below is the whole of it. Keys are:
+- **derived from the program:** for a static program, from the position, the sequence of child positions from the root template's root, with the component at each step, composites included, so a composite's expansion is part of every key below it. For a static program that position is the same place as the site (spec §9.10.10);
+- **independent of values:** no snapshot or payload affects any key this MESH produces. The one value that may ever enter an identity is a key an application *declares* for a repeated item (spec §9.10.3), and nothing can declare one yet;
 - **unique:** no two nodes or text runs in one tree share one;
-- **stable within one program:** every render of a program has the same keys at the same positions. They are **not** stable across programs: changing the root or any template (spans included) may change every key. That is intentional, and there is no compatibility guarantee for keys across programs;
+- **stable within one program, for one identity:** every render of a program gives the same key to the same identity. For a static program that means every render has the same keys at the same positions. Once a program's structure can vary, the set of keys, and the position of a key, can differ from render to render, but a key still names the same node and is never a position. Keys are **not** stable across programs: changing the root or any template (spans included) may change every key. That is intentional, and there is no compatibility guarantee for keys across programs;
 - **opaque:** a renderer may compare keys for equality, and must not interpret them;
-- **not data identity,** nor application identity. A later design for lists may extend them.
+- **not data identity,** nor application identity, except where an application declares a key for a repeated item (spec §9.10.3). That is the extension "a later design for lists" was reserved for. It is specified as a contract and not implemented.
 
-**Encoding.** `H` is SHA-256; strings and counts are written as in the fingerprint (`docs/manual/templates.md`: a string is its 32-bit big-endian UTF-8 byte length and its bytes; a count is 32-bit big-endian). A **path** is the list of steps from the root. Each step is a position (a count), a kind byte, and a component name (a string):
+**Encoding of a static program's keys.** `H` is SHA-256; strings and counts are written as in the fingerprint (`docs/manual/templates.md`: a string is its 32-bit big-endian UTF-8 byte length and its bytes; a count is 32-bit big-endian). A **path** is the list of steps from the root. Each step is a position (a count), a kind byte, and a component name (a string):
 
 - the root is step `(0, 0x01, its component)`;
 - the child at position `i` of a node's `children`, in the render tree, is `(i, 0x01, its component)` for a node, or `(i, 0x02, "")` for a text run;
 - a composite occurrence adds two steps: `(i, 0x03, the composite)`, then `(0, 0x01, the component of its template's root element)`, and further expansions nest the same way.
 
-The key is `k` followed by the first 16 bytes of `H(string "mesh-key-v1", the program identity (32 bytes), count of steps, each step)`, in unpadded base64url: 22 characters.
+The key is `k` followed by the first 16 bytes of `H(string "mesh-key-v1", the program identity (32 bytes), count of steps, each step)`, in unpadded base64url: 22 characters. This is the static case of identity. How an identity that has an instance is encoded is not decided (spec §9.10.10, §9.10.12).
 
 **Why the program identity is in the hash.** The encoding is public. Without the program identity, anyone holding a key could hash guessed paths and component names, such as `user-card`, and confirm a guess, recovering a composite's name, which I13 rules out. With it, confirming a guess needs the program identity, which is a digest of the program's templates. A renderer is given neither: the handler identifiers it sees carry only the identity's first 8 bytes.
 
@@ -147,7 +147,17 @@ The key is `k` followed by the first 16 bytes of `H(string "mesh-key-v1", the pr
 
 **The cost:** keys change whenever the program changes. The tree doesn't say which program it came from, and a renderer mustn't try to infer it (handler identifiers are opaque). The host knows, because it made the render: when it gives the renderer a tree from a different program, it tells the renderer to draw it afresh rather than reconcile it by key.
 
-The runtime checks every tree it builds for duplicate keys, and a collision is an internal error, `runtime-key-collision`. At 128 bits one doesn't happen in practice; the check makes "unique" a guarantee rather than a probability.
+The runtime checks every tree it builds for duplicate keys, and a collision is an internal error, `runtime-key-collision`. At 128 bits one doesn't happen in practice; the check makes "unique" a guarantee rather than a probability. That is a different failure from two nodes with the *same identity* (the same declared key at one repeated site): spec §9.10.4 makes that a diagnostic, fail closed, with no render tree. Its code is not decided.
+
+### Identity, realization and lifetime
+
+A key names a node. It is not the target's object for that node. Three things have three owners (spec §9.10.6):
+
+- **Semantic identity** is MESH's: which node of the program's output an occurrence is. It is what a key carries.
+- **Realization** is the PORT's and its target's: the object or objects held for the node. Nothing in a key says whether one exists, or what it is.
+- **Lifetime** is the run of consecutive renders in which an identity is present. A node that is absent from a render is not realized, and its occurrence has ended. If its identity is present again later, that is a new occurrence: **created**, inheriting nothing. The same identity returning is the same *name*, not a surviving realization. Whether a target may cache anything across the absence is not decided.
+
+So between two renders of one program a renderer classifies each node as **kept** (its key is in both trees), **created** (only in the later) or **removed** (only in the earlier), and a kept node as **moved** when its order relative to another kept sibling is reversed. `examples/conformance/identity/` pins these outcomes, and shows where matching by position would get them wrong.
 
 ### Program identity
 
@@ -155,7 +165,7 @@ A program's **identity** is `H(string "mesh-program-v1", string root, count of t
 
 ### Handler identifiers
 
-A handler identifier names exactly one handler at one node. It is determined by the program's identity, the node's key and the event's name. So it is unique within a program, the same in every render of it, and independent of values. It is not the command, and it contains nothing from which the command or its arguments can be recovered without the program's templates. The same limits apply as for keys: it is opaque, not secret, and dispatch's validation, not its unpredictability, is what makes it safe to accept from a renderer.
+A handler identifier names exactly one handler at one node. It is determined by the program's identity, the node's key (its identity) and the event's name. So it is unique within a program, the same in every render in which its node is present, and independent of values. When a program can have repeated nodes (spec §9.10.7), two occurrences of one template handler at different instances will have different identifiers, a node that moves among its siblings keeps its handler identifiers, and an identifier changes only when its node's identity does. It is not the command, and it contains nothing from which the command or its arguments can be recovered without the program's templates. The same limits apply as for keys: it is opaque, not secret, and dispatch's validation, not its unpredictability, is what makes it safe to accept from a renderer.
 
 **Encoding:** `h`, then the first 8 bytes of the program identity in unpadded base64url (11 characters), then `.`, then the first 16 bytes of `H(string "mesh-handler-v1", program identity (32 bytes), string key, string event name)` in unpadded base64url (22 characters).
 
@@ -199,7 +209,7 @@ A renderer implements the rule for its target, and checks itself against `exampl
 ## Updates
 
 - **A change of values is a new render.** The whole program is evaluated again, and the result is a complete new render tree.
-- **Every render of a program has the same structure, keys and handler identifiers,** so a renderer can match a new tree against the one it drew, node by node, by key, and update in place. A tree from a **different** program (a template changed or was added) may have entirely different keys: a renderer draws it afresh, and never matches it against the old tree by key.
+- **Every render of a program names its nodes by identity, and a key is that identity.** For a static program, which is every program this MESH compiles, every render has the same structure, keys and handler identifiers, so a renderer can match a new tree against the one it drew, node by node, by key, and update in place. The contract for a program whose structure can vary (spec §9.10, with no syntax yet) is the same rule for a tree that differs: match **by key, not by position**. A key in both trees is the same node, kept and moved if its order among its siblings changed; a key only in the new tree is created; a key only in the old one is removed. A tree from a **different** program (a template changed or was added) may have entirely different keys: a renderer draws it afresh, and never matches it against the old tree by key.
 - **Finding what changed is the renderer's job,** by comparing prop values and text at equal keys. The runtime does no dependency tracking, no caching of evaluation, and no diffing.
 
 ## What renderers and hosts must do
@@ -207,7 +217,7 @@ A renderer implements the rule for its target, and checks itself against `exampl
 A **renderer**:
 - realizes each node's props, and each text run's text, **as given** (§9.8.7): a prop value natively, in a target slot that holds a value of its kind exactly, or, in a slot that holds only text, as its MESH text: a string prop's value, or the prop's `propText` entry. It computes nothing: it doesn't format numbers, convert or coerce values (by a platform's conversion, a host language's formatting, JSON or anything else), or supply a missing prop. A value with no conforming slot, such as a list or record where only text fits, is the renderer's failure to report, never a value to substitute;
 - resolves each interaction to at most one binding by event resolution (§9.9), and reports that binding's handler identifier and the event's payload, never interpreting either;
-- compares keys only for equality, and reconciles by key only between trees its host says come from one program;
+- compares keys only for equality, and reconciles by key, never by position, and only between trees its host says come from one program;
 - surfaces a node of a component it doesn't know, rather than dropping it (a composite whose template a program left out arrives as a node of its name).
 
 A **host**:

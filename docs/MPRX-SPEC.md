@@ -7,7 +7,7 @@ MPRX (MeshExpr) is the declarative UI language at the heart of [MESH](../README.
 - **Want a gentler introduction?** The [Writing MPRX guide](./guides/writing-mprx.md) covers the same ground with examples and common mistakes.
 - **Implementing something?** Write against this spec rather than inventing syntax inline. The plans in `docs/superpowers/plans/` build it out step by step.
 
-This is a **living document**. It was updated as each pass shipped and now describes MESH v0.6, whose syntax is v0.2's: §2–§8 are the syntax and its representation, and §9 is what a file means when it's checked against a component manifest; in §9.7 and §9.8, what a checked file does when it runs, how values cross into and out of it, and what may be done with them after; and in §9.9, which binding an interaction reaches. The "Introduced in" column in §8 shows which pass added each node kind.
+This is a **living document**. It was updated as each pass shipped and now describes MESH v0.6, whose syntax is v0.2's: §2–§8 are the syntax and its representation, and §9 is what a file means when it's checked against a component manifest; in §9.7 and §9.8, what a checked file does when it runs, how values cross into and out of it, and what may be done with them after; in §9.9, which binding an interaction reaches, and in §9.10, what identifies a node across renders. The "Introduced in" column in §8 shows which pass added each node kind.
 
 ---
 
@@ -838,6 +838,115 @@ With `click` as the applicable event of both `card` and `button`: an interaction
 
 ---
 
+### 9.10 Node identity
+
+*A contract, written ahead of the syntax it governs.* No MPRX construct can yet make an element conditional or repeated, so every program this MESH compiles is **static** (§9.10.10), and for a static program this section changes nothing the compiler or runtime does: its keys and handler identifiers are the ones `docs/manual/runtime.md` encodes. What this section fixes is what any construct that lets one program's renders differ in structure **must preserve**. It adds no syntax and no schema member.
+
+#### 9.10.1 Semantic identity
+
+The **identity** of a render occurrence, a node or a text run, names *which node of the program's output it is*. Two occurrences, in renders of **one program**, are **the same node** if and only if their identities are equal.
+
+Identity is MESH's, and it is semantic: it is not a target object, not a position in a render tree, and not a value that happens to be on screen. What a target holds for a node is its realization (§9.10.6), which is the target's.
+
+#### 9.10.2 Sites, instances and the identity path
+
+- A **site** is a place in a program's templates that can produce occurrences: an element of a template, or the run of literal text and interpolations in an element's content, together with its component. A composite occurrence is expanded in place (`docs/manual/templates.md`), so a composite's expansion is part of every site below it. A site is named by the **template positions** from the root template's root, each being the position among its *template* siblings, and the component at each step. It is **not** the position an occurrence has in a render tree's `children`: that can change when a sibling is conditional or repeated, and a site cannot.
+- The alternatives of a **conditional** are **distinct sites**, even when they are the same component in the same place. A conditional site produces zero or one occurrence for each occurrence of its parent.
+- A **repeated** site produces zero or more occurrences for each occurrence of its parent, one for each item. Each has an **instance**: its declared key (§9.10.3).
+- Every other site, static or conditional, has **no instance**.
+
+An occurrence's identity is the sequence of steps from the root, each step being **(site, instance)**, the instance being absent where the site has none. Neither the order of siblings nor an occurrence's position among them is in any step.
+
+#### 9.10.3 Declared keys
+
+The instance of an occurrence at a repeated site is a **declared key**: a value the template declares to be the item's identity. Only a declaration makes a value an identity. MESH never uses an item's index, its content, or any value it was not told to use, and it cannot use an item's "object identity", since the boundary data model has none: values cross by copy, and records are equal field by field (§9.7.4, §9.8.1).
+
+- A declared key is a **string** or a **finite number**. Keys are equal when `==` says so (§9.7.4): strings by their sequences of Unicode scalar values, numbers by IEEE 754 equality (so `0` and `-0` are one key), and a string never equals a number: `"1"` and `1` are different keys.
+- A key that is absent, `null`, a boolean, a list or a record is invalid, and so is a number that isn't finite.
+- A repeated site with **no declared key is invalid**. There is no default. An author who wants an item identified by its position declares its position as the key; MESH never assumes it.
+
+How a key is declared, and so where each of these errors is reported, is not decided here, except that a missing declaration is an error in the template and an invalid key value is an error in a render (§9.10.4).
+
+#### 9.10.4 Uniqueness
+
+Identities in one render are **unique**. At a repeated site that means the declared keys of the occurrences it produces for one parent occurrence are pairwise unequal. Occurrences of different sites, or of one site under different parent occurrences, can never collide, because their paths differ.
+
+Equal content is irrelevant to identity. Two items that both show `X` but have different keys are different nodes. Two items with the *same* key are the same identity twice, and that is invalid.
+
+A render in which two occurrences would have the same identity, or in which a declared key is invalid, **fails closed**: the runtime reports a diagnostic and produces no render tree. It never tells two such occurrences apart by their order or in any other way. The diagnostic's code is not decided. It is not `runtime-key-collision`, which reports two encoded keys that collide, an internal error (`docs/manual/runtime.md`).
+
+#### 9.10.5 Stability across renders
+
+Across renders of one program, a node **keeps its identity if and only if** its sites and its declared keys are unchanged. Nothing else is relevant. So:
+
+- **Reordering** siblings changes no identity.
+- **Inserting or removing other nodes**, conditional siblings included, changes no identity.
+- **A change of values** that are not declared keys on the node's path (props, text, anything else) changes no identity.
+- **A change of a declared key** is a different identity: the old node ends and a new node begins. The key *is* the identity.
+- **Moving an item** to another repeated site, or under another parent occurrence, is a different identity, since the path differs.
+
+#### 9.10.6 Identity, realization and lifetime
+
+Three things are kept apart, each with one owner:
+
+| | What it is | Owner |
+|---|---|---|
+| **Semantic identity** | which node of the program's output an occurrence is (§9.10.1) | MESH |
+| **Realization** | the object or objects a target holds for the node | the PORT and its target |
+| **Lifetime** | the span of renders in which an identity is present | defined here; observed by the renderer |
+
+An **occurrence** of a node is a maximal run of consecutive renders of one program in which its identity is present. A node that is absent from a render is not realized, and its occurrence has **ended**. If the same identity is present again in a later render, that is a **new occurrence**: it is **created**, not kept, and MESH requires it to inherit nothing from the earlier one. "The same identity" says the two occurrences share a name. It does not make an earlier realization survive. Whether a target may reuse or cache anything across the absence is **not decided**; the contract's classification of the later occurrence is *created*.
+
+A key is **not** a DOM object, nor any target's object, and the equality of two keys says nothing about whether a target object exists.
+
+For the conformance vectors, between two renders of one program:
+- a node whose identity is in both is **kept**: the target object realizing it in the earlier render is the one that realizes it in the later;
+- a node whose identity is only in the later render is **created**, and one whose identity is only in the earlier render is **removed**;
+- a kept node is **moved** if its order relative to at least one other kept sibling (a kept node with the same parent) is reversed. A kept node that merely changed index because a sibling was created or removed is **not** moved.
+
+#### 9.10.7 Handler identity
+
+A handler's identity is **(the identity of the node that binds it, the event's name)** within one program. So:
+
+- a handler identifier is determined by the program, the node's identity and the event's name, and by nothing else. For a static program that is the rule `docs/manual/runtime.md` states, since the key is the identity;
+- two occurrences produced by one template handler at different instances have **different** handler identifiers;
+- a handler identifier is **unchanged** whenever its node's identity is: from render to render, and when the node moves among its siblings;
+- a handler identifier **changes** if and only if its node's identity does, so when a node ends and another begins, the new node's handlers are new;
+- dispatch resolves an identifier against the render it is given, and evaluates against that render's own snapshot (§9.9). So an identifier that names an item must let the runtime find that item from that render alone. How is not decided.
+
+#### 9.10.8 Program scope
+
+Identities are comparable only between renders of **one program**. Dynamic structure does not make a new program: the program, and so its identity, is the same whatever the snapshot, and the snapshot selects among the occurrences the program can produce. A different program may give any node a different identity, as it may give it a different key today, and is never reconciled with an earlier one by identity.
+
+So the host's signal is unchanged: a render of the same program is reconciled by identity (an update), and a render of a different program is drawn afresh.
+
+#### 9.10.9 Determinism
+
+Identity is a **pure function of the program and the snapshot**: the same program and snapshot give the same identities, in the same order, wherever and whenever the render is made. No identity depends on time, the environment, a host, or the renders that came before.
+
+#### 9.10.10 render-v1, renderers and static programs
+
+**render-v1.** A node's or text run's `key` carries its identity: the keys of two nodes in renders of one program are equal if and only if their identities are. Keys stay opaque, unique within a tree, and compared only for equality. A node's place among its siblings is the order of `children`, and nothing else. This section asks render-v1 for no new member. How an identity is encoded into a key is **not decided**; the only requirement is that equal keys mean equal identities.
+
+**Reconciliation.** A renderer that reconciles two trees from one program matches **by key, not by position**:
+- a key in both trees is the same node: keep its realization, bring its props and text up to date, and move it if its order among its siblings changed;
+- a key only in the later tree is a new node: create it;
+- a key only in the earlier tree is gone: dispose it, and its handlers are no longer reachable.
+
+Matching by position gives the same answer only where position determines identity. It does in every static program, and it does not once structure can vary: inserting before a node, removing a node before it, or reordering, pairs a position with a different node.
+
+**Static programs.** A program is **static** if it has no conditional site and no repeated site. Each of its sites produces exactly one occurrence for each occurrence of its parent, at a rendered position the site determines, and no site has an instance. Its identities are therefore its sites alone, and its keys and handler identifiers are the ones `docs/manual/runtime.md` encodes, unchanged. That encoding, whose steps are rendered positions, is **the static case of identity**: for a static program a rendered position and a template site name the same place. How identities that are not static are encoded is not decided.
+
+#### 9.10.11 Conformance
+
+`examples/conformance/identity/` holds language-neutral vectors for this section. Each is a pair of hand-written render-v1 trees, the identity of every node in each, and what the contract says happened: kept, created, removed, moved, and which handler identifiers stay the same. They need no MPRX source and no compiler, because no MPRX can yet produce them. Each also gives the pairing that matching **by position** would make, so a renderer can see exactly where that would be wrong.
+
+#### 9.10.12 What is not decided
+
+The syntax for conditional and repeated elements, and for declaring a key; the compiler's implementation; the encoding of an identity into a key, and what happens if two collide; whether other kinds of value may be keys; any change to render-v1; how a renderer reconciles; how hydration transports identity; how dispatch finds the item an identifier names; and whether a target may cache a realization across an absence.
+
+---
+
 ## 10. Explicitly out of scope
 
 - Comments (§2)
@@ -858,6 +967,10 @@ With `click` as the applicable event of both `card` and `button`: an interaction
 - Any control over event resolution (§9.9), such as stopping or
   repeating it, and a declaration of which interactions constitute a
   primitive's event (§9.9.1)
+- Conditional elements, repeated elements, and the syntax that declares
+  an item's key. §9.10 states the identity any such construct must
+  preserve; it is a contract, not a feature, and none of it can be
+  written in MPRX yet
 
 ---
 

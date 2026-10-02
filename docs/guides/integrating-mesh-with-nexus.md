@@ -26,11 +26,11 @@ The runtime computes everything in between: every expression, every text, every 
 
 So a host keeps each render until the renderer has drawn a newer one, and dispatches each event with the render that was on screen when it fired. Only the host can know which that was, so this is the host's obligation, not the runtime's. `dispatch()` evaluates against the render's own snapshot, taken when `render()` was called, never against the host's current state.
 
-Every render of one program has the same handler identifiers, so a mispaired dispatch doesn't fail: it silently uses the wrong values. The example below shows the difference.
+A handler identifier names a handler at a node, and it is the same in every render of one program in which that node is present, so a mispaired dispatch doesn't fail: it silently uses the wrong values. The example below shows the difference.
 
 ## When the program changes
 
-Keys and handler identifiers are stable across renders of one program, and change when the program does: a template recompiled, added or removed. A renderer reconciles a new tree against the one it drew by key, so **tell the renderer when a tree comes from a different program**, and it draws that tree afresh. A render of an earlier program can still be dispatched, and gives that program's intent.
+A key and a handler identifier name the same node and handler in every render of one program in which that node is present, and they change when the program does: a template recompiled, added or removed. A renderer reconciles a new tree against the one it drew by key, so **tell the renderer when a tree comes from a different program**, and it draws that tree afresh. A render of an earlier program can still be dispatched, and gives that program's intent.
 
 ## Shaping values to the manifest
 

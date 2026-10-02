@@ -43,7 +43,9 @@ Keys and handler identifiers are **opaque, but not secret.** Compare them only f
 
 A change of values is a new render: the runtime evaluates the whole program again and gives a complete new tree. It doesn't say what changed; finding that is the renderer's job.
 
-**Every tree from one program has the same keys.** So a renderer matches the new tree against the one it drew, key by key, and updates only the props and text that differ. Within one program that never happens; if it ever does, treat a key in only the new tree as new, and a key in only the old one as gone.
+**A key is a node's identity, and trees from one program name the same node by the same key.** Every program MESH compiles today is static, so every tree from one program has the same keys, and a renderer matches the new tree against the one it drew, key by key, and updates only the props and text that differ.
+
+Match by key, **never by position.** Once a program's structure can vary (MPRX cannot express that yet; the contract is spec §9.10), a key in both trees is the same node: keep its realization, and move it if its order among its siblings changed. A key only in the new tree is a new node, and a key only in the old one is gone. Matching children by position gives the same answer only while position determines identity, which it does for every static program and does not once a node can be inserted, removed or reordered. A node that is absent from one tree and back in a later one is new: it keeps nothing from its earlier realization. The vectors in [`examples/conformance/identity/`](../../examples/conformance/identity/README.md) pin each case, and show where matching by position goes wrong.
 
 **Keys change when the program does,** by design. The host tells the renderer when a tree comes from a different program (a template recompiled, added or removed), and the renderer draws that tree afresh, never matching it against the old one by key.
 

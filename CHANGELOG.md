@@ -4,6 +4,13 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Documented
+
+- **Node identity contract (spec §9.10).** The runtime manual said every render of a program has the same structure, keys and handler identifiers. That holds for every program MESH compiles today, because MPRX has no conditional or repeated elements, but it is a fact about MPRX and not a rule the render tree has to keep. §9.10 states what identity must mean once structure can vary: an identity is a sequence of (site, instance) steps, a site being a template place and an instance a key the application declares at a repeated site, so keys are never rendered positions or values MESH infers; equal identity is the same node, whatever order its siblings come in; identities are unique and a duplicate fails closed; an absent node's occurrence ends and a returning one is new; a handler's identity is its node's identity and its event; and identity stays within one program, so update and draw keep their meaning. Keys, handler identifiers and the encoding for static programs are unchanged. The runtime manual, the two guides and the package README no longer state the old invariant without qualification.
+- **Identity conformance vectors** (`examples/conformance/identity/`): hand-written render-v1 before/after trees with each node's identity and the expected kept, created, removed and moved sets, handler expectations, and the pairing that matching by position would make. They need no MPRX and no compiler, and are checked only for validity and consistency.
+
+No syntax, compiler, runtime, schema or behavior changed.
+
 ## [0.6.0] - 2026-09-27
 
 The semantic questions PORT's first renderer raised, settled. See the [v0.6 release notes](./docs/releases/v0.6.md) for an overview.
