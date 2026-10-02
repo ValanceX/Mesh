@@ -459,12 +459,10 @@ impl<'v> Renderer<'v> {
             let declared_key = inner.eval(&key.value)?;
             let canonical = match &declared_key {
                 Value::String(text) => format!("s:{text}"),
-                // `-0` and `0` are one key.
+                // `-0` and `0` are one key: §9.7.7.1's text of a number has one
+                // text for both.
                 Value::Number(number) if number.is_finite() => {
-                    format!(
-                        "n:{}",
-                        number_to_text(if *number == 0.0 { 0.0 } else { *number })
-                    )
+                    format!("n:{}", number_to_text(*number))
                 }
                 other => {
                     return Err(scope.error(

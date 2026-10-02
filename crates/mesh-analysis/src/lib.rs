@@ -161,6 +161,11 @@ pub enum Expectation {
     Field { field: String },
     /// An element of an array literal where a list is expected.
     Element,
+    /// PROVISIONAL (§9.10 tracer): a repeat's declared key, which must be a
+    /// string or a finite number. The type system has no union, so the
+    /// rule is the checker's, not the prop's declared type's; `expected`
+    /// in the mismatch is the nearer of the two, and the message says both.
+    RepeatKey,
 }
 
 /// A unary or binary operator.

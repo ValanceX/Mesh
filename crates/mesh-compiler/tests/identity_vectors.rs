@@ -25,8 +25,16 @@ fn read(path: &str) -> String {
 }
 
 fn vectors() -> Vec<Value> {
-    let document: Value =
-        serde_json::from_str(&read("examples/conformance/identity/cases.json")).expect("JSON");
+    load("examples/conformance/identity/cases.json")
+}
+
+/// The repeated-site vectors, `identity/repeat/` (C11–C22).
+fn repeat_vectors() -> Vec<Value> {
+    load("examples/conformance/identity/repeat/cases.json")
+}
+
+fn load(path: &str) -> Vec<Value> {
+    let document: Value = serde_json::from_str(&read(path)).expect("JSON");
     assert_eq!(document["format"], "mesh-identity-vectors");
     assert_eq!(document["version"], 1);
     document["vectors"]
@@ -195,7 +203,7 @@ fn every_tree_is_a_valid_render_v1_tree() {
     let schema: Value =
         serde_json::from_str(&read("schemas/render-v1.schema.json")).expect("the schema is JSON");
     let validator = jsonschema::draft202012::new(&schema).expect("a valid 2020-12 schema");
-    for vector in with_trees(&vectors()) {
+    for vector in with_trees(&vectors()).chain(with_trees(&repeat_vectors())) {
         for side in ["earlier", "previous", "next"] {
             if let Some(side) = vector.get(side) {
                 assert!(
@@ -212,7 +220,8 @@ fn every_tree_is_a_valid_render_v1_tree() {
 /// `examples/conformance/identity/README.md`.
 #[test]
 fn every_expectation_follows_from_the_identities() {
-    for vector in with_trees(&vectors()) {
+    let (identity, repeat) = (vectors(), repeat_vectors());
+    for vector in with_trees(&identity).chain(with_trees(&repeat)) {
         let label = name(vector);
         let previous = occurrences(label, &vector["previous"]);
         let next = occurrences(label, &vector["next"]);
@@ -394,4 +403,218 @@ fn a_duplicate_identity_is_rejected_and_has_no_tree() {
         identities.iter().collect::<BTreeSet<_>>().len() + 1,
         "exactly one identity occurs twice"
     );
+}
+
+// --- identity/repeat/ (C11–C22): the declared key is the instance -------------
+
+/// A declared key, under §9.10 equality: a string, or a finite number whose
+/// `-0` is `0`. `None` is not a key.
+fn canonical(key: &Value) -> Option<String> {
+    match key {
+        Value::String(text) => Some(format!("s:{text}")),
+        Value::Number(number) => {
+            let number = number.as_f64().filter(|n| n.is_finite())?;
+            Some(format!("n:{}", if number == 0.0 { 0.0 } else { number }))
+        }
+        _ => None,
+    }
+}
+
+/// How an identity name writes a key: a string quoted, a number bare.
+fn written(key: &Value) -> String {
+    match key {
+        Value::String(_) => key.to_string(),
+        Value::Number(number) => {
+            let number = number.as_f64().unwrap();
+            if number == 0.0 {
+                "0".to_string()
+            } else if number.fract() == 0.0 {
+                format!("{}", number as i64)
+            } else {
+                number.to_string()
+            }
+        }
+        _ => panic!("not a key: {key}"),
+    }
+}
+
+fn declared(side: &Value) -> Vec<(String, Vec<Value>)> {
+    side["keys"]
+        .as_object()
+        .expect("`keys` is a map of site → declared keys")
+        .iter()
+        .map(|(site, keys)| (site.clone(), keys.as_array().unwrap().clone()))
+        .collect()
+}
+
+#[test]
+fn the_repeat_vector_set_is_c11_to_c22() {
+    let all = repeat_vectors();
+    for number in 11..=22 {
+        let prefix = format!("C{number}-");
+        assert_eq!(
+            all.iter().filter(|v| name(v).starts_with(&prefix)).count(),
+            1,
+            "exactly one vector named {prefix}…"
+        );
+    }
+    assert_eq!(all.len(), 12);
+}
+
+/// Identity is the site and the declared key, and the rendered order is the
+/// items' order: each repeated node's identity is written from its declared
+/// key, the declared keys of one site are unique under §9.10 equality, and
+/// the children of the site come in the order the keys do.
+#[test]
+fn every_repeated_identity_is_its_site_and_declared_key() {
+    for vector in with_trees(&repeat_vectors()) {
+        let label = name(vector);
+        for side in ["earlier", "previous", "next"] {
+            let Some(side) = vector.get(side) else {
+                continue;
+            };
+            let found = occurrences(label, side);
+            for (site, keys) in declared(side) {
+                let unique: BTreeSet<String> =
+                    keys.iter().map(|k| canonical(k).expect("a key")).collect();
+                assert_eq!(unique.len(), keys.len(), "{label}: declared keys repeat");
+                let expected: Vec<String> = keys
+                    .iter()
+                    .map(|key| format!("page/{site}/item[{}]", written(key)))
+                    .collect();
+                assert_eq!(
+                    children(&found, &format!("page/{site}")),
+                    expected,
+                    "{label}: `{site}`'s nodes are its keys, in item order"
+                );
+            }
+        }
+    }
+}
+
+/// C16 and C17: no tree, and the keys are what the contract refuses.
+#[test]
+fn a_duplicate_or_invalid_declared_key_has_no_tree() {
+    let all = repeat_vectors();
+    let duplicate = find(&all, "C16");
+    assert!(duplicate.get("previous").is_none() && duplicate.get("next").is_none());
+    assert_eq!(duplicate["expect"]["rejected"], true);
+    assert!(duplicate["expect"]["tree"].is_null());
+    let keys = duplicate["declaredKeys"]["list"].as_array().unwrap();
+    let unique: BTreeSet<_> = keys.iter().map(|k| canonical(k).unwrap()).collect();
+    assert_eq!(unique.len() + 1, keys.len(), "exactly one key repeats");
+
+    let invalid = find(&all, "C17");
+    assert!(invalid.get("previous").is_none() && invalid.get("next").is_none());
+    assert_eq!(invalid["expect"]["rejected"], true);
+    let categories = invalid["invalid"].as_array().unwrap();
+    assert!(categories.len() >= 4);
+    for case in categories {
+        let keys = case["declaredKeys"]["list"].as_array().unwrap();
+        assert!(
+            keys.iter().any(|key| canonical(key).is_none()),
+            "{}: a key that is not a string or a finite number",
+            case["category"]
+        );
+    }
+}
+
+/// C18: "1" and 1 are two keys. C19: 0 and -0 are one.
+#[test]
+fn string_and_number_keys_are_distinct_and_zero_is_one_key() {
+    let all = repeat_vectors();
+    let c18 = find(&all, "C18");
+    let keys = declared(&c18["previous"]).remove(0).1;
+    assert_eq!(keys, [Value::from("1"), Value::from(1)]);
+    assert_ne!(canonical(&keys[0]), canonical(&keys[1]));
+    let (kept, removed) = (&c18["expect"]["kept"], &c18["expect"]["removed"]);
+    assert!(set(kept).contains("page/list/item[1]"));
+    assert_eq!(
+        set(removed),
+        BTreeSet::from(["page/list/item[\"1\"]".to_string()])
+    );
+
+    let c19 = find(&all, "C19");
+    let (before, after) = (
+        declared(&c19["previous"]).remove(0).1,
+        declared(&c19["next"]).remove(0).1,
+    );
+    assert_eq!(canonical(&before[0]), canonical(&after[0]));
+    assert!(
+        after[0].as_f64().unwrap().is_sign_negative(),
+        "C19's second key must be written as negative zero"
+    );
+    assert!(set(&c19["expect"]["created"]).is_empty() && set(&c19["expect"]["removed"]).is_empty());
+}
+
+/// C20: the same key at two sites is two identities.
+#[test]
+fn the_same_key_at_two_sites_does_not_collide() {
+    let all = repeat_vectors();
+    let c20 = find(&all, "C20");
+    let found = occurrences("C20", &c20["previous"]);
+    let sites = declared(&c20["previous"]);
+    assert_eq!(sites.len(), 2);
+    assert_eq!(sites[0].1, sites[1].1, "both sites declare the same keys");
+    assert!(
+        found.contains_key("page/first/item[\"a\"]")
+            && found.contains_key("page/second/item[\"a\"]")
+    );
+}
+
+/// C21: the identity returns, the occurrence does not: created → removed → created.
+#[test]
+fn a_returning_identity_is_a_new_occurrence() {
+    let all = repeat_vectors();
+    let c21 = find(&all, "C21");
+    let identity = c21["expect"]["lifetime"]["identity"].as_str().unwrap();
+    let present = |side: &str| occurrences("C21", &c21[side]).contains_key(identity);
+    let presence: Vec<&str> = ["earlier", "previous", "next"]
+        .iter()
+        .map(|side| if present(side) { "present" } else { "absent" })
+        .collect();
+    assert_eq!(presence, ["present", "absent", "present"]);
+    assert_eq!(
+        c21["expect"]["lifetime"]["presence"],
+        serde_json::json!(presence)
+    );
+    assert_eq!(
+        c21["expect"]["lifetime"]["realization"],
+        serde_json::json!(["created", "disposed", "created"])
+    );
+    assert!(set(&c21["expect"]["recurring"]).contains(identity));
+    assert!(set(&c21["expect"]["created"]).contains(identity));
+    // Same identity, same handlers: a name, not a surviving realization.
+    assert!(!set(&c21["expect"]["handlers"]["sameAsEarlier"]).is_empty());
+}
+
+/// C22: a handler is its node's identity and its event.
+#[test]
+fn a_repeated_handler_is_its_identity_and_event() {
+    let all = repeat_vectors();
+    let c22 = find(&all, "C22");
+    let (previous, next) = (
+        occurrences("C22", &c22["previous"]),
+        occurrences("C22", &c22["next"]),
+    );
+    let (before, after) = (handler_map(&previous), handler_map(&next));
+    assert_eq!(before, after, "a reorder changes no handler");
+    assert_eq!(before.len(), 6, "three items, two events");
+    assert_eq!(before.values().collect::<BTreeSet<_>>().len(), 6);
+    assert_eq!(c22["expect"]["handlers"]["distinctWithinEachTree"], true);
+    assert!(!set(&c22["expect"]["moved"]).is_empty());
+}
+
+/// The vectors show where matching by position is wrong for repeated sites.
+#[test]
+fn the_repeat_vectors_expose_matching_by_position() {
+    let all = repeat_vectors();
+    assert_eq!(find(&all, "C11")["expect"]["positional"]["correct"], true);
+    for prefix in ["C12", "C13", "C14", "C15", "C18", "C22"] {
+        assert_eq!(
+            find(&all, prefix)["expect"]["positional"]["correct"],
+            false,
+            "{prefix}"
+        );
+    }
 }

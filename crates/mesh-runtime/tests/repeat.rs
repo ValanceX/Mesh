@@ -30,18 +30,29 @@ const MODEL: &str = r#"{
     "mesh-each": { "props": {
         "items": { "type": { "kind": "list", "element": { "kind": "any" } }, "required": true },
         "as":    { "type": { "kind": "string" }, "required": true },
-        "key":   { "type": { "kind": "optional", "type": { "kind": "any" } }, "required": true } },
+        "key":   { "type": { "kind": "any" }, "required": true } },
       "events": {}, "commands": {}, "scope": {} },
     "view": { "props": {}, "events": {},
-      "commands": { "pick": { "parameters": [ { "name": "id", "type": { "kind": "optional", "type": { "kind": "any" } } } ] },
+      "commands": { "pick": { "parameters": [ { "name": "id", "type": { "kind": "any" } } ] },
                     "name": { "parameters": [ { "name": "label", "type": { "kind": "string" } } ] } },
       "scope": {
         "items": { "kind": "list", "element": { "kind": "record", "fields": {
-            "id": { "type": { "kind": "any" }, "required": false },
+            "id": { "type": { "kind": "any" }, "required": true },
             "label": { "type": { "kind": "string" }, "required": true } } } },
         "others": { "kind": "list", "element": { "kind": "record", "fields": {
-            "id": { "type": { "kind": "any" }, "required": false },
+            "id": { "type": { "kind": "any" }, "required": true },
             "label": { "type": { "kind": "string" }, "required": true } } } } } },
+    "typed": { "props": {}, "events": {}, "commands": {},
+      "scope": { "rows": { "kind": "list", "element": { "kind": "record", "fields": {
+        "s": { "type": { "kind": "string" }, "required": true },
+        "n": { "type": { "kind": "number" }, "required": true },
+        "b": { "type": { "kind": "boolean" }, "required": true },
+        "z": { "type": { "kind": "null" }, "required": true },
+        "r": { "type": { "kind": "record", "fields": { "x": { "type": { "kind": "number" }, "required": true } } }, "required": true },
+        "l": { "type": { "kind": "list", "element": { "kind": "number" } }, "required": true },
+        "o": { "type": { "kind": "optional", "type": { "kind": "string" } }, "required": false },
+        "p": { "type": { "kind": "optional", "type": { "kind": "number" } }, "required": false },
+        "a": { "type": { "kind": "any" }, "required": true } } } } } },
     "bad": { "props": {}, "events": {}, "commands": {},
       "scope": { "items": { "kind": "list", "element": { "kind": "any" } } } }
   }
@@ -269,10 +280,10 @@ fn r6_a_key_that_is_not_a_string_or_a_finite_number_is_refused() {
     for id in ["null", "true", "false", "[1]", "{}", "{\"x\":1}"] {
         assert_eq!(refused(&[(id, "A")]), ["runtime-invalid-key"], "key {id}");
     }
-    // Absent: the field is optional in the model, and no key is invented.
-    let values = r#"{"items":[{"label":"A"}],"others":[]}"#;
-    let diagnostics = try_render("view", VIEW, values).unwrap_err();
-    assert_eq!(codes(&diagnostics), ["runtime-invalid-key"]);
+    // An absent key can't reach the runtime from a program that compiles: the
+    // checker refuses a key that may be absent (D1), and a missing field of
+    // an `any` is `runtime-missing-member`. The runtime's check of it stays
+    // as the backstop.
     // An invalid key among valid ones refuses the whole render.
     assert_eq!(
         refused(&[("\"a\"", "A"), ("null", "B")]),
@@ -426,22 +437,56 @@ fn dispatch_against_a_snapshot_with_a_bad_key_fails_closed() {
     assert_eq!(codes(&found.unwrap_err()), ["runtime-duplicate-key"]);
 }
 
+/// D1: the checker requires a repeat's key to be a string or a number, where
+/// types can say so, whatever the model declares for the `key` prop. `any` is
+/// accepted as it is everywhere (the runtime checks the value); the runtime's
+/// own check stays, and the tests above exercise it.
 #[test]
-fn a_key_that_may_be_absent_is_refused_by_the_compiler_when_the_prop_says_any() {
-    // The model decides: with `key: any` the ordinary type check refuses an
-    // optional field before any snapshot exists; the tests above declare
-    // `key: any?` to exercise the runtime's own check of the same thing.
-    let strict = MODEL.replace(
-        r#""key":   { "type": { "kind": "optional", "type": { "kind": "any" } }, "required": true }"#,
-        r#""key":   { "type": { "kind": "any" }, "required": true }"#,
-    );
-    let model = mesh_compiler::check::Model::load(&strict, "view").unwrap();
-    let compiled = mesh_compiler::check::template(VIEW, &model);
-    assert!(compiled.template.is_none());
-    assert!(compiled
-        .diagnostics
-        .iter()
-        .any(|d| d.message.contains("may be absent")));
+fn the_checker_requires_a_key_that_is_a_string_or_a_number() {
+    let model = mesh_compiler::check::Model::load(MODEL, "typed").unwrap();
+    let key = |expression: &str| {
+        let source = format!(
+            "<page><mesh-each items={{rows}} as=\"r\" key={{{expression}}}><note>x</note></mesh-each></page>"
+        );
+        mesh_compiler::check::template(&source, &model)
+    };
+    for accepted in ["r.s", "r.n", "r.a", "\"literal\"", "7", "r.n + 1"] {
+        let compiled = key(accepted);
+        assert!(
+            compiled.template.is_some(),
+            "{accepted}: {:#?}",
+            compiled.diagnostics
+        );
+    }
+    for (rejected, absent) in [
+        ("r.b", false),
+        ("r.z", false),
+        ("r.r", false),
+        ("r.l", false),
+        ("true", false),
+        ("null", false),
+        ("r.n > 1", false),
+        ("r.o", true),
+        ("r.p", true),
+    ] {
+        let compiled = key(rejected);
+        assert!(compiled.template.is_none(), "{rejected} should be refused");
+        let message = &compiled.diagnostics[0].message;
+        assert!(
+            message.contains("a repeat's key must be a string or a number"),
+            "{message}"
+        );
+        assert_eq!(
+            message.contains("may be absent"),
+            absent,
+            "{rejected}: {message}"
+        );
+        assert_eq!(
+            compiled.diagnostics.len(),
+            1,
+            "{rejected}: one mistake, one diagnostic"
+        );
+    }
 }
 
 // --- The compiler's side -------------------------------------------------------
@@ -489,11 +534,172 @@ fn a_malformed_repeat_is_refused() {
         // a repeat as the repeated child
         "<page><mesh-each items={items} as=\"i\" key={i}><mesh-each items={items} as=\"j\" key={j}><note>a</note></mesh-each></mesh-each></page>",
         // an empty name
-        "<page><mesh-each items={items} as=\"\" key={items}><note>a</note></mesh-each></page>",
+        "<page><mesh-each items={items} as=\"\" key=\"k\"><note>a</note></mesh-each></page>",
         // the repeat as the template's root
         "<mesh-each items={items} as=\"i\" key={i}><note>a</note></mesh-each>",
     ] {
         let diagnostics = refuse(source);
         assert_eq!(codes(&diagnostics), ["assembly-malformed-template"], "{source}");
+    }
+}
+
+// --- The conformance vectors, against the implementation -----------------------
+
+/// `examples/conformance/identity/repeat/` is render-v1-level and knows no
+/// syntax; this renders the declared keys it gives through the tracer's repeat
+/// and checks that the runtime classifies kept, created and removed, and the
+/// handlers, as the vectors say, and refuses what they say is refused.
+mod vectors {
+    use super::*;
+    use serde_json::Value;
+    use std::collections::BTreeSet;
+
+    fn document() -> Vec<Value> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/conformance/identity/repeat/cases.json");
+        let text = std::fs::read_to_string(path).expect("the vectors");
+        serde_json::from_str::<Value>(&text).unwrap()["vectors"]
+            .as_array()
+            .unwrap()
+            .clone()
+    }
+
+    /// The program's snapshot for declared keys `site → keys`: the site's
+    /// label is `site/<key as the identity names write it>`.
+    fn snapshot_of(keys: &Value) -> String {
+        let site = |name: &str| -> String {
+            let rows: Vec<String> = keys
+                .get(name)
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .map(|key| {
+                    let written = match key {
+                        Value::Number(n) if n.as_f64() == Some(0.0) => "0".to_string(),
+                        other => other.to_string(),
+                    };
+                    format!(
+                        r#"{{"id":{key},"label":{}}}"#,
+                        Value::from(format!("{name}/{written}"))
+                    )
+                })
+                .collect();
+            format!("[{}]", rows.join(","))
+        };
+        let (first, second) = if keys.get("list").is_some() {
+            ("list", "none")
+        } else {
+            ("first", "second")
+        };
+        format!(r#"{{"items":{},"others":{}}}"#, site(first), site(second))
+    }
+
+    fn render_keys(keys: &Value) -> Result<Render, Vec<&'static str>> {
+        try_render("view", TWO, &snapshot_of(keys)).map_err(|d| codes(&d))
+    }
+
+    /// `page/<site>/item[<key>]` → the label the program shows for it.
+    fn label(identity: &str) -> String {
+        let rest = identity.strip_prefix("page/").unwrap();
+        let (site, item) = rest.split_once("/item[").unwrap();
+        format!("{site}/{}", item.trim_end_matches(']'))
+    }
+
+    fn labels(render: &Render) -> BTreeSet<String> {
+        parts(render)
+            .into_iter()
+            .filter(|p| p.component == "row")
+            .map(|p| p.text)
+            .collect()
+    }
+
+    fn named(list: &Value) -> BTreeSet<String> {
+        list.as_array()
+            .unwrap()
+            .iter()
+            .filter(|i| i.as_str().unwrap().contains("/item["))
+            .filter(|i| !i.as_str().unwrap().ends_with("/#text"))
+            .map(|i| label(i.as_str().unwrap()))
+            .collect()
+    }
+
+    #[test]
+    fn the_runtime_classifies_as_the_vectors_say() {
+        let mut checked = 0;
+        for vector in document() {
+            let Some(previous) = vector.get("previous") else {
+                continue;
+            };
+            let next = &vector["next"];
+            let (before, after) = (
+                render_keys(&previous["keys"]).expect("renders"),
+                render_keys(&next["keys"]).expect("renders"),
+            );
+            let name = vector["name"].as_str().unwrap();
+            let expect = &vector["expect"];
+            let (was, now) = (labels(&before), labels(&after));
+            let kept: BTreeSet<String> = was.intersection(&now).cloned().collect();
+            let created: BTreeSet<String> = now.difference(&was).cloned().collect();
+            let removed: BTreeSet<String> = was.difference(&now).cloned().collect();
+            assert_eq!(kept, named(&expect["kept"]), "{name}: kept");
+            assert_eq!(created, named(&expect["created"]), "{name}: created");
+            assert_eq!(removed, named(&expect["removed"]), "{name}: removed");
+            // A kept item has the key and the handlers it had; none is shared.
+            for kept in &kept {
+                let (b, a) = (must(&before, kept), must(&after, kept));
+                assert_eq!((&b.key, &b.events), (&a.key, &a.events), "{name}: {kept}");
+            }
+            let handlers: Vec<String> = parts(&after)
+                .into_iter()
+                .flat_map(|p| p.events.into_values())
+                .collect();
+            assert_eq!(
+                handlers.len(),
+                handlers.iter().collect::<BTreeSet<_>>().len(),
+                "{name}: handlers are distinct"
+            );
+            // A returning identity inherits nothing from the render before it.
+            if let Some(earlier) = vector.get("earlier") {
+                let earlier = render_keys(&earlier["keys"]).expect("renders");
+                for identity in expect["recurring"].as_array().unwrap() {
+                    let item = label(identity.as_str().unwrap());
+                    assert!(
+                        !was.contains(&item),
+                        "{name}: absent from the render before"
+                    );
+                    assert_eq!(must(&earlier, &item).key, must(&after, &item).key);
+                }
+            }
+            checked += 1;
+        }
+        assert_eq!(checked, 10);
+    }
+
+    #[test]
+    fn the_runtime_refuses_what_the_vectors_refuse() {
+        for vector in document() {
+            let name = vector["name"].as_str().unwrap();
+            if name.starts_with("C16") {
+                assert_eq!(
+                    render_keys(&vector["declaredKeys"]).err(),
+                    Some(vec!["runtime-duplicate-key"])
+                );
+            }
+            if name.starts_with("C17") {
+                for case in vector["invalid"].as_array().unwrap() {
+                    // An absent key can't be built from a snapshot of a program that
+                    // compiles (the checker refuses it); the rest are values.
+                    if case["category"] == "absent" {
+                        continue;
+                    }
+                    assert_eq!(
+                        render_keys(&case["declaredKeys"]).err(),
+                        Some(vec!["runtime-invalid-key"]),
+                        "{}",
+                        case["category"]
+                    );
+                }
+            }
+        }
     }
 }

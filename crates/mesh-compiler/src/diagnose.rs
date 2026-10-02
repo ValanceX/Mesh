@@ -145,6 +145,24 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
             actual,
             possibly_absent,
             ..
+        } if *expectation == Expectation::RepeatKey => (
+            DiagnosticCode::TYPE_MISMATCH,
+            format!(
+                "a repeat's key must be a string or a number, found {actual}{}",
+                if *possibly_absent {
+                    ", which may be absent"
+                } else {
+                    ""
+                }
+            ),
+            Vec::new(),
+        ),
+        Fact::TypeMismatch {
+            expectation,
+            expected,
+            actual,
+            possibly_absent,
+            ..
         } => (
             DiagnosticCode::TYPE_MISMATCH,
             format!(
@@ -232,6 +250,7 @@ fn expecting(expectation: &Expectation) -> String {
         }
         Expectation::Field { field } => format!("the field {field:?}"),
         Expectation::Element => "the list element".to_string(),
+        Expectation::RepeatKey => "a repeat's key".to_string(),
     }
 }
 

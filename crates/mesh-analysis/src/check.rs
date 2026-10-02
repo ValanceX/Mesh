@@ -163,6 +163,16 @@ impl<'m> Walker<'m> {
                     }),
                 }
             }
+            if repeating && attribute.name == "key" {
+                if let AttributeValue::Expression(expression) = &attribute.value {
+                    // Typed alone: the prop's declared type can't say
+                    // "string or number", so the repeat's rule is the check.
+                    if let Some(ty) = self.expression(expression, Place::Value) {
+                        self.repeat_key(ty, expression.span());
+                    }
+                    continue;
+                }
+            }
             match (&attribute.value, expected) {
                 (AttributeValue::String { span, .. }, Some((expected, expectation))) => {
                     self.expect(Ty::String, *span, expectation, &expected);
@@ -232,6 +242,25 @@ impl<'m> Walker<'m> {
         if pushed {
             self.loops.pop();
         }
+    }
+
+    /// A repeat's key must be a string or a finite number (§9.10.4). The
+    /// finiteness is a value's, so statically the type must be `string` or
+    /// `number`, or `any`, which every check leaves to the runtime. A
+    /// possibly absent key, and every other type, is refused here; the
+    /// runtime refuses what a type can't show (`runtime-invalid-key`).
+    fn repeat_key(&mut self, ty: Ty, span: Span) {
+        let manifest = self.manifest();
+        let present = match relation::expand(manifest, &ty) {
+            Ty::Optional(inner) => relation::expand(manifest, &inner),
+            other => other,
+        };
+        let expected = if present == Ty::Number {
+            Ty::Number
+        } else {
+            Ty::String
+        };
+        self.expect(ty, span, Expectation::RepeatKey, &expected);
     }
 
     /// The type of one item of a list type (an optional list's too); `any`

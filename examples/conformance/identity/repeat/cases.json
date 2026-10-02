@@ -1,0 +1,2056 @@
+{
+  "format": "mesh-identity-vectors",
+  "version": 1,
+  "about": "Repeated-site identity vectors (spec §9.10). Hand-written render-v1; no MPRX, no manifest, no syntax. `keys` is the declared key of each instance of each repeated site, in item order; identity names write a string key quoted and a number bare.",
+  "vectors": [
+    {
+      "name": "C11-stable-repeated",
+      "section": "9.10",
+      "about": "the same declared keys in the same order: every instance kept, none moved",
+      "previous": {
+        "keys": {
+          "list": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kq7mbxsAYUxPP00JNICg-wL",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.PStkpTmoDysM8aX5gzEJ--"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k-yMcwRKyWmVtW6z7rWK0Mt",
+                        "text": "C"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "kq7mbxsAYUxPP00JNICg-wL": "page/list/item[\"c\"]",
+          "k-yMcwRKyWmVtW6z7rWK0Mt": "page/list/item[\"c\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "next": {
+        "keys": {
+          "list": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kq7mbxsAYUxPP00JNICg-wL",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.PStkpTmoDysM8aX5gzEJ--"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k-yMcwRKyWmVtW6z7rWK0Mt",
+                        "text": "C"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "kq7mbxsAYUxPP00JNICg-wL": "page/list/item[\"c\"]",
+          "k-yMcwRKyWmVtW6z7rWK0Mt": "page/list/item[\"c\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[\"a\"]",
+          "page/list/item[\"b\"]",
+          "page/list/item[\"c\"]"
+        ],
+        "created": [],
+        "removed": [],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[\"a\"]:tap",
+            "page/list/item[\"b\"]:tap",
+            "page/list/item[\"c\"]:tap"
+          ],
+          "new": [],
+          "gone": [],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[\"a\"]",
+              "page/list/item[\"a\"]"
+            ],
+            [
+              "page/list/item[\"b\"]",
+              "page/list/item[\"b\"]"
+            ],
+            [
+              "page/list/item[\"c\"]",
+              "page/list/item[\"c\"]"
+            ]
+          ],
+          "correct": true
+        }
+      }
+    },
+    {
+      "name": "C12-reorder",
+      "section": "9.10",
+      "about": "the items come in another order: every identity is kept, and each is moved relative to another kept sibling",
+      "previous": {
+        "keys": {
+          "list": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kq7mbxsAYUxPP00JNICg-wL",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.PStkpTmoDysM8aX5gzEJ--"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k-yMcwRKyWmVtW6z7rWK0Mt",
+                        "text": "C"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "kq7mbxsAYUxPP00JNICg-wL": "page/list/item[\"c\"]",
+          "k-yMcwRKyWmVtW6z7rWK0Mt": "page/list/item[\"c\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "next": {
+        "keys": {
+          "list": [
+            "c",
+            "a",
+            "b"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kq7mbxsAYUxPP00JNICg-wL",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.PStkpTmoDysM8aX5gzEJ--"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k-yMcwRKyWmVtW6z7rWK0Mt",
+                        "text": "C"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kq7mbxsAYUxPP00JNICg-wL": "page/list/item[\"c\"]",
+          "k-yMcwRKyWmVtW6z7rWK0Mt": "page/list/item[\"c\"]/#text",
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[\"a\"]",
+          "page/list/item[\"b\"]",
+          "page/list/item[\"c\"]"
+        ],
+        "created": [],
+        "removed": [],
+        "moved": [
+          "page/list/item[\"a\"]",
+          "page/list/item[\"b\"]",
+          "page/list/item[\"c\"]"
+        ],
+        "handlers": {
+          "same": [
+            "page/list/item[\"a\"]:tap",
+            "page/list/item[\"b\"]:tap",
+            "page/list/item[\"c\"]:tap"
+          ],
+          "new": [],
+          "gone": [],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[\"a\"]",
+              "page/list/item[\"c\"]"
+            ],
+            [
+              "page/list/item[\"b\"]",
+              "page/list/item[\"a\"]"
+            ],
+            [
+              "page/list/item[\"c\"]",
+              "page/list/item[\"b\"]"
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C13-insert",
+      "section": "9.10",
+      "about": "an item is inserted between two others: they are kept, the new one created",
+      "previous": {
+        "keys": {
+          "list": [
+            "a",
+            "b"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "next": {
+        "keys": {
+          "list": [
+            "a",
+            "x",
+            "b"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kHZgjh9hoADv3qtO53Oe5GH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.7I6bzBAKCS3uaKfR76IF2G"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kougKQ8MmyKtAIxtyrH3LKf",
+                        "text": "X"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kHZgjh9hoADv3qtO53Oe5GH": "page/list/item[\"x\"]",
+          "kougKQ8MmyKtAIxtyrH3LKf": "page/list/item[\"x\"]/#text",
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[\"a\"]",
+          "page/list/item[\"b\"]"
+        ],
+        "created": [
+          "page/list/item[\"x\"]"
+        ],
+        "removed": [],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[\"a\"]:tap",
+            "page/list/item[\"b\"]:tap"
+          ],
+          "new": [
+            "page/list/item[\"x\"]:tap"
+          ],
+          "gone": [],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[\"a\"]",
+              "page/list/item[\"a\"]"
+            ],
+            [
+              "page/list/item[\"b\"]",
+              "page/list/item[\"x\"]"
+            ],
+            [
+              null,
+              "page/list/item[\"b\"]"
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C14-remove-middle",
+      "section": "9.10",
+      "about": "the middle item goes: it is removed, the others kept",
+      "previous": {
+        "keys": {
+          "list": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kq7mbxsAYUxPP00JNICg-wL",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.PStkpTmoDysM8aX5gzEJ--"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k-yMcwRKyWmVtW6z7rWK0Mt",
+                        "text": "C"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "kq7mbxsAYUxPP00JNICg-wL": "page/list/item[\"c\"]",
+          "k-yMcwRKyWmVtW6z7rWK0Mt": "page/list/item[\"c\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "next": {
+        "keys": {
+          "list": [
+            "a",
+            "c"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kq7mbxsAYUxPP00JNICg-wL",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.PStkpTmoDysM8aX5gzEJ--"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k-yMcwRKyWmVtW6z7rWK0Mt",
+                        "text": "C"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kq7mbxsAYUxPP00JNICg-wL": "page/list/item[\"c\"]",
+          "k-yMcwRKyWmVtW6z7rWK0Mt": "page/list/item[\"c\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[\"a\"]",
+          "page/list/item[\"c\"]"
+        ],
+        "created": [],
+        "removed": [
+          "page/list/item[\"b\"]"
+        ],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[\"a\"]:tap",
+            "page/list/item[\"c\"]:tap"
+          ],
+          "new": [],
+          "gone": [
+            "page/list/item[\"b\"]:tap"
+          ],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[\"a\"]",
+              "page/list/item[\"a\"]"
+            ],
+            [
+              "page/list/item[\"b\"]",
+              "page/list/item[\"c\"]"
+            ],
+            [
+              "page/list/item[\"c\"]",
+              null
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C15-remove-first",
+      "section": "9.10",
+      "about": "the first item goes: it is removed, the others kept, though every index changed",
+      "previous": {
+        "keys": {
+          "list": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kq7mbxsAYUxPP00JNICg-wL",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.PStkpTmoDysM8aX5gzEJ--"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k-yMcwRKyWmVtW6z7rWK0Mt",
+                        "text": "C"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "kq7mbxsAYUxPP00JNICg-wL": "page/list/item[\"c\"]",
+          "k-yMcwRKyWmVtW6z7rWK0Mt": "page/list/item[\"c\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "next": {
+        "keys": {
+          "list": [
+            "b",
+            "c"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kq7mbxsAYUxPP00JNICg-wL",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.PStkpTmoDysM8aX5gzEJ--"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k-yMcwRKyWmVtW6z7rWK0Mt",
+                        "text": "C"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "kq7mbxsAYUxPP00JNICg-wL": "page/list/item[\"c\"]",
+          "k-yMcwRKyWmVtW6z7rWK0Mt": "page/list/item[\"c\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[\"b\"]",
+          "page/list/item[\"c\"]"
+        ],
+        "created": [],
+        "removed": [
+          "page/list/item[\"a\"]"
+        ],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[\"b\"]:tap",
+            "page/list/item[\"c\"]:tap"
+          ],
+          "new": [],
+          "gone": [
+            "page/list/item[\"a\"]:tap"
+          ],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[\"a\"]",
+              "page/list/item[\"b\"]"
+            ],
+            [
+              "page/list/item[\"b\"]",
+              "page/list/item[\"c\"]"
+            ],
+            [
+              "page/list/item[\"c\"]",
+              null
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C16-duplicate-key",
+      "section": "9.10",
+      "about": "two items of one repeat declare the same key: the render fails closed and no tree exists",
+      "declaredKeys": {
+        "list": [
+          "a",
+          "b",
+          "b"
+        ]
+      },
+      "expect": {
+        "rejected": true,
+        "tree": null,
+        "reason": "duplicate-key",
+        "duplicate": "page/list/item[\"b\"]"
+      }
+    },
+    {
+      "name": "C17-invalid-key",
+      "section": "9.10",
+      "about": "an item whose declared key is not a string or a finite number: the render fails closed and no tree exists; the runtime never substitutes the item's position",
+      "invalid": [
+        {
+          "category": "null",
+          "declaredKeys": {
+            "list": [
+              "a",
+              null
+            ]
+          }
+        },
+        {
+          "category": "boolean",
+          "declaredKeys": {
+            "list": [
+              "a",
+              true
+            ]
+          }
+        },
+        {
+          "category": "list",
+          "declaredKeys": {
+            "list": [
+              "a",
+              [
+                1
+              ]
+            ]
+          }
+        },
+        {
+          "category": "record",
+          "declaredKeys": {
+            "list": [
+              "a",
+              {
+                "x": 1
+              }
+            ]
+          }
+        },
+        {
+          "category": "absent",
+          "declaredKeys": {
+            "list": [
+              "a",
+              {
+                "$absent": true
+              }
+            ]
+          }
+        }
+      ],
+      "notes": "NaN and the infinities are also not keys; JSON cannot write them, so there is no vector entry",
+      "expect": {
+        "rejected": true,
+        "tree": null,
+        "reason": "invalid-key"
+      }
+    },
+    {
+      "name": "C18-string-versus-number",
+      "section": "9.10",
+      "about": "the string \"1\" and the number 1 are different keys, so different identities; removing one keeps the other",
+      "previous": {
+        "keys": {
+          "list": [
+            "1",
+            1
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kXwryivt1lw-ZnShxz4tDau",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.iWNqtoAiseic3ZjE70dzLj"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kyAgil44BJ4FdK5oNHwUN_G",
+                        "text": "1"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "k3woIuGEOvSAXRcK4YQ3uyA",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.LP0Py_WQ0hyAJnfFRE5tDq"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kS6JYoIDL5KEWfYb7A_9AL4",
+                        "text": "#1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kXwryivt1lw-ZnShxz4tDau": "page/list/item[\"1\"]",
+          "kyAgil44BJ4FdK5oNHwUN_G": "page/list/item[\"1\"]/#text",
+          "k3woIuGEOvSAXRcK4YQ3uyA": "page/list/item[1]",
+          "kS6JYoIDL5KEWfYb7A_9AL4": "page/list/item[1]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "next": {
+        "keys": {
+          "list": [
+            1
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "k3woIuGEOvSAXRcK4YQ3uyA",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.LP0Py_WQ0hyAJnfFRE5tDq"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kS6JYoIDL5KEWfYb7A_9AL4",
+                        "text": "#1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "k3woIuGEOvSAXRcK4YQ3uyA": "page/list/item[1]",
+          "kS6JYoIDL5KEWfYb7A_9AL4": "page/list/item[1]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[1]"
+        ],
+        "created": [],
+        "removed": [
+          "page/list/item[\"1\"]"
+        ],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[1]:tap"
+          ],
+          "new": [],
+          "gone": [
+            "page/list/item[\"1\"]:tap"
+          ],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[\"1\"]",
+              "page/list/item[1]"
+            ],
+            [
+              "page/list/item[1]",
+              null
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C19-zero-normalization",
+      "section": "9.10",
+      "about": "0 and -0 are the same key: one identity, kept",
+      "previous": {
+        "keys": {
+          "list": [
+            0
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kAVj-9Z-UqkELQaeTd0w_Bd",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.0PkoEFQnz7p458ReemHIoU"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k7OXquRCQ46xPqmDTaPs3Kp",
+                        "text": "#0"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kAVj-9Z-UqkELQaeTd0w_Bd": "page/list/item[0]",
+          "k7OXquRCQ46xPqmDTaPs3Kp": "page/list/item[0]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "next": {
+        "keys": {
+          "list": [
+            -0.0
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kAVj-9Z-UqkELQaeTd0w_Bd",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.0PkoEFQnz7p458ReemHIoU"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k7OXquRCQ46xPqmDTaPs3Kp",
+                        "text": "#-0.0"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kAVj-9Z-UqkELQaeTd0w_Bd": "page/list/item[0]",
+          "k7OXquRCQ46xPqmDTaPs3Kp": "page/list/item[0]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[0]"
+        ],
+        "created": [],
+        "removed": [],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[0]:tap"
+          ],
+          "new": [],
+          "gone": [],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[0]",
+              "page/list/item[0]"
+            ]
+          ],
+          "correct": true
+        }
+      }
+    },
+    {
+      "name": "C20-same-key-different-sites",
+      "section": "9.10",
+      "about": "the key \"a\" at two repeated sites is two identities, with no collision; removing the second leaves the first",
+      "previous": {
+        "keys": {
+          "first": [
+            "a"
+          ],
+          "second": [
+            "a"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "kdcDjrj-7DgJQCewgSHlk2b",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kbc4U8WpJaTZTTj2lvvC8C8",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.t7mTxGL3sna04eADPEq6cr"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kmQjQr3IUd3fY5yPg1LS_l1",
+                        "text": "A"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "node",
+                "key": "kzg1Hfr2v6tyRiBgG9WGbdj",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kekLNM7-RnMl8mdHCEBnDII",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.W84aW6hqOAhddL-3KoswhA"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kAvT99MiMXSVwkWP-IIJrEW",
+                        "text": "A"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kbc4U8WpJaTZTTj2lvvC8C8": "page/first/item[\"a\"]",
+          "kmQjQr3IUd3fY5yPg1LS_l1": "page/first/item[\"a\"]/#text",
+          "kdcDjrj-7DgJQCewgSHlk2b": "page/first",
+          "kekLNM7-RnMl8mdHCEBnDII": "page/second/item[\"a\"]",
+          "kAvT99MiMXSVwkWP-IIJrEW": "page/second/item[\"a\"]/#text",
+          "kzg1Hfr2v6tyRiBgG9WGbdj": "page/second",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "next": {
+        "keys": {
+          "first": [
+            "a"
+          ],
+          "second": []
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "kdcDjrj-7DgJQCewgSHlk2b",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kbc4U8WpJaTZTTj2lvvC8C8",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.t7mTxGL3sna04eADPEq6cr"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kmQjQr3IUd3fY5yPg1LS_l1",
+                        "text": "A"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "node",
+                "key": "kzg1Hfr2v6tyRiBgG9WGbdj",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": []
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kbc4U8WpJaTZTTj2lvvC8C8": "page/first/item[\"a\"]",
+          "kmQjQr3IUd3fY5yPg1LS_l1": "page/first/item[\"a\"]/#text",
+          "kdcDjrj-7DgJQCewgSHlk2b": "page/first",
+          "kzg1Hfr2v6tyRiBgG9WGbdj": "page/second",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/first",
+          "page/first/item[\"a\"]",
+          "page/second"
+        ],
+        "created": [],
+        "removed": [
+          "page/second/item[\"a\"]"
+        ],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/first/item[\"a\"]:tap"
+          ],
+          "new": [],
+          "gone": [
+            "page/second/item[\"a\"]:tap"
+          ],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/first",
+          "pairs": [
+            [
+              "page/first/item[\"a\"]",
+              "page/first/item[\"a\"]"
+            ]
+          ],
+          "correct": true
+        }
+      }
+    },
+    {
+      "name": "C21-reappearance",
+      "section": "9.10",
+      "about": "[a] → [] → [a]: the identity is the same name in the first and third trees, but its occurrence ended in the second, so the third is created, inheriting nothing",
+      "earlier": {
+        "keys": {
+          "list": [
+            "a"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "previous": {
+        "keys": {
+          "list": []
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": []
+              }
+            ]
+          }
+        },
+        "identities": {
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "next": {
+        "keys": {
+          "list": [
+            "a"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list"
+        ],
+        "created": [
+          "page/list/item[\"a\"]"
+        ],
+        "removed": [],
+        "moved": [],
+        "handlers": {
+          "same": [],
+          "new": [
+            "page/list/item[\"a\"]:tap"
+          ],
+          "gone": [],
+          "distinctWithinEachTree": true,
+          "sameAsEarlier": [
+            "page/list/item[\"a\"]:tap"
+          ]
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              null,
+              "page/list/item[\"a\"]"
+            ]
+          ],
+          "correct": true
+        },
+        "recurring": [
+          "page/list/item[\"a\"]"
+        ],
+        "lifetime": {
+          "identity": "page/list/item[\"a\"]",
+          "presence": [
+            "present",
+            "absent",
+            "present"
+          ],
+          "realization": [
+            "created",
+            "disposed",
+            "created"
+          ]
+        }
+      }
+    },
+    {
+      "name": "C22-handler-identity",
+      "section": "9.10",
+      "about": "a repeated node's handlers are its identity and the event: stable across a reorder, different for a different key, and different per event",
+      "previous": {
+        "keys": {
+          "list": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK",
+                      "hold": "hvector-prog.4WZmVu08H_8VOUOiRbSq78"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK",
+                      "hold": "hvector-prog.HDr9FfY0ehHxy6F1W-cblA"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kq7mbxsAYUxPP00JNICg-wL",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.PStkpTmoDysM8aX5gzEJ--",
+                      "hold": "hvector-prog.i7VPyaqE0iy8YAn7v9_xU7"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k-yMcwRKyWmVtW6z7rWK0Mt",
+                        "text": "C"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "kq7mbxsAYUxPP00JNICg-wL": "page/list/item[\"c\"]",
+          "k-yMcwRKyWmVtW6z7rWK0Mt": "page/list/item[\"c\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "next": {
+        "keys": {
+          "list": [
+            "c",
+            "a",
+            "b"
+          ]
+        },
+        "tree": {
+          "format": "mesh-render",
+          "version": 1,
+          "root": {
+            "type": "node",
+            "key": "kdk1dUHHEASTCOaWV_GfnHM",
+            "component": "page",
+            "props": {},
+            "events": {},
+            "children": [
+              {
+                "type": "node",
+                "key": "klDYuH5jayVc-NQaITsLlGh",
+                "component": "list",
+                "props": {},
+                "events": {},
+                "children": [
+                  {
+                    "type": "node",
+                    "key": "kq7mbxsAYUxPP00JNICg-wL",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.PStkpTmoDysM8aX5gzEJ--",
+                      "hold": "hvector-prog.i7VPyaqE0iy8YAn7v9_xU7"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "k-yMcwRKyWmVtW6z7rWK0Mt",
+                        "text": "C"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kDXWdtSgZCxbl_z38TFXzBH",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.XNhr7Wvo4asaTlgEIegzzK",
+                      "hold": "hvector-prog.4WZmVu08H_8VOUOiRbSq78"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kd3LHbNreSor7esbS55csCr",
+                        "text": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "node",
+                    "key": "kXiZG1vyB3iEW_T4TNQwfg_",
+                    "component": "item",
+                    "props": {},
+                    "events": {
+                      "tap": "hvector-prog.w3yIrGQ51gpK2aR4JmWXtK",
+                      "hold": "hvector-prog.HDr9FfY0ehHxy6F1W-cblA"
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "key": "kQgj-ZL0qhifYLjBcVJhEfg",
+                        "text": "B"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "identities": {
+          "kq7mbxsAYUxPP00JNICg-wL": "page/list/item[\"c\"]",
+          "k-yMcwRKyWmVtW6z7rWK0Mt": "page/list/item[\"c\"]/#text",
+          "kDXWdtSgZCxbl_z38TFXzBH": "page/list/item[\"a\"]",
+          "kd3LHbNreSor7esbS55csCr": "page/list/item[\"a\"]/#text",
+          "kXiZG1vyB3iEW_T4TNQwfg_": "page/list/item[\"b\"]",
+          "kQgj-ZL0qhifYLjBcVJhEfg": "page/list/item[\"b\"]/#text",
+          "klDYuH5jayVc-NQaITsLlGh": "page/list",
+          "kdk1dUHHEASTCOaWV_GfnHM": "page"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[\"a\"]",
+          "page/list/item[\"b\"]",
+          "page/list/item[\"c\"]"
+        ],
+        "created": [],
+        "removed": [],
+        "moved": [
+          "page/list/item[\"a\"]",
+          "page/list/item[\"b\"]",
+          "page/list/item[\"c\"]"
+        ],
+        "handlers": {
+          "same": [
+            "page/list/item[\"a\"]:hold",
+            "page/list/item[\"a\"]:tap",
+            "page/list/item[\"b\"]:hold",
+            "page/list/item[\"b\"]:tap",
+            "page/list/item[\"c\"]:hold",
+            "page/list/item[\"c\"]:tap"
+          ],
+          "new": [],
+          "gone": [],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[\"a\"]",
+              "page/list/item[\"c\"]"
+            ],
+            [
+              "page/list/item[\"b\"]",
+              "page/list/item[\"a\"]"
+            ],
+            [
+              "page/list/item[\"c\"]",
+              "page/list/item[\"b\"]"
+            ]
+          ],
+          "correct": false
+        }
+      }
+    }
+  ]
+}

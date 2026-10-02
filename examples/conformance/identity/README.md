@@ -48,6 +48,8 @@ So the vectors make the contract observable. For identities in both trees the sa
 
 `C6` has no trees because a render-v1 tree has unique keys; a render with a duplicate identity is rejected before there is one. The diagnostic's code is not decided.
 
+Repeated sites have their own vectors, C11–C22, in [`repeat/`](./repeat/README.md).
+
 ## What these do not decide
 
 The syntax for conditional and repeated elements and for declaring a key; how an identity is encoded into a key; collisions; other key types; render-v1 changes; how a renderer reconciles; how hydration transports identity; how dispatch finds an item from an identifier; and whether a target may cache a realization across an absence. See [§9.10.12](../../../docs/MPRX-SPEC.md).

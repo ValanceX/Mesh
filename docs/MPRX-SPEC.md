@@ -865,7 +865,9 @@ The instance of an occurrence at a repeated site is a **declared key**: a value 
 - A key that is absent, `null`, a boolean, a list or a record is invalid, and so is a number that isn't finite.
 - A repeated site with **no declared key is invalid**. There is no default. An author who wants an item identified by its position declares its position as the key; MESH never assumes it.
 
-How a key is declared, and so where each of these errors is reported, is not decided here, except that a missing declaration is an error in the template and an invalid key value is an error in a render (§9.10.4).
+A key's **type** is checked where the template is, wherever the types can say it: an expression whose type is a string or a number is a key, and so is one of type `any`, which is unchecked against its value everywhere (§9.2) and is left to the render. An expression of any other type is **invalid in the template**: a boolean, `null`, a list or a record, and a string or number that may be **absent**. The check cannot establish that a number is finite, or that an `any` is a string or a number, so the render checks every key it evaluates, and an invalid value is an error in the render whatever the template's types said. The type rule is a consequence of this section and not of any prop's declared type: MESH's types have no union, so no declaration of a key's type could say "a string or a number".
+
+How a key is declared is not decided here, except that a missing declaration is an error in the template, an unusable key type is an error in the template, and an invalid key value is an error in a render (§9.10.4).
 
 #### 9.10.4 Uniqueness
 
@@ -873,7 +875,7 @@ Identities in one render are **unique**. At a repeated site that means the decla
 
 Equal content is irrelevant to identity. Two items that both show `X` but have different keys are different nodes. Two items with the *same* key are the same identity twice, and that is invalid.
 
-A render in which two occurrences would have the same identity, or in which a declared key is invalid, **fails closed**: the runtime reports a diagnostic and produces no render tree. It never tells two such occurrences apart by their order or in any other way. The diagnostic's code is not decided. It is not `runtime-key-collision`, which reports two encoded keys that collide, an internal error (`docs/manual/runtime.md`).
+A render in which two occurrences would have the same identity, or in which a declared key is invalid, **fails closed**: the runtime reports a diagnostic and produces no render tree. It never tells two such occurrences apart by their order or in any other way. The implementation reports an invalid key as `runtime-invalid-key` and a duplicate as `runtime-duplicate-key` (`docs/manual/diagnostics.md`). Neither is `runtime-key-collision`, which reports two encoded keys that collide, an internal error (`docs/manual/runtime.md`). A key's evaluation is not a render's only failure: any other error in a render also produces no tree.
 
 #### 9.10.5 Stability across renders
 
@@ -897,7 +899,9 @@ Three things are kept apart, each with one owner:
 
 An **occurrence** of a node is a maximal run of consecutive renders of one program in which its identity is present. A node that is absent from a render is not realized, and its occurrence has **ended**. If the same identity is present again in a later render, that is a **new occurrence**: it is **created**, not kept, and MESH requires it to inherit nothing from the earlier one. "The same identity" says the two occurrences share a name. It does not make an earlier realization survive. Whether a target may reuse or cache anything across the absence is **not decided**; the contract's classification of the later occurrence is *created*.
 
-A key is **not** a DOM object, nor any target's object, and the equality of two keys says nothing about whether a target object exists.
+A key is **not** a DOM object, nor any target's object, and the equality of two keys says nothing about whether a target object exists. Semantic identity is a **name**: it is not a handle on an object, and nothing about it can keep one alive.
+
+So for a repeated site whose items go `[A]`, then `[]`, then `[A]`, the identity of A in the first and third renders is the same, and A's occurrence in the first **ended** in the second. A's node in the third render is **created**: its realization, if a target makes one, is a new realization, not the first one returned. The same holds for any node whose identity leaves the render and returns.
 
 For the conformance vectors, between two renders of one program:
 - a node whose identity is in both is **kept**: the target object realizing it in the earlier render is the one that realizes it in the later;
@@ -912,7 +916,7 @@ A handler's identity is **(the identity of the node that binds it, the event's n
 - two occurrences produced by one template handler at different instances have **different** handler identifiers;
 - a handler identifier is **unchanged** whenever its node's identity is: from render to render, and when the node moves among its siblings;
 - a handler identifier **changes** if and only if its node's identity does, so when a node ends and another begins, the new node's handlers are new;
-- dispatch resolves an identifier against the render it is given, and evaluates against that render's own snapshot (§9.9). So an identifier that names an item must let the runtime find that item from that render alone. How is not decided.
+- dispatch resolves an identifier against the render it is given, and evaluates against that render's own snapshot (§9.9). For a handler on a repeated node the arguments depend on its **item**, and an identifier is opaque, so the runtime must derive that item's scope **from the program and the snapshot**, the current render's, and evaluate the handler there. It never takes the item from a rendered position, from a target or its objects, or from the application's own objects. An identifier whose item is not in the render's snapshot names no handler in it. For a program with no repeated site the handlers are a function of the program and need no values. The mechanism is the runtime's and is not part of this contract.
 
 #### 9.10.8 Program scope
 
@@ -939,13 +943,15 @@ Matching by position gives the same answer only where position determines identi
 
 #### 9.10.11 Conformance
 
-`examples/conformance/identity/` holds language-neutral vectors for this section. Each is a pair of hand-written render-v1 trees, the identity of every node in each, and what the contract says happened: kept, created, removed, moved, and which handler identifiers stay the same. They need no MPRX source and no compiler, because no MPRX can yet produce them. Each also gives the pairing that matching **by position** would make, so a renderer can see exactly where that would be wrong.
+`examples/conformance/identity/` holds language-neutral vectors for this section. `examples/conformance/identity/repeat/` has those for repeated sites (C11–C22): reordering, insertion and removal of items, duplicate and invalid keys, a string and a number, `0` and `-0`, the same key at two sites, an identity that leaves and returns, and handler identity. They write a repeated node's identity from its declared key and know no syntax.
+
+Each vector in `identity/` is a pair of hand-written render-v1 trees, the identity of every node in each, and what the contract says happened: kept, created, removed, moved, and which handler identifiers stay the same. They need no MPRX source and no compiler, because no MPRX can yet produce them. Each also gives the pairing that matching **by position** would make, so a renderer can see exactly where that would be wrong.
 
 #### 9.10.12 What is not decided
 
 A provisional tracer implements conditional sites with a reserved component, `mesh-if`, to show the identity rules can be kept (`docs/manual/runtime.md`, "Conditionals (provisional)"). It is not the language's conditional. A second, `mesh-each`, does the same for repeated sites (`docs/manual/runtime.md`, "Repeated structure (provisional)"): the key is evaluated per item at render, and dispatch finds an item by rendering the stored inputs and recording each handler's scope. It is not the language's repetition, and it does not settle the questions below.
 
-The syntax for conditional and repeated elements, and for declaring a key; the compiler's implementation; the encoding of an identity into a key, and what happens if two collide; whether other kinds of value may be keys; any change to render-v1; how a renderer reconciles; how hydration transports identity; how dispatch finds the item an identifier names; and whether a target may cache a realization across an absence.
+The syntax for conditional and repeated elements, and for declaring a key; the compiler's implementation; the **encoding** of an identity into a key (the tracer writes a repeat's key as `s:` and the string, or `n:` and the number's text, inside the hash of the path; that is an implementation detail and not part of this contract, whose only requirement is that equal keys mean equal identities), and what happens if two collide; whether other kinds of value may be keys; nested repeated sites; any change to render-v1; how a renderer reconciles; how hydration transports identity; the mechanism by which dispatch recovers an item's scope, as against the requirement that it come from the program and the snapshot (§9.10.7); and whether a target may cache a realization across an absence.
 
 ---
 
