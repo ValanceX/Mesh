@@ -141,7 +141,6 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
         ),
         Fact::TypeMismatch {
             expectation,
-            expected,
             actual,
             possibly_absent,
             ..

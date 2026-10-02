@@ -559,7 +559,7 @@ impl<'m> Walker<'m> {
                 Literal::Boolean(_) => Ty::Boolean,
                 Literal::Null => Ty::Null,
             }),
-            Expression::Reference { name, span }
+            Expression::Reference { name, .. }
                 if self.loops.iter().any(|(bound, _)| bound == name) =>
             {
                 let (_, ty) = self
