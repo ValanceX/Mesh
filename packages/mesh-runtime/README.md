@@ -33,7 +33,7 @@ A problem with your values is a diagnostic, never an exception. The promises rej
 ## Your obligations as a host
 
 - **Keep each render while its tree is drawn,** and dispatch an event with the render whose tree the renderer drew when it fired. A render keeps its own copy of its snapshot, taken when `render` was called, so changing your objects afterwards changes nothing.
-- **Tell your renderer when a tree comes from a different program.** Keys are stable within one program, and change when the program does.
+- **Tell your renderer when a tree comes from a different program.** A key names the same node in every render of one program that has that node, and keys change when the program does.
 - **Give values as plain data:** `null`, booleans, finite numbers, strings, arrays and plain objects. A missing property and one that is `undefined` are both absent. Anything else (a `Map`, a `Date`, a class instance, a function, a `bigint`, NaN, a hole in an array, a string with an unpaired surrogate, a cycle) reaches the runtime as it is, and the runtime reports it.
 
 ## Guides

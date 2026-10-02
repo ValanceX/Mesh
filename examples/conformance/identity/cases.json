@@ -1,0 +1,671 @@
+{
+  "format": "mesh-identity-vectors",
+  "version": 1,
+  "about": "Contract vectors for spec §9.10 (node identity). No MPRX and no compiler: every tree is a hand-written render-v1 tree. See README.md.",
+  "vectors": [
+    {
+      "name": "C1-stable-siblings",
+      "section": "9.10.5",
+      "about": "Nothing about the structure changes: [A, B, C] again. Every node is kept and none moves, which is the only case where matching by position is also right.",
+      "previous": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]},{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]},{"type":"node","key":"kpage-list-item_c______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_c"},"children":[{"type":"text","key":"kpage-list-item_c-text_","text":"C"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text",
+          "kpage-list-item_c______": "page/list/item[c]",
+          "kpage-list-item_c-text_": "page/list/item[c]/#text"
+        }
+      },
+      "next": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]},{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]},{"type":"node","key":"kpage-list-item_c______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_c"},"children":[{"type":"text","key":"kpage-list-item_c-text_","text":"C"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text",
+          "kpage-list-item_c______": "page/list/item[c]",
+          "kpage-list-item_c-text_": "page/list/item[c]/#text"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[a]",
+          "page/list/item[b]",
+          "page/list/item[c]"
+        ],
+        "created": [],
+        "removed": [],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[a]:click",
+            "page/list/item[b]:click",
+            "page/list/item[c]:click"
+          ],
+          "new": [],
+          "gone": [],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[a]",
+              "page/list/item[a]"
+            ],
+            [
+              "page/list/item[b]",
+              "page/list/item[b]"
+            ],
+            [
+              "page/list/item[c]",
+              "page/list/item[c]"
+            ]
+          ],
+          "correct": true
+        }
+      }
+    },
+    {
+      "name": "C2-insert",
+      "section": "9.10.5",
+      "about": "A new item X is inserted between A and B. A and B keep their identities; B's position changes, and B is not moved: nothing was reordered.",
+      "previous": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]},{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text"
+        }
+      },
+      "next": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]},{"type":"node","key":"kpage-list-item_x______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_x"},"children":[{"type":"text","key":"kpage-list-item_x-text_","text":"X"}]},{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_x______": "page/list/item[x]",
+          "kpage-list-item_x-text_": "page/list/item[x]/#text",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[a]",
+          "page/list/item[b]"
+        ],
+        "created": [
+          "page/list/item[x]"
+        ],
+        "removed": [],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[a]:click",
+            "page/list/item[b]:click"
+          ],
+          "new": [
+            "page/list/item[x]:click"
+          ],
+          "gone": [],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[a]",
+              "page/list/item[a]"
+            ],
+            [
+              "page/list/item[b]",
+              "page/list/item[x]"
+            ],
+            [
+              null,
+              "page/list/item[b]"
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C3-remove-middle",
+      "section": "9.10.5",
+      "about": "B is removed from the middle. A and C are kept; C's position changes and C is not moved.",
+      "previous": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]},{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]},{"type":"node","key":"kpage-list-item_c______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_c"},"children":[{"type":"text","key":"kpage-list-item_c-text_","text":"C"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text",
+          "kpage-list-item_c______": "page/list/item[c]",
+          "kpage-list-item_c-text_": "page/list/item[c]/#text"
+        }
+      },
+      "next": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]},{"type":"node","key":"kpage-list-item_c______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_c"},"children":[{"type":"text","key":"kpage-list-item_c-text_","text":"C"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_c______": "page/list/item[c]",
+          "kpage-list-item_c-text_": "page/list/item[c]/#text"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[a]",
+          "page/list/item[c]"
+        ],
+        "created": [],
+        "removed": [
+          "page/list/item[b]"
+        ],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[a]:click",
+            "page/list/item[c]:click"
+          ],
+          "new": [],
+          "gone": [
+            "page/list/item[b]:click"
+          ],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[a]",
+              "page/list/item[a]"
+            ],
+            [
+              "page/list/item[b]",
+              "page/list/item[c]"
+            ],
+            [
+              "page/list/item[c]",
+              null
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C4-remove-first",
+      "section": "9.10.5",
+      "about": "A is removed from the front. B and C are kept; both positions change and neither is moved.",
+      "previous": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]},{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]},{"type":"node","key":"kpage-list-item_c______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_c"},"children":[{"type":"text","key":"kpage-list-item_c-text_","text":"C"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text",
+          "kpage-list-item_c______": "page/list/item[c]",
+          "kpage-list-item_c-text_": "page/list/item[c]/#text"
+        }
+      },
+      "next": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]},{"type":"node","key":"kpage-list-item_c______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_c"},"children":[{"type":"text","key":"kpage-list-item_c-text_","text":"C"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text",
+          "kpage-list-item_c______": "page/list/item[c]",
+          "kpage-list-item_c-text_": "page/list/item[c]/#text"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[b]",
+          "page/list/item[c]"
+        ],
+        "created": [],
+        "removed": [
+          "page/list/item[a]"
+        ],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[b]:click",
+            "page/list/item[c]:click"
+          ],
+          "new": [],
+          "gone": [
+            "page/list/item[a]:click"
+          ],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[a]",
+              "page/list/item[b]"
+            ],
+            [
+              "page/list/item[b]",
+              "page/list/item[c]"
+            ],
+            [
+              "page/list/item[c]",
+              null
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C5-reorder",
+      "section": "9.10.5",
+      "about": "The same three items in another order: [C, A, B]. All three are kept, and all three are moved: each is in a different order relative to some kept sibling.",
+      "previous": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]},{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]},{"type":"node","key":"kpage-list-item_c______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_c"},"children":[{"type":"text","key":"kpage-list-item_c-text_","text":"C"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text",
+          "kpage-list-item_c______": "page/list/item[c]",
+          "kpage-list-item_c-text_": "page/list/item[c]/#text"
+        }
+      },
+      "next": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_c______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_c"},"children":[{"type":"text","key":"kpage-list-item_c-text_","text":"C"}]},{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]},{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_c______": "page/list/item[c]",
+          "kpage-list-item_c-text_": "page/list/item[c]/#text",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[a]",
+          "page/list/item[b]",
+          "page/list/item[c]"
+        ],
+        "created": [],
+        "removed": [],
+        "moved": [
+          "page/list/item[a]",
+          "page/list/item[b]",
+          "page/list/item[c]"
+        ],
+        "handlers": {
+          "same": [
+            "page/list/item[a]:click",
+            "page/list/item[b]:click",
+            "page/list/item[c]:click"
+          ],
+          "new": [],
+          "gone": [],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[a]",
+              "page/list/item[c]"
+            ],
+            [
+              "page/list/item[b]",
+              "page/list/item[a]"
+            ],
+            [
+              "page/list/item[c]",
+              "page/list/item[b]"
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C6-duplicate-key",
+      "section": "9.10.4",
+      "about": "Items declare the keys a, b, b. Two occurrences would have the identity page/list/item[b], so the render fails closed. No render-v1 tree is produced, and nothing is said about what a renderer does beyond that.",
+      "wouldBe": [
+        {
+          "identity": "page/list/item[a]",
+          "label": "A"
+        },
+        {
+          "identity": "page/list/item[b]",
+          "label": "B"
+        },
+        {
+          "identity": "page/list/item[b]",
+          "label": "B"
+        }
+      ],
+      "expect": {
+        "rejected": true,
+        "tree": null,
+        "diagnostic": "a diagnostic; its code is not decided"
+      }
+    },
+    {
+      "name": "C7-conditional-disappears",
+      "section": "9.10.2, 9.10.5",
+      "about": "A conditional X sits between the static siblings A and B and goes away. A and B keep their identities, although B's position changes.",
+      "previous": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-a________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-a__________"},"children":[{"type":"text","key":"kpage-a-text___________","text":"A"}]},{"type":"node","key":"kpage-x________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-x__________"},"children":[{"type":"text","key":"kpage-x-text___________","text":"X"}]},{"type":"node","key":"kpage-b________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-b__________"},"children":[{"type":"text","key":"kpage-b-text___________","text":"B"}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-a________________": "page/a",
+          "kpage-a-text___________": "page/a/#text",
+          "kpage-x________________": "page/x",
+          "kpage-x-text___________": "page/x/#text",
+          "kpage-b________________": "page/b",
+          "kpage-b-text___________": "page/b/#text"
+        }
+      },
+      "next": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-a________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-a__________"},"children":[{"type":"text","key":"kpage-a-text___________","text":"A"}]},{"type":"node","key":"kpage-b________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-b__________"},"children":[{"type":"text","key":"kpage-b-text___________","text":"B"}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-a________________": "page/a",
+          "kpage-a-text___________": "page/a/#text",
+          "kpage-b________________": "page/b",
+          "kpage-b-text___________": "page/b/#text"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/a",
+          "page/b"
+        ],
+        "created": [],
+        "removed": [
+          "page/x"
+        ],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/a:click",
+            "page/b:click"
+          ],
+          "new": [],
+          "gone": [
+            "page/x:click"
+          ],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page",
+          "pairs": [
+            [
+              "page/a",
+              "page/a"
+            ],
+            [
+              "page/x",
+              "page/b"
+            ],
+            [
+              "page/b",
+              null
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C8-conditional-reappears",
+      "section": "9.10.6",
+      "about": "X is absent in the previous render and present again in the next. Its identity recurs, but this is a new occurrence: X is created, and MESH requires it to inherit nothing from the occurrence in `earlier`.",
+      "earlier": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-a________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-a__________"},"children":[{"type":"text","key":"kpage-a-text___________","text":"A"}]},{"type":"node","key":"kpage-x________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-x__________"},"children":[{"type":"text","key":"kpage-x-text___________","text":"X"}]},{"type":"node","key":"kpage-b________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-b__________"},"children":[{"type":"text","key":"kpage-b-text___________","text":"B"}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-a________________": "page/a",
+          "kpage-a-text___________": "page/a/#text",
+          "kpage-x________________": "page/x",
+          "kpage-x-text___________": "page/x/#text",
+          "kpage-b________________": "page/b",
+          "kpage-b-text___________": "page/b/#text"
+        }
+      },
+      "previous": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-a________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-a__________"},"children":[{"type":"text","key":"kpage-a-text___________","text":"A"}]},{"type":"node","key":"kpage-b________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-b__________"},"children":[{"type":"text","key":"kpage-b-text___________","text":"B"}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-a________________": "page/a",
+          "kpage-a-text___________": "page/a/#text",
+          "kpage-b________________": "page/b",
+          "kpage-b-text___________": "page/b/#text"
+        }
+      },
+      "next": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-a________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-a__________"},"children":[{"type":"text","key":"kpage-a-text___________","text":"A"}]},{"type":"node","key":"kpage-x________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-x__________"},"children":[{"type":"text","key":"kpage-x-text___________","text":"X"}]},{"type":"node","key":"kpage-b________________","component":"block","props":{},"events":{"click":"hvector-prog.click-page-b__________"},"children":[{"type":"text","key":"kpage-b-text___________","text":"B"}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-a________________": "page/a",
+          "kpage-a-text___________": "page/a/#text",
+          "kpage-x________________": "page/x",
+          "kpage-x-text___________": "page/x/#text",
+          "kpage-b________________": "page/b",
+          "kpage-b-text___________": "page/b/#text"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/a",
+          "page/b"
+        ],
+        "created": [
+          "page/x"
+        ],
+        "removed": [],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/a:click",
+            "page/b:click"
+          ],
+          "new": [
+            "page/x:click"
+          ],
+          "gone": [],
+          "distinctWithinEachTree": true,
+          "sameAsEarlier": [
+            "page/a:click",
+            "page/b:click",
+            "page/x:click"
+          ]
+        },
+        "positional": {
+          "parent": "page",
+          "pairs": [
+            [
+              "page/a",
+              "page/a"
+            ],
+            [
+              "page/b",
+              "page/x"
+            ],
+            [
+              null,
+              "page/b"
+            ]
+          ],
+          "correct": false
+        },
+        "recurring": [
+          "page/x"
+        ]
+      }
+    },
+    {
+      "name": "C9-handler-identity",
+      "section": "9.10.7",
+      "about": "Two items each bind click. Their handler identifiers differ, and after the reorder each item's identifier is the one it had: a handler belongs to a node's identity, not to a position.",
+      "previous": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]},{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text"
+        }
+      },
+      "next": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"B"}]},{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"A"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[a]",
+          "page/list/item[b]"
+        ],
+        "created": [],
+        "removed": [],
+        "moved": [
+          "page/list/item[a]",
+          "page/list/item[b]"
+        ],
+        "handlers": {
+          "same": [
+            "page/list/item[a]:click",
+            "page/list/item[b]:click"
+          ],
+          "new": [],
+          "gone": [],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[a]",
+              "page/list/item[b]"
+            ],
+            [
+              "page/list/item[b]",
+              "page/list/item[a]"
+            ]
+          ],
+          "correct": false
+        }
+      }
+    },
+    {
+      "name": "C10-same-label-different-identity",
+      "section": "9.10.3, 9.10.4",
+      "about": "Items a and b both show the text X. Removing a leaves b: a is removed and b is kept, though nothing on screen distinguishes them. Equal content is irrelevant to identity.",
+      "previous": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_a______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_a"},"children":[{"type":"text","key":"kpage-list-item_a-text_","text":"X"}]},{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"X"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_a______": "page/list/item[a]",
+          "kpage-list-item_a-text_": "page/list/item[a]/#text",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text"
+        }
+      },
+      "next": {
+        "tree": {"format":"mesh-render","version":1,"root":{"type":"node","key":"kpage__________________","component":"page","props":{},"events":{},"children":[{"type":"node","key":"kpage-list_____________","component":"list","props":{},"events":{},"children":[{"type":"node","key":"kpage-list-item_b______","component":"item","props":{},"events":{"click":"hvector-prog.click-page-list-item_b"},"children":[{"type":"text","key":"kpage-list-item_b-text_","text":"X"}]}]}]}},
+        "identities": {
+          "kpage__________________": "page",
+          "kpage-list_____________": "page/list",
+          "kpage-list-item_b______": "page/list/item[b]",
+          "kpage-list-item_b-text_": "page/list/item[b]/#text"
+        }
+      },
+      "expect": {
+        "kept": [
+          "page",
+          "page/list",
+          "page/list/item[b]"
+        ],
+        "created": [],
+        "removed": [
+          "page/list/item[a]"
+        ],
+        "moved": [],
+        "handlers": {
+          "same": [
+            "page/list/item[b]:click"
+          ],
+          "new": [],
+          "gone": [
+            "page/list/item[a]:click"
+          ],
+          "distinctWithinEachTree": true
+        },
+        "positional": {
+          "parent": "page/list",
+          "pairs": [
+            [
+              "page/list/item[a]",
+              "page/list/item[b]"
+            ],
+            [
+              "page/list/item[b]",
+              null
+            ]
+          ],
+          "correct": false
+        }
+      }
+    }
+  ]
+}

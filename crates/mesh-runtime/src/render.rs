@@ -5,7 +5,10 @@ use crate::boundary::{output, Inputs};
 use crate::diagnostic::{PathSegment, RuntimeCode, RuntimeDiagnostic};
 use crate::eval::Scope;
 use crate::number::number_to_text;
-use crate::program::{self, Program, Step, Valid, COMPOSITE, NODE, TEXT};
+use crate::program::{
+    self, alternatives, repeat_name, Program, Step, Valid, ALTERNATIVES, COMPOSITE, CONDITIONAL,
+    CONDITIONAL_COMPONENT, NODE, REPEAT, REPEAT_COMPONENT, TEXT,
+};
 use crate::tree::{Node, Tree, TreeChild};
 use crate::types::{fits, Statics};
 use crate::value::{HostRecord, Value};
@@ -47,22 +50,7 @@ pub fn render(
     snapshot: &HostRecord,
 ) -> Result<Render, Vec<RuntimeDiagnostic>> {
     let valid = program::validate(program, model)?;
-    let mut inputs = Inputs::new(&valid.manifest);
-    let scope = snapshot_values(&valid, snapshot, &mut inputs);
-    let diagnostics = inputs.sorted();
-    if !diagnostics.is_empty() {
-        return Err(diagnostics);
-    }
-    let mut renderer = Renderer {
-        valid: &valid,
-        keys: HashSet::new(),
-    };
-    let root = &valid.templates[&valid.root];
-    let tree = Tree {
-        root: renderer
-            .occurrence(&valid.root, &root.root, 0, &mut Vec::new(), &scope)
-            .map_err(|diagnostic| vec![diagnostic])?,
-    };
+    let (tree, _) = tree(&valid, snapshot, false)?;
     Ok(Render {
         root: program.root.to_string(),
         templates: program
@@ -74,6 +62,46 @@ pub fn render(
         snapshot: snapshot.clone(),
         tree,
     })
+}
+
+/// A handler as a render found it: the node, in the template of `component`,
+/// and the **values its scope had there**, which for a repeated node include
+/// the item (§9.10.7). Only a render that was asked to record has them.
+pub(crate) struct Recorded<'v> {
+    pub component: String,
+    pub node: &'v Element,
+    pub event: &'v str,
+    pub values: BTreeMap<String, Value>,
+}
+
+/// Every handler of a render, by identifier.
+pub(crate) type Sites<'v> = BTreeMap<String, Recorded<'v>>;
+
+/// The render tree of a validated program, and, when `record`, the sites of
+/// its handlers.
+pub(crate) fn tree<'v>(
+    valid: &'v Valid,
+    snapshot: &HostRecord,
+    record: bool,
+) -> Result<(Tree, Sites<'v>), Vec<RuntimeDiagnostic>> {
+    let mut inputs = Inputs::new(&valid.manifest);
+    let scope = snapshot_values(valid, snapshot, &mut inputs);
+    let diagnostics = inputs.sorted();
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+    let mut renderer = Renderer {
+        valid,
+        keys: HashSet::new(),
+        sites: record.then(BTreeMap::new),
+    };
+    let root = &valid.templates[&valid.root];
+    let tree = Tree {
+        root: renderer
+            .occurrence(&valid.root, &root.root, 0, &mut Vec::new(), &scope)
+            .map_err(|diagnostic| vec![diagnostic])?,
+    };
+    Ok((tree, renderer.sites.unwrap_or_default()))
 }
 
 /// The root template's scope from the snapshot (§9.8.4): each name the
@@ -93,12 +121,19 @@ pub(crate) fn snapshot_values(
     values
 }
 
-/// An element's children as the render tree has them: maximal runs of
-/// text and interpolations, and elements. A child's position in the
-/// render tree is its index here.
+/// An element's children as a **template** has them: maximal runs of text
+/// and interpolations, elements, and conditionals. A child's position is its
+/// index here: its *site's* position (spec §9.10.2), a function of the
+/// template alone. A conditional is one slot whether or not it produces a
+/// node, so the children after it keep their positions either way, and a
+/// child's position in the render tree is not its position here.
 pub(crate) enum RenderChild<'t> {
     Run(Vec<&'t Child>),
     Element(&'t Element),
+    /// PROVISIONAL (§9.10 tracer): zero or one of its alternatives.
+    Conditional(&'t Element),
+    /// PROVISIONAL (§9.10 tracer): its child, once per item.
+    Repeat(&'t Element),
 }
 
 pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
@@ -110,7 +145,13 @@ pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
                 if !run.is_empty() {
                     children.push(RenderChild::Run(std::mem::take(&mut run)));
                 }
-                children.push(RenderChild::Element(element));
+                children.push(if element.component == CONDITIONAL_COMPONENT {
+                    RenderChild::Conditional(element)
+                } else if element.component == REPEAT_COMPONENT {
+                    RenderChild::Repeat(element)
+                } else {
+                    RenderChild::Element(element)
+                });
             }
             text_or_expression => run.push(text_or_expression),
         }
@@ -177,9 +218,10 @@ pub(crate) fn statics<'m>(
 struct Renderer<'v> {
     valid: &'v Valid,
     keys: HashSet<String>,
+    sites: Option<Sites<'v>>,
 }
 
-impl Renderer<'_> {
+impl<'v> Renderer<'v> {
     fn key(
         &mut self,
         path: &[Step],
@@ -202,7 +244,7 @@ impl Renderer<'_> {
     fn occurrence(
         &mut self,
         component: &str,
-        element: &Element,
+        element: &'v Element,
         position: usize,
         path: &mut Vec<Step>,
         values: &BTreeMap<String, Value>,
@@ -238,7 +280,7 @@ impl Renderer<'_> {
     fn node(
         &mut self,
         scope: &Scope<'_, '_>,
-        element: &Element,
+        element: &'v Element,
         path: &mut Vec<Step>,
     ) -> Result<Node, RuntimeDiagnostic> {
         let key = self.key(path, scope, element.span)?;
@@ -274,7 +316,7 @@ impl Renderer<'_> {
             }
             props.insert(prop.prop.clone(), json);
         }
-        let events = element
+        let events: BTreeMap<String, String> = element
             .events
             .iter()
             .map(|binding| {
@@ -284,6 +326,19 @@ impl Renderer<'_> {
                 )
             })
             .collect();
+        if let Some(sites) = &mut self.sites {
+            for binding in &element.events {
+                sites.insert(
+                    events[&binding.event].clone(),
+                    Recorded {
+                        component: scope.component.to_string(),
+                        node: element,
+                        event: &binding.event,
+                        values: scope.values.clone(),
+                    },
+                );
+            }
+        }
         let mut children = Vec::new();
         for (position, child) in render_children(element).into_iter().enumerate() {
             match child {
@@ -316,6 +371,23 @@ impl Renderer<'_> {
                         scope.values,
                     )?));
                 }
+                RenderChild::Conditional(conditional) => {
+                    // The slot is `position` whether or not a node comes of it.
+                    if let Some((alternative, chosen)) = self.choose(scope, conditional)? {
+                        path.push(Step {
+                            position,
+                            kind: CONDITIONAL,
+                            component: ALTERNATIVES[alternative].to_string(),
+                        });
+                        let rendered =
+                            self.occurrence(scope.component, chosen, 0, path, scope.values);
+                        path.pop();
+                        children.push(TreeChild::Node(rendered?));
+                    }
+                }
+                RenderChild::Repeat(repeat) => {
+                    self.repeat(scope, repeat, position, path, &mut children)?;
+                }
             }
         }
         Ok(Node {
@@ -326,6 +398,140 @@ impl Renderer<'_> {
             events,
             children,
         })
+    }
+
+    /// A repeat's instances (§9.10.2): its child once per item, in the
+    /// order of the items, each under a step that is the item's declared key
+    /// and **not** its index. The key is evaluated here, for each item, in a
+    /// scope that has the item; it is a string or a finite number, and no
+    /// two items of this repeat have the same one. Nothing is rendered for
+    /// an item whose key isn't usable: the author's key is never replaced by
+    /// a position.
+    fn repeat(
+        &mut self,
+        scope: &Scope<'_, '_>,
+        repeat: &'v Element,
+        position: usize,
+        path: &mut Vec<Step>,
+        children: &mut Vec<TreeChild>,
+    ) -> Result<(), RuntimeDiagnostic> {
+        let written = |name: &str| {
+            repeat
+                .props
+                .iter()
+                .find(|prop| prop.prop == name)
+                .expect("validated: a repeat has `items` and `key`")
+        };
+        let items = written("items");
+        let key = written("key");
+        let name = repeat_name(repeat).expect("validated: a repeat has an `as`");
+        let value = scope.eval(&items.value)?;
+        let declared = &self.valid.component(REPEAT_COMPONENT).props["items"].ty;
+        let Value::List(list) = &value else {
+            return Err(scope.error(
+                RuntimeCode::PROP_MISMATCH,
+                format!("this value, {}, isn't a list to repeat over", value.kind()),
+                items.value.span(),
+            ));
+        };
+        if !fits(&self.valid.manifest, &value, declared) {
+            return Err(scope.error(
+                RuntimeCode::PROP_MISMATCH,
+                format!(
+                    "this value, {}, doesn't fit `{REPEAT_COMPONENT}`'s prop `items`",
+                    value.kind()
+                ),
+                items.value.span(),
+            ));
+        }
+        let child = alternatives(repeat)[0];
+        let mut seen = HashSet::new();
+        for item in list.iter() {
+            let mut values = scope.values.clone();
+            values.insert(name.to_string(), item.clone());
+            let inner = Scope {
+                component: scope.component,
+                values: &values,
+                payload: None,
+                statics: statics(self.valid, scope.component, None),
+            };
+            let span = key.value.span();
+            let declared_key = inner.eval(&key.value)?;
+            let canonical = match &declared_key {
+                Value::String(text) => format!("s:{text}"),
+                // `-0` and `0` are one key: §9.7.7.1's text of a number has one
+                // text for both.
+                Value::Number(number) if number.is_finite() => {
+                    format!("n:{}", number_to_text(*number))
+                }
+                other => {
+                    return Err(scope.error(
+                        RuntimeCode::INVALID_KEY,
+                        format!(
+                            "this key is {}: a key is a string or a finite number",
+                            if matches!(other, Value::Absent) {
+                                "absent"
+                            } else {
+                                other.kind()
+                            }
+                        ),
+                        span,
+                    ))
+                }
+            };
+            if !seen.insert(canonical.clone()) {
+                return Err(scope.error(
+                    RuntimeCode::DUPLICATE_KEY,
+                    "two items of this repeat declare the same key",
+                    span,
+                ));
+            }
+            path.push(Step {
+                position,
+                kind: REPEAT,
+                component: canonical,
+            });
+            let rendered = self.occurrence(scope.component, child, 0, path, &values);
+            path.pop();
+            children.push(TreeChild::Node(rendered?));
+        }
+        Ok(())
+    }
+
+    /// Which alternative of `conditional` the snapshot chooses, if any: the
+    /// first when `when` is true, the second, if there is one, when it is
+    /// false. `when` is checked as any prop is, and must be a boolean.
+    fn choose<'t>(
+        &self,
+        scope: &Scope<'_, '_>,
+        conditional: &'t Element,
+    ) -> Result<Option<(usize, &'t Element)>, RuntimeDiagnostic> {
+        let when = conditional
+            .props
+            .iter()
+            .find(|prop| prop.prop == "when")
+            .expect("validated: a conditional has a `when`");
+        let span = when.value.span();
+        let value = scope.eval(&when.value)?;
+        let declared = &self.valid.component(CONDITIONAL_COMPONENT).props["when"].ty;
+        let chosen = match value {
+            Value::Boolean(true) if fits(&self.valid.manifest, &value, declared) => 0,
+            Value::Boolean(false) if fits(&self.valid.manifest, &value, declared) => 1,
+            _ => {
+                return Err(scope.error(
+                    RuntimeCode::PROP_MISMATCH,
+                    format!(
+                        "this value, {}, can't choose between a conditional's alternatives: `when` is a boolean",
+                        value.kind()
+                    ),
+                    span,
+                ))
+            }
+        };
+
+        Ok(alternatives(conditional)
+            .get(chosen)
+            .map(|element| (chosen, *element)))
     }
 
     /// An interpolation's text (§9.7.7): the content check, then the

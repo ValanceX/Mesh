@@ -2,7 +2,7 @@
 
 Language-neutral cases for MESH's semantics at the render tree, for anyone who builds a renderer (a PORT) and for MESH's own tests. They need no target, no browser and none of MESH's code: every file is JSON or MPRX.
 
-Each directory is one real program, against [`components.json`](./components.json):
+Each directory except [`identity/`](./identity/README.md) is one real program, against [`components.json`](./components.json):
 
 | File | What it is |
 |---|---|
@@ -46,3 +46,9 @@ Each case gives an **interaction** and what it resolves to:
 Resolution examines the target node, then each ancestor in turn, and stops at the first node whose component has an applicable event and which binds it. So every case resolves to at most one binding and one intent. The cases cover a child's binding winning over its ancestors', an ancestor receiving the interaction when the child has no applicable binding, text runs, nodes with no events, several ancestors with bindings, unrelated bindings and event names shared across components, a composite boundary, and an interaction that resolves to nothing.
 
 A renderer implements the rule against its own target (hit testing, then the walk) and checks, for each case, that it reports exactly the expected handler identifier, or nothing.
+
+## `identity/`: node identity (spec §9.10)
+
+Unlike the directories above, this one is **not** a real program. MPRX can't yet express a conditional or repeated element, so no MESH produces the trees. `identity/cases.json` holds hand-written before/after render-v1 trees, the identity of every node in each, and what the contract says happened between them: kept, created, removed, moved, and which handler identifiers stay the same. It also gives the pairing that matching by position would make, so a renderer can see exactly where that is wrong. It needs no MPRX, no manifest and no compiler.
+
+See [`identity/README.md`](./identity/README.md) for the format and the meaning of each outcome.

@@ -986,7 +986,7 @@ Location: `handler`.
 
 ### `runtime-unknown-handler`
 
-Dispatch was given a handler identifier of the render's program that names no handler in it.
+Dispatch was given a handler identifier of the render's program that names no handler in it or, in a program with a conditional, whose node isn't in the render (spec §9.10.7).
 
 Location: `handler`.
 
@@ -1041,6 +1041,22 @@ Location: `source`.
 A list holding an absent element would reach an output, at any depth.
 
 Location: `source`.
+
+### Repeated structure (provisional)
+
+These two belong to the provisional `mesh-each` ([runtime manual](runtime.md#repeated-structure-provisional)); their names and the construct are not final.
+
+### `runtime-invalid-key`
+
+An item of a repeat has no usable declared key: the `key` expression is absent for it, or is neither a string nor a finite number (`null`, a boolean, a list, a record, `NaN` and the infinities are not keys). Nothing is rendered; a key is never invented from the item's position.
+
+Location: `source`, the `key` expression.
+
+### `runtime-duplicate-key`
+
+Two items of one repeat declare the same key, under strict equality: the same kind (`"1"` is not `1`) and the same value (`0` and `-0` are one). Nothing is rendered; the author's key was meant to be unique, and the runtime does not pick one of the items.
+
+Location: `source`, the `key` expression of the later item.
 
 ### Internal errors
 
