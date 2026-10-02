@@ -114,7 +114,7 @@ mesh/
 
 ## Status
 
-**v0.7.0 prepared** (2026-10-02; not yet released: v0.6.0 is the latest release). See the [release notes](./docs/releases/v0.7.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.7.0 released** (2026-10-02). See the [release notes](./docs/releases/v0.7.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), and event bindings (`on.click={...}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings
