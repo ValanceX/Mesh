@@ -1,8 +1,9 @@
 //! The MESH runtime for WebAssembly: what `@valancex/mesh-runtime` runs.
 //!
 //! It has no semantics of its own (I11). [`respond_render`] is
-//! [`mesh_runtime::render`] and [`respond_dispatch`] is
-//! [`mesh_runtime::dispatch_from`], each with its inputs decoded from
+//! [`mesh_runtime::render`], [`respond_dispatch`] is
+//! [`mesh_runtime::dispatch_from`] and [`respond_declared_events`] is
+//! [`mesh_runtime::declared_events`], each with its inputs decoded from
 //! the byte encoding (`mesh_runtime::encoding`) and its result rendered
 //! as one JSON document; everything else only moves bytes across the
 //! boundary between WebAssembly's linear memory and JavaScript. It links
@@ -99,6 +100,33 @@ pub fn respond_dispatch(
             ),
         },
     )
+}
+
+/// The events declared by the program of `root` and the encoded
+/// `templates`, against `model`: `{"events": [...]}`, each event as
+/// [`mesh_runtime::declared_events_to_json`] writes it, or
+/// `{"diagnostics": <runtime-diagnostics-v1>}`. It takes no snapshot.
+pub fn respond_declared_events(
+    root: &str,
+    templates: &[u8],
+    model: &str,
+) -> Result<String, Refusal> {
+    let templates = decode_texts(templates)?;
+    let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+    let program = Program {
+        root,
+        templates: &texts,
+    };
+    Ok(match mesh_runtime::declared_events(&program, model) {
+        Ok(events) => format!(
+            "{{\"events\":{}}}",
+            mesh_runtime::declared_events_to_json(&events)
+        ),
+        Err(diagnostics) => format!(
+            "{{\"diagnostics\":{}}}",
+            mesh_runtime::to_json(&diagnostics, model)
+        ),
+    })
 }
 
 /// MPRX's text for each number in `bits` (8 bytes each, little-endian

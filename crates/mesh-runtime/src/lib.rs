@@ -31,7 +31,7 @@ mod value;
 pub use diagnostic::{to_json, Form, Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
 pub use dispatch::{dispatch, dispatch_from};
 pub use number::number_to_text;
-pub use program::Program;
+pub use program::{declared_events_to_json, DeclaredEvent, Program};
 pub use render::{render, Render};
 pub use resolve::{resolve, Interaction, ResolveError, Resolved};
 pub use tree::{Intent, Node, Tree, TreeChild};
@@ -44,4 +44,20 @@ pub use value::{HostKey, HostRecord, HostValue};
 /// is this.
 pub fn check_program(program: &Program<'_>, model: &str) -> Vec<RuntimeDiagnostic> {
     program::validate(program, model).err().unwrap_or_default()
+}
+
+/// Validates `program` against `model` exactly as [`check_program`] does,
+/// and, if it is valid, returns every event binding its templates declare
+/// (see [`DeclaredEvent`]); otherwise returns [`check_program`]'s
+/// diagnostics, unchanged.
+///
+/// The declarations are the validated program's own: templates of every
+/// component the host supplied, composites included, and every element of
+/// each, so an event in an inactive `mesh-if` alternative or in a
+/// `mesh-each` body is there. It takes no snapshot and no handler.
+pub fn declared_events(
+    program: &Program<'_>,
+    model: &str,
+) -> Result<Vec<DeclaredEvent>, Vec<RuntimeDiagnostic>> {
+    program::validate(program, model).map(|valid| program::declared_events(&valid))
 }

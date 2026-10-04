@@ -110,11 +110,11 @@ mesh/
 
 - MESH never depends on [NEXUS](https://github.com/ValanceX/Nexus). The compiler and tooling work on their own.
 - The language server reuses `mesh-parser` and `mesh-compiler`. There is never a second parser or type system for editor tooling.
-- Other layers (NEXUS, PORT) consume MESH through its formats (templates, render trees, command intents) and the runtime's two operations, never through Rust compiler internals. MESH evaluates MPRX exactly once, in its runtime; JavaScript only encodes values and carries results.
+- Other layers (NEXUS, PORT) consume MESH through its formats (templates, render trees, command intents) and the runtime's operations (render, dispatch and declared events), never through Rust compiler internals. MESH evaluates MPRX exactly once, in its runtime; JavaScript only encodes values and carries results.
 
 ## Status
 
-**v0.7.0 released** (2026-10-02). See the [release notes](./docs/releases/v0.7.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.8.0 prepared** (2026-10-04; not yet released: v0.7.0 is the latest release). See the [release notes](./docs/releases/v0.8.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), and event bindings (`on.click={...}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings

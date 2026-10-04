@@ -1,7 +1,7 @@
 //! The module's exports: the internal boundary the wrapper drives.
 //!
-//! One call is: `mesh_alloc` and fill a buffer per input; `mesh_render`
-//! or `mesh_dispatch`; `mesh_free` every input buffer; read the result at
+//! One call is: `mesh_alloc` and fill a buffer per input; `mesh_render`,
+//! `mesh_dispatch` or `mesh_declared_events`; `mesh_free` every input buffer; read the result at
 //! `mesh_result_ptr`/`mesh_result_len`; `mesh_result_clear`. After that,
 //! the call holds no memory in the module.
 //!
@@ -163,6 +163,36 @@ pub unsafe extern "C" fn mesh_dispatch(
                 bytes(snapshot, snapshot_len),
                 handler,
                 (has_payload != 0).then(|| bytes(payload, payload_len)),
+            )),
+            _ => None,
+        }
+    };
+    keep(result)
+}
+
+/// The events a program declares (`crate::respond_declared_events`): the
+/// root's name, the templates as a text list, and the manifest.
+///
+/// # Safety
+///
+/// Each pointer must point to its length's initialized bytes, unless that
+/// length is 0.
+#[no_mangle]
+pub unsafe extern "C" fn mesh_declared_events(
+    root: *const u8,
+    root_len: usize,
+    templates: *const u8,
+    templates_len: usize,
+    model: *const u8,
+    model_len: usize,
+) -> u32 {
+    // SAFETY: the caller's guarantee, passed on for each input.
+    let result = unsafe {
+        match (text(root, root_len), text(model, model_len)) {
+            (Some(root), Some(model)) => Some(crate::respond_declared_events(
+                root,
+                bytes(templates, templates_len),
+                model,
             )),
             _ => None,
         }

@@ -21,14 +21,24 @@
  */
 
 import {
+  declaredEvents as declaredEventsWith,
   dispatch as dispatchWith,
   init as initWith,
   render as renderWith,
   Render,
 } from "./engine.js";
-import type { DispatchResult, ModuleSource, RenderInput, RenderResult } from "./engine.js";
+import type {
+  DeclaredEventsInput,
+  DeclaredEventsResult,
+  DispatchResult,
+  ModuleSource,
+  RenderInput,
+  RenderResult,
+} from "./engine.js";
 
 export type {
+  DeclaredEventsInput,
+  DeclaredEventsResult,
   DispatchResult,
   ModuleSource,
   ProgramInput,
@@ -38,6 +48,7 @@ export type {
 export type {
   BoundaryValue,
   CommandIntent,
+  DeclaredEvent,
   Host,
   IntentArgument,
   ModelPosition,
@@ -86,6 +97,22 @@ export function render(input: RenderInput): Promise<RenderResult> {
  */
 export function dispatch(render: Render, handler: string, payload?: unknown): Promise<DispatchResult> {
   return dispatchWith(render, handler, payload);
+}
+
+/**
+ * The events the templates of `input.program` declare, against
+ * `input.model`: validates the program as {@link render} does, then
+ * returns `{ events }`, each one's declaring component, event, command
+ * and source span, or `{ diagnostics }`, the same diagnostics render
+ * would give for that program. The events are the program's own, not a
+ * render's: those inside composites, inactive conditionals and repeated
+ * sections are there, and nothing is deduplicated. It needs no snapshot.
+ *
+ * It rejects with a `TypeError` for arguments of the wrong type, and
+ * otherwise as {@link render} does.
+ */
+export function declaredEvents(input: DeclaredEventsInput): Promise<DeclaredEventsResult> {
+  return declaredEventsWith(input);
 }
 
 /**

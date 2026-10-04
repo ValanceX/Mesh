@@ -146,6 +146,22 @@ export interface SourceOffset {
 }
 
 /**
+ * One event binding that a program's templates declare (docs/manual/runtime.md,
+ * "The declared events"): a fact about the validated program, whether or not any
+ * render currently contains it.
+ */
+export interface DeclaredEvent {
+  /** The component whose template declares the binding: the component of the command's intent. */
+  readonly component: string;
+  /** The event of the element the binding is on. */
+  readonly event: string;
+  /** The command of `component` the event raises. */
+  readonly command: string;
+  /** The binding's span in the source of `component`'s template. */
+  readonly span: SourceSpan;
+}
+
+/**
  * A host's obligations (docs/manual/runtime.md, "The host"). Nothing
  * checks that a host implements this; it names what a host must do.
  */

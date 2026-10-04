@@ -4,6 +4,14 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-04
+
+Declared events: the runtime says which events a program declares, so a host can compare them with what it handles. See the [v0.8 release notes](./docs/releases/v0.8.md).
+
+### Added
+
+- **Declared events.** The runtime says which events a program declares: `mesh_runtime::declared_events(&program, model)` in Rust, and `declaredEvents({ program, model })` in `@valancex/mesh-runtime`. Each declared event is one event binding in one of the program's templates, with its declaring `component`, `event`, `command` and source `span` (`mesh_runtime::DeclaredEvent`). They are the validated program's own, not a render's: those in composite templates, in inactive `mesh-if` alternatives and in `mesh-each` bodies are included, and nothing is deduplicated. The program is validated as `check_program`, render and dispatch validate it, and an invalid program gives the same diagnostics. Documented in the runtime manual ("The declared events"). The runtime WebAssembly module has a new export, `mesh_declared_events`, which the package now requires. Additive: `check_program`, render, dispatch, the compiler and `template-v1` are unchanged.
+
 ## [0.7.0] - 2026-10-02
 
 Node identity for programs whose structure varies: the locked contract (spec §9.10), and the provisional conditional and repeated structure that implements it. See the [v0.7 release notes](./docs/releases/v0.7.md) for an overview.
@@ -200,6 +208,7 @@ The first release. See the [v0.1 release notes](./docs/releases/v0.1.md) for an 
 - No component-model or type checking yet.
 - `mesh-lsp` and the npm packages are placeholders.
 
+[0.8.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.8.0
 [0.7.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.6.0
 [0.5.0]: https://github.com/ValanceX/Mesh/releases/tag/v0.5.0
