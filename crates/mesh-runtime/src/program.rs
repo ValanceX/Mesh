@@ -6,6 +6,7 @@ use crate::diagnostic::{Location, RuntimeCode, RuntimeDiagnostic};
 use crate::number::number_to_text;
 use mesh_manifest::{Component, Manifest, Type};
 use mesh_template::{Child, Element, Expression, Refusal, Template};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -389,6 +390,67 @@ pub(crate) fn visit(expression: &Expression, f: &mut impl FnMut(&Expression)) {
         Expression::List { elements, .. } => elements.iter().for_each(|e| visit(e, f)),
         Expression::Record { fields, .. } => fields.iter().for_each(|field| visit(&field.value, f)),
     }
+}
+
+/// One event binding that a program's templates declare: the occurrence in
+/// a template, whether or not any render currently contains it.
+///
+/// It is a fact about the validated program, not about a render: an event
+/// inside a `mesh-if` alternative the snapshot doesn't choose, or inside a
+/// `mesh-each` body whatever the items, is declared once.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeclaredEvent {
+    /// The component whose template declares the binding: the component of
+    /// the command's intent (docs/manual/runtime.md, "The command intent").
+    pub component: String,
+    /// The event of the element the binding is on.
+    pub event: String,
+    /// The command of `component` the event raises.
+    pub command: String,
+    /// The binding's span in the source of `component`'s template.
+    pub span: mesh_template::Span,
+}
+
+/// Every event binding of every template of a validated program: templates
+/// by component name, then each template's elements in document order.
+/// Nothing is deduplicated.
+pub(crate) fn declared_events(valid: &Valid) -> Vec<DeclaredEvent> {
+    let mut found = Vec::new();
+    for (component, template) in &valid.templates {
+        let mut all = Vec::new();
+        elements(&template.root, &mut all);
+        for element in all {
+            for binding in &element.events {
+                found.push(DeclaredEvent {
+                    component: component.clone(),
+                    event: binding.event.clone(),
+                    command: binding.command.clone(),
+                    span: binding.span,
+                });
+            }
+        }
+    }
+    found
+}
+
+/// The declared events as a JSON array, in the form docs/manual/runtime.md
+/// describes ("The declared events"): each one's `component`, `event`,
+/// `command` and `span`, in the order given.
+pub fn declared_events_to_json(events: &[DeclaredEvent]) -> String {
+    serde_json::Value::Array(
+        events
+            .iter()
+            .map(|e| {
+                json!({
+                    "component": e.component,
+                    "event": e.event,
+                    "command": e.command,
+                    "span": e.span,
+                })
+            })
+            .collect(),
+    )
+    .to_string()
 }
 
 /// Every element of `element`'s tree, `element` included, in document

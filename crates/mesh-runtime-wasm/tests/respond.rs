@@ -1,11 +1,13 @@
-//! The module's core, natively: render and dispatch from encoded inputs
+//! The module's core, natively: render, dispatch and declared events from encoded inputs
 //! give exactly the runtime's results, and inputs that can't be taken
 //! are refused with the right status.
 
 use mesh_compiler::check;
 use mesh_runtime::encoding::{encode_texts, encode_value};
 use mesh_runtime::{HostKey, HostRecord, HostValue, Program};
-use mesh_runtime_wasm::{number_texts, respond_dispatch, respond_render, Refusal};
+use mesh_runtime_wasm::{
+    number_texts, respond_declared_events, respond_dispatch, respond_render, Refusal,
+};
 use serde_json::Value;
 use std::path::Path;
 
@@ -133,4 +135,47 @@ fn number_texts_are_the_runtimes() {
     );
     assert_eq!(number_texts(&[0; 7]), None);
     assert_eq!(number_texts(&f64::NAN.to_bits().to_le_bytes()), None);
+}
+
+#[test]
+fn declared_events_give_the_runtimes_results() {
+    let model = model();
+    let templates = [compile(&model, "view", VIEW), compile(&model, "card", CARD)];
+    let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+    let program = Program {
+        root: "view",
+        templates: &texts,
+    };
+
+    let native = mesh_runtime::declared_events(&program, &model).unwrap();
+    assert!(!native.is_empty());
+    assert_eq!(
+        respond_declared_events("view", &encode_texts(&texts), &model).unwrap(),
+        format!(
+            "{{\"events\":{}}}",
+            mesh_runtime::declared_events_to_json(&native)
+        )
+    );
+
+    // An invalid program (no template for the root) is the runtime's diagnostics, as render reports them.
+    let only_card = [texts[1]];
+    let invalid = Program {
+        root: "view",
+        templates: &only_card,
+    };
+    let diagnostics = mesh_runtime::check_program(&invalid, &model);
+    assert!(!diagnostics.is_empty());
+    assert_eq!(
+        respond_declared_events("view", &encode_texts(&only_card), &model).unwrap(),
+        format!(
+            "{{\"diagnostics\":{}}}",
+            mesh_runtime::to_json(&diagnostics, &model)
+        )
+    );
+
+    // Bytes that aren't the encoding are refused as for render.
+    assert!(matches!(
+        respond_declared_events("view", &[1, 2], &model),
+        Err(Refusal::Encoding(_))
+    ));
 }

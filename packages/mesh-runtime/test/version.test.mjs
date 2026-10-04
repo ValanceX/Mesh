@@ -37,6 +37,7 @@ const RENDER_EXPORTS = [
   "mesh_free",
   "mesh_render",
   "mesh_dispatch",
+  "mesh_declared_events",
   "mesh_result_ptr",
   "mesh_result_len",
   "mesh_result_clear",
@@ -46,13 +47,13 @@ const RENDER_EXPORTS = [
  * A module exporting `memory`, `mesh_version_ptr`/`mesh_version_len` over
  * a data segment holding `version`, and, with `callExports`, a stub for
  * every export a call needs: all a module needs to pass for a MESH
- * module except the version.
+ * module except the version. `without` leaves one of them out.
  */
-function moduleReporting(version, { callExports = false } = {}) {
+function moduleReporting(version, { callExports = false, without = undefined } = {}) {
   const text = [...encoder.encode(version)];
   const name = (s) => vec([...encoder.encode(s)]);
   const constant = (value) => [0x00, 0x41, value, 0x0b]; // no locals; i32.const value; end
-  const stubs = callExports ? RENDER_EXPORTS : [];
+  const stubs = callExports ? RENDER_EXPORTS.filter((stub) => stub !== without) : [];
   const functions = 2 + stubs.length;
   return new Uint8Array([
     0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
@@ -98,6 +99,19 @@ test("a module of the right version without the render exports is refused", asyn
     ),
   );
   await assert.rejects(init(moduleReporting(pkg.version)), /has no mesh_alloc/);
+});
+
+test("a module of the right version without the declared-events export is refused", async () => {
+  const pkg = JSON.parse(
+    await import("node:fs/promises").then(({ readFile }) =>
+      readFile(new URL("../package.json", import.meta.url), "utf8"),
+    ),
+  );
+  // Everything else is there, so only the missing export refuses it.
+  await assert.rejects(
+    init(moduleReporting(pkg.version, { callExports: true, without: "mesh_declared_events" })),
+    /has no mesh_declared_events/,
+  );
 });
 
 test("after a refused module, nothing is kept: Node loads the package's own", async () => {

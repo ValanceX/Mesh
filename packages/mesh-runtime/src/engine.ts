@@ -11,7 +11,12 @@
  */
 
 import { encodeTexts, encodeValue } from "./encode.js";
-import type { CommandIntent, RenderTree, RuntimeDiagnosticsDocument } from "./types.js";
+import type {
+  CommandIntent,
+  DeclaredEvent,
+  RenderTree,
+  RuntimeDiagnosticsDocument,
+} from "./types.js";
 import { version } from "./version.js";
 
 /**
@@ -50,6 +55,18 @@ export interface RenderInput {
   /** The root's scope values, by scope name: a plain object. */
   readonly snapshot: Record<string, unknown>;
 }
+
+/** One declared-events request: a program, and the manifest it was compiled against. */
+export interface DeclaredEventsInput {
+  readonly program: ProgramInput;
+  /** The manifest's text: the model the templates were compiled against. */
+  readonly model: string;
+}
+
+/** What declaredEvents gives: the program's declared events, or diagnostics. */
+export type DeclaredEventsResult =
+  | { readonly events: readonly DeclaredEvent[]; readonly diagnostics?: never }
+  | { readonly events?: never; readonly diagnostics: RuntimeDiagnosticsDocument };
 
 /** What render gives: a render, or diagnostics. */
 export type RenderResult =
@@ -116,6 +133,7 @@ interface Exports {
   mesh_free(ptr: number, len: number): void;
   mesh_render(...args: number[]): number;
   mesh_dispatch(...args: number[]): number;
+  mesh_declared_events(...args: number[]): number;
   mesh_result_ptr(): number;
   mesh_result_len(): number;
   mesh_result_clear(): void;
@@ -126,6 +144,7 @@ const EXPORTS = [
   "mesh_free",
   "mesh_render",
   "mesh_dispatch",
+  "mesh_declared_events",
   "mesh_result_ptr",
   "mesh_result_len",
   "mesh_result_clear",
@@ -383,6 +402,45 @@ export function render(input: RenderInput): Promise<RenderResult> {
         }
         const tree = result.tree as RenderTree;
         return Object.freeze({ render: new Render(MAKING, tree, root, templates, model, snapshot) });
+      },
+    );
+  });
+}
+
+function validateDeclaredEvents(input: DeclaredEventsInput): void {
+  if (typeof input !== "object" || input === null) {
+    throw new TypeError("declaredEvents() takes an object: { program, model }");
+  }
+  const program = input.program;
+  if (typeof program !== "object" || program === null) {
+    throw new TypeError("program must be an object: { root, templates }");
+  }
+  if (typeof program.root !== "string") {
+    throw new TypeError("program.root must be a string");
+  }
+  if (!Array.isArray(program.templates) || !program.templates.every((t) => typeof t === "string")) {
+    throw new TypeError("program.templates must be an array of strings");
+  }
+  if (typeof input.model !== "string") {
+    throw new TypeError("model must be a string");
+  }
+}
+
+/** The events a program declares. See the package's `declaredEvents`. */
+export function declaredEvents(input: DeclaredEventsInput): Promise<DeclaredEventsResult> {
+  return enqueue(async () => {
+    validateDeclaredEvents(input);
+    return runNow(
+      [encoder.encode(input.program.root), encodeTexts(input.program.templates), encoder.encode(input.model)],
+      (exports, pointers) => exports.mesh_declared_events(...pointers),
+      (result): DeclaredEventsResult => {
+        if (isDiagnostics(result.diagnostics)) {
+          return Object.freeze({ diagnostics: result.diagnostics });
+        }
+        if (!Array.isArray(result.events)) {
+          throw new MeshInternalError("the runtime's result is neither declared events nor diagnostics");
+        }
+        return Object.freeze({ events: result.events as DeclaredEvent[] });
       },
     );
   });

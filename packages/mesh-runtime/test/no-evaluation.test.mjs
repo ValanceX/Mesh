@@ -64,13 +64,14 @@ test("nothing converts a value to text or a number, or compares values", () => {
 });
 
 test("nothing reads the tree or an intent after parsing them", () => {
-  // The result document's envelope (`tree`, `intent`, `diagnostics`) is
-  // read to return its parts; nothing inside them is.
+  // The result document's envelope (`tree`, `intent`, `events`, `diagnostics`)
+  // is read to return its parts; nothing inside them is.
   const pattern = /\.(root|children|props|events|arguments|command|key|component|text|location|code)\b/;
   const exceptions = [
     { file: "engine.ts", text: "input.program.root", reason: "the host's own program input, passed to the module" },
     { file: "engine.ts", text: "program.root", reason: "the host's own program input, checked to be a string" },
     { file: "engine.ts", text: "render.#root", reason: "the render's kept root name, passed back to the module" },
+    { file: "engine.ts", text: "result.events", reason: "the result document's envelope key, like `tree` and `intent`: the declared events are returned as the module wrote them" },
   ];
   assert.deepEqual(unexcused(find(pattern), exceptions), []);
 });
@@ -106,6 +107,7 @@ test("the only code that walks host values is the encoder", () => {
     { file: "encode.ts", text: "", reason: "the encoder: the one walk of host values (§9.8.6)" },
     { file: "engine.ts", text: "Array.isArray(program.templates)", reason: "the host's template list, checked to be an array" },
     { file: "engine.ts", text: "Array.isArray((value as", reason: "the module's result envelope has a diagnostics array" },
+    { file: "engine.ts", text: "Array.isArray(result.events)", reason: "the module's result envelope has an events array" },
     { file: "engine.ts", text: "Array.isArray(value)) {", reason: "the module's result document is an object" },
   ];
   assert.deepEqual(unexcused(walkers, exceptions), []);

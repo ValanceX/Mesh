@@ -46,7 +46,7 @@ A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any p
 
 **From Rust,** `mesh_runtime::render(&program, model, &snapshot)` returns a `Render` or the diagnostics, and `mesh_runtime::dispatch(&render, handler, payload)` returns an `Intent` or the diagnostics. A `Program` is the root's name and the templates' texts; the model is the manifest's text; a snapshot is a `HostRecord` (`HostRecord::from_json` reads one). A host that keeps a render's program, model and snapshot rather than the `Render` itself calls `mesh_runtime::dispatch_from` with them, which validates them all again, as dispatch always does. `mesh_runtime::to_json` writes diagnostics as the document below.
 
-**From JavaScript,** `@valancex/mesh-runtime` has the same two operations: `render({ program: { root, templates }, model, snapshot })` resolves to `{ render }` or `{ diagnostics }`, and `dispatch(render, handler, payload?)` to `{ intent }` or `{ diagnostics }`. `render.tree` is the render tree, frozen. Its [README](../../packages/mesh-runtime/README.md) has the details. What a JavaScript host needs to know about its values (§9.8.6):
+**From JavaScript,** `@valancex/mesh-runtime` has the same two operations (and a third, below): `render({ program: { root, templates }, model, snapshot })` resolves to `{ render }` or `{ diagnostics }`, and `dispatch(render, handler, payload?)` to `{ intent }` or `{ diagnostics }`. A third operation, `declaredEvents({ program, model })`, resolves to a program's [declared events](#the-declared-events) or `{ diagnostics }`. `render.tree` is the render tree, frozen. Its [README](../../packages/mesh-runtime/README.md) has the details. What a JavaScript host needs to know about its values (§9.8.6):
 - The package **encodes, and never judges.** Every value reaches the runtime, which reports what it can't accept: NaN, the infinities, a hole or `undefined` in an array, an unpaired surrogate, a `Map`, a `Date`, a class instance, a function, a `bigint` or a value that contains itself. So a JavaScript host gets exactly the diagnostics a native host gets for the same values.
 - A missing property and a property that is `undefined` are both absent. A payload that isn't given is absent too.
 - `-0` crosses in as `-0`, and never comes out (§9.8.2).
@@ -225,6 +225,46 @@ It is `$defs/intent` in `render-v1.schema.json`:
 ```
 
 NEXUS's adapter maps an intent to a NEXUS command (for example, `user-card`'s `selectUser` to `"users.select"`) and its input. That mapping is the adapter's own. **A renderer never receives an intent.**
+
+## The declared events
+
+Besides render and dispatch, the runtime can say which events a **program** declares. A **declared event** is one event binding (`on.click={open(item.id)}`) in one of the program's templates: a fact about the validated program, not about a render. It is there whether or not any render contains it.
+
+Each declared event is:
+
+- **`component`:** the component whose template declares the binding. It is the component of the command's intent (see [The command intent](#the-command-intent)): the declared event `list`/`open` is the event whose intent is `open` of `list`.
+- **`event`:** the event of the element the binding is on (`click`).
+- **`command`:** the command of `component` that the event raises (`open`).
+- **`span`:** the binding's span in the source of `component`'s template, as the template records it (UTF-8 bytes and UTF-16 code units, from the start of the source). It carries no file name: the source of a template is the host's.
+
+What is declared:
+
+- **Every template of the program,** composites included. A composite's template is walked once, however many times it is used, so `user-card`'s `selectUser` is declared once.
+- **Every element of each template,** so an event inside a `mesh-if` alternative the snapshot doesn't choose is declared, and an event inside a `mesh-each` body is declared once, whatever the items. A rendered handler belongs to a node, and a repeated node's identity needs the item's values; a declared event needs neither, so it has no handler identifier.
+- **Nothing is deduplicated.** Two bindings that raise the same command are two declared events, with their own spans.
+- **A component with no template is a primitive** ([the program decides](./templates.md#programs), never the template), so the commands the manifest declares for it are not declared events: a program that doesn't supply `user-card`'s template renders `user-card` as a primitive that raises none.
+
+They are in a fixed order: the templates' components in order of name, then each template's bindings in document order, whatever order the host supplied the templates in.
+
+A program that isn't valid has no declared events. The operation validates the program exactly as render and dispatch do (and as `mesh check-program` does), and gives that program's diagnostics.
+
+**From Rust,** `mesh_runtime::declared_events(&program, model)` returns `Ok(Vec<DeclaredEvent>)` or `Err(diagnostics)`, the diagnostics `mesh_runtime::check_program` gives. `mesh_runtime::declared_events_to_json` writes them as the array below.
+
+**From JavaScript,** `declaredEvents({ program: { root, templates }, model })` resolves to `{ events }`, an array of objects of the form below, or `{ diagnostics }`. It needs no snapshot. The package transports the result and judges nothing.
+
+The JSON form of one declared event (the WebAssembly module returns `{"events": [ ... ]}`, or `{"diagnostics": ...}` as render does):
+
+```json
+{
+  "component": "list",
+  "event": "click",
+  "command": "open",
+  "span": {
+    "start": { "byte": 162, "utf16": 162 },
+    "end": { "byte": 183, "utf16": 183 }
+  }
+}
+```
 
 ## Event resolution
 

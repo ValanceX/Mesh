@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "The MESH runtime for WebAssembly: render and dispatch behind @valancex/mesh-runtime, with no semantics of its own."
+description = "The MESH runtime for WebAssembly: render, dispatch and declared events behind @valancex/mesh-runtime, with no semantics of its own."
 publish = false
 
 [lints]
