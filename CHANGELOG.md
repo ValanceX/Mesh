@@ -4,6 +4,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Added
+
+- **`compileProgram`** in `@valancex/mesh-compiler`: compiles a program's components against one manifest, checks the program they make with `checkProgram`, and returns the program's parts (`{ model, root, templates }`, the templates as text) for the runtime. It composes `compile` and `checkProgram` and adds no rule of its own; a failure is the existing diagnostics documents.
+
 ## [0.8.0] - 2026-10-04
 
 Declared events: the runtime says which events a program declares, so a host can compare them with what it handles. See the [v0.8 release notes](./docs/releases/v0.8.md).

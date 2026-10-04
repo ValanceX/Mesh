@@ -2,8 +2,9 @@
  * The MESH compiler, in WebAssembly: check MPRX against a component
  * manifest, and get back exactly the diagnostics `mesh check --format
  * json` prints for the same inputs; compile it, and get the template
- * `mesh compile` writes too; or check a program of templates, as
- * `mesh check-program` does.
+ * `mesh compile` writes too; check a program of templates, as `mesh
+ * check-program` does; or compile a whole program's components, and get
+ * the program's parts for the runtime.
  *
  * ```js
  * import { check } from "@valancex/mesh-compiler";
@@ -30,6 +31,8 @@ import {
 } from "./engine.js";
 import type { CheckInput, CompileInput, CompileResult, ModuleSource, ProgramInput } from "./engine.js";
 import type { DiagnosticsDocument } from "./document.js";
+import { compileProgram as compileProgramWith } from "./program.js";
+import type { CompileProgramInput, CompileProgramResult } from "./program.js";
 import type { RuntimeDiagnosticsDocument } from "./runtime-document.js";
 
 export type {
@@ -41,6 +44,7 @@ export type {
   Suggestion,
 } from "./document.js";
 export type { CheckInput, CompileInput, CompileResult, ModuleSource, ProgramInput } from "./engine.js";
+export type { CompileProgramInput, CompileProgramResult, ProgramComponent } from "./program.js";
 export type {
   ModelPosition,
   ModelSpan,
@@ -101,6 +105,28 @@ export function compile(input: CompileInput): Promise<CompileResult> {
  */
 export function checkProgram(input: ProgramInput): Promise<RuntimeDiagnosticsDocument> {
   return checkProgramWith(input);
+}
+
+/**
+ * Compiles a program's components against one manifest, checks the program
+ * they make, and returns the program's parts: the input `checkProgram` and
+ * the runtime's `render` take, with the templates as text, so a host passes
+ * the result on as it is.
+ *
+ * Each of `input.components` is compiled as {@link compile} compiles it, and
+ * `components` in the result holds each one's diagnostics document, in
+ * order, whether it has errors or not (warnings don't stop a template). Only
+ * when none has an error are the templates checked as a program, by
+ * {@link checkProgram}, whose document is `assembly`. `program` is present
+ * exactly when neither found an error. This adds no rule of its own, and
+ * needs no module but the compiler's: in a browser, call {@link init} first,
+ * as for any check.
+ *
+ * It takes the sources it is given and finds none: a component that isn't
+ * listed has no template, and is a primitive. It rejects as `check` does.
+ */
+export function compileProgram(input: CompileProgramInput): Promise<CompileProgramResult> {
+  return compileProgramWith(input);
 }
 
 /**
