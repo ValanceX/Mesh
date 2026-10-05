@@ -227,10 +227,10 @@ async function instantiate(module: WebAssembly.Module): Promise<Exports> {
 }
 
 /**
- * Loads the module from `source` and checks its version. In Node, the
- * package loads its own module on the first call, so this is only needed
- * to use another copy; in a browser, it's needed once, before the first
- * call. If it fails, nothing is kept.
+ * Loads the module from `source` and checks its version. Without it, the
+ * package loads its own module (the file next to this one) on the first
+ * call, in Node and in a browser: `init` is for another copy, or another
+ * location. If it fails, nothing is kept.
  */
 export function init(source: ModuleSource): Promise<void> {
   const run = queue.then(async () => {
@@ -249,12 +249,23 @@ async function current(): Promise<Exports> {
     return instance;
   }
   if (!compiled) {
-    if (!isNode()) {
+    let module: WebAssembly.Module;
+    try {
+      module = await compileModule(new URL("./mesh-runtime.wasm", import.meta.url));
+    } catch (cause) {
+      if (isNode()) {
+        throw cause;
+      }
+      const detail = cause instanceof Error ? ` (${cause.message})` : "";
       throw new Error(
-        "@valancex/mesh-runtime: call init() with the URL of mesh-runtime.wasm before the first render",
+        `@valancex/mesh-runtime: could not load its packaged WebAssembly module automatically${detail}. ` +
+          "Pass the URL of mesh-runtime.wasm to init() to load it explicitly. " +
+          "If this is a Vite 5-7 development server, it may have moved this package into its dependency cache, " +
+          "away from mesh-runtime.wasm: excluding @valancex/mesh-runtime from dependency optimization " +
+          "(optimizeDeps.exclude) lets the package find its file.",
+        { cause },
       );
     }
-    const module = await compileModule(new URL("./mesh-runtime.wasm", import.meta.url));
     instance = await instantiate(module);
     compiled = module;
     return instance;

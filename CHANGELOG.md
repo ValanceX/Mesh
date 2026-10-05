@@ -4,6 +4,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Changed
+
+- **The runtime's `init()` is optional in a browser.** Without it, the first call loads the packaged `mesh-runtime.wasm` from next to the runtime's code (`new URL("./mesh-runtime.wasm", import.meta.url)`), as Node always did. `init(source)` is unchanged and still decides which module is used. If the automatic load fails, the error says so, keeps the original failure as its `cause`, and names `init()` and, for a Vite 5 to 7 development server, excluding `@valancex/mesh-runtime` from dependency optimization.
+
 ## [0.9.0] - 2026-10-04
 
 Build-time program assembly: the compiler package compiles a program's components and returns the program's parts. See the [v0.9 release notes](./docs/releases/v0.9.md).
