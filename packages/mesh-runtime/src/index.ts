@@ -118,8 +118,10 @@ export function declaredEvents(input: DeclaredEventsInput): Promise<DeclaredEven
 /**
  * Loads the WebAssembly module from `source`: a URL (or a string resolved
  * against the page), its bytes, or a compiled `WebAssembly.Module`, and
- * checks its version. Needed once in a browser, before the first render;
- * in Node the package loads its own module. The module is
+ * checks its version. Optional: without it the package loads its own
+ * module (`mesh-runtime.wasm`, next to its code) on the first call, in Node
+ * and in a browser. Call it to load another copy, or from another URL, which
+ * a bundler may need: the module is
  * `@valancex/mesh-runtime/mesh-runtime.wasm`.
  */
 export function init(source: ModuleSource): Promise<void> {
