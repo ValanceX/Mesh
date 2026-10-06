@@ -3,7 +3,8 @@
 //! One call is: `mesh_alloc` and fill a buffer per input; `mesh_render`,
 //! `mesh_dispatch` or `mesh_declared_events`; `mesh_free` every input buffer; read the result at
 //! `mesh_result_ptr`/`mesh_result_len`; `mesh_result_clear`. After that,
-//! the call holds no memory in the module.
+//! the call holds no memory in the module, except the renders `mesh_update`
+//! keeps for the next update, until `mesh_release`.
 //!
 //! A call returns a status: 0, and the result document; 1, and nothing,
 //! if an input isn't UTF-8 or isn't the encoding (the wrapper's fault);
@@ -126,7 +127,8 @@ pub unsafe extern "C" fn mesh_render(
 
 /// Updates (`crate::respond_update`): a render's inputs, as
 /// [`mesh_render`] took them, with the render's snapshot, then the new
-/// snapshot, encoded.
+/// snapshot, encoded, then the previous render's handle, which is used when
+/// `has_handle` is not 0 and the module still holds it.
 ///
 /// # Safety
 ///
@@ -145,6 +147,8 @@ pub unsafe extern "C" fn mesh_update(
     previous_len: usize,
     snapshot: *const u8,
     snapshot_len: usize,
+    handle: u32,
+    has_handle: u32,
 ) -> u32 {
     // SAFETY: the caller's guarantee, passed on for each input.
     let result = unsafe {
@@ -153,6 +157,7 @@ pub unsafe extern "C" fn mesh_update(
                 root,
                 bytes(templates, templates_len),
                 model,
+                (has_handle != 0).then_some(handle),
                 bytes(previous, previous_len),
                 bytes(snapshot, snapshot_len),
             )),
@@ -160,6 +165,12 @@ pub unsafe extern "C" fn mesh_update(
         }
     };
     keep(result)
+}
+
+/// Releases the render `handle` names (`crate::release`).
+#[no_mangle]
+pub extern "C" fn mesh_release(handle: u32) {
+    crate::release(handle);
 }
 
 /// Dispatches (`crate::respond_dispatch`): a render's inputs, as
@@ -302,6 +313,12 @@ mod hooks {
 
     #[global_allocator]
     static ALLOCATOR: Counting = Counting;
+
+    /// How many renders the module holds for `update`.
+    #[no_mangle]
+    pub extern "C" fn mesh_retained_renders() -> usize {
+        crate::retained_renders()
+    }
 
     /// How many allocations are live.
     #[no_mangle]

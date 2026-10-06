@@ -47,7 +47,7 @@ impl Tree {
     }
 }
 
-fn node(node: &Node) -> Value {
+pub(crate) fn node(node: &Node) -> Value {
     let mut out = json!({
         "type": "node",
         "key": node.key,
@@ -65,6 +65,14 @@ fn node(node: &Node) -> Value {
         out["propText"] = json!(node.prop_text);
     }
     out
+}
+
+/// A node's child as a render-v1 `node` or `text` object.
+pub(crate) fn child(child: &TreeChild) -> Value {
+    match child {
+        TreeChild::Node(child) => node(child),
+        TreeChild::Text { key, text } => json!({ "type": "text", "key": key, "text": text }),
+    }
 }
 
 /// A command intent: which command a handler invoked, and its evaluated

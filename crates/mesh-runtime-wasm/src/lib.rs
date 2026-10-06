@@ -2,12 +2,18 @@
 //!
 //! It has no semantics of its own (I11). [`respond_render`] is
 //! [`mesh_runtime::render`], [`respond_dispatch`] is
-//! [`mesh_runtime::dispatch_from`] and [`respond_declared_events`] is
-//! [`mesh_runtime::declared_events`], each with its inputs decoded from
+//! [`mesh_runtime::dispatch_from`], [`respond_declared_events`] is
+//! [`mesh_runtime::declared_events`] and [`respond_update`] is
+//! [`mesh_runtime::update`], each with its inputs decoded from
 //! the byte encoding (`mesh_runtime::encoding`) and its result rendered
 //! as one JSON document; everything else only moves bytes across the
 //! boundary between WebAssembly's linear memory and JavaScript. It links
 //! no parser: a host that renders needs no compiler.
+//!
+//! **Its one state between calls is the renders `update` keeps,** so that
+//! the next `update` from one needn't derive it again: a table of handles
+//! (`respond_update` makes one, `release` ends it). `render`, `dispatch`
+//! and `declared_events` keep nothing.
 //!
 //! Build it with Cargo alone:
 //!
@@ -72,37 +78,102 @@ pub fn respond_render(
     })
 }
 
-/// Updates: renders the program against the render's own (previous)
-/// encoded snapshot, as the wrapper kept it, then updates to the encoded
-/// `snapshot` ([`mesh_runtime::update`]): `{"tree": <render-v1>, "patches":
-/// <render-patch-v1>}`, or `{"diagnostics": <runtime-diagnostics-v1>}`.
+/// Renders the module holds for `update`, by handle. This is the module's
+/// only state between calls. A handle is made by [`respond_update`], never
+/// reused in this module's life, and ends at [`release`]; a module that is
+/// replaced (the wrapper discards one after a trap) takes its handles with it.
+mod retained {
+    use mesh_runtime::Render;
+    use std::cell::{Cell, RefCell};
+    use std::collections::BTreeMap;
+
+    thread_local! {
+        static TABLE: RefCell<BTreeMap<u32, Render>> = const { RefCell::new(BTreeMap::new()) };
+        static NEXT: Cell<u32> = const { Cell::new(1) };
+    }
+
+    pub(super) fn keep(render: Render) -> u32 {
+        let handle = NEXT.with(|next| {
+            let handle = next.get();
+            next.set(handle.checked_add(1).expect("handles don't run out"));
+            handle
+        });
+        TABLE.with(|table| table.borrow_mut().insert(handle, render));
+        handle
+    }
+
+    /// Runs `use_it` on the render `handle` names, in place: a render is
+    /// never copied out of the table.
+    pub(super) fn with<T>(handle: u32, use_it: impl FnOnce(&Render) -> T) -> Option<T> {
+        TABLE.with(|table| table.borrow().get(&handle).map(use_it))
+    }
+
+    pub(super) fn release(handle: u32) {
+        TABLE.with(|table| table.borrow_mut().remove(&handle));
+    }
+
+    pub(super) fn count() -> usize {
+        TABLE.with(|table| table.borrow().len())
+    }
+}
+
+/// Releases the render `handle` names. A handle that isn't kept (already
+/// released, or never made) is ignored.
+pub fn release(handle: u32) {
+    retained::release(handle);
+}
+
+/// How many renders the module holds. For the package's memory tests.
+pub fn retained_renders() -> usize {
+    retained::count()
+}
+
+/// Updates to the encoded `snapshot`: `{"handle": <n>, "tree": <render-v1>,
+/// "patches": <render-patch-v1>}`, or `{"diagnostics":
+/// <runtime-diagnostics-v1>}`.
 ///
-/// The module holds nothing between calls, so the previous render is
-/// derived again here, and a call costs a render more than the same
-/// update in Rust (docs/manual/runtime.md). The patches are exactly those.
+/// The previous render is the one `previous_handle` names, if the module
+/// holds it. Otherwise the module derives it from the render's own inputs
+/// as the wrapper kept them (the encoded `previous_bytes`), so a handle that
+/// was released, or came from a module since replaced, costs a render more
+/// and gives the same result. The new render is kept under a new handle, which
+/// the caller releases; the previous render stays kept (and valid) until the
+/// caller releases its handle, so a host can still dispatch with it until its
+/// renderer has applied the patches. A refused update keeps nothing.
 pub fn respond_update(
     root: &str,
     templates: &[u8],
     model: &str,
+    previous_handle: Option<u32>,
     previous_bytes: &[u8],
     snapshot_bytes: &[u8],
 ) -> Result<String, Refusal> {
     let templates = decode_texts(templates)?;
-    let previous_snapshot = decode_snapshot(previous_bytes)?;
     let snapshot = decode_snapshot(snapshot_bytes)?;
-    let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
-    let program = Program {
-        root,
-        templates: &texts,
+    let result = match previous_handle.and_then(|handle| {
+        retained::with(handle, |previous| mesh_runtime::update(previous, &snapshot))
+    }) {
+        Some(result) => result,
+        None => {
+            let previous_snapshot = decode_snapshot(previous_bytes)?;
+            let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+            let program = Program {
+                root,
+                templates: &texts,
+            };
+            mesh_runtime::render(&program, model, &previous_snapshot)
+                .and_then(|previous| mesh_runtime::update(&previous, &snapshot))
+        }
     };
-    let result = mesh_runtime::render(&program, model, &previous_snapshot)
-        .and_then(|previous| mesh_runtime::update(&previous, &snapshot));
     Ok(match result {
-        Ok(updated) => format!(
-            "{{\"tree\":{},\"patches\":{}}}",
-            updated.render.tree().to_json(),
-            mesh_runtime::patches_to_json(&updated.patches)
-        ),
+        Ok(updated) => {
+            let (tree, patches) = (
+                updated.render.tree().to_json(),
+                mesh_runtime::patches_to_json(&updated.patches),
+            );
+            let handle = retained::keep(updated.render);
+            format!("{{\"handle\":{handle},\"tree\":{tree},\"patches\":{patches}}}")
+        }
         Err(diagnostics) => format!(
             "{{\"diagnostics\":{}}}",
             mesh_runtime::to_json(&diagnostics, model)

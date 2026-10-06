@@ -5,10 +5,12 @@
 //! A patch list is correct by one law: applying it to the previous tree
 //! gives exactly the tree a full render of the new snapshot gives. The
 //! encoding of a list is not unique, so a renderer never compares lists, it
-//! applies them. This version has the operations that change a prop or a
-//! text; a change of structure is a `replace` of the whole tree.
+//! applies them. The operations change a prop or a text, and insert, remove
+//! and move a node or text among its siblings by key; a tree that none of
+//! them can turn into the next (a different root, or a node whose event
+//! bindings differ, which one program never produces) is a `replace`.
 
-use crate::tree::{Node, Tree, TreeChild};
+use crate::tree::{child, Node, Tree, TreeChild};
 use serde_json::{json, Value};
 
 /// One operation of a patch list.
@@ -25,6 +27,18 @@ pub enum Patch {
     RemoveProp { key: String, prop: String },
     /// A text child's new text.
     SetText { key: String, text: String },
+    /// A node or text run, with everything under it, is new under the node
+    /// `parent`: before its child `before`, or last when there is none.
+    Insert {
+        parent: String,
+        before: Option<String>,
+        child: TreeChild,
+    },
+    /// The node or text run, with everything under it, is gone.
+    Remove { key: String },
+    /// The same node or text run, kept, now stands before its sibling
+    /// `before`, or last when there is none.
+    Move { key: String, before: Option<String> },
     /// The tree is this one: the renderer draws it afresh, as for a
     /// program change, reusing nothing.
     Replace { tree: Tree },
@@ -39,13 +53,10 @@ pub fn diff(old: &Tree, new: &Tree) -> Vec<Patch> {
     patches
 }
 
-/// `None` when the two nodes differ in a way no prop or text patch
-/// expresses: a different key, component, event binding or child shape.
+/// `None` when the two nodes differ in a way no patch expresses: a
+/// different key, component or event binding.
 fn diff_node(old: &Node, new: &Node, out: &mut Vec<Patch>) -> Option<()> {
-    if old.key != new.key || old.component != new.component || old.events != new.events {
-        return None;
-    }
-    if old.children.len() != new.children.len() {
+    if !same_part(old, new) {
         return None;
     }
     for (name, value) in &new.props {
@@ -69,16 +80,91 @@ fn diff_node(old: &Node, new: &Node, out: &mut Vec<Patch>) -> Option<()> {
             prop: name.clone(),
         });
     }
-    for (old, new) in old.children.iter().zip(&new.children) {
-        match (old, new) {
+    diff_children(&new.key, &old.children, &new.children, out)
+}
+
+/// Whether `new` can be `old` kept: the same key, component and bindings.
+/// Only props and children can then differ, and patches say how.
+fn same_part(old: &Node, new: &Node) -> bool {
+    old.key == new.key && old.component == new.component && old.events == new.events
+}
+
+fn key_of(part: &TreeChild) -> &str {
+    match part {
+        TreeChild::Node(node) => &node.key,
+        TreeChild::Text { key, .. } => key,
+    }
+}
+
+/// Whether the old child and the new child are one part, kept: a node and
+/// a node of the same key, component and bindings, or two text runs of the
+/// same key. A key in both trees that isn't compatible is a part removed
+/// and a part inserted, as the contract has it for a key whose component
+/// changes.
+fn kept(old: &TreeChild, new: &TreeChild) -> bool {
+    match (old, new) {
+        (TreeChild::Node(old), TreeChild::Node(new)) => same_part(old, new),
+        (TreeChild::Text { key: old, .. }, TreeChild::Text { key: new, .. }) => old == new,
+        _ => false,
+    }
+}
+
+/// The patches for one node's children: matched by key and nothing else
+/// (never by position, MESH §9.10), as removals first, then the
+/// insertions and moves that put the kept parts in the new order, then the
+/// changes inside each kept part.
+fn diff_children(
+    parent: &str,
+    old: &[TreeChild],
+    new: &[TreeChild],
+    out: &mut Vec<Patch>,
+) -> Option<()> {
+    use std::collections::HashMap;
+
+    let old_at: HashMap<&str, &TreeChild> = old.iter().map(|part| (key_of(part), part)).collect();
+    let new_at: HashMap<&str, &TreeChild> = new.iter().map(|part| (key_of(part), part)).collect();
+    let is_kept = |key: &str| match (old_at.get(key), new_at.get(key)) {
+        (Some(old), Some(new)) => kept(old, new),
+        _ => false,
+    };
+
+    for part in old.iter().filter(|part| !is_kept(key_of(part))) {
+        out.push(Patch::Remove {
+            key: key_of(part).to_string(),
+        });
+    }
+
+    // The kept parts, in their old order: what the DOM, say, holds now.
+    let mut current: Vec<&str> = old.iter().map(key_of).filter(|key| is_kept(key)).collect();
+    for (at, part) in new.iter().enumerate() {
+        let key = key_of(part);
+        if is_kept(key) {
+            if current.get(at) != Some(&key) {
+                let from = current
+                    .iter()
+                    .position(|candidate| *candidate == key)
+                    .expect("a kept part is in the current order");
+                current.remove(from);
+                current.insert(at, key);
+                out.push(Patch::Move {
+                    key: key.to_string(),
+                    before: current.get(at + 1).map(|key| (*key).to_string()),
+                });
+            }
+        } else {
+            current.insert(at, key);
+            out.push(Patch::Insert {
+                parent: parent.to_string(),
+                before: current.get(at + 1).map(|key| (*key).to_string()),
+                child: part.clone(),
+            });
+        }
+    }
+
+    for part in new.iter().filter(|part| is_kept(key_of(part))) {
+        match (old_at[key_of(part)], part) {
             (TreeChild::Node(old), TreeChild::Node(new)) => diff_node(old, new, out)?,
-            (
-                TreeChild::Text {
-                    key: old_key,
-                    text: old,
-                },
-                TreeChild::Text { key, text },
-            ) if old_key == key => {
+            (TreeChild::Text { text: old, .. }, TreeChild::Text { key, text }) => {
                 if old != text {
                     out.push(Patch::SetText {
                         key: key.clone(),
@@ -86,7 +172,7 @@ fn diff_node(old: &Node, new: &Node, out: &mut Vec<Patch>) -> Option<()> {
                     });
                 }
             }
-            _ => return None,
+            _ => unreachable!("a kept part is a node and a node, or a text and a text"),
         }
     }
     Some(())
@@ -118,6 +204,25 @@ fn op(patch: &Patch) -> Value {
         }
         Patch::RemoveProp { key, prop } => json!({ "op": "removeProp", "key": key, "prop": prop }),
         Patch::SetText { key, text } => json!({ "op": "setText", "key": key, "text": text }),
+        Patch::Insert {
+            parent,
+            before,
+            child: part,
+        } => {
+            let mut out = json!({ "op": "insert", "parent": parent, "node": child(part) });
+            if let Some(before) = before {
+                out["before"] = json!(before);
+            }
+            out
+        }
+        Patch::Remove { key } => json!({ "op": "remove", "key": key }),
+        Patch::Move { key, before } => {
+            let mut out = json!({ "op": "move", "key": key });
+            if let Some(before) = before {
+                out["before"] = json!(before);
+            }
+            out
+        }
         Patch::Replace { tree } => {
             json!({ "op": "replace", "tree": serde_json::from_str::<Value>(&tree.to_json()).expect("a tree is JSON") })
         }

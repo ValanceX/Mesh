@@ -10,10 +10,13 @@ host ── program, model, snapshot ──▶ render ──▶ a render ──�
 host ◀── command intent ◀── dispatch ◀── the render, handler identifier, payload
 ```
 
-## The two operations
+## The operations
 
 - **render:** a program, a model and a snapshot in. Out: a **render**, or diagnostics.
 - **dispatch:** a render, a handler identifier and a payload in. Out: a **command intent**, or diagnostics.
+- **update:** a render and a new snapshot of the same program in. Out: the new **render** and the **patches** from the previous tree to its tree, or diagnostics ([Update](#update)).
+
+Render and dispatch are the two the lifecycle below is about; `declaredEvents` (a program's declared events, below) is a fourth, and takes no snapshot.
 
 Each returns either its result and no diagnostics, or diagnostics and no result. The runtime has no warnings.
 
@@ -46,7 +49,7 @@ A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any p
 
 **From Rust,** `mesh_runtime::render(&program, model, &snapshot)` returns a `Render` or the diagnostics, and `mesh_runtime::dispatch(&render, handler, payload)` returns an `Intent` or the diagnostics. A `Program` is the root's name and the templates' texts; the model is the manifest's text; a snapshot is a `HostRecord` (`HostRecord::from_json` reads one). A host that keeps a render's program, model and snapshot rather than the `Render` itself calls `mesh_runtime::dispatch_from` with them, which validates them all again, as dispatch always does. `mesh_runtime::to_json` writes diagnostics as the document below.
 
-**From JavaScript,** `@valancex/mesh-runtime` has the same two operations (and a third, below): `render({ program: { root, templates }, model, snapshot })` resolves to `{ render }` or `{ diagnostics }`, and `dispatch(render, handler, payload?)` to `{ intent }` or `{ diagnostics }`. A third operation, `declaredEvents({ program, model })`, resolves to a program's [declared events](#the-declared-events) or `{ diagnostics }`. `render.tree` is the render tree, frozen. Its [README](../../packages/mesh-runtime/README.md) has the details. What a JavaScript host needs to know about its values (§9.8.6):
+**From JavaScript,** `@valancex/mesh-runtime` has the same operations (`render`, `dispatch` and `update`, and `declaredEvents`, below): `render({ program: { root, templates }, model, snapshot })` resolves to `{ render }` or `{ diagnostics }`, and `dispatch(render, handler, payload?)` to `{ intent }` or `{ diagnostics }`. `update(render, snapshot)` resolves to `{ render, patches }` or `{ diagnostics }` (see [Update](#update)), and `declaredEvents({ program, model })` resolves to a program's [declared events](#the-declared-events) or `{ diagnostics }`. `render.tree` is the render tree, frozen. Its [README](../../packages/mesh-runtime/README.md) has the details. What a JavaScript host needs to know about its values (§9.8.6):
 - The package **encodes, and never judges.** Every value reaches the runtime, which reports what it can't accept: NaN, the infinities, a hole or `undefined` in an array, an unpaired surrogate, a `Map`, a `Date`, a class instance, a function, a `bigint` or a value that contains itself. So a JavaScript host gets exactly the diagnostics a native host gets for the same values.
 - A missing property and a property that is `undefined` are both absent. A payload that isn't given is absent too.
 - `-0` crosses in as `-0`, and never comes out (§9.8.2).
@@ -280,7 +283,7 @@ A renderer implements the rule for its target, and checks itself against `exampl
 
 ## Updates
 
-- **A change of values is a new render.** The whole program is evaluated again, and the result is a complete new render tree.
+- **A change of values is a new render,** or an *update*, which gives the same tree and says what changed. `render` evaluates the whole program again and gives a complete new tree; `update` (below) does that for a render's program and a new snapshot, and also returns the patches from the previous tree to the new one.
 - **Every render of a program names its nodes by identity, and a key is that identity.** For a static program every render has the same structure, keys and handler identifiers, so a renderer can match a new tree against the one it drew, node by node, by key, and update in place. For a program whose structure varies (a `mesh-if` or `mesh-each`, spec §9.10) the rule is the same for a tree that differs: match **by key, not by position**. A key in both trees is the same node, kept and moved if its order among its siblings changed; a key only in the new tree is created; a key only in the old one is removed. A tree from a **different** program (a template changed or was added) may have entirely different keys: a renderer draws it afresh, and never matches it against the old tree by key.
 - **Finding what changed is the runtime's job when the host asks.** `update` (below) renders a new snapshot of the same program and returns the patches from the previous tree to the new one. `render` alone still gives a complete tree, and a renderer that compares trees by key itself loses nothing.
 
@@ -288,14 +291,26 @@ A renderer implements the rule for its target, and checks itself against `exampl
 
 `update(previous, snapshot)` (Rust: `mesh_runtime::update`; JavaScript: `update(render, snapshot)`) takes a render and a new snapshot of **the same program**, and returns the new render and a `render-patch-v1` list ([`schemas/render-patch-v1.schema.json`](../../schemas/render-patch-v1.schema.json)), or diagnostics. The host, as for a renderer's `update`, asserts program continuity: a different program is a `render`.
 
-- **The law.** Applying the patches, in order, to the previous render's tree gives exactly the tree a full `render` of the new snapshot gives. A list is minimal in effect, not unique in form, so a renderer applies lists and never compares them. The runtime's tests check the law over random programs' snapshots, and against the schema.
-- **The operations.** `setProp` (with `propText` when the value has text), `removeProp`, and `setText`, each naming a node or text run by its render-v1 key. A change of structure (a node or text added, removed or reordered, a different component or event binding) is one `replace` of the whole tree, which a renderer draws afresh, and which is always the only operation of its list. Structural patches (`insert`, `remove`, `move`) are the next version's work.
-- **What it skips.** Each node's props and each text run's text are recorded with the scope values they were computed from: the values of the scope names their expressions read, which a template says statically (a name an expression mentions, as `item` in `item.label`). On `update`, a node or text whose values are identical (a number is compared by its bits, so `0` and `-0` differ) keeps its previous result and is not evaluated again. `mesh-if`'s `when`, `mesh-each`'s `items` and `key`, and the walk of the template are still evaluated and done on every update.
+- **The law.** Applying the patches, in order, to the previous render's tree gives exactly the tree a full `render` of the new snapshot gives. A list is minimal in effect, not unique in form, so a renderer applies lists and never compares them. The runtime's tests check the law over random snapshots of a program with a conditional, a keyed repeat and an optional prop, and check every list against the schema.
+- **The operations.** Parts are named by their render-v1 keys, and matched by key, never by position (spec §9.10).
+  - `setProp` (with `propText` when the value has text), `removeProp` and `setText` change a kept node or text run.
+  - `insert` adds a node (with its whole subtree) or text run under a parent, before a sibling or last; `remove` takes a part and everything under it away; `move` puts a kept part before a sibling, or last. A kept part is kept: a renderer keeps its realization across a `move`, and a key that is removed and later appears again is a new part.
+  - **The order of a list is the order to apply it in:** removals first, then the insertions and moves that bring the kept parts into the new order (each `before` names a sibling that exists at that point), then the changes inside kept parts. A list that reorders needs only moves and inserts, never a rebuild: moving one item of a long list to the front is one `move`.
+  - `replace` is for a tree no other operation can turn into the next (a different root, or a node whose event bindings differ, which one program never produces). It is always the only operation of its list, and a renderer draws it afresh, reusing nothing.
+- **What it skips.** Each node's props and each text run's text are recorded with the scope values they were computed from: the values of the scope names their expressions read, which a template says statically (a name an expression mentions, as `item` in `item.label`). On `update`, a node or text whose values are identical (a number is compared by its bits, so `0` and `-0` differ) keeps its previous result and is not evaluated again. `mesh-if`'s `when`, `mesh-each`'s `items` and `key`, the walk of the template and the comparison of the two trees are still done on every update.
 - **A refused update changes nothing.** On diagnostics, `previous` is untouched and still dispatches.
-- **In JavaScript the module keeps nothing between calls,** so `update` derives the previous render again from the render's own snapshot, and costs a render more than the same update in Rust. What it saves is the renderer's work. Keeping a render in the module between calls is a larger change, and isn't made yet.
-- **The handler identifiers are unchanged by an update,** since they come from identity (§9.10), so a drawn tree's handlers remain valid for the new render.
+- **The handler identifiers are unchanged by an update,** since they come from identity (§9.10), so a drawn tree's handlers remain valid for the new render, and a part inserted by a patch has the handler identifiers a full render would give it.
 
-Measured on one machine (`cargo test -p mesh-runtime --release --test update_baseline -- --ignored --nocapture`), a keyed list of 10,000 items with one changed: a full render evaluates 60,001 expressions in about 169 ms; `update` evaluates 20,005 in about 149 ms and returns 2 patches. Evaluation is not the main cost: rebuilding and re-keying the whole tree is, so an update whose cost follows the change, not the tree, needs the runtime to keep what it rendered and touch only what a change reaches. That is not done here.
+**Retained renders in the module.** In Rust a render is a value, and `update` takes the previous one by reference. The WebAssembly module, which a JavaScript host calls, keeps the renders `update` returns, so that the next `update` from one has what it needs and doesn't derive it again:
+
+- **`render()` keeps nothing in the module.** A render it returns has no copy there, so the first `update` from it derives the render again from its own inputs (a render more than the same update costs in Rust), and the render that `update` returns is kept.
+- **`update` keeps the render it returns, under a handle the module never reuses,** and keeps `previous` too, until released: after an update the host may still dispatch with `previous` (events fired before its renderer applied the patches), or update from it again.
+- **`release()` on a render ends the module's copy of it.** A host calls it on a render it will no longer update from or dispatch with, typically `previous` once the patches are applied. It is safe to call twice, and a released render still works: it keeps its own inputs, so a later `update` derives it again. A render that is never released is released when it is garbage collected, but that is up to the JavaScript engine and can be late, and until then its copy is memory in the module. The package's memory test releases every render in a chain of ten thousand updates and checks that memory doesn't grow.
+- **A copy is good only in the module that made it.** The package discards its module after a trap and uses a new one, which has none of the old one's renders: a render whose copy is gone updates by deriving itself again, with the same result.
+- **`dispatch` still evaluates against the render's own snapshot,** as before, and holds nothing in the module after the call.
+- **The module's calls are one at a time,** so retention adds no ordering of its own: a `release` is queued behind the calls already made.
+
+Measured on one machine (`cargo test -p mesh-runtime --release --test update_baseline -- --ignored --nocapture`), a keyed list of 10,000 items with one changed: a full render evaluates 60,001 expressions in about 169 ms; `update` evaluates 20,005 in about 149 ms and returns 2 patches. Evaluation is not the main cost: rebuilding and re-keying the whole tree is, so an update whose cost follows the change, not the tree, needs the runtime to touch only what a change reaches, over the render it now retains. That is not done yet.
 
 ## What renderers and hosts must do
 

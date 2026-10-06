@@ -103,6 +103,41 @@ fn apply(tree: &mut Value, patches: &Value) {
     for patch in patches["patches"].as_array().expect("a list") {
         match patch["op"].as_str().expect("an op") {
             "replace" => *tree = patch["tree"].clone(),
+            "insert" => {
+                let parent = find(&mut tree["root"], patch["parent"].as_str().unwrap());
+                let children = parent["children"].as_array_mut().unwrap();
+                let at = match patch.get("before") {
+                    Some(before) => children
+                        .iter()
+                        .position(|child| child["key"] == *before)
+                        .unwrap_or_else(|| panic!("before {before} is a child at this point")),
+                    None => children.len(),
+                };
+                assert!(
+                    !children
+                        .iter()
+                        .any(|child| child["key"] == patch["node"]["key"]),
+                    "an inserted key is new"
+                );
+                children.insert(at, patch["node"].clone());
+            }
+            "remove" => {
+                let (parent, at) = parent_of(&mut tree["root"], patch["key"].as_str().unwrap());
+                parent["children"].as_array_mut().unwrap().remove(at);
+            }
+            "move" => {
+                let (parent, from) = parent_of(&mut tree["root"], patch["key"].as_str().unwrap());
+                let children = parent["children"].as_array_mut().unwrap();
+                let moved = children.remove(from);
+                let at = match patch.get("before") {
+                    Some(before) => children
+                        .iter()
+                        .position(|child| child["key"] == *before)
+                        .unwrap_or_else(|| panic!("before {before} is a sibling at this point")),
+                    None => children.len(),
+                };
+                children.insert(at, moved);
+            }
             "setProp" => {
                 let node = find(&mut tree["root"], patch["key"].as_str().unwrap());
                 node["props"][patch["prop"].as_str().unwrap()] = patch["value"].clone();
@@ -139,6 +174,29 @@ fn apply(tree: &mut Value, patches: &Value) {
             other => panic!("unknown op {other}"),
         }
     }
+}
+
+/// The node holding `key` among its children, and `key`'s index there.
+fn parent_of<'t>(node: &'t mut Value, key: &str) -> (&'t mut Value, usize) {
+    fn path(node: &Value, key: &str) -> Option<Vec<usize>> {
+        for (index, child) in node["children"].as_array()?.iter().enumerate() {
+            if child["key"] == key {
+                return Some(vec![index]);
+            }
+            if let Some(mut rest) = path(child, key) {
+                rest.insert(0, index);
+                return Some(rest);
+            }
+        }
+        None
+    }
+    let mut steps = path(node, key).unwrap_or_else(|| panic!("no part {key}"));
+    let last = steps.pop().unwrap();
+    let mut at = node;
+    for step in steps {
+        at = &mut at["children"][step];
+    }
+    (at, last)
 }
 
 /// The node or text with `key`.
@@ -184,7 +242,7 @@ fn random_snapshot(rng: &mut Rng, base: Option<&Value>) -> Value {
         || serde_json::json!({ "title": "t", "count": 0, "flag": false, "items": [] }),
     );
     for _ in 0..=rng.below(3) {
-        match rng.below(7) {
+        match rng.below(9) {
             0 => out["title"] = format!("title {}", rng.below(4)).into(),
             1 => out["count"] = (rng.below(5) as f64 - 2.0).into(),
             2 => out["flag"] = (rng.below(2) == 1).into(),
@@ -196,11 +254,42 @@ fn random_snapshot(rng: &mut Rng, base: Option<&Value>) -> Value {
                 }
             }
             4 => {
-                let n = rng.below(5);
-                out["items"] = (0..n)
-                    .map(|i| serde_json::json!({ "id": i, "label": format!("l{}", rng.below(3)), "done": rng.below(2) == 1 }))
-                    .collect::<Vec<_>>()
-                    .into();
+                let mut ids: Vec<u64> = (0..8).collect();
+                let n = rng.below(6) as usize;
+                let mut items = Vec::new();
+                for _ in 0..n {
+                    let id = ids.remove(rng.below(ids.len() as u64) as usize);
+                    items.push(serde_json::json!({ "id": id, "label": format!("l{}", rng.below(3)), "done": rng.below(2) == 1 }));
+                }
+                out["items"] = items.into();
+            }
+            6 => {
+                // Reorder: swap two items.
+                if let Some(items) = out["items"].as_array_mut() {
+                    if items.len() > 1 {
+                        let (a, b) = (
+                            rng.below(items.len() as u64) as usize,
+                            rng.below(items.len() as u64) as usize,
+                        );
+                        items.swap(a, b);
+                    }
+                }
+            }
+            7 => {
+                // Remove one item, or insert one with an unused id at a random place.
+                if let Some(items) = out["items"].as_array_mut() {
+                    if !items.is_empty() && rng.below(2) == 0 {
+                        items.remove(rng.below(items.len() as u64) as usize);
+                    } else if let Some(id) =
+                        (0..8u64).find(|id| !items.iter().any(|item| item["id"] == *id))
+                    {
+                        let at = rng.below(items.len() as u64 + 1) as usize;
+                        items.insert(
+                            at,
+                            serde_json::json!({ "id": id, "label": "new", "done": false }),
+                        );
+                    }
+                }
             }
             5 => {
                 if let Some(items) = out["items"].as_array_mut() {
@@ -279,14 +368,92 @@ fn one_changed_field_patches_one_prop_and_one_text() {
     assert_eq!(ops, ["setProp", "setText"], "{doc}");
 }
 
+fn ops(from: &str, to: &str) -> Vec<String> {
+    let updated = update(&program_render(from), &snapshot(to)).expect("updates");
+    let doc: Value = serde_json::from_str(&patches_to_json(&updated.patches)).unwrap();
+    doc["patches"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["op"].as_str().unwrap().to_string())
+        .collect()
+}
+
+fn list(ids: &[u32]) -> String {
+    let items: Vec<String> = ids
+        .iter()
+        .map(|id| format!(r#"{{"id":{id},"label":"l{id}","done":false}}"#))
+        .collect();
+    format!(
+        r#"{{"title":"t","count":1,"flag":true,"items":[{}]}}"#,
+        items.join(",")
+    )
+}
+
 #[test]
-fn a_change_of_structure_is_a_replace() {
+fn a_conditional_switching_is_a_remove_and_an_insert_not_a_replace() {
     let a = r#"{"title":"t","count":1,"flag":true,"items":[]}"#;
     let b = r#"{"title":"t","count":1,"flag":false,"items":[]}"#;
-    let updated = update(&program_render(a), &snapshot(b)).expect("updates");
-    let doc: Value = serde_json::from_str(&patches_to_json(&updated.patches)).unwrap();
-    assert_eq!(doc["patches"][0]["op"], "replace");
-    assert_eq!(doc["patches"].as_array().unwrap().len(), 1);
+    assert_eq!(ops(a, b), ["remove", "insert"]);
+}
+
+#[test]
+fn a_list_gaining_losing_and_reordering_items_patches_by_key() {
+    assert_eq!(ops(&list(&[1, 2, 3]), &list(&[1, 2, 3, 4])), ["insert"]);
+    assert_eq!(ops(&list(&[1, 2, 3]), &list(&[1, 3])), ["remove"]);
+    assert_eq!(ops(&list(&[1, 3]), &list(&[1, 2, 3])), ["insert"]);
+    // One item moved to the front is one move, whatever the length.
+    assert_eq!(
+        ops(&list(&[1, 2, 3, 4, 5]), &list(&[5, 1, 2, 3, 4])),
+        ["move"]
+    );
+    // A new order uses moves only, never a rebuild.
+    let reversed = ops(&list(&[1, 2, 3, 4]), &list(&[4, 3, 2, 1]));
+    assert!(reversed.iter().all(|op| op == "move"), "{reversed:?}");
+    // Nothing but the changed item's own props and text change when it stays put.
+    assert_eq!(
+        ops(&list(&[1, 2, 3]), &list(&[1, 2, 3]).replace("l2", "L2")),
+        ["setProp", "setText"]
+    );
+}
+
+#[test]
+fn a_long_list_rotated_is_one_move_and_a_shuffle_is_only_moves() {
+    let ids: Vec<u32> = (0..1000).collect();
+    let mut rotated = ids.clone();
+    rotated.rotate_right(1);
+    assert_eq!(ops(&list(&ids), &list(&rotated)), ["move"]);
+    // A deterministic shuffle: every kept item is moved or left, never rebuilt.
+    let mut shuffled = ids.clone();
+    let mut rng = Rng(3);
+    for at in (1..shuffled.len()).rev() {
+        shuffled.swap(at, rng.below(at as u64 + 1) as usize);
+    }
+    let shuffle_ops = ops(&list(&ids), &list(&shuffled));
+    assert!(shuffle_ops.iter().all(|op| op == "move"), "only moves");
+    let mut tree: Value =
+        serde_json::from_str(&program_render(&list(&ids)).tree().to_json()).unwrap();
+    let updated =
+        update(&program_render(&list(&ids)), &snapshot(&list(&shuffled))).expect("updates");
+    apply(
+        &mut tree,
+        &serde_json::from_str(&patches_to_json(&updated.patches)).unwrap(),
+    );
+    let full: Value =
+        serde_json::from_str(&program_render(&list(&shuffled)).tree().to_json()).unwrap();
+    assert_eq!(tree, full);
+}
+
+#[test]
+fn a_moved_item_keeps_its_changes_and_an_inserted_one_brings_its_subtree() {
+    let a = list(&[1, 2, 3]);
+    let b = list(&[3, 1, 9]).replace("l1", "L1");
+    let mut tree: Value = serde_json::from_str(&program_render(&a).tree().to_json()).unwrap();
+    let updated = update(&program_render(&a), &snapshot(&b)).expect("updates");
+    let patches: Value = serde_json::from_str(&patches_to_json(&updated.patches)).unwrap();
+    apply(&mut tree, &patches);
+    let full: Value = serde_json::from_str(&program_render(&b).tree().to_json()).unwrap();
+    assert_eq!(tree, full);
 }
 
 #[test]
@@ -321,4 +488,78 @@ fn a_refused_update_leaves_the_previous_render_valid() {
     let intent = dispatch(&current, &handler.expect("a handler"), None).expect("still dispatches");
     assert_eq!(intent.command, "pick");
     let _ = HostValue::from_json("null");
+}
+
+/// A custom element is a primitive like any other: the manifest declares its
+/// tag, props and events, and a list or a record prop is carried natively,
+/// in render-v1 and in `setProp`, never as text (§9.7.8, §9.8.7).
+#[test]
+fn a_custom_elements_list_and_record_props_are_carried_natively() {
+    const MODEL: &str = r#"{
+      "version": 1, "types": {},
+      "components": {
+        "my-chart": {
+          "props": {
+            "points": { "type": { "kind": "list", "element": { "kind": "record", "fields": {
+                "x": { "type": { "kind": "number" }, "required": true },
+                "y": { "type": { "kind": "number" }, "required": true } } } }, "required": true },
+            "options": { "type": { "kind": "record", "fields": {
+                "title": { "type": { "kind": "string" }, "required": true } } }, "required": true }
+          },
+          "events": { "pointSelected": { "payload": { "kind": "record", "fields": {
+              "index": { "type": { "kind": "number" }, "required": true } } } } },
+          "commands": {}, "scope": {} },
+        "view": { "props": {}, "events": {},
+          "commands": { "show": { "parameters": [ { "name": "at", "type": { "kind": "record", "fields": {
+              "index": { "type": { "kind": "number" }, "required": true } } } } ] } },
+          "scope": {
+            "points": { "kind": "list", "element": { "kind": "record", "fields": {
+                "x": { "type": { "kind": "number" }, "required": true },
+                "y": { "type": { "kind": "number" }, "required": true } } } },
+            "title": { "kind": "string" } } }
+      }
+    }"#;
+    let template = compile_with(
+        MODEL,
+        "view",
+        "<my-chart points={points} options={{ title: title }} on.pointSelected={show($event)} />",
+    );
+    let texts = [template.as_str()];
+    let program = Program {
+        root: "view",
+        templates: &texts,
+    };
+    let first = render(
+        &program,
+        MODEL,
+        &snapshot(r#"{"points":[{"x":1,"y":2}],"title":"a"}"#),
+    )
+    .unwrap_or_else(|d| panic!("renders: {d:#?}"));
+    let root: Value = serde_json::from_str(&first.tree().to_json()).unwrap();
+    // Carried natively: a list and a record in `props`, and no text for either.
+    assert_eq!(
+        root["root"]["props"]["points"],
+        serde_json::json!([{ "x": 1, "y": 2 }])
+    );
+    assert_eq!(
+        root["root"]["props"]["options"],
+        serde_json::json!({ "title": "a" })
+    );
+    assert!(root["root"].get("propText").is_none());
+
+    let updated = update(
+        &first,
+        &snapshot(r#"{"points":[{"x":1,"y":2},{"x":3,"y":4}],"title":"a"}"#),
+    )
+    .expect("updates");
+    let doc: Value = serde_json::from_str(&patches_to_json(&updated.patches)).unwrap();
+    assert_eq!(doc["patches"].as_array().unwrap().len(), 1, "{doc}");
+    assert_eq!(doc["patches"][0]["op"], "setProp");
+    assert_eq!(doc["patches"][0]["prop"], "points");
+    assert_eq!(
+        doc["patches"][0]["value"],
+        serde_json::json!([{ "x": 1, "y": 2 }, { "x": 3, "y": 4 }])
+    );
+    assert!(doc["patches"][0].get("propText").is_none());
+    assert!(patch_schema().is_valid(&doc));
 }

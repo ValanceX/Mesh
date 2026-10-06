@@ -49,7 +49,22 @@ export type RenderPatch =
     }
   | { readonly op: "removeProp"; readonly key: string; readonly prop: string }
   | { readonly op: "setText"; readonly key: string; readonly text: string }
-  /** A change of structure: draw this tree afresh, reusing nothing. */
+  /**
+   * A node (with its whole subtree) or text run is new under `parent`: before
+   * its child `before`, or last when there is none. Its keys aren't in the tree
+   * at this point.
+   */
+  | {
+      readonly op: "insert";
+      readonly parent: string;
+      readonly before?: string;
+      readonly node: RenderNode | TextRun;
+    }
+  /** The node or text run, and everything under it, is gone. */
+  | { readonly op: "remove"; readonly key: string }
+  /** The same node or text run, kept, now stands before its sibling `before`, or last when there is none. */
+  | { readonly op: "move"; readonly key: string; readonly before?: string }
+  /** A tree no other operation can turn into the next: draw it afresh, reusing nothing. The only operation of its list. */
   | { readonly op: "replace"; readonly tree: RenderTree };
 
 /** A primitive occurrence. Composites never appear: they're expanded. */

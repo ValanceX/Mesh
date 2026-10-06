@@ -100,8 +100,10 @@ export class Render {
   readonly #templates: Uint8Array;
   readonly #model: string;
   readonly #snapshot: Uint8Array;
+  /** The module's copy of this render, which `update` made: its handle, and the module it is in. */
+  #kept: { readonly handle: number; readonly generation: number } | undefined;
 
-  /** Not public: renders come from {@link render}. */
+  /** Not public: renders come from {@link render} and {@link update}. */
   constructor(
     token: symbol,
     tree: RenderTree,
@@ -109,22 +111,56 @@ export class Render {
     templates: Uint8Array,
     model: string,
     snapshot: Uint8Array,
+    kept?: { readonly handle: number; readonly generation: number },
   ) {
     if (token !== MAKING) {
-      throw new TypeError("a Render comes from render()");
+      throw new TypeError("a Render comes from render() or update()");
     }
     this.tree = tree;
     this.#root = root;
     this.#templates = templates;
     this.#model = model;
     this.#snapshot = snapshot;
+    this.#kept = kept;
+    if (kept) {
+      // If this render is dropped without release(), its copy in the module is released when it is collected.
+      keptRegistry.register(this, kept, this);
+    }
     Object.freeze(this);
+  }
+
+  /**
+   * Releases the module's copy of this render, which `update` made so the
+   * next `update` need not derive it again. Call it when this render is no
+   * longer the one to update from or to dispatch with: once an update's
+   * patches are applied, release the render before it. It is safe to call
+   * twice, and a render still works after it, since it keeps its own inputs:
+   * the next `update` just derives it again, as it does for a render
+   * `render()` made. A render that is never released is released when it is
+   * garbage collected, but that is up to the engine and can be late.
+   */
+  release(): void {
+    const kept = this.#kept;
+    if (!kept) {
+      return;
+    }
+    this.#kept = undefined;
+    keptRegistry.unregister(this);
+    releaseKept(kept);
+  }
+
+  /** The module's copy of `render`, if it has one that is still in the module in use. Throws a TypeError for a foreign object. */
+  static keptOf(render: Render): { readonly handle: number; readonly generation: number } | undefined {
+    if (!(typeof render === "object" && render !== null && #root in render)) {
+      throw new TypeError("update() takes a Render that render() or update() returned");
+    }
+    return render.#kept;
   }
 
   /** The inputs dispatch passes back to the module. Throws a TypeError for a foreign object. */
   static inputsOf(render: Render): [string, Uint8Array, string, Uint8Array] {
     if (!(typeof render === "object" && render !== null && #root in render)) {
-      throw new TypeError("dispatch() takes a Render that render() returned");
+      throw new TypeError("dispatch() takes a Render that render() or update() returned");
     }
     return [render.#root, render.#templates, render.#model, render.#snapshot];
   }
@@ -139,6 +175,7 @@ interface Exports {
   mesh_free(ptr: number, len: number): void;
   mesh_render(...args: number[]): number;
   mesh_update(...args: number[]): number;
+  mesh_release(handle: number): void;
   mesh_dispatch(...args: number[]): number;
   mesh_declared_events(...args: number[]): number;
   mesh_result_ptr(): number;
@@ -151,6 +188,7 @@ const EXPORTS = [
   "mesh_free",
   "mesh_render",
   "mesh_update",
+  "mesh_release",
   "mesh_dispatch",
   "mesh_declared_events",
   "mesh_result_ptr",
@@ -160,6 +198,26 @@ const EXPORTS = [
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
+
+/**
+ * Which instance each `Exports` is, in order of creation. A handle is only
+ * good in the instance that made it, and an instance is discarded after a
+ * boundary failure, so a render's handle names its instance's number.
+ */
+const generations = new WeakMap<Exports, number>();
+let generationCount = 0;
+
+/** Releases the module's copy of a render, in the instance that has it, if that is still the one in use. Never throws. */
+function releaseKept(kept: { readonly handle: number; readonly generation: number }): void {
+  void enqueue(async () => {
+    if (instance && generations.get(instance) === kept.generation) {
+      instance.mesh_release(kept.handle);
+    }
+  }).catch(() => undefined);
+}
+
+/** Releases the copy of a render that was garbage collected without `release()`. */
+const keptRegistry = new FinalizationRegistry<{ readonly handle: number; readonly generation: number }>(releaseKept);
 
 /** The compiled module, once loaded. */
 let compiled: WebAssembly.Module | undefined;
@@ -231,7 +289,9 @@ async function instantiate(module: WebAssembly.Module): Promise<Exports> {
   }
   // A plain copy of the exports (theirs is frozen), which the package's
   // failure tests can instrument.
-  return { ...exports } as unknown as Exports;
+  const made = { ...exports } as unknown as Exports;
+  generations.set(made, ++generationCount);
+  return made;
 }
 
 /**
@@ -430,15 +490,21 @@ export function render(input: RenderInput): Promise<RenderResult> {
 export function update(previous: Render, snapshotInput: Record<string, unknown>): Promise<UpdateResult> {
   return enqueue(async () => {
     const [root, templates, model, previousSnapshot] = Render.inputsOf(previous);
+    const kept = Render.keptOf(previous);
     const snapshot = encodeValue(snapshotInput);
     return runNow(
       [encoder.encode(root), templates, encoder.encode(model), previousSnapshot, snapshot],
-      (exports, pointers) => exports.mesh_update(...pointers),
+      (exports, pointers) => {
+        // The module's copy is good only in the instance that made it.
+        const held = kept !== undefined && generations.get(exports) === kept.generation;
+        return exports.mesh_update(...pointers, held ? kept.handle : 0, held ? 1 : 0);
+      },
       (result): UpdateResult => {
         if (isDiagnostics(result.diagnostics)) {
           return Object.freeze({ diagnostics: result.diagnostics });
         }
         if (
+          typeof result.handle !== "number" ||
           typeof result.tree !== "object" ||
           result.tree === null ||
           typeof result.patches !== "object" ||
@@ -446,8 +512,15 @@ export function update(previous: Render, snapshotInput: Record<string, unknown>)
         ) {
           throw new MeshInternalError("the runtime's result is neither an update nor diagnostics");
         }
+        const generation = generations.get(instance as Exports);
+        if (generation === undefined) {
+          throw new MeshInternalError("the runtime's instance has no generation");
+        }
         return Object.freeze({
-          render: new Render(MAKING, result.tree as RenderTree, root, templates, model, snapshot),
+          render: new Render(MAKING, result.tree as RenderTree, root, templates, model, snapshot, {
+            handle: result.handle,
+            generation,
+          }),
           patches: result.patches as RenderPatches,
         });
       },

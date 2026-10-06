@@ -3,8 +3,9 @@
 //! It renders a **program** of templates (`mesh-template`) against a
 //! host's **snapshot**, producing a render tree for a renderer to draw,
 //! and turns the events a renderer reports into **command intents** for
-//! the host. Its whole surface is two operations, render and dispatch,
-//! and `resolve`, the reference implementation of event resolution
+//! the host. Its surface is render, dispatch, `update` (render again,
+//! reusing what is unchanged, and say what changed as patches) and
+//! `declared_events`, and `resolve`, the reference implementation of event resolution
 //! (§9.9), a pure function of a render tree that renderers implement for
 //! their own targets.
 //!
