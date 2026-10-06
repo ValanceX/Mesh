@@ -77,9 +77,41 @@ Rules:
 
 `mesh-each` items are tracked by their declared key. For each key present in both renders: if the item value is structurally unchanged, nothing is evaluated for it; if it changed, only the sites inside the body that read the item's changed fields re-evaluate. New keys `insert`, missing keys `remove`, reordered keys `move`. Duplicate or invalid keys still fail closed (§9.10).
 
-### A6. Cost model
+### A6. Refinement: the host hands over changes, over a structurally shared snapshot
 
-Update cost is proportional to the number of changed paths plus the sites that read them, plus a structural compare of the snapshot. The compare is a full walk of the snapshot, which is linear in snapshot size and cheap compared to evaluating a template. A later refinement lets the host hand over changed paths (a hint, verified under test, never trusted for correctness).
+This is a refinement of A3, not a milestone. It lands inside M1 as the second form of `update`'s input, and the full-snapshot form stays (it is the reference and the fallback).
+
+**Why.** The first form of A3 compares the whole new snapshot with the stored one. That is linear in snapshot size, and the JavaScript package must also encode the whole snapshot on every call. The boundary cost dominates for large state.
+
+**The second input form.**
+
+```text
+update(render, changes) -> { render', patches } | diagnostics
+changes = { base, set: [{ path, value }], remove: [{ path }] }
+```
+
+- `base` is the **digest of the snapshot** the changes apply to (the runtime computes and stores a digest of every `Render`'s snapshot over the boundary data model, §9.8.1, so a digest is canonical). The runtime refuses changes whose `base` is not the held render's digest (`runtime-changes-base-mismatch`): changes can never be applied to a snapshot other than the one they were computed against.
+- A path addresses a root-scope name and then record fields and list indices. `set` replaces the value at a path (or inserts a record field, or appends at index = length); `remove` removes a record field. Paths are validated against the model's types, and the resulting snapshot is validated exactly as a full snapshot is (I14), so an untyped or ill-formed change is a diagnostic, not a state.
+- The runtime **derives** the new snapshot by applying the changes to the held one. **The changes are not a hint beside a snapshot; they define it.** There is no second copy of the state that could disagree with them, so a wrong change set can only produce a *different valid snapshot*, never an inconsistent render.
+
+**Structural sharing in the runtime.** The snapshot's nodes are `Arc`-shared, so applying changes copies only the spine from the root to each changed path and shares every other subtree with the previous snapshot. Consequences:
+
+- A `Render` costs O(changed spine) to create, not O(snapshot). Retaining many renders (time travel, the dispatch rule that a render keeps its own snapshot) is cheap.
+- The changed-path set for the patch step is exactly the changes given, normalized (a `set` at `a.b` makes `a.b.c` dirty). With the full-snapshot form, pointer equality (`Arc::ptr_eq`) lets the compare skip any subtree shared with the previous snapshot. Pointer equality only ever short-circuits to "equal"; "different" is always decided by value comparison, so the boundary's equality (binary64 numbers, no `-0`, UTF-16 strings) is unchanged.
+- Start with `Arc`-shared records and lists. Adopt a persistent vector (an RRB tree) only if the benchmark below shows plain `Arc<[Value]>` copy-on-write is too slow for big keyed lists; that decision is made in M2 on measurements.
+
+**Making the changes correct by construction and by test.** The host-side producer is the risk, so correctness is enforced in four layers rather than trusted:
+
+1. **Derive changes from states, not from command code.** The host computes `changes` by diffing its previous and next immutable state values (reference-equality shortcut where the state is persistent, deep value comparison otherwise), then projecting each state change onto the *scope*: the view's `scope` function runs on the next state, and the diff is taken on scope values. Nothing relies on a command declaring what it touched. Valance does this (M6); the diff function is one shared, specified algorithm with its own tests, not per-app code.
+2. **Digest-chained bases.** Each `update` result carries the digest of the new snapshot. The host passes it back as the next `base`. A skipped, reordered, duplicated or concurrent update breaks the chain and fails closed with `runtime-changes-base-mismatch`; it can never silently apply.
+3. **Verify mode.** A runtime option, on by default in tests, debug builds and the devtools, and off in production, takes the host's full next snapshot alongside the changes and requires `apply(changes, previous) == full` as values (`runtime-changes-disagree` on any difference, with the path of the first). This is the cross-check that the diff producer is right. It costs a full encode, which is exactly why it is not the production default.
+4. **Property tests as the acceptance gate.** Over generated programs, snapshot pairs and edit sequences: (a) `diff(s0, s1)` applied to `s0` yields `s1` exactly; (b) the render and patches from the changes form equal those from the full-snapshot form; (c) the equivalence law of §Non-negotiable rule 5 holds. Edge cases are explicit vectors: list insert, remove and reorder in the middle, an absent-to-present optional field, `-0` to `0`, a field set to its own value (an empty change), a record field renamed (a remove plus a set), and a nested change under a list element that a concurrent change removes.
+
+**When changes cannot be trusted or built:** the host uses the full-snapshot form, which always works. A host never needs the changes form for correctness.
+
+**Benchmark first.** M1 starts with a benchmark and a counter test: a 10,000-item keyed list with one item changed; a deep record with one leaf changed. Reported: bytes encoded across the JavaScript boundary, sites re-evaluated, and wall time, for the full-snapshot form and the changes form. The sharing and changes-form work must show a measured improvement to ship; otherwise it is dropped from M1 and stays as designed.
+
+**Cost model.** Update cost is proportional to the number of changes, the sites that read them, and the spine copy of each changed path. In the full-snapshot form it also includes a compare that skips every shared subtree.
 
 ## Part B: composition (the basic-feature gap)
 
@@ -151,12 +183,12 @@ Each milestone is releasable and carries its own conformance vectors.
 
 | # | Milestone | Repos | Acceptance |
 |---|---|---|---|
-| **M1** | Static `reads`, `update` and `render-patch-v1` for **props and text only** (no structural change), plus PORT's patch application | Mesh, Port | Equivalence law holds in a property test over generated programs and snapshots; a one-field change touches one DOM node in a Chromium test; untouched nodes are not re-evaluated (counter test) |
+| **M1** | Static `reads`, `update` (full-snapshot form, then the A6 changes form over an `Arc`-shared snapshot, gated on the benchmark) and `render-patch-v1` for **props and text only** (no structural change), plus PORT's patch application | Mesh, Port | Equivalence law holds in a property test over generated programs and snapshots; a one-field change touches one DOM node in a Chromium test; untouched nodes are not re-evaluated (counter test) |
 | **M2** | Structural patches: `insert`, `remove`, `move` for `mesh-if` and keyed `mesh-each`; per-item reuse | Mesh, Port | Identity vectors (§9.10) still pass; reorder of 1,000 keyed items moves nodes and reuses every node object |
 | **M3** | Expression gaps: `len`, `has`, `?.`, subscripts, `mesh-if` else and nesting; `mesh-each` and `mesh-if` become M3 | Mesh | Spec §9.7 text, diagnostics with stable codes, LSP completion and hover cover them |
 | **M4** | Children and a default `mesh-slot`; manifest `children` declaration and checking | Mesh, Port | Composite with children renders; identity vectors extended; update routes caller paths through a slot |
 | **M5** | Composite events (`emit`) and named slots | Mesh | Dispatch forwarding vectors; at-most-one-binding rule holds |
-| **M6** | Valance and Nexus integration: `host.render` becomes `update` when the program is unchanged; the Valance Web host applies patches | Valance, Nexus | docs-site example updates fine-grained end to end; documented in Tier 1 |
+| **M6** | Valance and Nexus integration: `host.render` becomes `update` when the program is unchanged, with the shared state-diff producing A6's changes and digest-chained bases; the Valance Web host applies patches | Valance, Nexus | docs-site example updates fine-grained end to end; documented in Tier 1 |
 
 | **M3a** | Error handling: diagnostic codes for every new construct, previous-render-intact guarantee for failed `update`, documented failure-as-state host pattern with vector | Mesh | A failed `update` returns diagnostics only and the old `Render` still dispatches; codes are in the diagnostics manual |
 | **M1b** | `explain` output and the versioned session-log format with a replay vector | Mesh | Replay of a recorded log reproduces every tree byte for byte |
@@ -167,7 +199,8 @@ Ordering note: M1 comes before the language additions on purpose. The patch form
 
 ## Risks
 
-- **Snapshot compare cost** on very large state. Mitigated by the host-supplied changed-path hint (A6), later.
+- **Snapshot compare and encode cost** on very large state. Mitigated by the changes form over a structurally shared snapshot (A6), with its correctness layers.
+- **A wrong change set.** Cannot corrupt a render, since the changes define the new snapshot and are type-validated, but could show the wrong state. Mitigated by deriving changes from state diffs, digest-chained bases and verify mode (A6).
 - **`reads` conservatism.** A coarse `reads` only costs extra re-evaluation, never correctness, because the equivalence law is tested against full render.
 - **Pre-1.0 churn.** Port declares `peerDependencies` on a MESH range; each MESH minor needs a Port range bump. M1 touches both, so release them together and bump the ranges in the same change.
 - **Cross-repo coupling.** PORT must not depend on the MESH runtime (contract obligation 7). It consumes the patch *schema* only, as it does `render-v1` today.
