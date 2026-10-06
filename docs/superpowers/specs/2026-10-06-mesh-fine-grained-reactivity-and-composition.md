@@ -116,6 +116,35 @@ Today a composite has no events. Proposal: a composite's manifest entry may decl
 - **Subscripts.** `list[i]` with a bounds failure as a runtime diagnostic, not `null`.
 - **Rename.** Keep the reserved names `mesh-if` and `mesh-each` as the stable spelling. A prettier surface can be sugar later; renaming now would cost every example.
 
+## Part C: devtools (replay and time travel)
+
+State changes only through commands, and render is pure: no I/O, clock, randomness or global state (runtime invariants). So a session is fully described by an ordered log, and replay needs no instrumentation of application code.
+
+- **The log is data.** A session is `(program, model, initial snapshot)` plus the ordered `(handler, payload)` dispatches the host relayed, plus the command results Nexus committed. MESH's part: the runtime already returns intents deterministically, so the same log gives the same intents and, through `render`/`update`, the same trees.
+- **Time travel is `render` of a past snapshot.** Jumping to step *n* renders the snapshot recorded at *n* with `render` (a `replace`/draw for the renderer), never `update`, so it works across any history gap. Stepping forward one command uses `update` and shows the real patch list, which is itself a devtools feature: the panel can show *why* a node changed (the changed path, the binding site that read it, the patch).
+- **Inspection comes from existing data.** Template `reads` (A1) give a dependency graph: which state path feeds which site. Keys and handler identifiers (§9.10) give stable node identity across frames. Spans in templates map any rendered node back to MPRX source.
+- **MESH deliverables:** (1) `render-v1` and `render-patch-v1` JSON are the only formats a recorder needs, so a recorder is a host concern, not a runtime feature; (2) an optional `explain` output from `update` (changed paths, sites re-evaluated, sites skipped), off by default and not part of the equivalence law; (3) a documented, versioned **session log** format with a conformance replay vector: replaying a recorded log reproduces every recorded tree byte for byte.
+- **Not in MESH:** the UI of the devtools, and recording of Nexus command results. Those belong to Nexus and Valance (milestone M7).
+
+## Part D: error handling
+
+Principle: **a failure is state, and an invalid program fails closed with diagnostics.** MESH already follows the second half; this part makes both explicit and checks they hold for everything this design adds.
+
+- **Fail closed.** `render` and `update` return diagnostics or a result, never both and never an exception (runtime manual). Every new construct gets stable diagnostic codes (never renamed or reused): `reads` inconsistent with an expression, malformed patch lists, `emit` of an undeclared event, children given to a composite that declares none, slot misuse, and out-of-bounds subscripts. A failed `update` leaves the previous `Render` valid and unchanged, so the drawn UI never diverges from a render the host holds.
+- **No silent fallback hiding a bug.** The `replace` escape hatch (A4) is allowed only for missing `reads` or an explicit runtime decision, and `explain` reports why it was used. A patch that would not satisfy the equivalence law is a runtime bug, not a condition to recover from.
+- **Failure as state, in templates.** MPRX stays free of exceptions and handlers. The way to express a failure in the UI is the one already used elsewhere: the host models it in scope (for example a `status` record with `loading`, `error` and `data`), and the template shows it with `mesh-if`. This design adds what that pattern needs: `has(x)` and `?.` (M3) so absent data is testable, and `else` so the error branch is one conditional. Nexus owns producing the failure state from a failed command; MESH only renders it.
+- **Template-level boundary (proposal).** Because rendering a failed expression (a subscript out of bounds, a prop of the wrong type) currently fails the whole render, `mesh-if` gains no catch semantics, but the host can keep the last good render and surface the diagnostics as its own error state. Documenting this host pattern, with a conformance vector, is in M3. A per-subtree error boundary is deliberately not proposed: it would let invalid output render, against the fail-closed rule.
+- **Dispatch.** An unknown or stale handler identifier is already a diagnostic (`§9.10.7`); patches add nothing here, since identifiers are identity-derived and stable.
+
+## Part E: Web Components as primitives (MESH side)
+
+A custom element is just a primitive: the manifest declares its tag, props, events and payload types. MESH needs no change for this, and the design keeps it that way.
+
+- Tag names with a hyphen are already valid component names (`tagName` allows `-`). The documented rule to add: a hyphenated tag the manifest declares as a primitive is realized by the renderer as an element of that name; MESH assigns it no behavior.
+- A manifest for a custom element can type its props (including lists and records, which §9.8.7 only allows natively, never as text) and its events with payloads. The compiler then checks usage as for any primitive. Tooling (hover, completion) works from the manifest with no special case.
+- Reactivity is unchanged: a `setProp` on a custom element is a prop change like any other. The PORT side decides which slot receives it (see PORT's design).
+- Deliverables: a manifest guide section and an example manifest (a typical `<my-chart>` with a record prop and a `point-selected` event), plus a conformance vector that a list/record prop is carried natively in render-v1 and in `render-patch-v1` `setProp`.
+
 ## Milestones
 
 Each milestone is releasable and carries its own conformance vectors.
@@ -128,6 +157,11 @@ Each milestone is releasable and carries its own conformance vectors.
 | **M4** | Children and a default `mesh-slot`; manifest `children` declaration and checking | Mesh, Port | Composite with children renders; identity vectors extended; update routes caller paths through a slot |
 | **M5** | Composite events (`emit`) and named slots | Mesh | Dispatch forwarding vectors; at-most-one-binding rule holds |
 | **M6** | Valance and Nexus integration: `host.render` becomes `update` when the program is unchanged; the Valance Web host applies patches | Valance, Nexus | docs-site example updates fine-grained end to end; documented in Tier 1 |
+
+| **M3a** | Error handling: diagnostic codes for every new construct, previous-render-intact guarantee for failed `update`, documented failure-as-state host pattern with vector | Mesh | A failed `update` returns diagnostics only and the old `Render` still dispatches; codes are in the diagnostics manual |
+| **M1b** | `explain` output and the versioned session-log format with a replay vector | Mesh | Replay of a recorded log reproduces every tree byte for byte |
+| **M1c** | Web Component manifest guide, example manifest and native list/record conformance vectors | Mesh | Vectors pass in Rust and JavaScript |
+| **M7** | Devtools panel: command log, time travel, patch and dependency inspector | Valance, Nexus | Jumping to any past step restores that UI; a node can be traced to its state path and MPRX span |
 
 Ordering note: M1 comes before the language additions on purpose. The patch format and equivalence law constrain every later construct, so they must exist before structure grows.
 
