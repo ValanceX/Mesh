@@ -114,7 +114,7 @@ mesh/
 
 ## Status
 
-**v0.9.0 prepared** (2026-10-04; not yet released: v0.8.0 is the latest release). See the [release notes](./docs/releases/v0.9.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.9.0 is released** (2026-10-04; the latest release, on npm as `@valancex/mesh-compiler`, `@valancex/mesh-runtime` and `@valancex/mesh-lsp`). Unreleased changes since are in the [CHANGELOG](./CHANGELOG.md). See the [release notes](./docs/releases/v0.9.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), and event bindings (`on.click={...}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings
