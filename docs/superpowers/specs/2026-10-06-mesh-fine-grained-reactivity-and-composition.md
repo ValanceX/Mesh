@@ -183,6 +183,17 @@ A custom element is just a primitive: the manifest declares its tag, props, even
 - Reactivity is unchanged: a `setProp` on a custom element is a prop change like any other. The PORT side decides which slot receives it (see PORT's design).
 - Deliverables: a manifest guide section and an example manifest (a typical `<my-chart>` with a record prop and a `point-selected` event), plus a conformance vector that a list/record prop is carried natively in render-v1 and in `render-patch-v1` `setProp`.
 
+## M1 status and what building it changed (2026-10-06)
+
+M1's first four steps are built and tested on the `ccr-969a5158-vobqhh` branches; the shared snapshot and changes form (A6) is not built. The design above stays the target; this records where the first implementation differs from it, and why.
+
+- **Read sets are derived by the runtime, not emitted by the compiler (A1).** `reads` is a pure function of a template's expressions, so the runtime computes it from the template it is given. That needs no `template-v1` change and no recompile of existing templates, and gives the same answer the compiler would. The compiler change in A1 is dropped unless a second runtime needs the sets without parsing a template.
+- **The unit of reuse is a scope name's value, not a root path (A2).** A node's props and a text run's text are recorded with the values of the scope names their expressions read, and reused when those are identical (numbers by their bits, so `0` and `-0` differ). This handles composites and repeated items with no extra mapping, because a composite's or an item's scope is just values under names. It is coarser than a path (a change to any field of a record that is read as a whole re-evaluates), which costs evaluation only, never correctness.
+- **Patches come from diffing the two trees (A3 step 4),** which makes the law true by construction, and the random test checks it. A change of structure is one `replace` until M2.
+- **The module is stateless, so JavaScript `update` derives the previous render again** and costs a render more than Rust's. Skipping work across the JavaScript boundary needs the module to keep a render between calls: a handle table, which departs from "after a call the module holds nothing". That is a decision for review, not made here.
+- **Measured (10,000 keyed items, one changed, release build):** a full render evaluates 60,001 expressions in about 169 ms; `update` evaluates 20,005 (the structural `items` and `key` expressions, which M2 addresses) in about 149 ms, with 2 patches. Program validation is 0.3 ms and cloning a render is 27 ms of that. **The time is in rebuilding and re-keying the whole tree** (each node's key is a SHA-256), not in evaluation, so reusing results alone gives a third of the evaluations but only a small share of the time.
+- **Consequence for A6.** The shared snapshot and changes form would save snapshot encoding at the JavaScript boundary and snapshot cloning, neither of which dominates in these numbers; the benchmark's gate for A6 is **not met** on the Rust side, and the JavaScript boundary's cost has not been measured. A6 stays designed, not built. What would move the numbers is keeping the rendered tree and a table from a changed value to the nodes that read it, so an update touches only those: the original A2 table, built over the retained tree. That is the next piece of reactivity work, and it needs the retained-render decision above.
+
 ## Milestones
 
 Each milestone is releasable and carries its own conformance vectors.

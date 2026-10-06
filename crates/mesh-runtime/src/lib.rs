@@ -21,6 +21,7 @@ mod dispatch;
 pub mod encoding;
 mod eval;
 mod number;
+mod patch;
 mod program;
 mod render;
 mod resolve;
@@ -30,9 +31,12 @@ mod value;
 
 pub use diagnostic::{to_json, Form, Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
 pub use dispatch::{dispatch, dispatch_from};
+#[doc(hidden)]
+pub use eval::evaluations;
 pub use number::number_to_text;
+pub use patch::{diff, patches_to_json, Patch};
 pub use program::{declared_events_to_json, DeclaredEvent, Program};
-pub use render::{render, Render};
+pub use render::{render, update, Render, Update};
 pub use resolve::{resolve, Interaction, ResolveError, Resolved};
 pub use tree::{Intent, Node, Tree, TreeChild};
 pub use value::{HostKey, HostRecord, HostValue};

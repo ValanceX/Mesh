@@ -14,6 +14,7 @@ import { encodeTexts, encodeValue } from "./encode.js";
 import type {
   CommandIntent,
   DeclaredEvent,
+  RenderPatches,
   RenderTree,
   RuntimeDiagnosticsDocument,
 } from "./types.js";
@@ -72,6 +73,11 @@ export type DeclaredEventsResult =
 export type RenderResult =
   | { readonly render: Render; readonly diagnostics?: never }
   | { readonly render?: never; readonly diagnostics: RuntimeDiagnosticsDocument };
+
+/** What update gives: the new render and the patches from the previous tree to its tree, or diagnostics. */
+export type UpdateResult =
+  | { readonly render: Render; readonly patches: RenderPatches; readonly diagnostics?: never }
+  | { readonly render?: never; readonly patches?: never; readonly diagnostics: RuntimeDiagnosticsDocument };
 
 /** What dispatch gives: a command intent, or diagnostics. */
 export type DispatchResult =
@@ -132,6 +138,7 @@ interface Exports {
   mesh_alloc(len: number): number;
   mesh_free(ptr: number, len: number): void;
   mesh_render(...args: number[]): number;
+  mesh_update(...args: number[]): number;
   mesh_dispatch(...args: number[]): number;
   mesh_declared_events(...args: number[]): number;
   mesh_result_ptr(): number;
@@ -143,6 +150,7 @@ const EXPORTS = [
   "mesh_alloc",
   "mesh_free",
   "mesh_render",
+  "mesh_update",
   "mesh_dispatch",
   "mesh_declared_events",
   "mesh_result_ptr",
@@ -413,6 +421,35 @@ export function render(input: RenderInput): Promise<RenderResult> {
         }
         const tree = result.tree as RenderTree;
         return Object.freeze({ render: new Render(MAKING, tree, root, templates, model, snapshot) });
+      },
+    );
+  });
+}
+
+/** Updates. See the package's `update`. */
+export function update(previous: Render, snapshotInput: Record<string, unknown>): Promise<UpdateResult> {
+  return enqueue(async () => {
+    const [root, templates, model, previousSnapshot] = Render.inputsOf(previous);
+    const snapshot = encodeValue(snapshotInput);
+    return runNow(
+      [encoder.encode(root), templates, encoder.encode(model), previousSnapshot, snapshot],
+      (exports, pointers) => exports.mesh_update(...pointers),
+      (result): UpdateResult => {
+        if (isDiagnostics(result.diagnostics)) {
+          return Object.freeze({ diagnostics: result.diagnostics });
+        }
+        if (
+          typeof result.tree !== "object" ||
+          result.tree === null ||
+          typeof result.patches !== "object" ||
+          result.patches === null
+        ) {
+          throw new MeshInternalError("the runtime's result is neither an update nor diagnostics");
+        }
+        return Object.freeze({
+          render: new Render(MAKING, result.tree as RenderTree, root, templates, model, snapshot),
+          patches: result.patches as RenderPatches,
+        });
       },
     );
   });

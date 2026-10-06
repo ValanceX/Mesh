@@ -5,6 +5,7 @@ use crate::boundary::{output, Inputs};
 use crate::diagnostic::{PathSegment, RuntimeCode, RuntimeDiagnostic};
 use crate::eval::Scope;
 use crate::number::number_to_text;
+use crate::patch::Patch;
 use crate::program::{
     self, alternatives, repeat_name, Program, Step, Valid, ALTERNATIVES, COMPOSITE, CONDITIONAL,
     CONDITIONAL_COMPONENT, NODE, REPEAT, REPEAT_COMPONENT, TEXT,
@@ -13,7 +14,7 @@ use crate::tree::{Node, Tree, TreeChild};
 use crate::types::{fits, Statics};
 use crate::value::{HostRecord, Value};
 use mesh_template::{Child, Element, Expression};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 /// One successful render: its tree, and the program, model and snapshot
 /// it came from. It owns copies of all of them, so nothing a host does
@@ -26,6 +27,9 @@ pub struct Render {
     pub(crate) model: String,
     pub(crate) snapshot: HostRecord,
     tree: Tree,
+    /// What each node and text was computed from, so that `update` can
+    /// reuse a result whose inputs haven't changed.
+    memo: Memo,
 }
 
 impl Render {
@@ -50,7 +54,7 @@ pub fn render(
     snapshot: &HostRecord,
 ) -> Result<Render, Vec<RuntimeDiagnostic>> {
     let valid = program::validate(program, model)?;
-    let (tree, _) = tree(&valid, snapshot, false)?;
+    let (tree, _, memo) = tree(&valid, snapshot, false, None)?;
     Ok(Render {
         root: program.root.to_string(),
         templates: program
@@ -61,6 +65,117 @@ pub fn render(
         model: model.to_string(),
         snapshot: snapshot.clone(),
         tree,
+        memo,
+    })
+}
+
+/// One update: the render of the new snapshot, and the patches that turn
+/// the previous render's tree into its tree.
+#[derive(Debug, Clone)]
+pub struct Update {
+    pub render: Render,
+    pub patches: Vec<Patch>,
+}
+
+/// Renders `snapshot` in the program `previous` came from, reusing every
+/// node and text whose inputs are unchanged, and returns the new render and
+/// the patches from `previous`'s tree to its tree. The program is the
+/// previous render's: a host that has a different program renders afresh.
+/// On diagnostics, `previous` is untouched and still valid.
+pub fn update(previous: &Render, snapshot: &HostRecord) -> Result<Update, Vec<RuntimeDiagnostic>> {
+    let templates: Vec<&str> = previous.templates.iter().map(String::as_str).collect();
+    let valid = program::validate(
+        &Program {
+            root: &previous.root,
+            templates: &templates,
+        },
+        &previous.model,
+    )?;
+    let (tree, _, memo) = tree(&valid, snapshot, false, Some(&previous.memo))?;
+    let patches = crate::patch::diff(&previous.tree, &tree);
+    Ok(Update {
+        render: Render {
+            root: previous.root.clone(),
+            templates: previous.templates.clone(),
+            model: previous.model.clone(),
+            snapshot: snapshot.clone(),
+            tree,
+            memo,
+        },
+        patches,
+    })
+}
+
+/// What a node's props, or a text run, were computed from: the scope
+/// values of the names it reads, and its result.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Memo {
+    nodes: BTreeMap<String, NodeMemo>,
+    texts: BTreeMap<String, TextMemo>,
+}
+
+#[derive(Debug, Clone)]
+struct NodeMemo {
+    inputs: Vec<(String, Value)>,
+    props: BTreeMap<String, serde_json::Value>,
+    prop_text: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone)]
+struct TextMemo {
+    inputs: Vec<(String, Value)>,
+    text: String,
+}
+
+/// The scope names an expression reads. An expression is a pure function
+/// of these (and of nothing else in a render), so a result computed from
+/// the same values of them is the result.
+fn reads<'t>(expression: &'t Expression, names: &mut BTreeSet<&'t str>) {
+    match expression {
+        Expression::Literal { .. } | Expression::Event { .. } => {}
+        Expression::Scope { name, .. } => {
+            names.insert(name);
+        }
+        Expression::Member { object, .. } => reads(object, names),
+        Expression::Unary { operand, .. } => reads(operand, names),
+        Expression::Binary { left, right, .. } => {
+            reads(left, names);
+            reads(right, names);
+        }
+        Expression::Conditional {
+            condition,
+            consequent,
+            alternate,
+            ..
+        } => {
+            reads(condition, names);
+            reads(consequent, names);
+            reads(alternate, names);
+        }
+        Expression::List { elements, .. } => elements.iter().for_each(|e| reads(e, names)),
+        Expression::Record { fields, .. } => fields.iter().for_each(|f| reads(&f.value, names)),
+    }
+}
+
+/// The values `names` have in `values`: absent for a name with none.
+fn inputs_of(names: &BTreeSet<&str>, values: &BTreeMap<String, Value>) -> Vec<(String, Value)> {
+    names
+        .iter()
+        .map(|name| {
+            (
+                (*name).to_string(),
+                values.get(*name).cloned().unwrap_or(Value::Absent),
+            )
+        })
+        .collect()
+}
+
+/// Whether `inputs` are exactly what `values` holds now.
+fn unchanged(inputs: &[(String, Value)], values: &BTreeMap<String, Value>) -> bool {
+    inputs.iter().all(|(name, before)| {
+        values
+            .get(name)
+            .map_or(matches!(before, Value::Absent), |now| before.identical(now))
     })
 }
 
@@ -83,7 +198,8 @@ pub(crate) fn tree<'v>(
     valid: &'v Valid,
     snapshot: &HostRecord,
     record: bool,
-) -> Result<(Tree, Sites<'v>), Vec<RuntimeDiagnostic>> {
+    previous: Option<&Memo>,
+) -> Result<(Tree, Sites<'v>, Memo), Vec<RuntimeDiagnostic>> {
     let mut inputs = Inputs::new(&valid.manifest);
     let scope = snapshot_values(valid, snapshot, &mut inputs);
     let diagnostics = inputs.sorted();
@@ -94,6 +210,8 @@ pub(crate) fn tree<'v>(
         valid,
         keys: HashSet::new(),
         sites: record.then(BTreeMap::new),
+        previous,
+        memo: Memo::default(),
     };
     let root = &valid.templates[&valid.root];
     let tree = Tree {
@@ -101,7 +219,7 @@ pub(crate) fn tree<'v>(
             .occurrence(&valid.root, &root.root, 0, &mut Vec::new(), &scope)
             .map_err(|diagnostic| vec![diagnostic])?,
     };
-    Ok((tree, renderer.sites.unwrap_or_default()))
+    Ok((tree, renderer.sites.unwrap_or_default(), renderer.memo))
 }
 
 /// The root template's scope from the snapshot (§9.8.4): each name the
@@ -215,13 +333,16 @@ pub(crate) fn statics<'m>(
     }
 }
 
-struct Renderer<'v> {
+struct Renderer<'v, 'p> {
     valid: &'v Valid,
     keys: HashSet<String>,
     sites: Option<Sites<'v>>,
+    /// The previous render's memo, when updating.
+    previous: Option<&'p Memo>,
+    memo: Memo,
 }
 
-impl<'v> Renderer<'v> {
+impl<'v> Renderer<'v, '_> {
     fn key(
         &mut self,
         path: &[Step],
@@ -287,7 +408,21 @@ impl<'v> Renderer<'v> {
         let declared = &self.valid.component(&element.component).props;
         let mut props = BTreeMap::new();
         let mut prop_text = BTreeMap::new();
-        for prop in &element.props {
+        let mut read = BTreeSet::new();
+        element
+            .props
+            .iter()
+            .for_each(|prop| reads(&prop.value, &mut read));
+        let reused = self
+            .previous
+            .and_then(|memo| memo.nodes.get(&key))
+            .filter(|memo| unchanged(&memo.inputs, scope.values));
+        let computed = reused.is_none();
+        if let Some(memo) = reused {
+            props = memo.props.clone();
+            prop_text = memo.prop_text.clone();
+        }
+        for prop in element.props.iter().filter(|_| computed) {
             let value = scope.eval(&prop.value)?;
             let span = prop.value.span();
             if !fits(&self.valid.manifest, &value, &declared[&prop.prop].ty) {
@@ -316,6 +451,14 @@ impl<'v> Renderer<'v> {
             }
             props.insert(prop.prop.clone(), json);
         }
+        self.memo.nodes.insert(
+            key.clone(),
+            NodeMemo {
+                inputs: inputs_of(&read, scope.values),
+                props: props.clone(),
+                prop_text: prop_text.clone(),
+            },
+        );
         let events: BTreeMap<String, String> = element
             .events
             .iter()
@@ -343,16 +486,42 @@ impl<'v> Renderer<'v> {
         for (position, child) in render_children(element).into_iter().enumerate() {
             match child {
                 RenderChild::Run(parts) => {
-                    let mut text = String::new();
-                    for part in parts {
-                        match part {
-                            Child::Text { value, .. } => text.push_str(value),
-                            Child::Expression { expression } => {
-                                text.push_str(&self.text(scope, expression)?)
-                            }
-                            Child::Element { .. } => unreachable!("a run holds no elements"),
+                    path.push(Step {
+                        position,
+                        kind: TEXT,
+                        component: String::new(),
+                    });
+                    let peeked = program::key(&self.valid.identity, path);
+                    path.pop();
+                    let mut read = BTreeSet::new();
+                    for part in &parts {
+                        if let Child::Expression { expression } = part {
+                            reads(expression, &mut read);
                         }
                     }
+                    let reused = self
+                        .previous
+                        .and_then(|memo| memo.texts.get(&peeked))
+                        .filter(|memo| unchanged(&memo.inputs, scope.values))
+                        .map(|memo| memo.text.clone());
+                    let text = match reused {
+                        Some(text) => text,
+                        None => {
+                            let mut text = String::new();
+                            for part in parts {
+                                match part {
+                                    Child::Text { value, .. } => text.push_str(value),
+                                    Child::Expression { expression } => {
+                                        text.push_str(&self.text(scope, expression)?)
+                                    }
+                                    Child::Element { .. } => {
+                                        unreachable!("a run holds no elements")
+                                    }
+                                }
+                            }
+                            text
+                        }
+                    };
                     path.push(Step {
                         position,
                         kind: TEXT,
@@ -360,7 +529,15 @@ impl<'v> Renderer<'v> {
                     });
                     let key = self.key(path, scope, element.span);
                     path.pop();
-                    children.push(TreeChild::Text { key: key?, text });
+                    let key = key?;
+                    self.memo.texts.insert(
+                        key.clone(),
+                        TextMemo {
+                            inputs: inputs_of(&read, scope.values),
+                            text: text.clone(),
+                        },
+                    );
+                    children.push(TreeChild::Text { key, text });
                 }
                 RenderChild::Element(child) => {
                     children.push(TreeChild::Node(self.occurrence(

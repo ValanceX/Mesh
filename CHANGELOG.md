@@ -4,6 +4,13 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Added
+
+- **`update`**, a third runtime operation: `mesh_runtime::update(&previous, &snapshot)` and `update(render, snapshot)` in `@valancex/mesh-runtime` render a new snapshot of the same program, reuse every node's props and text whose inputs are unchanged, and return the new render with the patches that turn the previous tree into its tree. See the [runtime manual](./docs/manual/runtime.md#update).
+- **`render-patch-v1`** ([`schemas/render-patch-v1.schema.json`](./schemas/render-patch-v1.schema.json)): `setProp`, `removeProp`, `setText` and `replace`. Applying a list to the previous tree gives exactly a full render's tree; the runtime's tests check this over random snapshots of a program with conditionals, repeats and optional props.
+- `mesh_runtime::evaluations()` (hidden), a count of evaluated expressions, for the update benchmark and tests.
+- The `mesh_update` export of `mesh-runtime-wasm`. It is internal to the package, which checks for it: a `@valancex/mesh-runtime` is built with its own module.
+
 ### Changed
 
 - **The runtime's `init()` is optional in a browser.** Without it, the first call loads the packaged `mesh-runtime.wasm` from next to the runtime's code (`new URL("./mesh-runtime.wasm", import.meta.url)`), as Node always did. `init(source)` is unchanged and still decides which module is used. If the automatic load fails, the error says so, keeps the original failure as its `cause`, and names `init()` and, for a Vite 5 to 7 development server, excluding `@valancex/mesh-runtime` from dependency optimization.

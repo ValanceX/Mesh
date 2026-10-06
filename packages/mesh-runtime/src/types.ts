@@ -29,6 +29,29 @@ export interface RenderTree {
   readonly root: RenderNode;
 }
 
+/** What `update` returns to turn the previous tree into the new one: `render-patch-v1`. Frozen. */
+export interface RenderPatches {
+  readonly format: "mesh-render-patch";
+  readonly version: 1;
+  /** Applied in order. Applying them to the previous tree gives exactly the new render's tree. */
+  readonly patches: readonly RenderPatch[];
+}
+
+/** One operation of a patch list. A renderer applies it; it never compares lists. */
+export type RenderPatch =
+  | {
+      readonly op: "setProp";
+      readonly key: string;
+      readonly prop: string;
+      readonly value: BoundaryValue;
+      /** The runtime's text of the value, when it has one (`propText`). */
+      readonly propText?: string;
+    }
+  | { readonly op: "removeProp"; readonly key: string; readonly prop: string }
+  | { readonly op: "setText"; readonly key: string; readonly text: string }
+  /** A change of structure: draw this tree afresh, reusing nothing. */
+  | { readonly op: "replace"; readonly tree: RenderTree };
+
 /** A primitive occurrence. Composites never appear: they're expanded. */
 export interface RenderNode {
   readonly type: "node";

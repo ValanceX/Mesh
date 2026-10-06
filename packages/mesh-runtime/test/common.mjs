@@ -63,6 +63,12 @@ function schema(name) {
 
 /** Validators for the tree and the runtime diagnostics document. */
 export const validateTree = schema("render-v1.schema.json");
+/** `render-patch-v1`, with `render-v1` registered so its `$ref`s resolve. */
+export const validatePatches = (() => {
+  const ajv = new Ajv2020({ strict: false });
+  ajv.addSchema(JSON.parse(readFileSync(join(root, "schemas", "render-v1.schema.json"), "utf8")));
+  return ajv.compile(JSON.parse(readFileSync(join(root, "schemas", "render-patch-v1.schema.json"), "utf8")));
+})();
 export const validateDiagnostics = schema("runtime-diagnostics-v1.schema.json");
 
 /** The intent schema: render-v1's `$defs/intent`. */

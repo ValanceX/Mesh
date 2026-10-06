@@ -124,6 +124,44 @@ pub unsafe extern "C" fn mesh_render(
     keep(result)
 }
 
+/// Updates (`crate::respond_update`): a render's inputs, as
+/// [`mesh_render`] took them, with the render's snapshot, then the new
+/// snapshot, encoded.
+///
+/// # Safety
+///
+/// Each pointer must point to its length's initialized bytes, unless that
+/// length is 0.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mesh_update(
+    root: *const u8,
+    root_len: usize,
+    templates: *const u8,
+    templates_len: usize,
+    model: *const u8,
+    model_len: usize,
+    previous: *const u8,
+    previous_len: usize,
+    snapshot: *const u8,
+    snapshot_len: usize,
+) -> u32 {
+    // SAFETY: the caller's guarantee, passed on for each input.
+    let result = unsafe {
+        match (text(root, root_len), text(model, model_len)) {
+            (Some(root), Some(model)) => Some(crate::respond_update(
+                root,
+                bytes(templates, templates_len),
+                model,
+                bytes(previous, previous_len),
+                bytes(snapshot, snapshot_len),
+            )),
+            _ => None,
+        }
+    };
+    keep(result)
+}
+
 /// Dispatches (`crate::respond_dispatch`): a render's inputs, as
 /// [`mesh_render`] took them, then the handler identifier, and the
 /// payload, encoded, which is absent when `has_payload` is 0.

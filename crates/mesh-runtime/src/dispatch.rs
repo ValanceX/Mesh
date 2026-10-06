@@ -187,7 +187,7 @@ pub fn dispatch_from(
     let recorded;
     let sites;
     let site = if repeats {
-        recorded = crate::render::tree(&valid, snapshot, true)?.1;
+        recorded = crate::render::tree(&valid, snapshot, true, None)?.1;
         recorded.get(handler).map(|found| Site {
             composites: Vec::new(),
             component: &found.component,

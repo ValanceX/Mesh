@@ -72,6 +72,44 @@ pub fn respond_render(
     })
 }
 
+/// Updates: renders the program against the render's own (previous)
+/// encoded snapshot, as the wrapper kept it, then updates to the encoded
+/// `snapshot` ([`mesh_runtime::update`]): `{"tree": <render-v1>, "patches":
+/// <render-patch-v1>}`, or `{"diagnostics": <runtime-diagnostics-v1>}`.
+///
+/// The module holds nothing between calls, so the previous render is
+/// derived again here, and a call costs a render more than the same
+/// update in Rust (docs/manual/runtime.md). The patches are exactly those.
+pub fn respond_update(
+    root: &str,
+    templates: &[u8],
+    model: &str,
+    previous_bytes: &[u8],
+    snapshot_bytes: &[u8],
+) -> Result<String, Refusal> {
+    let templates = decode_texts(templates)?;
+    let previous_snapshot = decode_snapshot(previous_bytes)?;
+    let snapshot = decode_snapshot(snapshot_bytes)?;
+    let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+    let program = Program {
+        root,
+        templates: &texts,
+    };
+    let result = mesh_runtime::render(&program, model, &previous_snapshot)
+        .and_then(|previous| mesh_runtime::update(&previous, &snapshot));
+    Ok(match result {
+        Ok(updated) => format!(
+            "{{\"tree\":{},\"patches\":{}}}",
+            updated.render.tree().to_json(),
+            mesh_runtime::patches_to_json(&updated.patches)
+        ),
+        Err(diagnostics) => format!(
+            "{{\"diagnostics\":{}}}",
+            mesh_runtime::to_json(&diagnostics, model)
+        ),
+    })
+}
+
 /// Dispatches `handler` with the encoded `payload` (absent when `None`)
 /// against a render's inputs, as the wrapper kept them: `{"intent":
 /// <intent>}`, or `{"diagnostics": <runtime-diagnostics-v1>}`.

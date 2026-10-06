@@ -5,8 +5,21 @@ use crate::diagnostic::{Location, RuntimeCode, RuntimeDiagnostic};
 use crate::types::Statics;
 use crate::value::Value;
 use mesh_template::{BinaryOperator, Expression, Literal, Span, UnaryOperator};
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+
+thread_local! {
+    /// How many expressions this thread has evaluated. For benchmarks and
+    /// tests that count the work an update does; it has no other use.
+    static EVALUATIONS: Cell<u64> = const { Cell::new(0) };
+}
+
+/// The number of expressions this thread has evaluated so far.
+#[doc(hidden)]
+pub fn evaluations() -> u64 {
+    EVALUATIONS.with(Cell::get)
+}
 
 /// Where an expression is evaluated: in the template of `component`,
 /// with its scope's values, and, in a handler's arguments, the payload.
@@ -51,6 +64,7 @@ impl Scope<'_, '_> {
 
     /// Evaluates `expression`.
     pub(crate) fn eval(&self, expression: &Expression) -> Result<Value, RuntimeDiagnostic> {
+        EVALUATIONS.with(|count| count.set(count.get() + 1));
         Ok(match expression {
             Expression::Literal { value, .. } => match value {
                 Literal::String(text) => Value::String(Rc::from(text.as_str())),

@@ -25,6 +25,7 @@ import {
   dispatch as dispatchWith,
   init as initWith,
   render as renderWith,
+  update as updateWith,
   Render,
 } from "./engine.js";
 import type {
@@ -34,6 +35,7 @@ import type {
   ModuleSource,
   RenderInput,
   RenderResult,
+  UpdateResult,
 } from "./engine.js";
 
 export type {
@@ -44,6 +46,7 @@ export type {
   ProgramInput,
   RenderInput,
   RenderResult,
+  UpdateResult,
 } from "./engine.js";
 export type {
   BoundaryValue,
@@ -54,6 +57,8 @@ export type {
   ModelPosition,
   ModelSpan,
   RenderNode,
+  RenderPatch,
+  RenderPatches,
   RenderTree,
   RuntimeDiagnostic,
   RuntimeDiagnosticsDocument,
@@ -81,6 +86,23 @@ export { version } from "./version.js";
  */
 export function render(input: RenderInput): Promise<RenderResult> {
   return renderWith(input);
+}
+
+/**
+ * Updates `previous` to a new `snapshot` of the same program: returns
+ * `{ render, patches }`, the new render and the `render-patch-v1`
+ * patches that turn `previous.tree` into `render.tree` (a renderer applies
+ * them in order, and never compares lists), or `{ diagnostics }`, in which
+ * case `previous` is untouched and still dispatches. A change of structure
+ * (a conditional switching, a list gaining or losing an item) gives one
+ * `replace` of the whole tree. The module holds nothing between calls, so
+ * this derives `previous` again and costs a render more than the same
+ * update in Rust; what it saves is the renderer's work.
+ *
+ * It rejects as {@link render} does.
+ */
+export function update(previous: Render, snapshot: Record<string, unknown>): Promise<UpdateResult> {
+  return updateWith(previous, snapshot);
 }
 
 /**
