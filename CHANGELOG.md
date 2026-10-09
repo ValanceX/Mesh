@@ -4,7 +4,9 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
-> Frozen for an API design review on 2026-10-09: see [the review baseline](./docs/superpowers/specs/2026-10-09-api-review-baseline.md).
+## [0.10.0] - 2026-10-09
+
+Fine-grained updates and composition: the runtime updates a render from a new snapshot or from changes and returns patches; composites have children, named slots and events; a program's composites need no declared contract; and `mesh-switch` chooses among alternatives. The public APIs were reviewed against the API design principles first: see [the review baseline](./docs/superpowers/specs/2026-10-09-api-review-baseline.md). See the [v0.10 release notes](./docs/releases/v0.10.md).
 
 ### Added
 
