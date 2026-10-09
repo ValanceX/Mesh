@@ -804,7 +804,7 @@ MESH event resolution chooses the binding (§9.9.2), the same on every target
 
 What v0.6 doesn't have, deliberately: MESH has **no built-in primitive catalog** (§9.1), so the prose meaning of a given primitive's events is stated with the component library its manifest describes, as MESH-level contract, not in a PORT's implementation. MESH has **no universal interaction vocabulary**, and needs none, since resolution takes applicable events rather than interactions. And the manifest records an event's name and payload only: it is **not an interaction registry**. A later MESH may add a catalog or a declaration form for event meaning; neither changes this section's rule.
 
-Composites have no events (`assembly-composite-event`) and don't appear in the render tree, so composite boundaries play no part in resolution.
+Composites don't appear in the render tree, so composite boundaries play no part in resolution: it is a rule about nodes. A composite's declared events (`docs/manual/templates.md`, "Composite events") don't change that: a handler in a composite's template that names one of its events is a binding of the node it is on, and an interaction still resolves to at most one. Where that binding goes is the host's runtime dispatch, which carries the event out to the occurrence's binding; a handler whose event no occurrence binds is not in the tree, so resolution goes on past it as it would past a node with no binding.
 
 #### 9.9.2 The rule
 

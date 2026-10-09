@@ -410,7 +410,7 @@ Every assembly and runtime code, with its location form, what it means and how t
 | two templates for one component; a missing root template | `assembly-duplicate-template`; `assembly-missing-root` |
 | an unbound scope name; a binding whose types don't fit; an optional prop bound to a scope name that isn't optional | `assembly-unbound-scope-name`; `assembly-unsound-binding`; `assembly-unsound-binding` |
 | a direct or indirect cycle | `assembly-cycle` |
-| a composite that declares events; a composite occurrence with children | `assembly-composite-event`; `assembly-composite-children` |
+| a composite that declares an event and a command of one name; a composite occurrence with children, where the template has no slot | `assembly-composite-event`; `assembly-composite-children` |
 | a missing required scope name; `null` where absence is expected; absence where `null` is expected | `runtime-missing-value`; `runtime-value-mismatch`; `runtime-missing-value` |
 | a wrong-kind value at depth | `runtime-value-mismatch` at its path |
 | a record with an undeclared field; one missing a field that doesn't read as optional | `runtime-unknown-field`; `runtime-missing-value` |

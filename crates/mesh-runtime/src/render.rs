@@ -13,6 +13,7 @@ use crate::program::{
 use crate::tree::{Memo, Node, RepeatItem, RepeatMemo, Run, Tree, TreeChild};
 use crate::types::{fits, Statics};
 use crate::value::{HostRecord, Value};
+use mesh_template as mpl;
 use mesh_template::{Child, Element, Expression};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
@@ -216,6 +217,43 @@ fn free_names<'t>(element: &'t Element, bound: &mut Vec<&'t str>, out: &mut BTre
     }
 }
 
+/// Whether a handler binding names something that handles it. A command of
+/// the template's component does. An event of it does not by itself: the
+/// handler *forwards* the event to the occurrence of the component, so it
+/// is live only if that occurrence binds the event, to a command of the
+/// component whose template the occurrence is in, or to a forward in turn,
+/// which is live by the same rule one occurrence out. `chain` is the
+/// occurrences around this template, outermost first, each with the
+/// component whose template it is in. A binding that isn't live isn't in the
+/// render tree: the node has no such event, so event resolution (§9.9) goes on
+/// to the nodes above it.
+pub(crate) fn is_live(
+    valid: &Valid,
+    component: &str,
+    command: &str,
+    chain: &[(&str, &Element)],
+) -> bool {
+    if valid.component(component).commands.contains_key(command) {
+        return true;
+    }
+    let Some(((caller, occurrence), outer)) = chain.split_last() else {
+        return false;
+    };
+    occurrence
+        .events
+        .iter()
+        .find(|binding| binding.event == command)
+        .is_some_and(|binding| is_live(valid, caller, &binding.command, outer))
+}
+
+/// One composite occurrence around a recorded handler: the component whose
+/// template it is in, the occurrence, and the scope it was written in.
+pub(crate) struct Link<'v> {
+    pub component: String,
+    pub occurrence: &'v Element,
+    pub values: BTreeMap<String, Value>,
+}
+
 /// A composite occurrence being rendered: whose children a `mesh-slot` in
 /// its template places, in what scope.
 struct Frame<'v> {
@@ -287,6 +325,10 @@ pub(crate) struct Recorded<'v> {
     pub node: &'v Element,
     pub event: &'v str,
     pub values: BTreeMap<String, Value>,
+    /// The composite occurrences around the node, outermost first, with the
+    /// scopes they were written in, when the handler forwards an event: where
+    /// it goes next. Empty otherwise.
+    pub chain: Vec<Link<'v>>,
 }
 
 /// Every handler of a render, by identifier.
@@ -536,7 +578,8 @@ impl<'v> Renderer<'v> {
             self.frames.push(Frame {
                 occurrence: element,
                 component: component.to_string(),
-                values: (!element.children.is_empty()).then(|| values.clone()),
+                values: (!element.children.is_empty() || !element.events.is_empty())
+                    .then(|| values.clone()),
             });
             let rendered =
                 self.occurrence(&template.component, &template.root, 0, path, &bound, old);
@@ -628,8 +671,26 @@ impl<'v> Renderer<'v> {
             }
             props.insert(prop.prop.clone(), json);
         }
-        let events: BTreeMap<String, String> = element
+        // A binding that forwards an event nothing handles is not in the tree.
+        let own_commands = &self.valid.component(scope.component).commands;
+        let chain: Vec<(&str, &Element)> = if element
             .events
+            .iter()
+            .any(|binding| !own_commands.contains_key(&binding.command))
+        {
+            self.frames
+                .iter()
+                .map(|frame| (frame.component.as_str(), frame.occurrence))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let live: Vec<&mpl::EventBinding> = element
+            .events
+            .iter()
+            .filter(|binding| is_live(self.valid, scope.component, &binding.command, &chain))
+            .collect();
+        let events: BTreeMap<String, String> = live
             .iter()
             .map(|binding| {
                 (
@@ -639,7 +700,8 @@ impl<'v> Renderer<'v> {
             })
             .collect();
         if let Some(sites) = &mut self.sites {
-            for binding in &element.events {
+            for binding in &live {
+                let forwards = !own_commands.contains_key(&binding.command);
                 sites.insert(
                     events[&binding.event].clone(),
                     Recorded {
@@ -647,6 +709,18 @@ impl<'v> Renderer<'v> {
                         node: element,
                         event: &binding.event,
                         values: scope.values.clone(),
+                        chain: if forwards {
+                            self.frames
+                                .iter()
+                                .map(|frame| Link {
+                                    component: frame.component.clone(),
+                                    occurrence: frame.occurrence,
+                                    values: frame.values.clone().unwrap_or_default(),
+                                })
+                                .collect()
+                        } else {
+                            Vec::new()
+                        },
                     },
                 );
             }

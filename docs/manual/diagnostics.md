@@ -602,7 +602,7 @@ error[unknown-command]: unknown command "sav": the template's component doesn't 
 
 ### `command-arity-mismatch`
 
-A command is invoked with more or fewer arguments than it declares parameters. Every parameter is required. Points at the whole invocation.
+A command is invoked with more or fewer arguments than it declares parameters. Every parameter is required. Points at the whole invocation. The same holds for a handler that forwards one of the component's own events ([Composite events](templates.md#composite-events)): an event with a payload takes exactly one argument, and one without takes none.
 
 ```text
 error[command-arity-mismatch]: command "select" takes 1 argument, but 0 were given
@@ -906,7 +906,7 @@ Location: `source`, every composite occurrence on the cycle.
 
 ### `assembly-composite-event`
 
-A composite declares events in the model; v0.5 has no composite events.
+A composite declares an event and a command of the same name. A composite may declare events (its template forwards them, [Composite events](templates.md#composite-events)), but then a handler in its template that names one of them would be either, so the names must differ.
 
 Location: `source`, every composite occurrence of it.
 

@@ -369,3 +369,45 @@ test("children for a composite with no slot are an assembly error, through the m
   const result = await render({ program: bad, model: SLOT_MODEL, snapshot: { title: "T", who: "Ada" } });
   assert.deepEqual(result.diagnostics.diagnostics.map((d) => d.code), ["assembly-composite-children"]);
 });
+
+// Composite events, through the module: a forward reaches the occurrence's command.
+const EVENT_MODEL = JSON.stringify({
+  version: 1,
+  types: {},
+  components: {
+    page: { props: {}, events: {}, commands: {}, scope: {} },
+    panel: { props: {}, events: {}, commands: {}, scope: {} },
+    button: { props: {}, events: { tap: {} }, commands: {}, scope: {} },
+    card: {
+      props: { count: { type: { kind: "number" }, required: true } },
+      events: { select: { payload: { kind: "number" } }, close: {} },
+      commands: {},
+      scope: { count: { kind: "number" } },
+    },
+    view: { props: {}, events: {}, commands: { pick: { parameters: [{ name: "n", type: { kind: "number" } }] } }, scope: { n: { kind: "number" } } },
+  },
+});
+const eventProgram = {
+  root: "view",
+  templates: [
+    await template("view", "<page><card count={n} on.select={pick($event)} /></page>", EVENT_MODEL),
+    await template("card", "<panel><button on.tap={select(count)}>pick</button><button on.tap={close()}>close</button></panel>", EVENT_MODEL),
+  ],
+};
+
+test("a composite's forwarded event reaches the command its occurrence binds, and an unbound one is not in the tree", async () => {
+  const { render: first } = await render({ program: eventProgram, model: EVENT_MODEL, snapshot: { n: 7 } });
+  const buttons = first.tree.root.children[0].children.filter((c) => c.type === "node");
+  assert.equal(buttons.length, 2);
+  assert.ok(buttons[0].events.tap, "`select` is bound");
+  assert.deepEqual(buttons[1].events, {}, "`close` is not, so its button has no event");
+  const result = await dispatch(first, buttons[0].events.tap);
+  assert.deepEqual(result.intent.command, { component: "view", name: "pick" });
+  assert.deepEqual(result.intent.arguments, [{ value: 7 }]);
+  // And through an update: the same handler still reaches the same command, with the new value.
+  const updated = await update(first, { n: 9 });
+  const next = updated.render.tree.root.children[0].children.filter((c) => c.type === "node");
+  assert.equal(next[0].events.tap, buttons[0].events.tap);
+  assert.deepEqual((await dispatch(updated.render, next[0].events.tap)).intent.arguments, [{ value: 9 }]);
+  updated.render.release();
+});

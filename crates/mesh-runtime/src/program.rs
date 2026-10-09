@@ -248,6 +248,19 @@ fn walk_names(
             }
         }
         match own.commands.get(&binding.command) {
+            // Not a command, but an event the component declares: the handler
+            // forwards it, to the occurrence of the component, with its
+            // payload (one argument if the event has one, else none).
+            None if own.events.contains_key(&binding.command) => {
+                let expected = usize::from(own.events[&binding.command].payload.is_some());
+                if binding.arguments.len() != expected {
+                    problems.push(format!(
+                        "`{}` is an event of this component, and forwarding it takes {expected} arguments, not {}",
+                        binding.command,
+                        binding.arguments.len()
+                    ));
+                }
+            }
             None => problems.push(format!("no command `{}`", binding.command)),
             Some(command) if command.parameters.len() != binding.arguments.len() => {
                 problems.push(format!(
@@ -460,8 +473,14 @@ pub(crate) fn declared_events(valid: &Valid) -> Vec<DeclaredEvent> {
     for (component, template) in &valid.templates {
         let mut all = Vec::new();
         elements(&template.root, &mut all);
+        let own = &valid.component(component);
         for element in all {
             for binding in &element.events {
+                // A handler that forwards the component's own event is not a
+                // command the host handles: the occurrence's binding is.
+                if !own.commands.contains_key(&binding.command) {
+                    continue;
+                }
                 found.push(DeclaredEvent {
                     component: component.clone(),
                     event: binding.event.clone(),
@@ -620,13 +639,17 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
                     source(template, element.span),
                 ));
             }
-            // Rule 6: no composite events.
-            if !composite.events.is_empty() {
-                diagnostics.push(RuntimeDiagnostic::new(
-                    RuntimeCode::COMPOSITE_EVENT,
-                    format!("`{name}` has a template, so it's a composite, but declares events; composites can't raise events"),
-                    source(template, element.span),
-                ));
+            // Rule 6: a composite's events and commands have different names,
+            // so a handler in its template that names one of them is one or
+            // the other, never both.
+            for event in composite.events.keys() {
+                if composite.commands.contains_key(event) {
+                    diagnostics.push(RuntimeDiagnostic::new(
+                        RuntimeCode::COMPOSITE_EVENT,
+                        format!("`{name}` has a template, so it's a composite, and declares `{event}` as both an event and a command: a handler named `{event}` in its template would be either"),
+                        source(template, element.span),
+                    ));
+                }
             }
             // Rule 7: children only where the composite's template has a slot.
             let has_children = element.children.iter().any(|child| match child {

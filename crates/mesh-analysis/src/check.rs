@@ -350,12 +350,19 @@ impl<'m> Walker<'m> {
         span: Span,
         place: Place<'m>,
     ) {
-        let commands = &self.template.component().commands;
+        let component = self.template.component();
+        let commands = &component.commands;
         let parameters = match commands.get_key_value(command) {
             Some((name, declared)) => {
                 self.resolve(command_span, Target::Command(name.clone()));
                 if declared.parameters.len() == arguments.len() {
-                    Some(&declared.parameters)
+                    Some(
+                        declared
+                            .parameters
+                            .iter()
+                            .map(|parameter| (parameter.name.clone(), parameter.ty.clone()))
+                            .collect::<Vec<_>>(),
+                    )
                 } else {
                     self.facts.push(Fact::CommandArityMismatch {
                         command: command.to_string(),
@@ -366,23 +373,62 @@ impl<'m> Walker<'m> {
                     None
                 }
             }
+            // Not a command, but an event the template's own component
+            // declares: the handler forwards that event to the occurrence of
+            // the component, with its argument (if the event has a payload)
+            // as the payload. Handled where the occurrence binds it.
+            None if component.events.contains_key(command) => {
+                let (name, declared) = component
+                    .events
+                    .get_key_value(command)
+                    .expect("checked just above");
+                self.resolve(
+                    command_span,
+                    Target::Event {
+                        component: self.template.name().to_string(),
+                        event: name.clone(),
+                    },
+                );
+                let expected = usize::from(declared.payload.is_some());
+                if expected == arguments.len() {
+                    Some(
+                        declared
+                            .payload
+                            .iter()
+                            .map(|payload| ("payload".to_string(), payload.clone()))
+                            .collect::<Vec<_>>(),
+                    )
+                } else {
+                    self.facts.push(Fact::CommandArityMismatch {
+                        command: command.to_string(),
+                        expected,
+                        found: arguments.len(),
+                        span,
+                    });
+                    None
+                }
+            }
             None => {
                 self.facts.push(Fact::UnknownCommand {
                     command: command.to_string(),
                     span: command_span,
-                    candidates: commands.keys().cloned().collect(),
+                    candidates: commands
+                        .keys()
+                        .chain(component.events.keys())
+                        .cloned()
+                        .collect(),
                 });
                 None
             }
         };
-        match parameters {
+        match &parameters {
             Some(parameters) => {
-                for (argument, parameter) in arguments.iter().zip(parameters) {
+                for (argument, (name, ty)) in arguments.iter().zip(parameters) {
                     let expectation = Expectation::Argument {
                         command: command.to_string(),
-                        parameter: parameter.name.clone(),
+                        parameter: name.clone(),
                     };
-                    self.check(argument, place, &Ty::from(&parameter.ty), expectation);
+                    self.check(argument, place, &Ty::from(ty), expectation);
                 }
             }
             None => {

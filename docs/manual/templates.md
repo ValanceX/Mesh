@@ -425,7 +425,28 @@ Only the root template's scope comes from the snapshot. The root component's own
 
 **Nesting.** A composite's template may contain composite occurrences, to any depth, as long as the program has no cycle.
 
-**Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can't raise events of its own yet (rule 6).
+**Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can raise events of its own: see [Composite events](#composite-events).
+
+### Composite events
+
+A composite may declare **events** in the model, as any component does (`"events": { "select": { "payload": { "kind": "number" } } }`), and an occurrence binds them as any component's: `<card count={n} on.select={pick($event)} />`, where `pick` is a command of the template the occurrence is in. Inside the composite's own template, a handler **forwards** one of its events by naming it as the handler:
+
+```xml
+<!-- the template of `card`: its event `select` carries a number -->
+<panel>
+  <button on.tap={select(count)}>pick</button>
+  <button on.tap={close()}>close</button>
+</panel>
+```
+
+`select` is not a command of `card` but an event it declares, so `on.tap={select(count)}` is not a request to the host: it raises `select` on the occurrence of `card`, with `count` as the payload (one argument, of the event's payload type; none for an event without a payload, like `close`). The occurrence's handler then runs in the scope **its** template has, with `$event` the payload: `on.select={pick($event)}` is the page's `pick`, called with that number.
+
+- **No syntax is added.** A handler's name is looked up among the template's commands, then among its component's own events. A composite therefore can't have an event and a command of one name (rule 6), or a forward would be ambiguous.
+- **A forward nothing binds is not in the render tree.** If the occurrence doesn't bind `close`, the button has no `tap` event at all, so event resolution (§9.9) goes on to the nodes above it, as for any node without a binding. The same holds along a chain: a forward is live only if the occurrence binds the event, and, if that binding is a forward too, only if its occurrence does.
+- **It goes out through every composite on the way.** A composite's occurrence may itself forward the event (`<card on.select={chosen($event)} />` inside a `shell` that declares `chosen`), and it continues out until a command is reached. Each step evaluates its argument in the scope of the template the binding is in, and checks it against the event's declared payload type (`runtime-argument-mismatch`).
+- **Content a slot places forwards the caller's events.** A handler in children written in `shell`'s template, placed in a card's slot, names `shell`'s events, not `card`'s: the children are shell's (see [Children and the slot](#children-and-the-slot)).
+- **The host sees only commands.** The intent of a forwarded event names the command that finally handles it, with the component of the template that binds it (`view`'s `pick`, here). The runtime's declared events list the command bindings a host handles, so a forward is not in it.
+- **The compiler checks it.** A forward's argument is checked against the event's payload type, and its count against whether the event has one (`command-arity-mismatch` and `type-mismatch`, as for a command).
 
 ### Children and the slot
 
@@ -469,7 +490,7 @@ A program must satisfy these rules. Each broken rule is an **assembly error**. T
 | 4a | Every scope name of every composite used as an occurrence is bound by a prop of the same name. | `assembly-unbound-scope-name` | 4 |
 | 4b | Every such binding is sound. | `assembly-unsound-binding` | 4 |
 | 5 | **No cycles:** no composite expands itself, directly or through others. Every composite occurrence on a cycle is reported. | `assembly-cycle` | 4 |
-| 6 | **No composite declares events** in the model. | `assembly-composite-event` | 4 |
+| 6 | **No composite declares an event and a command of the same name** in the model. (A composite may declare events: [Composite events](#composite-events).) | `assembly-composite-event` | 4 |
 | 7 | **No composite occurrence has children,** text or elements, **unless the composite's template has a `mesh-slot`** to place them. Whitespace-only text isn't a child (§3). | `assembly-composite-children` | 4 |
 
 Program validation's steps run in order, and a step that reports anything ends validation. Step 1 is the model itself (a manifest error). Within a step, every problem is reported.
@@ -495,7 +516,8 @@ With a model in which `user-card` has the prop `user: User` (required), the scop
 | a model where `user-card`'s prop is named `person` | `assembly-unbound-scope-name` at the occurrence (rule 4a) |
 | a model where `user-card`'s prop `user` isn't required, and its scope name `user` isn't optional | `assembly-unsound-binding` (rule 4b): an unwritten prop would bind absent |
 | `user-card`'s template containing `<user-card user={user} />` | `assembly-cycle` (rule 5) |
-| a model where `user-card` declares an event `select` | `assembly-composite-event` (rule 6) |
+| a model where `user-card` declares an event `select` and a command `select` | `assembly-composite-event` (rule 6) |
+| a model where `user-card` declares an event `select`, and its template has `on.click={select(user)}` | valid: the handler forwards `select` to the occurrence |
 | `<user-card user={first}>Ada</user-card>`, with no `mesh-slot` in `user-card`'s template | `assembly-composite-children` (rule 7) |
 | the same, with a `mesh-slot` in `user-card`'s template | valid: the children are placed at the slot |
 | `<user-card user={first}>  </user-card>` | valid: whitespace-only text isn't a child |

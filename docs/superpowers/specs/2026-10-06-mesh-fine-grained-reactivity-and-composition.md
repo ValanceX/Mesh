@@ -133,6 +133,8 @@ changes = { base, set: [{ path, value }], remove: [{ path }] }
 
 ### B2. Composite events
 
+**Built (decided at review: composite events after children).** Differences from the design below, found by building it. (1) *The syntax is not `emit.name(args)`:* MPRX's grammar allows only a plain identifier as a command name, so a dotted callee would need a regenerated parser. The bare form the design weighed against `emit.` is what is built: a handler's name is looked up among the template's commands and then among its component's own events, and a composite may not have an event and a command of one name (rule 6, `assembly-composite-event`, now means this) so the name is never ambiguous. (2) *A forward nothing binds is not in the render tree* (the design left an unhandled forward as a dispatch problem): liveness is decided when rendering, from the occurrence's bindings, outward through every composite, so event resolution (§9.9) goes on past a dead forward and a handler identifier names something that is handled. (3) *Forwards chain through composites and slots:* a record of the occurrences around a handler, with the scopes they were written in, is kept for repeat programs, and derived for the rest. (4) *The declared-events list holds only bindings of commands,* since that is what a host compares with what it handles. Named slots are not built.
+
 Today a composite has no events. Proposal: a composite's manifest entry may declare events with a payload type, and its template forwards a primitive's event to one of them:
 
 ```xml
