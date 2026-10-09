@@ -116,3 +116,9 @@ Principle 9.1 for Mesh's thrown errors (stable `code`, `cause` kept); 7 for `rel
 3. G3: rename `Refusal.reason` to `code` while it is unreleased (recommended).
 4. G4: document that causes are logged (minimum) or log less.
 5. G5: add stability pages to Nexus, Valance and Port.
+
+### Third pass: the second pass's gaps closed (G1 to G5, "go for recommended")
+
+- **G1 (done).** `render()` keeps nothing in the module again, as in 0.9.0. `update` and `updateChanges` keep the render they return. `updateChanges` accepts any render: the module derives one it doesn't hold from its own snapshot, under the version it was given. Versions are now the package's to give (a counter in the package, passed to the module), because a version in `render()`'s result made the same inputs give different bytes and broke the native-parity tests. Measured with the earlier loop (2,000 renders of 500 items, never released): nothing retained and 5 MB of memory, against a crash at 2.15 GB. New tests: a no-release loop in the memory test (G9), changes to a plain and to a released render, a derived render under its version in Rust. `Render::with_version` is new Rust API (unreleased).
+- **G2 (done).** The `-v1` rule (optional properties may be added without a version change; consumers ignore unknown properties) was already in four schemas; it is now in `render-patch-v1`'s too, and stated once in [API stability](../../manual/stability.md).
+- **G3, G4, G5** are recorded below with their Nexus, Valance and Port changes.
