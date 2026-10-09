@@ -1,6 +1,6 @@
 # Ecosystem API design review
 
-Standard: [API Design Principles v1.0](../../standards/api-design-principles.md). Baseline: [the freeze](./2026-10-09-api-review-baseline.md). Reviewed 2026-10-09 on the `ccr-969a5158-vobqhh` branches. Mesh and Port were reviewed and changed by the author of this note; Nexus and Valance were read by two reviewers who changed nothing, and their findings were checked against the cited code only where noted. Nothing was compiled or run in Nexus or Valance (no dependencies installed), so their findings rest on reading.
+Standard: [API Design Principles v1.0](../../standards/api-design-principles.md). Baseline: [the freeze](./2026-10-09-api-review-baseline.md). Reviewed 2026-10-09 on the `ccr-969a5158-vobqhh` branches. Mesh and Port were reviewed and changed by the author of this note; Nexus and Valance were first read by two reviewers who changed nothing, and the findings below were checked against the cited code only where noted. The findings marked done in those two repos were made after installing dependencies and running typecheck and tests.
 
 How to read it: each finding has a principle, the evidence, a disposition, and whether it would break a released surface. **Done** means changed and tested in this review. **Owner** means a judgment call that is not made here. Released means Mesh 0.9.0, Port as published, Nexus 0.10.3, Valance 0.5.0.
 
@@ -65,9 +65,16 @@ How to read it: each finding has a principle, the evidence, a disposition, and w
 | V15 | 13 | Docs omit `./web/build`, hand-write `components.json`, and leave types out of the reference; snippets aren't compiled. | doc-only | **Owner.** |
 | V16 | 6.1, 14.1 | Composition: each state does a full MESH render and gives PORT a whole tree; `update`/`updateChanges`/`diff`/`version`/`release` and PORT `patch` would remove that. `Target` is user-implementable, so any new member must be optional. | additive | **Owner**; this is milestone M6 of the reactivity design. |
 
-## Why Nexus and Valance were not changed
+## What was done in Nexus and Valance, and what was not
 
-Both are released packages whose changes mostly alter behavior, packaging or types, and none of it could be compiled here. The review's own rule (item 4 of the baseline) is that anything touching a released API is flagged, not made silently. The doc-only fixes (N1, N7, N14, V15) are safe to make once someone can run their doc and type checks.
+Dependencies were installed and each repo's typecheck and tests run before and after (Nexus 494 then 495 tests, Valance 114, all passing).
+
+- **N3 (done, as documentation and a test).** The claim was checked: a probe showed `terminate` completing while a `runFork` effect was still running, which then finished after the scope closed. The runtime manual now says termination does not wait for running effects and that a resource they use can be released under them, and a test pins it. Changing `shutdown` to wait would be a behavior change that can hang a shutdown on a long-lived fork, so it is left to the owner.
+- **N1 (done).** The State example now uses `Schema.OptionFromSelf`, as `examples/basic-app` does. `docs/ARCHITECTURE.md` has an older sketch of the same example with a different `State.create` shape; it was left as a design record.
+- **V1 (done).** A finished dispatch leaves a mount's `pending` list, so a page that never calls `settled` no longer holds every fiber. Reasoned from the code and not measured; `dispatched`, the ledger the contract says is never trimmed, is unchanged.
+- **N4 (not done).** Nexus's `refusal` is documented in its source as "deliberately not a public error type", so adding one reverses a stated decision. It stays with the owner.
+- **V3 (not done).** The startup-work guide and the contract say Valance has no startup error channel and writes nothing to the log; the state is the channel. Logging the failure would reverse that. It stays with the owner.
+- **Everything else** in the Nexus and Valance tables is unchanged and stays with the owner: those fixes change types, packaging, public names or documented behavior, or add API.
 
 ## What the review changed
 
@@ -77,5 +84,5 @@ Mesh: error codes and `MeshUsageError` in both JavaScript packages, `Symbol.disp
 
 1. M6: every render is kept; `keep` removed; two verbs stay. Done.
 2. M5: `RenderVersion` brand. Done.
-3. Nexus and Valance: the recommended order was N3, V1, V3, N4, N1 first. See the section below for what was done and what was not.
+3. Nexus and Valance: the recommended order was N3, V1, V3, N4, N1 first; N3, V1 and N1 are done, N4 and V3 conflict with documented decisions and stay with the owner (below).
 4. M10: hints on the common codes. Done.
