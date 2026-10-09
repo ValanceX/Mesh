@@ -12,6 +12,12 @@
 // patch list), so that `update` returns what changed and not the whole tree.
 // It moves parts by key. It reads no value, and converts, defaults and judges
 // none: the test below that names it also checks it makes no text or number.
+//
+// A second file reads host values: `changes.ts`, the host-side `diff` from one
+// snapshot to the next. It compares two values for sameness as the boundary
+// does and carries the host's own values into edits, for the runtime to judge.
+// It is on no path of render, update or dispatch (the engine doesn't import
+// it): the tests below check that, and that it makes no text and no number.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -66,7 +72,11 @@ function unexcused(found, exceptions) {
 
 test("nothing converts a value to text or a number, or compares values", () => {
   const pattern = /\bString\(|\bNumber\(|\.toString\(|JSON\.stringify|parseFloat|parseInt|Object\.is\b|\.toFixed\(|\.toPrecision\(|\.toExponential\(|\bIntl\b|localeCompare|isNaN|isFinite/;
-  assert.deepEqual(unexcused(find(pattern), []), []);
+  const exceptions = [
+    { file: "changes.ts", text: "Object.is(", reason: "diff compares two host values for sameness, as the boundary does (a number by its bits)" },
+    { file: "changes.ts", text: "Object.keys(", reason: "diff lists a record's present fields, to compare two records" },
+  ];
+  assert.deepEqual(unexcused(find(pattern), exceptions), []);
 });
 
 test("nothing reads the tree or an intent after parsing them", () => {
@@ -78,6 +88,7 @@ test("nothing reads the tree or an intent after parsing them", () => {
     { file: "engine.ts", text: "program.root", reason: "the host's own program input, checked to be a string" },
     { file: "engine.ts", text: "render.#root", reason: "the render's kept root name, passed back to the module" },
     { file: "patches.ts", text: "", reason: "applies the runtime's patches to a tree by key, moving parts and reading no value" },
+    { file: "changes.ts", text: "", reason: "diff reads two host snapshots (not a tree or an intent) to compute edits; see the file's own test" },
     { file: "engine.ts", text: "result.events", reason: "the result document's envelope key, like `tree` and `intent`: the declared events are returned as the module wrote them" },
   ];
   assert.deepEqual(unexcused(find(pattern), exceptions), []);
@@ -115,6 +126,7 @@ test("the only code that walks host values is the encoder", () => {
   const exceptions = [
     { file: "encode.ts", text: "", reason: "the encoder: the one walk of host values (§9.8.6)" },
     { file: "patches.ts", text: "", reason: "applies patches by key: counts a record's entries to drop an empty `propText`, as the runtime's tree has none; reads no value" },
+    { file: "changes.ts", text: "", reason: "diff walks host values to compare them, as the encoder does to encode them; the only other place" },
     { file: "engine.ts", text: "Array.isArray(program.templates)", reason: "the host's template list, checked to be an array" },
     { file: "engine.ts", text: "Array.isArray((value as", reason: "the module's result envelope has a diagnostics array" },
     { file: "engine.ts", text: "Array.isArray(result.events)", reason: "the module's result envelope has an events array" },
@@ -132,4 +144,15 @@ test("the one file that reads a tree, patches.ts, makes no text and no number, a
   );
   // And it never looks inside a prop's value: `.value` appears only to carry a patch's value into the tree.
   assert.deepEqual(text.split("\n").filter((line) => /\.value\.|\.value\[/.test(line)), []);
+});
+
+test("diff, the one other file that reads host values, is on no path of render, update or dispatch, and makes no text and no number", () => {
+  // The engine never imports it, so nothing the runtime does depends on it.
+  const engine = files.find(({ name }) => name === "engine.ts").code;
+  assert.ok(!/from ["']\.\/changes\.js["']/.test(engine), "engine.ts must not import changes.ts");
+  const { code: text } = files.find(({ name }) => name === "changes.ts");
+  assert.deepEqual(
+    text.split("\n").filter((line) => /\bString\(|\bNumber\(|\.toString\(|JSON\.|parseFloat|parseInt|\.toFixed\(|\bIntl\b|isNaN|isFinite|Math\.|\bNaN\b|Infinity|\?\? /.test(line)),
+    [],
+  );
 });

@@ -77,6 +77,11 @@ impl RuntimeCode {
     pub const HANDLER_OTHER_PROGRAM: RuntimeCode =
         RuntimeCode("runtime-handler-other-program", Form::Handler);
     pub const UNKNOWN_HANDLER: RuntimeCode = RuntimeCode("runtime-unknown-handler", Form::Handler);
+    // Changes to a render's snapshot (`update_changes`).
+    pub const CHANGES_BASE_MISMATCH: RuntimeCode =
+        RuntimeCode("runtime-changes-base-mismatch", Form::Input);
+    pub const INVALID_CHANGE: RuntimeCode = RuntimeCode("runtime-invalid-change", Form::Input);
+    pub const CHANGES_DISAGREE: RuntimeCode = RuntimeCode("runtime-changes-disagree", Form::Input);
     // Evaluation.
     pub const OPERAND_MISMATCH: RuntimeCode = RuntimeCode("runtime-operand-mismatch", Form::Source);
     pub const NOT_A_RECORD: RuntimeCode = RuntimeCode("runtime-not-a-record", Form::Source);
@@ -118,6 +123,9 @@ impl RuntimeCode {
         RuntimeCode::UNEXPECTED_PAYLOAD,
         RuntimeCode::HANDLER_OTHER_PROGRAM,
         RuntimeCode::UNKNOWN_HANDLER,
+        RuntimeCode::CHANGES_BASE_MISMATCH,
+        RuntimeCode::INVALID_CHANGE,
+        RuntimeCode::CHANGES_DISAGREE,
         RuntimeCode::OPERAND_MISMATCH,
         RuntimeCode::NOT_A_RECORD,
         RuntimeCode::MISSING_MEMBER,

@@ -324,9 +324,34 @@ Measured on one machine, a keyed list of 10,000 items with one changed (the leas
 |---|---|---|---|
 | Rust: expressions evaluated | 60,001 | 7 | 0 |
 | Rust: time | 91 ms | 21 ms | 12 ms |
-| JavaScript: time, across the module's boundary | 481 ms | 77 ms | |
+| Rust: time, from changes (below) | | 13 ms | |
+| JavaScript: time, across the module's boundary | 470 ms | 61 ms | |
+| JavaScript: time, from changes | | 22 ms | |
 
-At 1,000 items the update is 1.6 ms in Rust against 6.2 ms to render, and 6.2 ms in JavaScript against 47 ms. What remains is the size of the snapshot, not of the tree: the snapshot is encoded, decoded and validated on every update (12 ms of the 21 in Rust, and the largest part of JavaScript's), and the per-item comparison in a changed repeat. An update that costs only what changed would have the host hand over the changes to the snapshot, not the snapshot: that is designed (the spec's A6) and not built.
+At 1,000 items the update is 1.6 ms in Rust against 6.2 ms to render, and about 5 ms in JavaScript against 46 (1.7 ms from changes). What remains of a whole-snapshot update is the size of the snapshot, not of the tree: the snapshot is encoded, decoded and validated on every update (12 ms of the 21 in Rust, and the largest part of JavaScript's). Handing over the changes to the snapshot instead removes that ([Changes](#changes)).
+
+### Changes
+
+`update_changes(previous, changes, verify?)` (Rust: `mesh_runtime::update_changes`; JavaScript: `updateChanges(render, changes, { verify })`) is `update` for a host that knows what it changed. It takes the render and the **edits** to its snapshot and returns the new render and patches exactly as `update` does, but it neither encodes nor validates the snapshot: the previous render's values were validated when it was made, so only the values an edit gives are. What an edit doesn't touch is shared with the previous render, and a node that reads only it is kept by a pointer comparison. An update costs the edits and what depends on them.
+
+**The edits define the new snapshot.** The runtime applies them to the previous render's values, so the new snapshot is never a second copy that could disagree with them. A host that computes edits wrongly gets a snapshot it didn't intend; see **verify**.
+
+```json
+{ "base": 41, "changes": [
+  { "op": "set", "path": ["items", 5000, "label"], "value": "changed" },
+  { "op": "insert", "path": ["items", 0], "value": { "id": 99, "label": "new" } },
+  { "op": "remove", "path": ["items", 7] }
+] }
+```
+
+- **`op`.** `set` makes the value at `path` the given one (a scope name's, a record field's, made if the record lacks it and the type allows, or a list element's; a list's length appends one). `insert` puts a value at a list index, and the elements from there on are one later. `remove` takes a record field (which the type lets be absent) or a list element (the later ones are one earlier) away.
+- **`path`.** A non-empty list: a scope name first, then record field names (strings) and list indices (non-negative integers). Edits apply in order, each seeing those before it.
+- **`base`.** The `version` of the render the changes were computed against: a number the runtime gives each render (`render.version`, `Render::version()`), new for every render it makes. Changes for any other render are refused (`runtime-changes-base-mismatch`), so changes made against a snapshot the runtime no longer holds are never applied to another. The version stands in for a digest of the snapshot: it costs nothing, and it detects the same mistake (changes for the wrong snapshot) without reading the snapshot.
+- **All or none.** Every edit is checked, with the document, before anything is done: a path that leads nowhere the type allows, a value that doesn't fit its type, a malformed edit. The first is `runtime-invalid-change`; a value's mismatch is reported by the input codes, at its path. On diagnostics `previous` is untouched and still dispatches.
+- **`verify`.** With the whole snapshot the host believes it now has, the runtime validates it, compares it with what the edits make, and refuses with `runtime-changes-disagree` at the first path that differs. It costs a whole validation, so it is for tests and development: the package's own tests run every chain with it.
+- **Computing the edits.** The host usually knows what it changed. A host that has the two snapshots can compute them: `diff(previous, next)` in `@valancex/mesh-runtime` returns the edits that turn one into the other, comparing values as the boundary does (a number by its bits, so `0` and `-0` differ), keeping an unchanged value as it is and descending into a record or list only where it changed. A list that changed at its ends gets an `insert`/`remove` at the ends and not a rewrite of every later element; a value that isn't a plain record, list or scalar is given whole, for the runtime to judge. `diff` is a host-side utility: nothing in render, update or dispatch calls it, and the package's review test checks that.
+
+**Limits in the JavaScript package.** The module holds the render's values, so a render made from changes has its snapshot only there: there is no copy in the host to derive it from, and `render.release()` ends the only one. While the module holds it, such a render does everything a render does: `dispatch`, `update(render, snapshot)` and `updateChanges` all work from it, and a host can switch between the two forms. After `release()`, or after the package replaced its module (a trap), they throw a `TypeError` saying the copy in the module is gone, and the host makes a new `render`. `updateChanges` needs the render to be in the module to begin with: one made by `update`, by `updateChanges`, or by `render({ ..., keep: true })`. `render()` without `keep` keeps nothing, as before.
 
 ## What renderers and hosts must do
 

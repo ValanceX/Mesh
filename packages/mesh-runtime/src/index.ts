@@ -28,9 +28,11 @@ import {
   init as initWith,
   render as renderWith,
   update as updateWith,
+  updateChanges as updateChangesWith,
   Render,
 } from "./engine.js";
 import type {
+  Changes,
   DeclaredEventsInput,
   DeclaredEventsResult,
   DispatchResult,
@@ -41,6 +43,9 @@ import type {
 } from "./engine.js";
 
 export type {
+  Change,
+  Changes,
+  PathStep,
   DeclaredEventsInput,
   DeclaredEventsResult,
   DispatchResult,
@@ -70,6 +75,7 @@ export type {
   TextRun,
 } from "./types.js";
 export { MeshInternalError, MeshVersionError, Render } from "./engine.js";
+export { diff } from "./changes.js";
 export { version } from "./version.js";
 
 /**
@@ -112,6 +118,47 @@ export function render(input: RenderInput): Promise<RenderResult> {
  */
 export function update(previous: Render, snapshot: Record<string, unknown>): Promise<UpdateResult> {
   return updateWith(previous, snapshot);
+}
+
+/**
+ * Updates `previous` by **changes** to its snapshot, not a whole new snapshot:
+ * returns `{ render, patches }` as {@link update} does, or `{ diagnostics }`,
+ * in which case `previous` is untouched and still valid.
+ *
+ * `changes` is `{ base, changes: [{ op, path, value? }] }`. `base` is the
+ * `version` of the render the changes were computed against, which must be
+ * `previous`'s: changes are only ever applied to the render they name, so one
+ * computed against another state, applied twice, or applied out of order is
+ * refused (`runtime-changes-base-mismatch`). Each edit is a `set`, an `insert`
+ * (into a list, shifting the rest) or a `remove`, at a `path` of record field
+ * names and list indices from a scope name down; edits apply in order, each
+ * seeing those before it. The changes *define* the new snapshot: the runtime
+ * applies them to the one it holds, sharing what they don't touch, and
+ * validates only the values they give. So an update costs the changes and what
+ * depends on them, not the size of the snapshot, and nothing of the snapshot
+ * crosses the boundary.
+ *
+ * The render must be in the module: made by `update`, `updateChanges`, or
+ * `render` with `keep`, and not released. A render made by this has no
+ * snapshot outside the module, so once it is released (or the module is
+ * replaced) it can't be updated or dispatched with: this rejects with a
+ * `TypeError` for a render whose copy is gone, and the host renders again from
+ * a whole snapshot.
+ *
+ * With `options.verify`, the whole snapshot the host believes it now has, the
+ * changes are checked against it (`runtime-changes-disagree`, at the first
+ * path that differs): a check of whoever computed the changes, at the cost of
+ * a validation of the whole snapshot, for tests and development. {@link diff}
+ * computes changes from two snapshots.
+ *
+ * It rejects as {@link render} does.
+ */
+export function updateChanges(
+  previous: Render,
+  changes: Changes,
+  options?: { readonly verify?: Record<string, unknown> },
+): Promise<UpdateResult> {
+  return updateChangesWith(previous, changes, options);
 }
 
 /**

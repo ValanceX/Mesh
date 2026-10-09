@@ -1058,6 +1058,28 @@ Two items of one repeat declare the same key, under strict equality: the same ki
 
 Location: `source`, the `key` expression of the later item.
 
+### Changes
+
+These belong to `update` from changes ([runtime manual](runtime.md#changes)). A value that an edit gives and that doesn't fit its type is reported by the input codes above (`runtime-value-mismatch` and the rest), at its path in the snapshot.
+
+### `runtime-changes-base-mismatch`
+
+The changes were computed against another render than the one given: their `base` is not the render's version. Nothing is applied. This is the check that the host and the runtime agree on which snapshot the changes edit; changes for a render that has since been updated, or for a different one, are refused rather than applied to a snapshot they weren't made for.
+
+Location: `input`, `["base"]`.
+
+### `runtime-invalid-change`
+
+The changes document, or one edit, can't be applied: the document isn't `{ base, changes }`; an edit isn't `{ op, path, value? }`; `op` isn't `set`, `insert` or `remove`; a `path` is empty or has a segment that is neither a field name nor a non-negative integer; a `value` is missing from a `set` or `insert`, or given to a `remove`; or a path leads nowhere the type allows (a field a record doesn't have, an index past the end of a list, a record indexed like a list, a scope name that isn't one, removing a field the type doesn't let be absent). Nothing is applied: the edits are all or none.
+
+Location: `input`, the path in the changes document of the part that is wrong (`["changes", 2, "path", 1]`), or, for a path that leads nowhere, the edit's own path in the snapshot.
+
+### `runtime-changes-disagree`
+
+Only when the host asks for verification (`verify` with the whole snapshot it believes it now has): the snapshot the changes make is not that snapshot. The host's way of computing changes is wrong, and nothing is applied. The location is the first path, in the snapshot, where they differ.
+
+Location: `input`, the first path that differs.
+
 ### Internal errors
 
 ### `runtime-key-collision`

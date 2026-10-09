@@ -5,7 +5,7 @@
 // and `npm run build` first; compiles its one template with the compiler package.
 //
 //   node scripts/bench-update.mjs [items ...]     (default: 1000 10000)
-import { render, update } from "../dist/index.js";
+import { render, update, updateChanges } from "../dist/index.js";
 import { compile } from "../../mesh-compiler/dist/index.js";
 
 const MODEL = JSON.stringify({
@@ -46,6 +46,18 @@ for (const n of (process.argv.slice(2).map(Number).filter(Boolean).length ? proc
     current.release();
     current = next.render;
   });
-  console.log(`${String(n).padStart(6)} items, one changed: full render ${fullMs.toFixed(1)} ms, update ${updateMs.toFixed(1)} ms`);
   current.release();
+  // The same chain from the changes form: one `set` of the changed label, the module keeping the snapshot.
+  let { render: kept } = await render({ program, model: MODEL, snapshot: base, keep: true });
+  const at = Math.floor(n / 2);
+  let state = false;
+  const changesMs = await least(15, async () => {
+    state = !state;
+    const next = await updateChanges(kept, { base: kept.version, changes: [{ op: "set", path: ["items", at, "label"], value: state ? "changed" : `item ${at}` }] });
+    if (next.diagnostics) throw new Error(JSON.stringify(next.diagnostics));
+    kept.release();
+    kept = next.render;
+  });
+  console.log(`${String(n).padStart(6)} items, one changed: full render ${fullMs.toFixed(1)} ms, update ${updateMs.toFixed(1)} ms, update from changes ${changesMs.toFixed(1)} ms`);
+  kept.release();
 }

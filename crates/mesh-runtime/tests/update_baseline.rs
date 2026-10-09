@@ -6,7 +6,9 @@
 mod common;
 
 use common::{compile_with, snapshot};
-use mesh_runtime::{evaluations, render, update, Program};
+use mesh_runtime::{
+    evaluations, render, update, update_changes, Change, Changes, HostValue, PathSegment, Program,
+};
 use std::time::Instant;
 
 const MODEL: &str = r#"{
@@ -82,6 +84,26 @@ fn full_render_of_a_large_list_with_one_change() {
             0
         });
         println!("update,        {n:>6} items, one changed: {expressions:>7} expressions evaluated, {took:?}, {patches} patches");
+        let edit = Changes {
+            base: first.version(),
+            changes: vec![Change::Set {
+                path: vec![
+                    PathSegment::Name("items".into()),
+                    PathSegment::Index(n / 2),
+                    PathSegment::Name("label".into()),
+                ],
+                value: HostValue::String("changed".into()),
+            }],
+        };
+        let patches = update_changes(&first, &edit, None)
+            .expect("updates")
+            .patches
+            .len();
+        let (took, expressions) = least(&|| {
+            update_changes(&first, &edit, None).expect("updates");
+            0
+        });
+        println!("changes,       {n:>6} items, one changed: {expressions:>7} expressions evaluated, {took:?}, {patches} patches");
         let (took, expressions) = least(&|| {
             update(&first, &before).expect("updates");
             0

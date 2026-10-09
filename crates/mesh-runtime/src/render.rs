@@ -12,7 +12,7 @@ use crate::program::{
 };
 use crate::tree::{Memo, Node, RepeatItem, RepeatMemo, Run, Tree, TreeChild};
 use crate::types::{fits, Statics};
-use crate::value::{HostRecord, Value};
+use crate::value::{HostKey, HostRecord, HostValue, Value};
 use mesh_template as mpl;
 use mesh_template::{Child, Element, Expression};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -27,8 +27,25 @@ pub struct Render {
     pub(crate) root: String,
     pub(crate) templates: Vec<String>,
     pub(crate) model: String,
-    pub(crate) snapshot: HostRecord,
+    /// The root scope's values, validated: the snapshot as the render
+    /// has it. Shared (`Rc`) with the renders made from it by changes.
+    pub(crate) values: BTreeMap<String, Value>,
     tree: Tree,
+    /// This render's version in this thread: no two renders have the same
+    /// one. Changes name the version they were computed against.
+    id: u64,
+}
+
+thread_local! {
+    static VERSIONS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// The next render's version: 1, 2, 3, ... never repeated in a thread.
+pub(crate) fn next_version() -> u64 {
+    VERSIONS.with(|count| {
+        count.set(count.get() + 1);
+        count.get()
+    })
 }
 
 impl Render {
@@ -37,11 +54,57 @@ impl Render {
         &self.tree
     }
 
+    /// This render's version: unique among the renders made in this thread.
+    /// Changes to apply to it (`update_changes`) name it as their `base`, so
+    /// that they can't be applied to any other render.
+    pub fn version(&self) -> u64 {
+        self.id
+    }
+
+    /// The snapshot this render has, as a host would give it: for the dispatch
+    /// that validates a render's inputs again.
+    pub(crate) fn host_snapshot(&self) -> HostRecord {
+        HostRecord(
+            self.values
+                .iter()
+                .filter(|(_, value)| !matches!(value, Value::Absent))
+                .map(|(name, value)| (HostKey::Text(name.clone()), to_host(value)))
+                .collect(),
+        )
+    }
+
     pub(crate) fn program(&self) -> (Vec<&str>, &str) {
         (
             self.templates.iter().map(String::as_str).collect(),
             &self.root,
         )
+    }
+}
+
+/// A value as a host would give it: the inverse of input validation, for
+/// values that passed it.
+fn to_host(value: &Value) -> HostValue {
+    match value {
+        Value::Absent => unreachable!("a record holds no absent field; a list's are refused"),
+        Value::Null => HostValue::Null,
+        Value::Boolean(value) => HostValue::Boolean(*value),
+        Value::Number(number) => HostValue::Number(*number),
+        Value::String(text) => HostValue::String(text.to_string()),
+        Value::List(items) => HostValue::List(
+            items
+                .iter()
+                .map(|item| match item {
+                    Value::Absent => None,
+                    item => Some(to_host(item)),
+                })
+                .collect(),
+        ),
+        Value::Record(fields) => HostValue::Record(HostRecord(
+            fields
+                .iter()
+                .map(|(name, value)| (HostKey::Text(name.clone()), to_host(value)))
+                .collect(),
+        )),
     }
 }
 
@@ -53,7 +116,8 @@ pub fn render(
     snapshot: &HostRecord,
 ) -> Result<Render, Vec<RuntimeDiagnostic>> {
     let valid = program::validate(program, model)?;
-    let (tree, _) = tree(&valid, snapshot, false, None)?;
+    let values = validated_values(&valid, snapshot)?;
+    let (tree, _) = tree_of(&valid, &values, false, None)?;
     Ok(Render {
         root: program.root.to_string(),
         templates: program
@@ -62,8 +126,9 @@ pub fn render(
             .map(|text| (*text).to_string())
             .collect(),
         model: model.to_string(),
-        snapshot: snapshot.clone(),
+        values,
         tree,
+        id: next_version(),
     })
 }
 
@@ -99,15 +164,85 @@ pub fn update_with(
         },
         &previous.model,
     )?;
-    let (tree, _) = tree(&valid, &snapshot, false, Some(&previous.tree.root))?;
+    let values = validated_values(&valid, &snapshot)?;
+    let (tree, _) = tree_of(&valid, &values, false, Some(&previous.tree.root))?;
     let patches = crate::patch::diff(&previous.tree, &tree);
     Ok(Update {
         render: Render {
             root: previous.root.clone(),
             templates: previous.templates.clone(),
             model: previous.model.clone(),
-            snapshot,
+            values,
             tree,
+            id: next_version(),
+        },
+        patches,
+    })
+}
+
+/// Updates `previous` by `changes` to its snapshot, not a whole new one
+/// (docs/manual/runtime.md, "Changes"): the same result as an update to the
+/// snapshot the changes make, at the cost of the changes and what depends on
+/// them. The new snapshot is the previous render's values with the changes
+/// applied, sharing what they don't touch, and only the values the changes give
+/// are validated.
+///
+/// `changes.base` must be `previous`'s version, or nothing is done
+/// (`runtime-changes-base-mismatch`). With `verify`, the snapshot the host
+/// believes it now has, whole, is validated and compared with what the changes
+/// make, and any difference is `runtime-changes-disagree`, at the first path
+/// that differs: a check of whoever computed the changes, which costs a
+/// validation of the whole snapshot, so it is for tests and development.
+///
+/// On diagnostics, `previous` is untouched and still valid.
+pub fn update_changes(
+    previous: &Render,
+    changes: &crate::changes::Changes,
+    verify: Option<&HostRecord>,
+) -> Result<Update, Vec<RuntimeDiagnostic>> {
+    if changes.base != previous.id {
+        return Err(vec![RuntimeDiagnostic::new(
+            RuntimeCode::CHANGES_BASE_MISMATCH,
+            format!(
+                "these changes are for render {}, but this is render {}: they were computed against another snapshot, and are not applied",
+                changes.base, previous.id
+            ),
+            crate::diagnostic::Location::Input(vec![PathSegment::Name("base".to_string())]),
+        )]);
+    }
+    let templates: Vec<&str> = previous.templates.iter().map(String::as_str).collect();
+    let valid = program::validate(
+        &Program {
+            root: &previous.root,
+            templates: &templates,
+        },
+        &previous.model,
+    )?;
+    let mut values = previous.values.clone();
+    crate::changes::apply(&valid, &mut values, &changes.changes)?;
+    if let Some(whole) = verify {
+        let believed = validated_values(&valid, whole)?;
+        if let Some(path) = crate::changes::first_difference(&values, &believed) {
+            return Err(vec![RuntimeDiagnostic::new(
+                RuntimeCode::CHANGES_DISAGREE,
+                format!(
+                    "the changes make a snapshot that differs from the whole snapshot given, at `{}`",
+                    crate::boundary::display(&path)
+                ),
+                crate::diagnostic::Location::Input(path),
+            )]);
+        }
+    }
+    let (tree, _) = tree_of(&valid, &values, false, Some(&previous.tree.root))?;
+    let patches = crate::patch::diff(&previous.tree, &tree);
+    Ok(Update {
+        render: Render {
+            root: previous.root.clone(),
+            templates: previous.templates.clone(),
+            model: previous.model.clone(),
+            values,
+            tree,
+            id: next_version(),
         },
         patches,
     })
@@ -342,12 +477,33 @@ pub(crate) fn tree<'v>(
     record: bool,
     previous: Option<&Rc<Node>>,
 ) -> Result<(Tree, Sites<'v>), Vec<RuntimeDiagnostic>> {
+    let scope = validated_values(valid, snapshot)?;
+    tree_of(valid, &scope, record, previous)
+}
+
+/// The root scope's values from a snapshot, validated (§9.8.4): every
+/// mismatch is reported, at its path.
+pub(crate) fn validated_values(
+    valid: &Valid,
+    snapshot: &HostRecord,
+) -> Result<BTreeMap<String, Value>, Vec<RuntimeDiagnostic>> {
     let mut inputs = Inputs::new(&valid.manifest);
     let scope = snapshot_values(valid, snapshot, &mut inputs);
     let diagnostics = inputs.sorted();
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
+    Ok(scope)
+}
+
+/// The render tree of a validated program against validated root values
+/// (`previous`, when updating, is the root node of the tree it updates).
+pub(crate) fn tree_of<'v>(
+    valid: &'v Valid,
+    scope: &BTreeMap<String, Value>,
+    record: bool,
+    previous: Option<&Rc<Node>>,
+) -> Result<(Tree, Sites<'v>), Vec<RuntimeDiagnostic>> {
     let mut renderer = Renderer {
         valid,
         keys: HashSet::new(),
@@ -364,7 +520,7 @@ pub(crate) fn tree<'v>(
         .unwrap_or_default();
     let tree = Tree {
         root: renderer
-            .occurrence(&valid.root, &root.root, 0, &mut Vec::new(), &scope, &old)
+            .occurrence(&valid.root, &root.root, 0, &mut Vec::new(), scope, &old)
             .map_err(|diagnostic| vec![diagnostic])?,
     };
     Ok((tree, renderer.sites.unwrap_or_default()))

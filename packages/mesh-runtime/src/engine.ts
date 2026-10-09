@@ -57,6 +57,30 @@ export interface RenderInput {
   readonly model: string;
   /** The root's scope values, by scope name: a plain object. */
   readonly snapshot: Record<string, unknown>;
+  /**
+   * Keep the render in the module, as `update` does for the render it makes, so
+   * that {@link updateChanges} can apply changes to it. The render then has a
+   * `version`, which those changes name, and the host releases it
+   * (`render.release()`) when it is done with it.
+   */
+  readonly keep?: boolean;
+}
+
+/** One step of a change's path: a record field's name or a list index. */
+export type PathStep = string | number;
+
+/** One edit of a snapshot, at a path into it. See `updateChanges`. */
+export type Change =
+  | { readonly op: "set"; readonly path: readonly PathStep[]; readonly value: unknown }
+  | { readonly op: "insert"; readonly path: readonly PathStep[]; readonly value: unknown }
+  | { readonly op: "remove"; readonly path: readonly PathStep[] };
+
+/** The edits to a render's snapshot, and the render they were computed against. */
+export interface Changes {
+  /** The `version` of the render these changes are for. Changes for any other render are refused. */
+  readonly base: number;
+  /** The edits, applied in order: an edit sees the effect of those before it. */
+  readonly changes: readonly Change[];
 }
 
 /** One declared-events request: a program, and the manifest it was compiled against. */
@@ -86,6 +110,13 @@ export type DispatchResult =
   | { readonly intent: CommandIntent; readonly diagnostics?: never }
   | { readonly intent?: never; readonly diagnostics: RuntimeDiagnosticsDocument };
 
+/** The module's copy of a render: its handle, the module it is in, and the render's version. */
+interface Kept {
+  readonly handle: number;
+  readonly generation: number;
+  readonly version: number;
+}
+
 /** Only the engine makes renders. */
 const MAKING = Symbol("making a render");
 
@@ -101,9 +132,10 @@ export class Render {
   readonly #root: string;
   readonly #templates: Uint8Array;
   readonly #model: string;
-  readonly #snapshot: Uint8Array;
-  /** The module's copy of this render, which `update` made: its handle, and the module it is in. */
-  #kept: { readonly handle: number; readonly generation: number } | undefined;
+  /** The snapshot as encoded, if this render has one; a render made from changes has none outside the module. */
+  readonly #snapshot: Uint8Array | undefined;
+  /** The module's copy of this render: its handle, the module it is in, and its version. */
+  #kept: Kept | undefined;
 
   /** Not public: renders come from {@link render} and {@link update}. */
   constructor(
@@ -112,11 +144,11 @@ export class Render {
     root: string,
     templates: Uint8Array,
     model: string,
-    snapshot: Uint8Array,
-    kept?: { readonly handle: number; readonly generation: number },
+    snapshot: Uint8Array | undefined,
+    kept?: Kept,
   ) {
     if (token !== MAKING) {
-      throw new TypeError("a Render comes from render() or update()");
+      throw new TypeError("a Render comes from render(), update() or updateChanges()");
     }
     this.tree = tree;
     this.#root = root;
@@ -132,13 +164,26 @@ export class Render {
   }
 
   /**
+   * The number changes name to say which render they were computed against,
+   * while the module holds this render (it was made by `update` or
+   * `updateChanges`, or by `render` with `keep`, and not released); otherwise
+   * `undefined`.
+   */
+  get version(): number | undefined {
+    return this.#kept?.version;
+  }
+
+  /**
    * Releases the module's copy of this render, which `update` made so the
    * next `update` need not derive it again. Call it when this render is no
    * longer the one to update from or to dispatch with: once an update's
    * patches are applied, release the render before it. It is safe to call
    * twice, and a render still works after it, since it keeps its own inputs:
    * the next `update` just derives it again, as it does for a render
-   * `render()` made. A render that is never released is released when it is
+   * `render()` made. **Except a render made by `updateChanges`:** it has no
+   * snapshot outside the module, so once released (or if the module is
+   * replaced) it can no longer be updated or dispatched with; render again from
+   * a whole snapshot. A render that is never released is released when it is
    * garbage collected, but that is up to the engine and can be late.
    */
   release(): void {
@@ -152,17 +197,17 @@ export class Render {
   }
 
   /** The module's copy of `render`, if it has one that is still in the module in use. Throws a TypeError for a foreign object. */
-  static keptOf(render: Render): { readonly handle: number; readonly generation: number } | undefined {
+  static keptOf(render: Render): Kept | undefined {
     if (!(typeof render === "object" && render !== null && #root in render)) {
-      throw new TypeError("update() takes a Render that render() or update() returned");
+      throw new TypeError("update() takes a Render that render(), update() or updateChanges() returned");
     }
     return render.#kept;
   }
 
   /** The inputs dispatch passes back to the module. Throws a TypeError for a foreign object. */
-  static inputsOf(render: Render): [string, Uint8Array, string, Uint8Array] {
+  static inputsOf(render: Render): [string, Uint8Array, string, Uint8Array | undefined] {
     if (!(typeof render === "object" && render !== null && #root in render)) {
-      throw new TypeError("dispatch() takes a Render that render() or update() returned");
+      throw new TypeError("dispatch() takes a Render that render(), update() or updateChanges() returned");
     }
     return [render.#root, render.#templates, render.#model, render.#snapshot];
   }
@@ -177,6 +222,9 @@ interface Exports {
   mesh_free(ptr: number, len: number): void;
   mesh_render(...args: number[]): number;
   mesh_update(...args: number[]): number;
+  mesh_render_kept(...args: number[]): number;
+  mesh_update_changes(...args: number[]): number;
+  mesh_dispatch_kept(...args: number[]): number;
   mesh_release(handle: number): void;
   mesh_dispatch(...args: number[]): number;
   mesh_declared_events(...args: number[]): number;
@@ -190,6 +238,9 @@ const EXPORTS = [
   "mesh_free",
   "mesh_render",
   "mesh_update",
+  "mesh_render_kept",
+  "mesh_update_changes",
+  "mesh_dispatch_kept",
   "mesh_release",
   "mesh_dispatch",
   "mesh_declared_events",
@@ -210,7 +261,7 @@ const generations = new WeakMap<Exports, number>();
 let generationCount = 0;
 
 /** Releases the module's copy of a render, in the instance that has it, if that is still the one in use. Never throws. */
-function releaseKept(kept: { readonly handle: number; readonly generation: number }): void {
+function releaseKept(kept: Kept): void {
   void enqueue(async () => {
     if (instance && generations.get(instance) === kept.generation) {
       instance.mesh_release(kept.handle);
@@ -219,7 +270,7 @@ function releaseKept(kept: { readonly handle: number; readonly generation: numbe
 }
 
 /** Releases the copy of a render that was garbage collected without `release()`. */
-const keptRegistry = new FinalizationRegistry<{ readonly handle: number; readonly generation: number }>(releaseKept);
+const keptRegistry = new FinalizationRegistry<Kept>(releaseKept);
 
 /** The compiled module, once loaded. */
 let compiled: WebAssembly.Module | undefined;
@@ -471,9 +522,10 @@ export function render(input: RenderInput): Promise<RenderResult> {
     const templates = encodeTexts(input.program.templates);
     const model = input.model;
     const snapshot = encodeValue(input.snapshot);
+    const keep = input.keep === true;
     return runNow(
       [encoder.encode(root), templates, encoder.encode(model), snapshot],
-      (exports, pointers) => exports.mesh_render(...pointers),
+      (exports, pointers) => (keep ? exports.mesh_render_kept(...pointers) : exports.mesh_render(...pointers)),
       (result): RenderResult => {
         if (isDiagnostics(result.diagnostics)) {
           return Object.freeze({ diagnostics: result.diagnostics });
@@ -482,10 +534,33 @@ export function render(input: RenderInput): Promise<RenderResult> {
           throw new MeshInternalError("the runtime's result is neither a tree nor diagnostics");
         }
         const tree = result.tree as RenderTree;
-        return Object.freeze({ render: new Render(MAKING, tree, root, templates, model, snapshot) });
+        const kept = keep ? keptFrom(result) : undefined;
+        return Object.freeze({ render: new Render(MAKING, tree, root, templates, model, snapshot, kept) });
       },
     );
   });
+}
+
+/** Whether the module in use still holds the render `kept` names. */
+function liveIn(kept: Kept | undefined): kept is Kept {
+  return kept !== undefined && instance !== undefined && generations.get(instance) === kept.generation;
+}
+
+/** What a render with no snapshot of its own is refused with when its copy in the module is gone. */
+function gone(operation: string): TypeError {
+  return new TypeError(
+    `${operation}() needs this render's copy in the module, which is gone (the render was released, or the module was replaced), ` +
+      "and a render made from changes has no snapshot of its own: render again from a whole snapshot",
+  );
+}
+
+/** The module's copy of the render a result names. */
+function keptFrom(result: Record<string, unknown>): Kept {
+  const generation = instance === undefined ? undefined : generations.get(instance);
+  if (typeof result.handle !== "number" || typeof result.version !== "number" || generation === undefined) {
+    throw new MeshInternalError("the runtime's result names no render");
+  }
+  return { handle: result.handle, version: result.version, generation };
 }
 
 /** Updates. See the package's `update`. */
@@ -493,9 +568,12 @@ export function update(previous: Render, snapshotInput: Record<string, unknown>)
   return enqueue(async () => {
     const [root, templates, model, previousSnapshot] = Render.inputsOf(previous);
     const kept = Render.keptOf(previous);
+    if (previousSnapshot === undefined && !liveIn(kept)) {
+      throw gone("update");
+    }
     const snapshot = encodeValue(snapshotInput);
     return runNow(
-      [encoder.encode(root), templates, encoder.encode(model), previousSnapshot, snapshot],
+      [encoder.encode(root), templates, encoder.encode(model), previousSnapshot === undefined ? new Uint8Array(0) : previousSnapshot, snapshot],
       (exports, pointers) => {
         // The module's copy is good only in the instance that made it.
         const held = kept !== undefined && generations.get(exports) === kept.generation;
@@ -505,20 +583,54 @@ export function update(previous: Render, snapshotInput: Record<string, unknown>)
         if (isDiagnostics(result.diagnostics)) {
           return Object.freeze({ diagnostics: result.diagnostics });
         }
-        if (typeof result.handle !== "number" || typeof result.patches !== "object" || result.patches === null) {
+        if (typeof result.patches !== "object" || result.patches === null) {
           throw new MeshInternalError("the runtime's result is neither an update nor diagnostics");
-        }
-        const generation = generations.get(instance as Exports);
-        if (generation === undefined) {
-          throw new MeshInternalError("the runtime's instance has no generation");
         }
         // The module returns what changed; the new tree is the previous one with it applied.
         const patches = result.patches as RenderPatches;
         return Object.freeze({
-          render: new Render(MAKING, applyPatches(previous.tree, patches), root, templates, model, snapshot, {
-            handle: result.handle,
-            generation,
-          }),
+          render: new Render(MAKING, applyPatches(previous.tree, patches), root, templates, model, snapshot, keptFrom(result)),
+          patches,
+        });
+      },
+    );
+  });
+}
+
+/** Updates by changes. See the package's `updateChanges`. */
+export function updateChanges(
+  previous: Render,
+  changes: Changes,
+  options?: { readonly verify?: Record<string, unknown> },
+): Promise<UpdateResult> {
+  return enqueue(async () => {
+    const [root, templates, model] = Render.inputsOf(previous);
+    const kept = Render.keptOf(previous);
+    // Changes are only ever applied to the render they name, which only the module that holds it can say.
+    if (!liveIn(kept)) {
+      throw new TypeError(
+        "updateChanges() needs this render to be in the module: make it with update(), or render() with keep, and don't release it first",
+      );
+    }
+    if (typeof changes !== "object" || changes === null) {
+      throw new TypeError("updateChanges() takes the changes: { base, changes }");
+    }
+    const encoded = encodeValue(changes as unknown as Record<string, unknown>);
+    const verify = options?.verify === undefined ? undefined : encodeValue(options.verify);
+    return runNow(
+      [encoder.encode(model), encoded, verify === undefined ? new Uint8Array(0) : verify],
+      (exports, pointers) => exports.mesh_update_changes(...pointers, verify === undefined ? 0 : 1, kept.handle),
+      (result): UpdateResult => {
+        if (isDiagnostics(result.diagnostics)) {
+          return Object.freeze({ diagnostics: result.diagnostics });
+        }
+        if (typeof result.patches !== "object" || result.patches === null) {
+          throw new MeshInternalError("the runtime's result is neither an update nor diagnostics");
+        }
+        const patches = result.patches as RenderPatches;
+        // No snapshot is kept outside the module: the new render is the module's.
+        return Object.freeze({
+          render: new Render(MAKING, applyPatches(previous.tree, patches), root, templates, model, undefined, keptFrom(result)),
           patches,
         });
       },
@@ -569,14 +681,25 @@ export function declaredEvents(input: DeclaredEventsInput): Promise<DeclaredEven
 export function dispatch(render: Render, handler: string, payload?: unknown): Promise<DispatchResult> {
   return enqueue(async () => {
     const [root, templates, model, snapshot] = Render.inputsOf(render);
+    const kept = Render.keptOf(render);
     if (typeof handler !== "string") {
       throw new TypeError("handler must be a string: a handler identifier from the render's tree");
     }
     const absent = payload === undefined;
     const encoded = absent ? new Uint8Array(0) : encodeValue(payload);
+    // A render the module holds is dispatched there, against the snapshot it has; any other is dispatched from its own.
+    const inModule = liveIn(kept);
+    if (!inModule && snapshot === undefined) {
+      throw gone("dispatch");
+    }
     return runNow(
-      [encoder.encode(root), templates, encoder.encode(model), snapshot, encoder.encode(handler), encoded],
-      (exports, pointers) => exports.mesh_dispatch(...pointers, absent ? 0 : 1),
+      inModule
+        ? [encoder.encode(model), encoder.encode(handler), encoded]
+        : [encoder.encode(root), templates, encoder.encode(model), snapshot as Uint8Array, encoder.encode(handler), encoded],
+      (exports, pointers) =>
+        inModule
+          ? exports.mesh_dispatch_kept(...pointers, absent ? 0 : 1, kept.handle)
+          : exports.mesh_dispatch(...pointers, absent ? 0 : 1),
       (result): DispatchResult => {
         if (isDiagnostics(result.diagnostics)) {
           return Object.freeze({ diagnostics: result.diagnostics });

@@ -128,8 +128,10 @@ pub fn retained_renders() -> usize {
     retained::count()
 }
 
-/// Updates to the encoded `snapshot`: `{"handle": <n>, "patches":
-/// <render-patch-v1>}`, or `{"diagnostics": <runtime-diagnostics-v1>}`.
+/// Updates to the encoded `snapshot`: `{"handle": <n>, "version": <n>,
+/// "patches": <render-patch-v1>}`, or `{"diagnostics":
+/// <runtime-diagnostics-v1>}`. The version is the new render's
+/// (`mesh_runtime::Render::version`), which changes to it name as their base.
 ///
 /// The new tree isn't in the result: the caller has the previous tree, and
 /// applying the patches to it gives the new one (the law of `render-patch-v1`),
@@ -177,9 +179,109 @@ pub fn respond_update(
     Ok(match result {
         Ok(updated) => {
             let patches = mesh_runtime::patches_to_json(&updated.patches);
+            let version = updated.render.version();
             let handle = retained::keep(updated.render);
-            format!("{{\"handle\":{handle},\"patches\":{patches}}}")
+            format!("{{\"handle\":{handle},\"version\":{version},\"patches\":{patches}}}")
         }
+        Err(diagnostics) => format!(
+            "{{\"diagnostics\":{}}}",
+            mesh_runtime::to_json(&diagnostics, model)
+        ),
+    })
+}
+
+/// Renders, and keeps the render, so that changes can be applied to it
+/// (`respond_update_changes`): `{"handle": <n>, "version": <n>, "tree":
+/// <render-v1>}`, or `{"diagnostics": <runtime-diagnostics-v1>}`. Like
+/// [`respond_render`], and the render is the module's until released.
+pub fn respond_render_kept(
+    root: &str,
+    templates: &[u8],
+    model: &str,
+    snapshot_bytes: &[u8],
+) -> Result<String, Refusal> {
+    let templates = decode_texts(templates)?;
+    let snapshot = decode_snapshot(snapshot_bytes)?;
+    let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+    let program = Program {
+        root,
+        templates: &texts,
+    };
+    Ok(match mesh_runtime::render(&program, model, &snapshot) {
+        Ok(render) => {
+            let tree = render.tree().to_json();
+            let version = render.version();
+            let handle = retained::keep(render);
+            format!("{{\"handle\":{handle},\"version\":{version},\"tree\":{tree}}}")
+        }
+        Err(diagnostics) => format!(
+            "{{\"diagnostics\":{}}}",
+            mesh_runtime::to_json(&diagnostics, model)
+        ),
+    })
+}
+
+/// Updates the kept render `handle` names by the encoded `changes`
+/// (`mesh_runtime::update_changes`): `{"handle": <n>, "version": <n>,
+/// "patches": <render-patch-v1>}`, or `{"diagnostics": ...}`. With
+/// `verify_bytes`, the host's whole snapshot, the changes are checked against
+/// it. A handle the module doesn't hold is a diagnostic (the render isn't here:
+/// released, or the module replaced), never a guess: changes are only ever
+/// applied to the render they were computed against.
+pub fn respond_update_changes(
+    model: &str,
+    handle: u32,
+    changes_bytes: &[u8],
+    verify_bytes: Option<&[u8]>,
+) -> Result<String, Refusal> {
+    use mesh_runtime::{Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
+
+    let changes = decode_value(changes_bytes)?;
+    let verify = verify_bytes.map(decode_snapshot).transpose()?;
+    let result = match mesh_runtime::Changes::from_host(&changes) {
+        Err(diagnostics) => Err(diagnostics),
+        Ok(changes) => retained::with(handle, |previous| {
+            mesh_runtime::update_changes(previous, &changes, verify.as_ref())
+        })
+        .unwrap_or_else(|| {
+            Err(vec![RuntimeDiagnostic::new(
+                RuntimeCode::CHANGES_BASE_MISMATCH,
+                "the module holds no such render (it was released, or the module was replaced): these changes can't be applied; update with a whole snapshot",
+                Location::Input(vec![PathSegment::Name("base".to_string())]),
+            )])
+        }),
+    };
+    Ok(match result {
+        Ok(updated) => {
+            let patches = mesh_runtime::patches_to_json(&updated.patches);
+            let version = updated.render.version();
+            let handle = retained::keep(updated.render);
+            format!("{{\"handle\":{handle},\"version\":{version},\"patches\":{patches}}}")
+        }
+        Err(diagnostics) => format!(
+            "{{\"diagnostics\":{}}}",
+            mesh_runtime::to_json(&diagnostics, model)
+        ),
+    })
+}
+
+/// Dispatches `handler` against the kept render `handle` names, with the encoded
+/// `payload` (absent when `None`): `{"intent": <intent>}`, or `{"diagnostics":
+/// ...}`. A render made by changes has no snapshot outside the module, so this
+/// is how it is dispatched. A handle the module doesn't hold is a refusal.
+pub fn respond_dispatch_kept(
+    model: &str,
+    handle: u32,
+    handler: &str,
+    payload_bytes: Option<&[u8]>,
+) -> Result<String, Refusal> {
+    let payload = payload_bytes.map(decode_value).transpose()?;
+    let result = retained::with(handle, |render| {
+        mesh_runtime::dispatch(render, handler, payload.as_ref())
+    })
+    .ok_or_else(|| Refusal::Input("the module holds no such render".to_string()))?;
+    Ok(match result {
+        Ok(intent) => format!("{{\"intent\":{}}}", intent.to_json()),
         Err(diagnostics) => format!(
             "{{\"diagnostics\":{}}}",
             mesh_runtime::to_json(&diagnostics, model)

@@ -17,6 +17,7 @@
 //! global state: identical inputs give identical results.
 
 mod boundary;
+mod changes;
 mod diagnostic;
 mod dispatch;
 pub mod encoding;
@@ -30,6 +31,7 @@ mod tree;
 mod types;
 mod value;
 
+pub use changes::{Change, Changes};
 pub use diagnostic::{to_json, Form, Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
 pub use dispatch::{dispatch, dispatch_from};
 #[doc(hidden)]
@@ -37,7 +39,7 @@ pub use eval::evaluations;
 pub use number::number_to_text;
 pub use patch::{diff, patches_to_json, Patch};
 pub use program::{declared_events_to_json, DeclaredEvent, Program};
-pub use render::{render, update, update_with, Render, Update};
+pub use render::{render, update, update_changes, update_with, Render, Update};
 pub use resolve::{resolve, Interaction, ResolveError, Resolved};
 pub use tree::{Intent, Node, Tree, TreeChild};
 pub use value::{HostKey, HostRecord, HostValue};

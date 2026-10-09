@@ -203,7 +203,7 @@ pub fn dispatch(
             templates: &templates,
         },
         &render.model,
-        &render.snapshot,
+        &render.host_snapshot(),
         handler,
         payload,
     )
