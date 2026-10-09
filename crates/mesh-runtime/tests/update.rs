@@ -339,17 +339,20 @@ fn applying_an_updates_patches_gives_the_full_render() {
 }
 
 #[test]
-fn an_update_with_nothing_changed_has_no_patches_and_evaluates_nothing_it_can_reuse() {
+fn an_update_with_nothing_changed_has_no_patches_and_evaluates_nothing() {
     let state =
         r#"{"title":"t","count":1,"flag":true,"items":[{"id":1,"label":"a","done":false}]}"#;
     let current = program_render(state);
     let before = evaluations();
     let updated = update(&current, &snapshot(state)).expect("updates");
     assert!(updated.patches.is_empty());
-    // Only the structural expressions are evaluated: `when` (1), `items`
-    // (1) and `key` for the one item (`item.id` is a member of a scope
-    // read, 2). Every prop and text is reused.
-    assert_eq!(evaluations() - before, 4);
+    // Nothing the root reads has changed, so the whole tree is the previous
+    // one, shared: not a single expression is evaluated.
+    assert_eq!(evaluations() - before, 0);
+    assert!(std::rc::Rc::ptr_eq(
+        &updated.render.tree().root,
+        &current.tree().root
+    ));
 }
 
 #[test]

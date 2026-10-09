@@ -12,6 +12,7 @@
 
 use crate::tree::{child, Node, Tree, TreeChild};
 use serde_json::{json, Value};
+use std::rc::Rc;
 
 /// One operation of a patch list.
 #[derive(Debug, Clone, PartialEq)]
@@ -47,10 +48,19 @@ pub enum Patch {
 /// The patches that turn `old` into `new`.
 pub fn diff(old: &Tree, new: &Tree) -> Vec<Patch> {
     let mut patches = Vec::new();
-    if diff_node(&old.root, &new.root, &mut patches).is_none() {
+    if diff_rc(&old.root, &new.root, &mut patches).is_none() {
         return vec![Patch::Replace { tree: new.clone() }];
     }
     patches
+}
+
+/// A node an update kept is the very same node (shared, not copied), and
+/// has nothing to patch: its subtree isn't looked at.
+fn diff_rc(old: &Rc<Node>, new: &Rc<Node>, out: &mut Vec<Patch>) -> Option<()> {
+    if Rc::ptr_eq(old, new) {
+        return Some(());
+    }
+    diff_node(old, new, out)
 }
 
 /// `None` when the two nodes differ in a way no patch expresses: a
@@ -103,7 +113,7 @@ fn key_of(part: &TreeChild) -> &str {
 /// changes.
 fn kept(old: &TreeChild, new: &TreeChild) -> bool {
     match (old, new) {
-        (TreeChild::Node(old), TreeChild::Node(new)) => same_part(old, new),
+        (TreeChild::Node(old), TreeChild::Node(new)) => Rc::ptr_eq(old, new) || same_part(old, new),
         (TreeChild::Text { key: old, .. }, TreeChild::Text { key: new, .. }) => old == new,
         _ => false,
     }
@@ -120,6 +130,21 @@ fn diff_children(
     out: &mut Vec<Patch>,
 ) -> Option<()> {
     use std::collections::HashMap;
+
+    // The common case: the same parts in the same order, so nothing is
+    // inserted, removed or moved, and only what is inside a part can differ.
+    // No lookup tables are made for it.
+    if old.len() == new.len()
+        && old
+            .iter()
+            .zip(new)
+            .all(|(old, new)| key_of(old) == key_of(new) && kept(old, new))
+    {
+        for (old, new) in old.iter().zip(new) {
+            diff_pair(old, new, out)?;
+        }
+        return Some(());
+    }
 
     let old_at: HashMap<&str, &TreeChild> = old.iter().map(|part| (key_of(part), part)).collect();
     let new_at: HashMap<&str, &TreeChild> = new.iter().map(|part| (key_of(part), part)).collect();
@@ -162,20 +187,26 @@ fn diff_children(
     }
 
     for part in new.iter().filter(|part| is_kept(key_of(part))) {
-        match (old_at[key_of(part)], part) {
-            (TreeChild::Node(old), TreeChild::Node(new)) => diff_node(old, new, out)?,
-            (TreeChild::Text { text: old, .. }, TreeChild::Text { key, text }) => {
-                if old != text {
-                    out.push(Patch::SetText {
-                        key: key.clone(),
-                        text: text.clone(),
-                    });
-                }
-            }
-            _ => unreachable!("a kept part is a node and a node, or a text and a text"),
-        }
+        diff_pair(old_at[key_of(part)], part, out)?;
     }
     Some(())
+}
+
+/// The changes inside one kept part: a node's props and children, or a text's text.
+fn diff_pair(old: &TreeChild, new: &TreeChild, out: &mut Vec<Patch>) -> Option<()> {
+    match (old, new) {
+        (TreeChild::Node(old), TreeChild::Node(new)) => diff_rc(old, new, out),
+        (TreeChild::Text { text: old, .. }, TreeChild::Text { key, text }) => {
+            if old != text {
+                out.push(Patch::SetText {
+                    key: key.clone(),
+                    text: text.clone(),
+                });
+            }
+            Some(())
+        }
+        _ => unreachable!("a kept part is a node and a node, or a text and a text"),
+    }
 }
 
 /// A patch list as a `render-patch-v1` document.

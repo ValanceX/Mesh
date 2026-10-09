@@ -15,6 +15,8 @@
  *
  * The runtime runs entirely in WebAssembly: this package encodes values
  * and transports them, and evaluates, converts and judges nothing (I11).
+ * The one thing it does with a tree is apply the runtime's own patches to
+ * the previous one, in `patches.ts`: it moves parts by key, and reads no value.
  * The same values give the same results as the Rust runtime.
  *
  * @packageDocumentation

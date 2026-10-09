@@ -128,9 +128,12 @@ pub fn retained_renders() -> usize {
     retained::count()
 }
 
-/// Updates to the encoded `snapshot`: `{"handle": <n>, "tree": <render-v1>,
-/// "patches": <render-patch-v1>}`, or `{"diagnostics":
-/// <runtime-diagnostics-v1>}`.
+/// Updates to the encoded `snapshot`: `{"handle": <n>, "patches":
+/// <render-patch-v1>}`, or `{"diagnostics": <runtime-diagnostics-v1>}`.
+///
+/// The new tree isn't in the result: the caller has the previous tree, and
+/// applying the patches to it gives the new one (the law of `render-patch-v1`),
+/// so a result costs what changed, not the size of the tree.
 ///
 /// The previous render is the one `previous_handle` names, if the module
 /// holds it. Otherwise the module derives it from the render's own inputs
@@ -150,11 +153,17 @@ pub fn respond_update(
 ) -> Result<String, Refusal> {
     let templates = decode_texts(templates)?;
     let snapshot = decode_snapshot(snapshot_bytes)?;
-    let result = match previous_handle.and_then(|handle| {
-        retained::with(handle, |previous| mesh_runtime::update(previous, &snapshot))
-    }) {
+    // The snapshot goes to whichever update uses it, and is copied by neither.
+    let mut owned = Some(snapshot);
+    let kept = previous_handle.and_then(|handle| {
+        retained::with(handle, |previous| {
+            mesh_runtime::update_with(previous, owned.take().expect("not yet taken"))
+        })
+    });
+    let result = match kept {
         Some(result) => result,
         None => {
+            let snapshot = owned.take().expect("not taken: no render was kept");
             let previous_snapshot = decode_snapshot(previous_bytes)?;
             let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
             let program = Program {
@@ -162,17 +171,14 @@ pub fn respond_update(
                 templates: &texts,
             };
             mesh_runtime::render(&program, model, &previous_snapshot)
-                .and_then(|previous| mesh_runtime::update(&previous, &snapshot))
+                .and_then(|previous| mesh_runtime::update_with(&previous, snapshot))
         }
     };
     Ok(match result {
         Ok(updated) => {
-            let (tree, patches) = (
-                updated.render.tree().to_json(),
-                mesh_runtime::patches_to_json(&updated.patches),
-            );
+            let patches = mesh_runtime::patches_to_json(&updated.patches);
             let handle = retained::keep(updated.render);
-            format!("{{\"handle\":{handle},\"tree\":{tree},\"patches\":{patches}}}")
+            format!("{{\"handle\":{handle},\"patches\":{patches}}}")
         }
         Err(diagnostics) => format!(
             "{{\"diagnostics\":{}}}",

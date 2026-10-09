@@ -807,17 +807,45 @@ pub(crate) fn uses_repeat(templates: &BTreeMap<String, Template>) -> bool {
 
 /// The key at `path` in the program whose identity is `identity`.
 pub(crate) fn key(identity: &[u8; 32], path: &[Step]) -> String {
-    let mut hash = Sha256::new();
-    string(&mut hash, "mesh-key-v1");
-    hash.update(identity);
-    count(&mut hash, path.len());
-    for step in path {
-        count(&mut hash, step.position);
-        hash.update([step.kind]);
-        string(&mut hash, &step.component);
+    KeyPrefix::new(identity, path.len(), path).key(&[])
+}
+
+/// The hash of a key's path up to some step, so that the keys of siblings,
+/// which share the path above them, are each finished from it and not hashed
+/// from the root. The bytes are exactly those [`key`] hashes: `total` is the
+/// length of the whole path, which the hash states before any step.
+#[derive(Clone)]
+pub(crate) struct KeyPrefix {
+    hash: Sha256,
+}
+
+impl KeyPrefix {
+    pub(crate) fn new(identity: &[u8; 32], total: usize, steps: &[Step]) -> KeyPrefix {
+        let mut hash = Sha256::new();
+        string(&mut hash, "mesh-key-v1");
+        hash.update(identity);
+        count(&mut hash, total);
+        for step in steps {
+            absorb(&mut hash, step);
+        }
+        KeyPrefix { hash }
     }
-    let digest: [u8; 32] = hash.finalize().into();
-    format!("k{}", base64url(&digest[..16]))
+
+    /// The key of the path whose remaining steps are `rest`.
+    pub(crate) fn key(&self, rest: &[Step]) -> String {
+        let mut hash = self.hash.clone();
+        for step in rest {
+            absorb(&mut hash, step);
+        }
+        let digest: [u8; 32] = hash.finalize().into();
+        format!("k{}", base64url(&digest[..16]))
+    }
+}
+
+fn absorb(hash: &mut Sha256, step: &Step) {
+    count(hash, step.position);
+    hash.update([step.kind]);
+    string(hash, &step.component);
 }
 
 /// The first part of every handler identifier of a program.

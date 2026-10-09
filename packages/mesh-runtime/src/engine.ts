@@ -5,12 +5,14 @@
  *
  * Deliberately boring (I6, I11): nothing here knows MPRX, the model,
  * values, trees or intents. It encodes (`encode.ts`), transfers, and
- * parses the one result document the module returns. Not public API: the
+ * parses the one result document the module returns, and, for `update`,
+ * hands the patches in it to `patches.ts`. Not public API: the
  * package's `exports` map doesn't expose this file, except for the types
  * and classes `index.ts` re-exports.
  */
 
 import { encodeTexts, encodeValue } from "./encode.js";
+import { applyPatches } from "./patches.js";
 import type {
   CommandIntent,
   DeclaredEvent,
@@ -503,25 +505,21 @@ export function update(previous: Render, snapshotInput: Record<string, unknown>)
         if (isDiagnostics(result.diagnostics)) {
           return Object.freeze({ diagnostics: result.diagnostics });
         }
-        if (
-          typeof result.handle !== "number" ||
-          typeof result.tree !== "object" ||
-          result.tree === null ||
-          typeof result.patches !== "object" ||
-          result.patches === null
-        ) {
+        if (typeof result.handle !== "number" || typeof result.patches !== "object" || result.patches === null) {
           throw new MeshInternalError("the runtime's result is neither an update nor diagnostics");
         }
         const generation = generations.get(instance as Exports);
         if (generation === undefined) {
           throw new MeshInternalError("the runtime's instance has no generation");
         }
+        // The module returns what changed; the new tree is the previous one with it applied.
+        const patches = result.patches as RenderPatches;
         return Object.freeze({
-          render: new Render(MAKING, result.tree as RenderTree, root, templates, model, snapshot, {
+          render: new Render(MAKING, applyPatches(previous.tree, patches), root, templates, model, snapshot, {
             handle: result.handle,
             generation,
           }),
-          patches: result.patches as RenderPatches,
+          patches,
         });
       },
     );

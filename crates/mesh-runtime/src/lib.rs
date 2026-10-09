@@ -37,7 +37,7 @@ pub use eval::evaluations;
 pub use number::number_to_text;
 pub use patch::{diff, patches_to_json, Patch};
 pub use program::{declared_events_to_json, DeclaredEvent, Program};
-pub use render::{render, update, Render, Update};
+pub use render::{render, update, update_with, Render, Update};
 pub use resolve::{resolve, Interaction, ResolveError, Resolved};
 pub use tree::{Intent, Node, Tree, TreeChild};
 pub use value::{HostKey, HostRecord, HostValue};

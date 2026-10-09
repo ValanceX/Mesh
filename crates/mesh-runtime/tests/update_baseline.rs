@@ -52,25 +52,41 @@ fn full_render_of_a_large_list_with_one_change() {
         root: "view",
         templates: &texts,
     };
+    // The least of 15 runs: a machine's noise only ever adds time.
+    let least = |run: &dyn Fn() -> u64| -> (std::time::Duration, u64) {
+        let mut best = std::time::Duration::MAX;
+        let mut expressions = 0;
+        for _ in 0..15 {
+            let (e0, t0) = (evaluations(), Instant::now());
+            run();
+            let took = t0.elapsed();
+            if took < best {
+                best = took;
+                expressions = evaluations() - e0;
+            }
+        }
+        (best, expressions)
+    };
     for n in [1_000usize, 10_000] {
         let before = snapshot(&items(n, None));
         let after = snapshot(&items(n, Some(n / 2)));
         let first = render(&program, MODEL, &before).expect("renders");
-        let (e0, t0) = (evaluations(), Instant::now());
-        render(&program, MODEL, &after).expect("renders");
-        println!(
-            "full render,   {n:>6} items, one changed: {:>7} expressions evaluated, {:?}",
-            evaluations() - e0,
-            t0.elapsed()
-        );
-        let (e0, t0) = (evaluations(), Instant::now());
-        let updated = update(&first, &after).expect("updates");
-        println!(
-            "update,        {n:>6} items, one changed: {:>7} expressions evaluated, {:?}, {} patches",
-            evaluations() - e0,
-            t0.elapsed(),
-            updated.patches.len()
-        );
+        let (took, expressions) = least(&|| {
+            render(&program, MODEL, &after).expect("renders");
+            0
+        });
+        println!("full render,   {n:>6} items, one changed: {expressions:>7} expressions evaluated, {took:?}");
+        let patches = update(&first, &after).expect("updates").patches.len();
+        let (took, expressions) = least(&|| {
+            update(&first, &after).expect("updates");
+            0
+        });
+        println!("update,        {n:>6} items, one changed: {expressions:>7} expressions evaluated, {took:?}, {patches} patches");
+        let (took, expressions) = least(&|| {
+            update(&first, &before).expect("updates");
+            0
+        });
+        println!("update, nothing changed, {n:>6} items:    {expressions:>7} expressions evaluated, {took:?}");
     }
 }
 
@@ -102,7 +118,17 @@ fn where_an_update_spends_its_time() {
         let _ = first.clone();
     }
     println!(
-        "render clone (tree + snapshot + memo) x10: {:?} each",
+        "render clone (tree + snapshot) x10: {:?} each",
         t.elapsed() / 10
     );
+    let t = Instant::now();
+    for _ in 0..10 {
+        let _ = after.clone();
+    }
+    println!("snapshot clone x10: {:?} each", t.elapsed() / 10);
+    let t = Instant::now();
+    for _ in 0..10 {
+        update(&first, &before).expect("updates");
+    }
+    println!("update, nothing changed, x10: {:?} each", t.elapsed() / 10);
 }
