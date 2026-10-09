@@ -72,3 +72,16 @@ test("a long chain of updates, each releasing the render before it, doesn't grow
   await settle();
   assert.equal(exports.mesh_retained_renders(), 0);
 });
+
+test("renders a host never releases don't accumulate in the module (render() keeps nothing)", { timeout: 30 * 60 * 1000 }, async () => {
+  await init(readFileSync(testModule));
+  const program = { root: "view", templates: await programTemplates(join(programsDir, "cards")) };
+  const exports = instanceForTests();
+  const total = Number(process.env.MESH_MEMORY_CALLS ?? 10_000);
+  for (let index = 0; index < 20; index++) await render({ program, model: MODEL, snapshot: SNAPSHOT });
+  const baseline = { live: exports.mesh_live_allocations(), bytes: exports.memory.buffer.byteLength };
+  for (let index = 0; index < total; index++) await render({ program, model: MODEL, snapshot: SNAPSHOT }); // a 0.9.0 host: never releases
+  assert.equal(exports.mesh_retained_renders(), 0);
+  assert.equal(exports.mesh_live_allocations(), baseline.live);
+  assert.equal(exports.memory.buffer.byteLength, baseline.bytes, "linear memory didn't grow");
+});

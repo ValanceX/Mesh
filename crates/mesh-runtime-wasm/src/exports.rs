@@ -4,7 +4,7 @@
 //! `mesh_dispatch` or `mesh_declared_events`; `mesh_free` every input buffer; read the result at
 //! `mesh_result_ptr`/`mesh_result_len`; `mesh_result_clear`. After that,
 //! the call holds no memory in the module, except the renders `mesh_update`
-//! keeps for the next update, until `mesh_release`.
+//! and `mesh_update_changes` keep for the next update, until `mesh_release`.
 //!
 //! A call returns a status: 0, and the result document; 1, and nothing,
 //! if an input isn't UTF-8 or isn't the encoding (the wrapper's fault);
@@ -127,8 +127,9 @@ pub unsafe extern "C" fn mesh_render(
 
 /// Updates (`crate::respond_update`): a render's inputs, as
 /// [`mesh_render`] took them, with the render's snapshot, then the new
-/// snapshot, encoded, then the previous render's handle, which is used when
-/// `has_handle` is not 0 and the module still holds it.
+/// snapshot, encoded, then the new render's version and the previous render's
+/// handle, which is used when `has_handle` is not 0 and the module still
+/// holds it.
 ///
 /// # Safety
 ///
@@ -147,6 +148,7 @@ pub unsafe extern "C" fn mesh_update(
     previous_len: usize,
     snapshot: *const u8,
     snapshot_len: usize,
+    new_version: f64,
     handle: u32,
     has_handle: u32,
 ) -> u32 {
@@ -160,6 +162,7 @@ pub unsafe extern "C" fn mesh_update(
                 (has_handle != 0).then_some(handle),
                 bytes(previous, previous_len),
                 bytes(snapshot, snapshot_len),
+                new_version as u64,
             )),
             _ => None,
         }
@@ -173,43 +176,13 @@ pub extern "C" fn mesh_release(handle: u32) {
     crate::release(handle);
 }
 
-/// Renders and keeps the render (`crate::respond_render_kept`): the inputs
-/// [`mesh_render`] takes.
-///
-/// # Safety
-///
-/// Each pointer must point to its length's initialized bytes, unless that
-/// length is 0.
-#[no_mangle]
-#[allow(clippy::too_many_arguments)]
-pub unsafe extern "C" fn mesh_render_kept(
-    root: *const u8,
-    root_len: usize,
-    templates: *const u8,
-    templates_len: usize,
-    model: *const u8,
-    model_len: usize,
-    snapshot: *const u8,
-    snapshot_len: usize,
-) -> u32 {
-    // SAFETY: the caller's guarantee, passed on for each input.
-    let result = unsafe {
-        match (text(root, root_len), text(model, model_len)) {
-            (Some(root), Some(model)) => Some(crate::respond_render_kept(
-                root,
-                bytes(templates, templates_len),
-                model,
-                bytes(snapshot, snapshot_len),
-            )),
-            _ => None,
-        }
-    };
-    keep(result)
-}
-
-/// Updates a kept render by changes (`crate::respond_update_changes`): the
-/// model's text, the encoded changes, and the whole snapshot to verify them
-/// against, used when `has_verify` is not 0; then the render's handle.
+/// Updates a render by changes (`crate::respond_update_changes`): a render's
+/// inputs, as [`mesh_render`] took them but with the render's snapshot only;
+/// the encoded changes; the whole snapshot to verify them against, used when
+/// `has_verify` is not 0; the render's version, then the new render's; then
+/// its handle, used when `has_handle` is not 0 and the module still holds it.
+/// A version is a `f64` so that it crosses the boundary as a JavaScript
+/// number.
 ///
 /// # Safety
 ///
@@ -218,25 +191,40 @@ pub unsafe extern "C" fn mesh_render_kept(
 #[no_mangle]
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn mesh_update_changes(
+    root: *const u8,
+    root_len: usize,
+    templates: *const u8,
+    templates_len: usize,
     model: *const u8,
     model_len: usize,
+    previous: *const u8,
+    previous_len: usize,
     changes: *const u8,
     changes_len: usize,
     verify: *const u8,
     verify_len: usize,
     has_verify: u32,
+    version: f64,
+    new_version: f64,
     handle: u32,
+    has_handle: u32,
 ) -> u32 {
     // SAFETY: the caller's guarantee, passed on for each input.
     let result = unsafe {
-        text(model, model_len).map(|model| {
-            crate::respond_update_changes(
+        match (text(root, root_len), text(model, model_len)) {
+            (Some(root), Some(model)) => Some(crate::respond_update_changes(
+                root,
+                bytes(templates, templates_len),
                 model,
-                handle,
+                (has_handle != 0).then_some(handle),
+                bytes(previous, previous_len),
+                version as u64,
+                new_version as u64,
                 bytes(changes, changes_len),
                 (has_verify != 0).then(|| bytes(verify, verify_len)),
-            )
-        })
+            )),
+            _ => None,
+        }
     };
     keep(result)
 }

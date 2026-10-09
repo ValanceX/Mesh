@@ -61,6 +61,17 @@ impl Render {
         self.id
     }
 
+    /// This render under `version` instead of the one it was given. For a host
+    /// that derives again a render it has already named by its version (the
+    /// JavaScript package does, for changes to a render the module no longer
+    /// holds), so that changes naming that version still apply to it. Two
+    /// renders may then share a version; changes are applied to the one the
+    /// caller passes, so the version only has to match that render's.
+    pub fn with_version(mut self, version: u64) -> Render {
+        self.id = version;
+        self
+    }
+
     /// The snapshot this render has, as a host would give it: for the dispatch
     /// that validates a render's inputs again.
     pub(crate) fn host_snapshot(&self) -> HostRecord {

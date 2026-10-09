@@ -98,14 +98,19 @@ test("diff: what isn't plain data is given whole, for the runtime to judge", () 
 
 // --- updateChanges -----------------------------------------------------------
 
-test("every render has a version while the module holds it, and each is different", async () => {
-  const kept = await first(START);
-  assert.equal(typeof kept.render.version, "number");
-  const other = await first(START);
-  assert.notEqual(other.render.version, kept.render.version);
-  kept.render.release();
-  assert.equal(kept.render.version, undefined, "released: not in the module");
-  other.render.release();
+test("every render has a version of its own, for life, and render() keeps nothing in the module", async () => {
+  await init(readFileSync(testModule)); // the test build has the counting hook
+  const exports = instanceForTests();
+  const before = exports.mesh_retained_renders();
+  const one = await first(START);
+  const two = await first(START);
+  assert.equal(typeof one.render.version, "number");
+  assert.notEqual(two.render.version, one.render.version);
+  assert.equal(exports.mesh_retained_renders(), before, "render() holds nothing in the module");
+  const version = one.render.version;
+  one.render.release();
+  assert.equal(one.render.version, version, "release doesn't change the version");
+  two.render.release();
 });
 
 test("over random chains of changes, the render is the render of the snapshot, verified every time", async () => {
@@ -207,10 +212,29 @@ test("verify mode catches changes that make a snapshot other than the one the ho
   applied.render.release();
 });
 
-test("a render not in the module can't take changes, and says why", async () => {
-  const { render: kept } = await first(START);
+test("changes apply to a render the module doesn't hold: render() made it, or it was released", async () => {
+  await init(readFileSync(testModule)); // the test build has the counting hook
+  const plain = await first(START);
+  const exports = instanceForTests();
+  const next = { ...START, count: 5, items: [...START.items, { id: 9, label: "n", done: false }] };
+  const made = await updateChanges(plain.render, { base: plain.render.version, changes: diff(START, next) }, { verify: next });
+  assert.equal(made.diagnostics, undefined);
+  const full = await first(next);
+  assert.deepEqual(made.render.tree, full.render.tree);
+  // The plain render is untouched and still the base of its own version; others' versions are refused.
+  const refused = await updateChanges(plain.render, { base: made.render.version, changes: [] });
+  assert.equal(refused.diagnostics.diagnostics[0].code, "runtime-changes-base-mismatch");
+  // A render `updateChanges` made that is then released has no snapshot of its own: it can't take more.
+  made.render.release();
+  await assert.rejects(updateChanges(made.render, { base: made.render.version, changes: [] }), /copy in the module, which is gone/);
+  // A released render that has a snapshot can.
+  const { render: kept } = await update(plain.render, next);
   kept.release();
-  await assert.rejects(updateChanges(kept, { base: 1, changes: [] }), /needs this render to be in the module/);
+  const again = await updateChanges(kept, { base: kept.version, changes: [{ op: "set", path: ["count"], value: 6 }] });
+  assert.equal(again.diagnostics, undefined);
+  again.render.release();
+  await new Promise((resolve) => setTimeout(resolve, 0)); // releases queue behind calls
+  assert.equal(exports.mesh_retained_renders(), 0);
 });
 
 test("a render made from changes dispatches in the module, and can be updated by either form", async () => {
@@ -247,15 +271,18 @@ test("when the module is replaced, a render with a snapshot of its own survives 
   const { render: kept } = await first(START);
   const made = await updateChanges(kept, { base: kept.version, changes: [{ op: "set", path: ["count"], value: 2 }] });
   const failed = instanceForTests();
-  failed.mesh_render_kept = () => failed.mesh_test_panic();
+  failed.mesh_render = () => failed.mesh_test_panic();
   await assert.rejects(render({ program, model, snapshot: START }));
   assert.notEqual(instanceForTests(), failed);
-  await assert.rejects(updateChanges(kept, { base: kept.version, changes: [] }), TypeError);
   await assert.rejects(dispatch(made.render, rowHandler(made.render.tree)), /gone/);
-  // `kept` has its own snapshot: whole-snapshot update derives it again.
+  await assert.rejects(updateChanges(made.render, { base: made.render.version, changes: [] }), /gone/);
+  // `kept` has its own snapshot: both forms derive it again in the new module.
   const again = await update(kept, { ...START, count: 9 });
   assert.equal(again.diagnostics, undefined);
+  const viaChanges = await updateChanges(kept, { base: kept.version, changes: [{ op: "set", path: ["count"], value: 3 }] });
+  assert.equal(viaChanges.diagnostics, undefined);
   again.render.release();
+  viaChanges.render.release();
 });
 
 test("a long chain of changes, releasing as it goes, doesn't grow memory", { timeout: 30 * 60 * 1000 }, async () => {

@@ -13,7 +13,7 @@ How to read it: each finding has a principle, the evidence, a disposition, and w
 | M3 | 8 | Serialization of calls and the absence of cancellation were stated in the manual but not in the package's contract. | **Done** (README, manual): calls run one at a time in order, no cancellation, nothing continues after a promise settles except queued release. |
 | M4 | 12, 15.4 | No page said which surfaces are stable, unreleased, provisional or internal. | **Done.** [API stability](../../manual/stability.md), linked from the docs index and the changelog. |
 | M5 | 4.5 | `Changes.base` and `Render.version` were plain `number`; a version could be confused with any number. | **Done.** `RenderVersion`, a branded number type, exported; `render.version` returns it and `Changes.base` takes it. Type-level only: a host that builds changes from JSON casts once, at the boundary it owns. |
-| M6 | 2, 2.2 | `update` and `updateChanges` are two verbs for one operation; `render({ keep })` decided whether `updateChanges` was possible later. | **Done (the recommended option).** `keep` is gone: every render is kept in the module until `release()` or GC, so `updateChanges` works on any render and the lifecycle is one thing. The two verbs stay: they take different inputs, and an overload by input shape is what 15.2 warns about. `dispatch` is unchanged. Cost: a render never released holds module memory until collected, which the docs say plainly. |
+| M6 | 2, 2.2 | `update` and `updateChanges` are two verbs for one operation; `render({ keep })` decided whether `updateChanges` was possible later. | **Done, then corrected by G1.** `keep` is gone. Making every render kept (the first attempt) broke hosts that never release; the final shape is that `render()` keeps nothing and `updateChanges` accepts any render, deriving it when the module doesn't hold it. The two verbs stay: they take different inputs, and an overload by input shape is what 15.2 warns about. |
 | M7 | 4.4, 9.2 | `render.version` is `undefined` once released; use-after-release throws (`render-gone`) where most failures return diagnostics. | **Owner.** The throw is a programmer error and now has a code; the alternative is a `runtime-render-released` diagnostic. Kept as thrown because a diagnostic document is for problems with the program or snapshot. |
 | M8 | 3.3 | `Render` names an entity after a process. | **Not changed.** Released in 0.9.0; a rename is a migration, not a fix. Noted for a major version. |
 | M9 | 14, 12 | `diff` is exported from the runtime package though the runtime never uses it. | **Kept.** It is the host-side producer of `changes`; separating it into a package would add a dependency for the one consumer that needs it. Its tier and the review test that confines it are documented. |
@@ -82,7 +82,7 @@ Mesh: error codes and `MeshUsageError` in both JavaScript packages, `Symbol.disp
 
 ## Decisions taken ("go for recommended")
 
-1. M6: every render is kept; `keep` removed; two verbs stay. Done.
+1. M6: `keep` removed; `updateChanges` accepts any render; two verbs stay. Done (corrected by G1 in the second pass).
 2. M5: `RenderVersion` brand. Done.
 3. Nexus and Valance: the recommended order was N3, V1, V3, N4, N1 first; N3, V1 and N1 are done, N4 and V3 conflict with documented decisions and stay with the owner (below).
 4. M10: hints on the common codes. Done.

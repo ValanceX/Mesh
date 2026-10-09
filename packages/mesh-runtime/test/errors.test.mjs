@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { dispatch, init, MeshUsageError, render, update, updateChanges } from "../dist/index.js";
+import { instanceForTests } from "../dist/engine.js";
 import { testModule } from "./common.mjs";
 import { LIST_MODEL, listProgram } from "./common/list-program.mjs";
 
@@ -33,12 +34,16 @@ test("a released render that has no snapshot of its own is refused with the code
 });
 
 test("a render has [Symbol.dispose], which does what release() does (the `using` statement calls it)", async () => {
-  const kept = (await render({ program: listProgram, model: LIST_MODEL, snapshot })).render;
-  assert.equal(typeof kept.version, "number");
-  assert.equal(typeof kept[Symbol.dispose], "function");
-  kept[Symbol.dispose]();
-  assert.equal(kept.version, undefined, "released");
-  kept[Symbol.dispose](); // safe twice, as release() is
+  const { render: first } = await render({ program: listProgram, model: LIST_MODEL, snapshot });
+  const made = await update(first, { ...snapshot, count: 1 });
+  const exports = instanceForTests();
+  const before = exports.mesh_retained_renders();
+  assert.equal(typeof made.render[Symbol.dispose], "function");
+  made.render[Symbol.dispose]();
+  made.render[Symbol.dispose](); // safe twice, as release() is
+  await new Promise((resolve) => setTimeout(resolve, 0)); // the release is queued behind the calls
+  assert.equal(exports.mesh_retained_renders(), before - 1, "the module's copy is gone");
+  assert.equal(typeof made.render.version, "number", "the render keeps its version");
 });
 
 test("a diagnostic of a code with one reliable corrective action carries a hint, and others carry none", async () => {

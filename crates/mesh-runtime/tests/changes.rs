@@ -129,6 +129,37 @@ fn failure(result: Result<mesh_runtime::Update, Vec<RuntimeDiagnostic>>) -> Vec<
 // --- the law -----------------------------------------------------------------
 
 #[test]
+fn a_render_derived_again_under_its_version_takes_the_changes_that_name_it() {
+    let first = program_render(&state());
+    let version = first.version();
+    // The same inputs, rendered again (as a module does for a render it no longer holds), given the version the host was told.
+    let again = program_render(&state()).with_version(version);
+    assert_eq!(again.version(), version);
+    let edit = vec![set(&[name("title")], json!("T2"))];
+    let updated = update_changes(
+        &again,
+        &Changes {
+            base: version,
+            changes: edit,
+        },
+        None,
+    )
+    .expect("updates");
+    let mut expected = state();
+    expected["title"] = json!("T2");
+    assert_eq!(updated.render.tree(), program_render(&expected).tree());
+    // And it is still refused for any other version.
+    let other = Changes {
+        base: version + 1_000_000,
+        changes: vec![],
+    };
+    assert_eq!(
+        codes(&failure(update_changes(&again, &other, None))),
+        vec!["runtime-changes-base-mismatch"]
+    );
+}
+
+#[test]
 fn a_change_makes_the_render_of_the_snapshot_it_makes() {
     let first = program_render(&state());
     let mut expected = state();

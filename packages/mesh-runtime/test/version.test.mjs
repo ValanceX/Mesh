@@ -37,7 +37,6 @@ const RENDER_EXPORTS = [
   "mesh_free",
   "mesh_render",
   "mesh_update",
-  "mesh_render_kept",
   "mesh_update_changes",
   "mesh_dispatch_kept",
   "mesh_release",
