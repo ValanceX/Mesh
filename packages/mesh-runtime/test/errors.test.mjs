@@ -57,3 +57,17 @@ test("a diagnostic of a code with one reliable corrective action carries a hint,
   assert.match(refused.diagnostics.diagnostics[0].hint, /version/);
   kept.release();
 });
+
+test("init refuses with a coded error for each kind of bad source, and the package keeps working", async () => {
+  await assert.rejects(init(5), (error) => error instanceof MeshUsageError && error.code === "invalid-argument");
+  await assert.rejects(init(new Uint8Array([1, 2, 3])), (error) => error.name === "MeshVersionError" && error.code === "version-mismatch");
+  await assert.rejects(init("file:///no/such/mesh-runtime.wasm"), (error) => error instanceof MeshUsageError && error.code === "module-unavailable");
+  await init(readFileSync(testModule));
+  assert.ok((await render({ program: listProgram, model: LIST_MODEL, snapshot })).render);
+});
+
+test("a Render this package didn't make is refused by the operation that was called, by name", async () => {
+  await assert.rejects(update({}, snapshot), /update\(\) takes a Render/);
+  await assert.rejects(updateChanges({}, { base: 1, changes: [] }), /updateChanges\(\) takes a Render/);
+  await assert.rejects(dispatch({}, "h"), /dispatch\(\) takes a Render/);
+});

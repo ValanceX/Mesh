@@ -208,7 +208,9 @@ export interface DeclaredEvent {
 export interface Host {
   /**
    * Keeps each render while its tree is drawn, since dispatch needs the
-   * render the renderer drew, not a newer one.
+   * render the renderer drew, not a newer one. A render `update` or
+   * `updateChanges` made is also held in the module: call its `release()` when
+   * the host no longer needs it.
    */
   keep(render: Render): void;
   /**

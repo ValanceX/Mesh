@@ -42,7 +42,9 @@ export class MeshVersionError extends Error {
 /** Why a call was refused before it reached the module. */
 export type MeshUsageCode =
   /** An argument is not of the type the call takes (`message` says which). */
-  "invalid-argument";
+  | "invalid-argument"
+  /** The WebAssembly module could not be loaded from the source `init` was given (or from the package's own file). */
+  | "module-unavailable";
 
 /**
  * A call that is wrong in a way types should have prevented: an argument of
@@ -54,8 +56,8 @@ export class MeshUsageError extends TypeError {
   override name = "MeshUsageError";
   /** The stable code of this failure. Match on this, not on `message`. */
   readonly code: MeshUsageCode;
-  constructor(message: string, code: MeshUsageCode = "invalid-argument") {
-    super(message);
+  constructor(message: string, code: MeshUsageCode = "invalid-argument", options?: { readonly cause?: unknown }) {
+    super(message, options);
     this.code = code;
   }
 }
@@ -160,11 +162,20 @@ function isNode(): boolean {
 async function bytesOf(location: URL): Promise<BufferSource> {
   if (location.protocol === "file:" && isNode()) {
     const { readFile } = await import("node:fs/promises");
-    return readFile(location);
+    try {
+      return await readFile(location);
+    } catch (cause) {
+      throw new MeshUsageError(`could not read the MESH module at ${location.href}`, "module-unavailable", { cause });
+    }
   }
-  const response = await fetch(location);
+  let response: Response;
+  try {
+    response = await fetch(location);
+  } catch (cause) {
+    throw new MeshUsageError(`could not fetch the MESH module from ${location.href}`, "module-unavailable", { cause });
+  }
   if (!response.ok) {
-    throw new Error(`could not fetch the MESH module from ${location.href}: ${response.status}`);
+    throw new MeshUsageError(`could not fetch the MESH module from ${location.href}: ${response.status}`, "module-unavailable");
   }
   return response.arrayBuffer();
 }
@@ -175,9 +186,21 @@ async function compileModule(source: ModuleSource): Promise<WebAssembly.Module> 
   }
   if (typeof source === "string" || source instanceof URL) {
     const base = typeof location === "undefined" ? undefined : location.href;
-    return WebAssembly.compile(await bytesOf(new URL(source, base)));
+    return compiled_(await bytesOf(new URL(source, base)));
   }
-  return WebAssembly.compile(source);
+  if (!(source instanceof ArrayBuffer || ArrayBuffer.isView(source))) {
+    throw new MeshUsageError("init() takes a URL, a string, the module's bytes, or a WebAssembly.Module");
+  }
+  return compiled_(source);
+}
+
+/** Compiles `bytes`; bytes that aren't a WebAssembly module are not a MESH module either. */
+async function compiled_(bytes: BufferSource): Promise<WebAssembly.Module> {
+  try {
+    return await WebAssembly.compile(bytes);
+  } catch (cause) {
+    throw new MeshVersionError("these bytes aren't a WebAssembly module, so not a MESH module", { cause });
+  }
 }
 
 /** Instantiates `module` and checks it's a MESH module of this version (I10). */
@@ -243,8 +266,9 @@ async function current(): Promise<Exports> {
   }
   if (!compiled) {
     if (!isNode()) {
-      throw new Error(
+      throw new MeshUsageError(
         "@valancex/mesh-compiler: call init() with the URL of mesh.wasm before the first check",
+        "module-unavailable",
       );
     }
     const module = await compileModule(new URL("./mesh.wasm", import.meta.url));

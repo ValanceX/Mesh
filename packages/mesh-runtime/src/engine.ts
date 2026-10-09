@@ -52,7 +52,9 @@ export type MeshUsageCode =
   /** The `Render` passed was not made by this package's `render`, `update` or `updateChanges`. */
   | "not-a-render"
   /** The render's copy in the module is gone (released, or the module was replaced) and the call needs it. Render again from a whole snapshot. */
-  | "render-gone";
+  | "render-gone"
+  /** The WebAssembly module could not be loaded from the source `init` was given (or from the package's own file). */
+  | "module-unavailable";
 
 /**
  * A call that is wrong in a way types should have prevented: an argument of
@@ -65,8 +67,8 @@ export class MeshUsageError extends TypeError {
   override name = "MeshUsageError";
   /** The stable code of this failure. Match on this, not on `message`. */
   readonly code: MeshUsageCode;
-  constructor(message: string, code: MeshUsageCode = "invalid-argument") {
-    super(message);
+  constructor(message: string, code: MeshUsageCode = "invalid-argument", options?: { readonly cause?: unknown }) {
+    super(message, options);
     this.code = code;
   }
 }
@@ -231,17 +233,17 @@ export class Render {
   }
 
   /** The module's copy of `render`, if it has one that is still in the module in use. Throws a TypeError for a foreign object. */
-  static keptOf(render: Render): Kept | undefined {
+  static keptOf(render: Render, operation: string): Kept | undefined {
     if (!(typeof render === "object" && render !== null && #root in render)) {
-      throw new MeshUsageError("update() takes a Render that render(), update() or updateChanges() returned", "not-a-render");
+      throw new MeshUsageError(`${operation}() takes a Render that render(), update() or updateChanges() returned`, "not-a-render");
     }
     return render.#kept;
   }
 
   /** The inputs dispatch passes back to the module. Throws a TypeError for a foreign object. */
-  static inputsOf(render: Render): [string, Uint8Array, string, Uint8Array | undefined] {
+  static inputsOf(render: Render, operation: string): [string, Uint8Array, string, Uint8Array | undefined] {
     if (!(typeof render === "object" && render !== null && #root in render)) {
-      throw new MeshUsageError("dispatch() takes a Render that render(), update() or updateChanges() returned", "not-a-render");
+      throw new MeshUsageError(`${operation}() takes a Render that render(), update() or updateChanges() returned`, "not-a-render");
     }
     return [render.#root, render.#templates, render.#model, render.#snapshot];
   }
@@ -333,11 +335,20 @@ function isNode(): boolean {
 async function bytesOf(location: URL): Promise<BufferSource> {
   if (location.protocol === "file:" && isNode()) {
     const { readFile } = await import("node:fs/promises");
-    return readFile(location);
+    try {
+      return await readFile(location);
+    } catch (cause) {
+      throw new MeshUsageError(`could not read the MESH runtime module at ${location.href}`, "module-unavailable", { cause });
+    }
   }
-  const response = await fetch(location);
+  let response: Response;
+  try {
+    response = await fetch(location);
+  } catch (cause) {
+    throw new MeshUsageError(`could not fetch the MESH runtime module from ${location.href}`, "module-unavailable", { cause });
+  }
   if (!response.ok) {
-    throw new Error(`could not fetch the MESH runtime module from ${location.href}: ${response.status}`);
+    throw new MeshUsageError(`could not fetch the MESH runtime module from ${location.href}: ${response.status}`, "module-unavailable");
   }
   return response.arrayBuffer();
 }
@@ -348,9 +359,21 @@ async function compileModule(source: ModuleSource): Promise<WebAssembly.Module> 
   }
   if (typeof source === "string" || source instanceof URL) {
     const base = typeof location === "undefined" ? undefined : location.href;
-    return WebAssembly.compile(await bytesOf(new URL(source, base)));
+    return compiled_(await bytesOf(new URL(source, base)));
   }
-  return WebAssembly.compile(source);
+  if (!(source instanceof ArrayBuffer || ArrayBuffer.isView(source))) {
+    throw new MeshUsageError("init() takes a URL, a string, the module's bytes, or a WebAssembly.Module");
+  }
+  return compiled_(source);
+}
+
+/** Compiles `bytes`; bytes that aren't a WebAssembly module are not a MESH module either. */
+async function compiled_(bytes: BufferSource): Promise<WebAssembly.Module> {
+  try {
+    return await WebAssembly.compile(bytes);
+  } catch (cause) {
+    throw new MeshVersionError("these bytes aren't a WebAssembly module, so not a MESH runtime module", { cause });
+  }
 }
 
 /** Instantiates `module` and checks it's a MESH runtime module of this version (I10). */
@@ -425,12 +448,13 @@ async function current(): Promise<Exports> {
         throw cause;
       }
       const detail = cause instanceof Error ? ` (${cause.message})` : "";
-      throw new Error(
+      throw new MeshUsageError(
         `@valancex/mesh-runtime: could not load its packaged WebAssembly module automatically${detail}. ` +
           "Pass the URL of mesh-runtime.wasm to init() to load it explicitly. " +
           "If this is a Vite 5-7 development server, it may have moved this package into its dependency cache, " +
           "away from mesh-runtime.wasm: excluding @valancex/mesh-runtime from dependency optimization " +
           "(optimizeDeps.exclude) lets the package find its file.",
+        "module-unavailable",
         { cause },
       );
     }
@@ -621,8 +645,8 @@ function keptFrom(result: Record<string, unknown>): Kept {
 /** Updates. See the package's `update`. */
 export function update(previous: Render, snapshotInput: Record<string, unknown>): Promise<UpdateResult> {
   return enqueue(async () => {
-    const [root, templates, model, previousSnapshot] = Render.inputsOf(previous);
-    const kept = Render.keptOf(previous);
+    const [root, templates, model, previousSnapshot] = Render.inputsOf(previous, "update");
+    const kept = Render.keptOf(previous, "update");
     if (previousSnapshot === undefined && !liveIn(kept)) {
       throw gone("update");
     }
@@ -660,8 +684,8 @@ export function updateChanges(
   options?: { readonly verify?: Record<string, unknown> },
 ): Promise<UpdateResult> {
   return enqueue(async () => {
-    const [root, templates, model, previousSnapshot] = Render.inputsOf(previous);
-    const kept = Render.keptOf(previous);
+    const [root, templates, model, previousSnapshot] = Render.inputsOf(previous, "updateChanges");
+    const kept = Render.keptOf(previous, "updateChanges");
     // A render the module no longer holds is derived again from its own snapshot, under the version it was given; a render made from changes has none.
     if (previousSnapshot === undefined && !liveIn(kept)) {
       throw gone("updateChanges");
@@ -746,8 +770,8 @@ export function declaredEvents(input: DeclaredEventsInput): Promise<DeclaredEven
 /** Dispatches. See the package's `dispatch`. */
 export function dispatch(render: Render, handler: string, payload?: unknown): Promise<DispatchResult> {
   return enqueue(async () => {
-    const [root, templates, model, snapshot] = Render.inputsOf(render);
-    const kept = Render.keptOf(render);
+    const [root, templates, model, snapshot] = Render.inputsOf(render, "dispatch");
+    const kept = Render.keptOf(render, "dispatch");
     if (typeof handler !== "string") {
       throw new MeshUsageError("handler must be a string: a handler identifier from the render's tree");
     }

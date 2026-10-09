@@ -137,3 +137,19 @@ Tests after this pass: Mesh runtime 97 and compiler 46 (JS), Rust workspace clea
 4. Nexus `Semantic` and the event-bus plumbing are "Unclassified" until a tier is chosen.
 5. Other Nexus and Valance findings in the tables above that were not taken (N2, N5, N6, N8 to N15, V2, V4 to V17).
 6. The browser tests have not run in this environment.
+
+### Fourth pass: documentation drift (after Valance 0.6.0 and Nexus 0.11.0 were released)
+
+Two read-only audits (Nexus; Mesh and Port) compared the docs with the exported APIs, running the examples where they could, and the findings were applied.
+
+- **Nexus (docs only).** Refusal is Stable since 0.11.0 and the release notes say "Released". Resource release is stated as it is: layer and platform resources are released at termination, a command's own `Effect.scoped` resource when the command ends. `State.update` trusts its function; only `create` and `set` validate. `run` rejects with a `FiberFailure`, so `isRefusal` is false on the rejection (use `runFork` and `Cause.dieOption`). `Service.layer`'s generics, `Selector.combine`'s completion, the event bus rules (subscription starts when run, tag uniqueness, unbounded buffering), the architecture examples and decision 16, the README status order, and the roadmap status were corrected or added.
+- **Mesh (docs and code).** `updateChanges` takes any render (the README still said otherwise); a released `updateChanges` render fails with `render-gone`; `diff` is the second named exception; `mesh_render_kept` no longer appears; `hint` is in the compiler package's types and a docs example; the NEXUS guide shows the error classes, `updateChanges` and the release pattern. In code: `init` and the browser auto-load now reject with coded errors (`module-unavailable`, `invalid-argument`, `version-mismatch`), and an operation given a foreign `Render` names itself.
+- **Port (docs and code).** `[Symbol.dispose]` is a member of `WebPort` (it was optional, so `using port = ...` did not typecheck); the error table has `unsupported-patch`, `unknown-key` and `patch-failed`; the contract table row is fixed; the stability page lists the server entry.
+- **`using` needs a runtime with explicit resource management** (a syntax error on Node 22); the docs now say so and show `release()` in a `finally`.
+
+Still open, as code decisions (not documentation):
+
+1. `Runtime.isRefusal` returns false for `Runtime.run`'s rejection, which is a `FiberFailure`. Either `isRefusal` unwraps it or `run` rejects with the `Refusal`.
+2. `Selector.combine(...).changes` emits nothing until every input has committed once (affects `Mesh.host` over a combined selector).
+3. A bare `Resource.acquire` run through `Runtime.run` does not typecheck, but run untyped it is never released.
+4. Examples not run by any test: the two package READMEs' first snippets, three blocks in `using-mesh-from-javascript.md`, and Port's README snippets.

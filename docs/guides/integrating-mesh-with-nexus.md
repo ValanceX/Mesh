@@ -2,7 +2,7 @@
 
 This guide is for whoever builds the adapter between NEXUS and MESH: the code that feeds a NEXUS application's state to MESH templates, and turns what the user does back into NEXUS commands. In MESH's terms, that adapter is a **host**. The adapter lives in the NEXUS repository, not in MESH. MESH gives it `@valancex/mesh-compiler`, to compile templates, and `@valancex/mesh-runtime`, to render and dispatch them. This guide says what the runtime expects of a host, and ends with a small working host.
 
-**You'll need:** Node 22 or 24, or a browser with WebAssembly.
+**You'll need:** Node 22 or 24, or a browser with WebAssembly. In a browser, call `init(url)` once for `@valancex/mesh-compiler` before the first `compile()`; `@valancex/mesh-runtime` loads its own module without `init`.
 
 ```console
 $ npm install @valancex/mesh-compiler @valancex/mesh-runtime
@@ -30,6 +30,8 @@ A handler identifier names a handler at a node, and it is the same in every rend
 
 **Updating instead of rendering again.** When state changes and the program doesn't, a host can call `update(render, snapshot)` instead of `render()`. It returns the new render and the patches that turn the previous tree into the new one, for a renderer that applies patches. The host's obligations are the same, with one more: the module keeps each render `update` returns, so **call `release()` on every render `update` made that you will no longer update from or dispatch with**, typically the previous one once its patches are applied. A render you forget is released when it is garbage collected, which can be late. See the [runtime manual](../manual/runtime.md#update).
 
+`updateChanges(render, { base: render.version, changes })` is `update` for a host that knows what it changed (see the [runtime manual](../manual/runtime.md#changes)); it accepts any render. Release the previous render in a `finally`, so a rejected call doesn't leave it held in the module: call `previous.release()` after the patches are applied, whether or not the update succeeded. (`using` does the same where the runtime supports explicit resource management; Node 22 doesn't.)
+
 ## When the program changes
 
 A key and a handler identifier name the same node and handler in every render of one program in which that node is present, and they change when the program does: a template recompiled, added or removed. A renderer reconciles a new tree against the one it drew by key, so **tell the renderer when a tree comes from a different program**, and it draws that tree afresh. A render of an earlier program can still be dispatched, and gives that program's intent.
@@ -47,7 +49,7 @@ An intent names a command by the component whose template declares it and the co
 
 ## Diagnostics
 
-`render()` and `dispatch()` return diagnostics instead of a result when something is wrong: the program, the manifest, the snapshot, the payload or the handler identifier. They're errors in the host's inputs or in the program. They're for the developer, and never something to show an end user as it is. Log them with their `code` and `location`, and treat them as bugs. They never throw: the promises reject only for arguments of the wrong JavaScript type or a render the package didn't make (`TypeError`), a module of another version (`MeshVersionError`), or a failure of the runtime itself (`MeshInternalError`).
+`render()` and `dispatch()` return diagnostics instead of a result when something is wrong: the program, the manifest, the snapshot, the payload or the handler identifier. They're errors in the host's inputs or in the program. They're for the developer, and never something to show an end user as it is. Log them with their `code` and `location`, and treat them as bugs. They never throw: the promises reject only with `MeshUsageError` (a `TypeError`; `code` `invalid-argument`, `not-a-render` or `render-gone`) for a call that is wrong in a way types should have prevented, `MeshVersionError` (`version-mismatch`) for a module of another version, or `MeshInternalError` (`internal-error`) for a failure of the runtime itself. Match on `code`. When you log a diagnostic, log its `code`, `location` and `hint` (present for the codes where one action applies).
 
 ## A host, end to end
 

@@ -17,6 +17,9 @@
  * and transports them, and evaluates, converts and judges nothing (I11).
  * The one thing it does with a tree is apply the runtime's own patches to
  * the previous one, in `patches.ts`: it moves parts by key, and reads no value.
+ * The one thing it does with host values besides encoding them is `diff`, in
+ * `changes.ts`: it compares two snapshots for sameness to compute edits, and is
+ * on no path of render, update or dispatch.
  * The same values give the same results as the Rust runtime.
  *
  * @packageDocumentation
@@ -89,10 +92,12 @@ export { version } from "./version.js";
  *
  * The snapshot is encoded when this is called, so changing the host's
  * objects afterwards changes nothing about this render. It rejects with
- * a `TypeError` for arguments of the wrong type, or a snapshot that
+ * a `MeshUsageError` (`invalid-argument`) for arguments of the wrong type, or a snapshot that
  * isn't a plain object; with `MeshVersionError` if the WebAssembly
  * module isn't this version's; and with `MeshInternalError` if the
- * runtime itself fails. In a browser, call {@link init} first.
+ * runtime itself fails. The package loads its own module on the first call
+ * (in a browser too), so {@link init} is only for loading another copy or
+ * giving the URL yourself. `render()` keeps nothing in the module.
  */
 export function render(input: RenderInput): Promise<RenderResult> {
   return renderWith(input);
@@ -174,9 +179,10 @@ export function updateChanges(
  * from, never a newer one, so pass the render whose tree the renderer
  * drew. It validates everything again.
  *
- * It rejects with a `TypeError` for a `render` that {@link render}
- * didn't return, or a handler that isn't a string, and otherwise as
- * {@link render} does.
+ * It rejects with a `MeshUsageError` (`not-a-render`, `render-gone` or
+ * `invalid-argument`) for a `render` this package didn't make, one whose copy in the
+ * module is gone and which has no snapshot of its own, or a handler that isn't a
+ * string, and otherwise as {@link render} does.
  */
 export function dispatch(render: Render, handler: string, payload?: unknown): Promise<DispatchResult> {
   return dispatchWith(render, handler, payload);
@@ -191,7 +197,7 @@ export function dispatch(render: Render, handler: string, payload?: unknown): Pr
  * render's: those inside composites, inactive conditionals and repeated
  * sections are there, and nothing is deduplicated. It needs no snapshot.
  *
- * It rejects with a `TypeError` for arguments of the wrong type, and
+ * It rejects with a `MeshUsageError` (`invalid-argument`) for arguments of the wrong type, and
  * otherwise as {@link render} does.
  */
 export function declaredEvents(input: DeclaredEventsInput): Promise<DeclaredEventsResult> {

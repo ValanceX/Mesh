@@ -14,10 +14,10 @@ What each public surface of MESH promises. The tiers have one meaning each, ever
 | Surface | Tier |
 |---|---|
 | MPRX language, manifest, `template-v1`, `render-v1`, `runtime-diagnostics-v1`, the CLI and its JSON output | Stable |
-| `render`, `dispatch`, `declaredEvents`, `init`, `version`, `Render.tree`; `mesh_runtime::{render, dispatch, resolve}`. `render()` keeps nothing in the module, as in 0.9.0, and that is part of the contract | Stable |
+| `check`, `compile`, `checkProgram`, `compileProgram`, `init`, `version` of `@valancex/mesh-compiler`; `render`, `dispatch`, `declaredEvents`, `init`, `version`, `Render.tree`; `mesh_runtime::{render, dispatch, resolve}`. `render()` keeps nothing in the module, as in 0.9.0, and that is part of the contract | Stable |
 | `update`, `render-patch-v1`, `render.release()`, `mesh_runtime::update`, `update_with` | Unreleased |
 | `updateChanges`, `diff`, `render.version`, `[Symbol.dispose]`; `mesh_runtime::{update_changes, Changes, Change}`; the changes document; the diagnostics `runtime-changes-base-mismatch`, `runtime-invalid-change`, `runtime-changes-disagree` | Unreleased |
-| `MeshUsageError`, `MeshUsageCode` and the `code` of the other errors; `RenderVersion`; the `hint` of a runtime diagnostic; `Render[Symbol.dispose]`; `mesh_runtime::Render::with_version` | Unreleased |
+| `MeshUsageError` (including its `module-unavailable` code), `MeshUsageCode` and the `code` of the other errors, in both JavaScript packages; `RenderVersion`; the `hint` of a runtime diagnostic; `Render[Symbol.dispose]`; `mesh_runtime::Render::with_version` | Unreleased |
 | `mesh-slot` and composite children; composite events (forwarding a declared event); `assembly-composite-children` | Unreleased |
 | `mesh-if`, `mesh-each` and the identity steps they add (`0x04`, `0x05`) | Provisional |
 | The module's exports (`mesh_*`) and its hook `mesh_retained_renders`; `mesh_runtime::evaluations`; the package's hidden test hooks | Internal |
