@@ -425,7 +425,35 @@ Only the root template's scope comes from the snapshot. The root component's own
 
 **Nesting.** A composite's template may contain composite occurrences, to any depth, as long as the program has no cycle.
 
-**Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. v0.5 has no composite events: a composite can't raise events of its own.
+**Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can't raise events of its own yet (rule 6).
+
+### Children and the slot
+
+A composite occurrence may have **children**, if its template says where they go with a **slot**: the reserved element `mesh-slot`, which the model declares like `mesh-if`, with no props.
+
+```xml
+<!-- the template of `card`, with the prop and scope name `heading` -->
+<panel heading={heading}>
+  <note>top</note>
+  <mesh-slot />
+  <note>end</note>
+</panel>
+
+<!-- an occurrence of it, in the page's template -->
+<card heading={title}>
+  <note>hello {who}</note>
+  <button on.tap={greet(who)}>go</button>
+</card>
+```
+
+renders a `panel` holding `top`, the two children of the occurrence and `end`, in that order. The slot is never a node.
+
+- **The children are the caller's.** They are written in the template that has the occurrence, and mean what they mean there: `{who}` is the page's `who`, never the card's scope, which they cannot see; and `greet(who)` is the page's command, with the page's values. (For a card inside a repeat, they have the repeat's item too.) The slot only says where they go.
+- **Where it may be.** A slot is a child of an element of the composite's template: not the template's root, and not directly the child of a `mesh-if` or `mesh-each` (put it inside an element). It has no props, events or children, and a template has at most one (the default slot); anything else is a malformed template (rule 3a). A slot may be a child of a composite occurrence, which passes the content it was given on to another composite.
+- **No children is fine.** An occurrence with none leaves the slot empty. A template with a slot that is the program's root has no caller, so its slot is empty too. A composite without a slot takes no children (rule 7).
+- **Text beside a slot is one run.** A render tree's text runs are maximal (`docs/manual/runtime.md`), so the text before a slot and the first text after it are one run, and so on: `before <mesh-slot /> after` around the text `middle` renders as `before middle after`, named by the first run's key.
+- **Identity.** Content a slot places is named by the path of its place in the caller's template, **through the slot**: a step for the slot (kind `0x06`, at the slot's position, with no component), then the content's own steps. So the same content in two occurrences, or the host's own children beside it, never share a key, and a key is the same in every render of the program that has the part (spec §9.10).
+- **Conditionals and repeats among the children** work as anywhere: they are evaluated in the caller's scope, and a `mesh-each` among them has its items' keys as usual.
 
 ### The assembly rules
 
@@ -442,7 +470,7 @@ A program must satisfy these rules. Each broken rule is an **assembly error**. T
 | 4b | Every such binding is sound. | `assembly-unsound-binding` | 4 |
 | 5 | **No cycles:** no composite expands itself, directly or through others. Every composite occurrence on a cycle is reported. | `assembly-cycle` | 4 |
 | 6 | **No composite declares events** in the model. | `assembly-composite-event` | 4 |
-| 7 | **No composite occurrence has children,** text or elements. Whitespace-only text isn't a child (§3). | `assembly-composite-children` | 4 |
+| 7 | **No composite occurrence has children,** text or elements, **unless the composite's template has a `mesh-slot`** to place them. Whitespace-only text isn't a child (§3). | `assembly-composite-children` | 4 |
 
 Program validation's steps run in order, and a step that reports anything ends validation. Step 1 is the model itself (a manifest error). Within a step, every problem is reported.
 
@@ -468,7 +496,8 @@ With a model in which `user-card` has the prop `user: User` (required), the scop
 | a model where `user-card`'s prop `user` isn't required, and its scope name `user` isn't optional | `assembly-unsound-binding` (rule 4b): an unwritten prop would bind absent |
 | `user-card`'s template containing `<user-card user={user} />` | `assembly-cycle` (rule 5) |
 | a model where `user-card` declares an event `select` | `assembly-composite-event` (rule 6) |
-| `<user-card user={first}>Ada</user-card>` | `assembly-composite-children` (rule 7) |
+| `<user-card user={first}>Ada</user-card>`, with no `mesh-slot` in `user-card`'s template | `assembly-composite-children` (rule 7) |
+| the same, with a `mesh-slot` in `user-card`'s template | valid: the children are placed at the slot |
 | `<user-card user={first}>  </user-card>` | valid: whitespace-only text isn't a child |
 | the valid program plus a template for `badge`, which nothing uses | valid: the unreached template is checked and ignored |
 | the valid program without `user-card`'s template | valid: `user-card` is then a primitive, and the render tree holds a `user-card` node |

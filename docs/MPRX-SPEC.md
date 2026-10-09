@@ -961,11 +961,11 @@ The syntax for conditional and repeated elements, and for declaring a key; the c
 - Array/object subscript access (§5)
 - Optional chaining (§7), and any other presence test for a value that
   may be absent (§9.2)
-- Slots and children for composites, and composite events
-  (`docs/ARCHITECTURE.md` §10 calls these out as eventual), and so
-  checking element children against a component (§9.1). v0.5 defines
-  composition without them: a program's composites, whose templates
-  are expanded in place (`docs/manual/templates.md`)
+- Composite events (`docs/ARCHITECTURE.md` §10 calls them out as
+  eventual), named slots, and checking element children against a
+  component (§9.1). Composites have a default slot and children:
+  `mesh-slot` places the children of an occurrence, in the caller's
+  scope (`docs/manual/templates.md`, "Children and the slot")
 - Type annotations in MPRX, and types beyond §9.2: unions, nullable types
   separate from absence, generics beyond `list<T>`, function types, open
   records, implicit coercions, and narrowing

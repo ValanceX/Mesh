@@ -68,7 +68,9 @@ pub(crate) type Run = (String, Vec<(String, Scoped)>, String);
 /// key, build a path or hash one for them.
 #[derive(Debug, Clone)]
 pub(crate) struct RepeatMemo {
-    pub position: usize,
+    /// Where the repeat is among the node's children: its position, after the
+    /// positions of any slots it is placed through.
+    pub site: Vec<usize>,
     pub key_other: Vec<(String, Scoped)>,
     pub items: Vec<RepeatItem>,
 }

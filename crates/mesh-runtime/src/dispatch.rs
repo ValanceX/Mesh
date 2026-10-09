@@ -7,7 +7,7 @@ use crate::diagnostic::{Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
 use crate::eval::Scope;
 use crate::program::{
     self, alternatives, uses_conditional, uses_repeat, Program, Step, Valid, ALTERNATIVES,
-    COMPOSITE, CONDITIONAL, NODE,
+    COMPOSITE, CONDITIONAL, NODE, SLOT,
 };
 use crate::render::{bind, render_children, snapshot_values, statics, Render, RenderChild};
 use crate::tree::Intent;
@@ -42,11 +42,18 @@ fn sites(valid: &Valid) -> BTreeMap<String, Site<'_>> {
         0,
         &mut Vec::new(),
         &mut Vec::new(),
+        &mut Vec::new(),
         &mut found,
     );
     found
 }
 
+/// The composite occurrences being walked, innermost last: for each, how
+/// many composites were on the way when it began, the component whose
+/// template it is in, and the occurrence, whose children a slot places.
+type Frames<'v> = Vec<(usize, &'v str, &'v Element)>;
+
+#[allow(clippy::too_many_arguments)]
 fn walk<'v>(
     valid: &'v Valid,
     component: &'v str,
@@ -54,6 +61,7 @@ fn walk<'v>(
     position: usize,
     path: &mut Vec<Step>,
     composites: &mut Vec<(&'v str, &'v Element)>,
+    frames: &mut Frames<'v>,
     found: &mut BTreeMap<String, Site<'v>>,
 ) {
     if let Some(template) = valid.templates.get(&element.component) {
@@ -62,6 +70,7 @@ fn walk<'v>(
             kind: COMPOSITE,
             component: element.component.clone(),
         });
+        frames.push((composites.len(), component, element));
         composites.push((component, element));
         walk(
             valid,
@@ -70,9 +79,11 @@ fn walk<'v>(
             0,
             path,
             composites,
+            frames,
             found,
         );
         composites.pop();
+        frames.pop();
         path.pop();
         return;
     }
@@ -94,10 +105,26 @@ fn walk<'v>(
             },
         );
     }
+    walk_children(valid, component, element, path, composites, frames, found);
+    path.pop();
+}
+
+/// The sites among `element`'s children, in the template of `component`.
+fn walk_children<'v>(
+    valid: &'v Valid,
+    component: &'v str,
+    element: &'v Element,
+    path: &mut Vec<Step>,
+    composites: &mut Vec<(&'v str, &'v Element)>,
+    frames: &mut Frames<'v>,
+    found: &mut BTreeMap<String, Site<'v>>,
+) {
     for (index, child) in render_children(element).into_iter().enumerate() {
         match child {
             RenderChild::Element(child) => {
-                walk(valid, component, child, index, path, composites, found);
+                walk(
+                    valid, component, child, index, path, composites, frames, found,
+                );
             }
             // Every alternative is a site, whichever a snapshot would choose:
             // identity is a function of the program, not of the values.
@@ -108,8 +135,27 @@ fn walk<'v>(
                         kind: CONDITIONAL,
                         component: ALTERNATIVES[alternative].to_string(),
                     });
-                    walk(valid, component, element, 0, path, composites, found);
+                    walk(
+                        valid, component, element, 0, path, composites, frames, found,
+                    );
                     path.pop();
+                }
+            }
+            // The occurrence's children, placed here, are the *caller's*: in
+            // its template, with its composites on the way, and with the
+            // enclosing composites' frames, not this one's.
+            RenderChild::Slot => {
+                if let Some((on_the_way, caller, occurrence)) = frames.pop() {
+                    let hosts = composites.split_off(on_the_way);
+                    path.push(Step {
+                        position: index,
+                        kind: SLOT,
+                        component: String::new(),
+                    });
+                    walk_children(valid, caller, occurrence, path, composites, frames, found);
+                    path.pop();
+                    composites.extend(hosts);
+                    frames.push((on_the_way, caller, occurrence));
                 }
             }
             // A repeat's sites are per item, and an item's key needs values:
@@ -118,7 +164,6 @@ fn walk<'v>(
             RenderChild::Repeat(_) | RenderChild::Run(_) => {}
         }
     }
-    path.pop();
 }
 
 /// Every handler identifier in a tree.

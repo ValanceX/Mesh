@@ -8,7 +8,7 @@ use crate::number::number_to_text;
 use crate::patch::Patch;
 use crate::program::{
     self, alternatives, repeat_name, Program, Step, Valid, ALTERNATIVES, COMPOSITE, CONDITIONAL,
-    CONDITIONAL_COMPONENT, NODE, REPEAT, REPEAT_COMPONENT, TEXT,
+    CONDITIONAL_COMPONENT, NODE, REPEAT, REPEAT_COMPONENT, SLOT, SLOT_COMPONENT, TEXT,
 };
 use crate::tree::{Memo, Node, RepeatItem, RepeatMemo, Run, Tree, TreeChild};
 use crate::types::{fits, Statics};
@@ -170,34 +170,41 @@ fn unchanged(inputs: &[(String, Value)], values: &BTreeMap<String, Value>) -> bo
 /// taken out, its `key` and what is under it, and a composite occurrence's
 /// props (its template reads the names those props bind, in a scope of its
 /// own). Event arguments aren't read: they never reach the tree.
-fn free_names<'t>(
-    valid: &Valid,
-    element: &'t Element,
-    bound: &mut Vec<&'t str>,
-    out: &mut BTreeSet<&'t str>,
-) {
+fn free_names<'t>(element: &'t Element, bound: &mut Vec<&'t str>, out: &mut BTreeSet<&'t str>) {
+    let repeated = element.component == REPEAT_COMPONENT;
+    // A repeat's `items` is read outside the name it binds; its `key` and its
+    // child are read inside it.
     let mut own = BTreeSet::new();
-    for prop in &element.props {
+    for prop in element
+        .props
+        .iter()
+        .filter(|prop| !(repeated && prop.prop == "key"))
+    {
         reads(&prop.value, &mut own);
     }
     out.extend(own.into_iter().filter(|name| !bound.contains(name)));
-    if element.component == REPEAT_COMPONENT {
+    if repeated {
         let name = repeat_name(element).expect("validated: a repeat has an `as`");
         bound.push(name);
-        // Its `items` was read outside its own name (a name it binds can't
-        // be read there); `key` and the child are read inside.
+        for prop in element.props.iter().filter(|prop| prop.prop == "key") {
+            let mut read = BTreeSet::new();
+            reads(&prop.value, &mut read);
+            out.extend(read.into_iter().filter(|name| !bound.contains(name)));
+        }
         for child in alternatives(element) {
-            free_names(valid, child, bound, out);
+            free_names(child, bound, out);
         }
         bound.pop();
     } else if element.component == CONDITIONAL_COMPONENT {
         for alternative in alternatives(element) {
-            free_names(valid, alternative, bound, out);
+            free_names(alternative, bound, out);
         }
-    } else if !valid.is_composite(&element.component) {
+    } else {
+        // A primitive's children, or the children of a composite occurrence,
+        // which its template places in the caller's scope: this one.
         for child in &element.children {
             match child {
-                Child::Element { element } => free_names(valid, element, bound, out),
+                Child::Element { element } => free_names(element, bound, out),
                 Child::Expression { expression } => {
                     let mut read = BTreeSet::new();
                     reads(expression, &mut read);
@@ -207,6 +214,52 @@ fn free_names<'t>(
             }
         }
     }
+}
+
+/// A composite occurrence being rendered: whose children a `mesh-slot` in
+/// its template places, in what scope.
+struct Frame<'v> {
+    occurrence: &'v Element,
+    /// The component whose template the occurrence is in.
+    component: String,
+    /// The caller's scope at the occurrence; only kept when the occurrence has children.
+    values: Option<BTreeMap<String, Value>>,
+}
+
+/// What rendering a list of children gives.
+#[derive(Default)]
+struct Built {
+    children: Vec<TreeChild>,
+    runs: Vec<Run>,
+    repeats: Vec<RepeatMemo>,
+    /// Whether a slot placed content, which may leave two text runs side by side.
+    slotted: bool,
+}
+
+/// Whether the subtree of `element` places a slot (its own, or one it forwards
+/// to a composite's children): what it renders then depends on the caller's
+/// content, which its own memo doesn't record, so it is rebuilt, never kept.
+fn contains_slot(element: &Element) -> bool {
+    element.component == SLOT_COMPONENT
+        || element.children.iter().any(|child| match child {
+            Child::Element { element } => contains_slot(element),
+            _ => false,
+        })
+}
+
+/// Runs of text a slot left side by side are one run (a render tree's text
+/// runs are maximal, §9.8), named by the first.
+fn coalesce(children: &mut Vec<TreeChild>) {
+    let mut merged: Vec<TreeChild> = Vec::with_capacity(children.len());
+    for child in children.drain(..) {
+        match (merged.last_mut(), child) {
+            (Some(TreeChild::Text { text, .. }), TreeChild::Text { text: more, .. }) => {
+                text.push_str(&more);
+            }
+            (_, child) => merged.push(child),
+        }
+    }
+    *children = merged;
 }
 
 /// The nodes of the previous render's tree that can be this render's, by key:
@@ -259,6 +312,9 @@ pub(crate) fn tree<'v>(
         sites: record.then(BTreeMap::new),
         free: HashMap::new(),
         prefixes: Vec::new(),
+        frames: Vec::new(),
+        site: Vec::new(),
+        slots: HashMap::new(),
     };
     let root = &valid.templates[&valid.root];
     let old: Old<'_> = previous
@@ -302,6 +358,9 @@ pub(crate) enum RenderChild<'t> {
     Conditional(&'t Element),
     /// PROVISIONAL (§9.10 tracer): its child, once per item.
     Repeat(&'t Element),
+    /// Where the children of the enclosing composite's occurrence go: the
+    /// caller's content, rendered in the caller's scope.
+    Slot,
 }
 
 pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
@@ -317,6 +376,8 @@ pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
                     RenderChild::Conditional(element)
                 } else if element.component == REPEAT_COMPONENT {
                     RenderChild::Repeat(element)
+                } else if element.component == SLOT_COMPONENT {
+                    RenderChild::Slot
                 } else {
                     RenderChild::Element(element)
                 });
@@ -393,17 +454,30 @@ struct Renderer<'v> {
     /// above an item's node, finished for each item (total path length, the
     /// number of steps the hash holds, and the hash).
     prefixes: Vec<(usize, usize, program::KeyPrefix)>,
+    /// The composite occurrences being rendered, innermost last.
+    frames: Vec<Frame<'v>>,
+    /// Where in the node being rendered (positions, through any slots) the
+    /// children being rendered are: names a repeat among them.
+    site: Vec<usize>,
+    /// Whether each element's subtree places a slot.
+    slots: HashMap<*const Element, bool>,
 }
 
 impl<'v> Renderer<'v> {
     /// The scope names the subtree of `element` reads from outside it.
     fn free(&mut self, element: &'v Element) -> Rc<Vec<String>> {
-        let valid = self.valid;
         Rc::clone(self.free.entry(element).or_insert_with(|| {
             let mut names = BTreeSet::new();
-            free_names(valid, element, &mut Vec::new(), &mut names);
+            free_names(element, &mut Vec::new(), &mut names);
             Rc::new(names.into_iter().map(str::to_string).collect())
         }))
+    }
+
+    fn has_slot(&mut self, element: &'v Element) -> bool {
+        *self
+            .slots
+            .entry(element)
+            .or_insert_with(|| contains_slot(element))
     }
 
     /// The key at `path`, finished from the innermost repeat's shared hash
@@ -457,8 +531,16 @@ impl<'v> Renderer<'v> {
                 kind: COMPOSITE,
                 component: element.component.clone(),
             });
+            // The occurrence's children are the caller's content: a slot in the
+            // template places them, in the scope they were written in (this one).
+            self.frames.push(Frame {
+                occurrence: element,
+                component: component.to_string(),
+                values: (!element.children.is_empty()).then(|| values.clone()),
+            });
             let rendered =
                 self.occurrence(&template.component, &template.root, 0, path, &bound, old);
+            self.frames.pop();
             path.pop();
             return rendered;
         }
@@ -484,7 +566,10 @@ impl<'v> Renderer<'v> {
         // A subtree whose inputs are all as they were is the same subtree:
         // keep it, without looking inside.
         let free = self.free(element);
-        if let Some(previous) = previous {
+        // Unless it places a slot: what it renders then depends on the
+        // caller's content too, which its memo doesn't record.
+        let hosts_slot = self.has_slot(element);
+        if let Some(previous) = previous.filter(|_| !hosts_slot) {
             if unchanged(&previous.memo.free, scope.values)
                 && previous.memo.free.len() == free.len()
             {
@@ -567,10 +652,49 @@ impl<'v> Renderer<'v> {
             }
         }
         let old_below = old_children(previous);
-        let mut runs: Vec<Run> = Vec::new();
-        let mut repeats: Vec<RepeatMemo> = Vec::new();
-        let mut children = Vec::new();
-        for (position, child) in render_children(element).into_iter().enumerate() {
+        let mut built = Built::default();
+        let outer_site = std::mem::take(&mut self.site);
+        let listed = self.render_list(scope, element, path, &old_below, previous, &mut built);
+        self.site = outer_site;
+        listed?;
+        if built.slotted {
+            coalesce(&mut built.children);
+        }
+        let Built {
+            children,
+            runs,
+            repeats,
+            ..
+        } = built;
+        Ok(Rc::new(Node {
+            key,
+            component: element.component.clone(),
+            props,
+            prop_text,
+            events,
+            children,
+            memo: Memo {
+                free: inputs_of(&free.iter().map(String::as_str).collect(), scope.values),
+                own: inputs_of(&read, scope.values),
+                runs,
+                repeats,
+            },
+        }))
+    }
+
+    /// Renders the children of `source` (an element of the template whose
+    /// scope is `scope`'s) into `built`: for a node, its own; for a slot, the
+    /// children of the composite occurrence that placed it.
+    fn render_list(
+        &mut self,
+        scope: &Scope<'_, '_>,
+        source: &'v Element,
+        path: &mut Vec<Step>,
+        old_below: &Old<'_>,
+        previous: Option<&Rc<Node>>,
+        built: &mut Built,
+    ) -> Result<(), RuntimeDiagnostic> {
+        for (position, child) in render_children(source).into_iter().enumerate() {
             match child {
                 RenderChild::Run(parts) => {
                     path.push(Step {
@@ -615,20 +739,22 @@ impl<'v> Renderer<'v> {
                         kind: TEXT,
                         component: String::new(),
                     });
-                    let key = self.key(path, scope, element.span);
+                    let key = self.key(path, scope, source.span);
                     path.pop();
                     let key = key?;
-                    runs.push((key.clone(), inputs_of(&read, scope.values), text.clone()));
-                    children.push(TreeChild::Text { key, text });
+                    built
+                        .runs
+                        .push((key.clone(), inputs_of(&read, scope.values), text.clone()));
+                    built.children.push(TreeChild::Text { key, text });
                 }
                 RenderChild::Element(child) => {
-                    children.push(TreeChild::Node(self.occurrence(
+                    built.children.push(TreeChild::Node(self.occurrence(
                         scope.component,
                         child,
                         position,
                         path,
                         scope.values,
-                        &old_below,
+                        old_below,
                     )?));
                 }
                 RenderChild::Conditional(conditional) => {
@@ -645,39 +771,71 @@ impl<'v> Renderer<'v> {
                             0,
                             path,
                             scope.values,
-                            &old_below,
+                            old_below,
                         );
                         path.pop();
-                        children.push(TreeChild::Node(rendered?));
+                        built.children.push(TreeChild::Node(rendered?));
                     }
                 }
                 RenderChild::Repeat(repeat) => {
-                    repeats.push(self.repeat(
+                    let memo = self.repeat(
                         scope,
                         repeat,
                         position,
                         path,
-                        &mut children,
-                        &old_below,
+                        &mut built.children,
+                        old_below,
                         previous,
-                    )?);
+                    )?;
+                    built.repeats.push(memo);
+                }
+                RenderChild::Slot => {
+                    built.slotted = true;
+                    self.slot(position, path, old_below, previous, built)?;
                 }
             }
         }
-        Ok(Rc::new(Node {
-            key,
-            component: element.component.clone(),
-            props,
-            prop_text,
-            events,
-            children,
-            memo: Memo {
-                free: inputs_of(&free.iter().map(String::as_str).collect(), scope.values),
-                own: inputs_of(&read, scope.values),
-                runs,
-                repeats,
-            },
-        }))
+        Ok(())
+    }
+
+    /// A slot: the children of the innermost composite occurrence, rendered in
+    /// the scope of its caller, under a step of their own (the slot's), and
+    /// with the occurrences outside it, not it, as the ones a slot among them places.
+    fn slot(
+        &mut self,
+        position: usize,
+        path: &mut Vec<Step>,
+        old_below: &Old<'_>,
+        previous: Option<&Rc<Node>>,
+        built: &mut Built,
+    ) -> Result<(), RuntimeDiagnostic> {
+        let Some(frame) = self.frames.pop() else {
+            return Ok(()); // a template with a slot that is the root: no caller
+        };
+        let result = match &frame.values {
+            None => Ok(()), // an occurrence with no children
+            Some(values) => {
+                path.push(Step {
+                    position,
+                    kind: SLOT,
+                    component: String::new(),
+                });
+                self.site.push(position);
+                let scope = Scope {
+                    component: &frame.component,
+                    values,
+                    payload: None,
+                    statics: statics(self.valid, &frame.component, None),
+                };
+                let listed =
+                    self.render_list(&scope, frame.occurrence, path, old_below, previous, built);
+                self.site.pop();
+                path.pop();
+                listed
+            }
+        };
+        self.frames.push(frame);
+        result
     }
 
     /// A repeat's instances (§9.10.2): its child once per item, in the
@@ -735,15 +893,13 @@ impl<'v> Renderer<'v> {
         reads(&key.value, &mut key_reads);
         key_reads.remove(name);
         let key_other = inputs_of(&key_reads, scope.values);
+        let mut site = self.site.clone();
+        site.push(position);
+        let hosts_slot = self.has_slot(child);
         let before = previous
-            .and_then(|previous| {
-                previous
-                    .memo
-                    .repeats
-                    .iter()
-                    .find(|memo| memo.position == position)
-            })
-            .filter(|memo| unchanged(&memo.key_other, scope.values));
+            .and_then(|previous| previous.memo.repeats.iter().find(|memo| memo.site == site))
+            .filter(|memo| unchanged(&memo.key_other, scope.values))
+            .filter(|_| !hosts_slot);
         let mut made: Vec<RepeatItem> = Vec::with_capacity(list.len());
         // One scope for the whole repeat, whose slot for the item is
         // overwritten for each item: an item's scope is the repeat's with the
@@ -833,7 +989,7 @@ impl<'v> Renderer<'v> {
         }
         self.prefixes.pop();
         Ok(RepeatMemo {
-            position,
+            site,
             key_other,
             items: made,
         })

@@ -152,7 +152,7 @@ fn undeclared(manifest: &Manifest, template: &Template) -> Vec<String> {
     let Some(own) = manifest.components().get(&template.component) else {
         return vec![format!("no component `{}`", template.component)];
     };
-    for reserved in [CONDITIONAL_COMPONENT, REPEAT_COMPONENT] {
+    for reserved in [CONDITIONAL_COMPONENT, REPEAT_COMPONENT, SLOT_COMPONENT] {
         if template.root.component == reserved {
             problems.push(format!(
                 "a template's root can't be a `{reserved}`: a render has exactly one root node"
@@ -166,6 +166,18 @@ fn undeclared(manifest: &Manifest, template: &Template) -> Vec<String> {
         &mut Vec::new(),
         &mut problems,
     );
+    let mut all = Vec::new();
+    elements(&template.root, &mut all);
+    if all
+        .iter()
+        .filter(|element| element.component == SLOT_COMPONENT)
+        .count()
+        > 1
+    {
+        problems.push(format!(
+            "a template has at most one `{SLOT_COMPONENT}`: a composite has one place for its children"
+        ));
+    }
     problems
 }
 
@@ -185,6 +197,9 @@ fn walk_names(
     };
     if element.component == CONDITIONAL_COMPONENT {
         conditional_problems(element, problems);
+    }
+    if element.component == SLOT_COMPONENT {
+        slot_problems(element, problems);
     }
     let repeated = element.component == REPEAT_COMPONENT;
     if repeated {
@@ -277,6 +292,19 @@ pub(crate) fn repeat_name(element: &Element) -> Option<&str> {
         })
 }
 
+/// What a slot must be: a place, with no props, events or children of its own.
+fn slot_problems(element: &Element, problems: &mut Vec<String>) {
+    if !element.props.is_empty() {
+        problems.push(format!("`{SLOT_COMPONENT}` has no props"));
+    }
+    if !element.events.is_empty() {
+        problems.push(format!("`{SLOT_COMPONENT}` can't have events"));
+    }
+    if !element.children.is_empty() {
+        problems.push(format!("`{SLOT_COMPONENT}` can't have children"));
+    }
+}
+
 /// What a repeat must be (provisional): `items`, `key` and a literal `as`, no
 /// events, and exactly one element child, which is neither a conditional nor
 /// a repeat (nested dynamic structures are not part of the tracer).
@@ -302,6 +330,11 @@ fn repeat_problems(element: &Element, problems: &mut Vec<String>) {
     if !only_elements || items.len() != 1 {
         problems.push(format!(
             "`{REPEAT_COMPONENT}` needs exactly one element child, and nothing else"
+        ));
+    }
+    if items.iter().any(|item| item.component == SLOT_COMPONENT) {
+        problems.push(format!(
+            "the child of `{REPEAT_COMPONENT}` can't be a `{SLOT_COMPONENT}`: put the slot inside an element"
         ));
     }
     if items
@@ -331,6 +364,14 @@ fn conditional_problems(element: &Element, problems: &mut Vec<String>) {
     if !only_elements || !(1..=2).contains(&alternatives.len()) {
         problems.push(format!(
             "`{CONDITIONAL_COMPONENT}` needs one or two element children, and nothing else"
+        ));
+    }
+    if alternatives
+        .iter()
+        .any(|alternative| alternative.component == SLOT_COMPONENT)
+    {
+        problems.push(format!(
+            "an alternative of `{CONDITIONAL_COMPONENT}` can't be a `{SLOT_COMPONENT}`: put the slot inside an element"
         ));
     }
     if alternatives
@@ -587,16 +628,19 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
                     source(template, element.span),
                 ));
             }
-            // Rule 7: no children.
+            // Rule 7: children only where the composite's template has a slot.
             let has_children = element.children.iter().any(|child| match child {
                 Child::Text { value, .. } => !value.trim().is_empty(),
                 _ => true,
             });
-            if has_children {
+            let mut inside = Vec::new();
+            elements(&first[name].root, &mut inside);
+            let has_slot = inside.iter().any(|inner| inner.component == SLOT_COMPONENT);
+            if has_children && !has_slot {
                 diagnostics.push(RuntimeDiagnostic::new(
                     RuntimeCode::COMPOSITE_CHILDREN,
                     format!(
-                        "`{name}` is a composite, and a composite occurrence can't have children"
+                        "`{name}` is a composite whose template has no `{SLOT_COMPONENT}`, so an occurrence of it can't have children"
                     ),
                     source(template, element.span),
                 ));
@@ -794,6 +838,19 @@ pub(crate) const REPEAT: u8 = 0x05;
 /// binds `as` for `key` and the children, and the runtime evaluates `key`
 /// per item. Never a node. Its spelling is not the language's decision.
 pub(crate) const REPEAT_COMPONENT: &str = "mesh-each";
+
+/// A slot inside a repeat's item, or a conditional's alternative, or in the
+/// caller's content that a composite's template places: one step for the
+/// slot, then the content's own steps, so that the same content placed by
+/// two occurrences, or by one occurrence's two slots, is named by different paths.
+pub(crate) const SLOT: u8 = 0x06;
+
+/// The component the runtime gives a composite's **slot** meaning: where, in
+/// a composite's template, the children of an occurrence of the composite are
+/// placed. It is declared in the model like `mesh-if`, with no props. Never a
+/// node: the render tree has the children, evaluated in the **caller's**
+/// scope, where the slot was. A template has at most one (the default slot).
+pub(crate) const SLOT_COMPONENT: &str = "mesh-slot";
 
 /// Whether any template of the program uses a repeat.
 pub(crate) fn uses_repeat(templates: &BTreeMap<String, Template>) -> bool {

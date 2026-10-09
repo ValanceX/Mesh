@@ -323,3 +323,49 @@ test("the new tree shares every part the patches didn't reach with the previous 
   first.release();
   updated.render.release();
 });
+
+// Composite children and the slot, through the module and the wrapper.
+const SLOT_MODEL = JSON.stringify({
+  version: 1,
+  types: {},
+  components: {
+    page: { props: {}, events: {}, commands: {}, scope: {} },
+    note: { props: {}, events: {}, commands: {}, scope: {} },
+    panel: { props: { heading: { type: { kind: "string" }, required: true } }, events: {}, commands: {}, scope: {} },
+    "mesh-slot": { props: {}, events: {}, commands: {}, scope: {} },
+    card: { props: { heading: { type: { kind: "string" }, required: true } }, events: {}, commands: {}, scope: { heading: { kind: "string" } } },
+    view: { props: {}, events: {}, commands: {}, scope: { title: { kind: "string" }, who: { kind: "string" } } },
+  },
+});
+const slotProgram = {
+  root: "view",
+  templates: [
+    await template("view", "<page><card heading={title}><note>hello {who}</note></card><note>{title}</note></page>", SLOT_MODEL),
+    await template("card", "<panel heading={heading}><note>top</note><mesh-slot /><note>end</note></panel>", SLOT_MODEL),
+  ],
+};
+
+test("a composite's children are placed at its slot, and an update reaches them", async () => {
+  const first = await render({ program: slotProgram, model: SLOT_MODEL, snapshot: { title: "T", who: "Ada" } });
+  assert.equal(first.diagnostics, undefined);
+  const text = (tree) => JSON.stringify(tree).match(/"text":"[^"]*"/g).join(" ");
+  assert.equal(text(first.render.tree), '"text":"top" "text":"hello Ada" "text":"end" "text":"T"');
+  // Only the content changed: the card's own props and the page's note are not touched.
+  const updated = await update(first.render, { title: "T", who: "Grace" });
+  assert.deepEqual(updated.patches.patches.map((p) => p.op), ["setText"]);
+  const { render: full } = await render({ program: slotProgram, model: SLOT_MODEL, snapshot: { title: "T", who: "Grace" } });
+  assert.deepEqual(updated.render.tree, full.tree);
+  updated.render.release();
+});
+
+test("children for a composite with no slot are an assembly error, through the module", async () => {
+  const bad = {
+    root: "view",
+    templates: [
+      await template("view", "<page><card heading={title}><note>x</note></card></page>", SLOT_MODEL),
+      await template("card", "<panel heading={heading} />", SLOT_MODEL),
+    ],
+  };
+  const result = await render({ program: bad, model: SLOT_MODEL, snapshot: { title: "T", who: "Ada" } });
+  assert.deepEqual(result.diagnostics.diagnostics.map((d) => d.code), ["assembly-composite-children"]);
+});
