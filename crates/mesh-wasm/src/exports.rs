@@ -189,6 +189,44 @@ pub unsafe extern "C" fn mesh_check_program(
 }
 
 /// Where the last check's document is.
+/// Runs one inference (`crate::respond_infer`) and keeps its result for
+/// [`mesh_result_ptr`]. `sources` is a text list of component, source pairs
+/// (`mesh_runtime::encoding`). Returns 0; or 1, keeping nothing, if an input
+/// isn't UTF-8 or `sources` isn't such a list.
+///
+/// # Safety
+///
+/// Each pointer must point to its length's initialized bytes, unless that
+/// length is 0.
+#[no_mangle]
+pub unsafe extern "C" fn mesh_infer(
+    manifest: *const u8,
+    manifest_len: usize,
+    root: *const u8,
+    root_len: usize,
+    sources: *const u8,
+    sources_len: usize,
+) -> u32 {
+    // SAFETY: the caller's guarantee, passed on for each input.
+    let inputs = unsafe { (text(manifest, manifest_len), text(root, root_len)) };
+    let (Some(manifest), Some(root)) = inputs else {
+        mesh_result_clear();
+        return 1;
+    };
+    let sources = if sources_len == 0 {
+        &[][..]
+    } else {
+        // SAFETY: the caller guarantees `sources_len` initialized bytes.
+        unsafe { std::slice::from_raw_parts(sources, sources_len) }
+    };
+    let Some(document) = crate::respond_infer(manifest, root, sources) else {
+        mesh_result_clear();
+        return 1;
+    };
+    RESULT.with(|kept| *kept.borrow_mut() = document.into_bytes());
+    0
+}
+
 #[no_mangle]
 pub extern "C" fn mesh_result_ptr() -> *const u8 {
     RESULT.with(|result| result.borrow().as_ptr())

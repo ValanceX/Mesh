@@ -11,6 +11,7 @@ pub mod check;
 mod diagnose;
 pub mod editor;
 mod emit;
+pub mod infer;
 mod json;
 mod position;
 mod render;

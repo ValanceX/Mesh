@@ -129,6 +129,7 @@ interface Exports {
   mesh_check(...args: number[]): number;
   mesh_compile(...args: number[]): number;
   mesh_check_program(...args: number[]): number;
+  mesh_infer(...args: number[]): number;
   mesh_result_ptr(): number;
   mesh_result_len(): number;
   mesh_result_clear(): void;
@@ -140,6 +141,7 @@ const CHECK_EXPORTS = [
   "mesh_check",
   "mesh_compile",
   "mesh_check_program",
+  "mesh_infer",
   "mesh_result_ptr",
   "mesh_result_len",
   "mesh_result_clear",
@@ -493,6 +495,32 @@ export function checkProgram(input: ProgramInput): Promise<RuntimeDiagnosticsDoc
       programResult,
     );
   });
+}
+
+/**
+ * The manifest with the contracts of the composites it leaves undeclared added, from the templates' own occurrences and handlers; `undefined` when
+ * there is nothing to add. Internal to `compileProgram`.
+ */
+export function inferComponents(
+  manifest: string,
+  root: string,
+  sources: ReadonlyArray<{ component: string; source: string }>,
+): Promise<string | undefined> {
+  return enqueue(async () =>
+    runNow(
+      [encoder.encode(manifest), encoder.encode(root), textList(sources.flatMap((entry) => [entry.component, entry.source]))],
+      (exports, pointers) => exports.mesh_infer(...pointers),
+      (value) => {
+        const found = (value as { manifest?: unknown } | null)?.manifest;
+
+        if (found !== null && typeof found !== "string") {
+          throw new MeshInternalError("the compiler's result isn't an inferred manifest");
+        }
+
+        return found ?? undefined;
+      },
+    ),
+  );
 }
 
 /**

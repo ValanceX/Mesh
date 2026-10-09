@@ -427,6 +427,16 @@ Only the root template's scope comes from the snapshot. The root component's own
 
 **Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can raise events of its own: see [Composite events](#composite-events).
 
+### Inferred contracts
+
+A composite's contract (its props, scope and events) is already stated by the program, so `compileProgram` in `@valancex/mesh-compiler` (and `mesh_compiler::infer::infer_components` in Rust) writes the entry of any listed component the manifest does not declare:
+
+- **props** are the attributes its occurrences pass, with the types of the arguments they pass (all occurrences are read; where types are compatible they are joined, and where they are not the first is kept and the others are reported by the ordinary prop check). A prop every occurrence passes is required; one some leave out is optional. The scope is the same names and types;
+- **events** are the handlers its template names that are not commands, each with the type of the one argument it forwards (none if it forwards none), read after the composites it uses, so a forwarded `$event` has its payload type;
+- **`mesh-slot`** is declared if a template uses it and the manifest does not.
+
+A component the manifest declares is used as written, whatever the templates say: write the entry when you need a contract the templates don't state, such as a command of the composite's own, or a type wider than its callers pass. Inference reports nothing itself: the compile that follows, with the manifest it returns (the program's `model`), reports every problem as it would for a manifest written by hand. The root and the primitives are never inferred: the root's scope and commands come from the host, and a component with no template is a primitive.
+
 ### Composite events
 
 A composite may declare **events** in the model, as any component does (`"events": { "select": { "payload": { "kind": "number" } } }`), and an occurrence binds them as any component's: `<card count={n} on.select={pick($event)} />`, where `pick` is a command of the template the occurrence is in. Inside the composite's own template, a handler **forwards** one of its events by naming it as the handler:
