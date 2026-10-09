@@ -8,7 +8,7 @@ import { render, dispatch } from "@valancex/mesh-runtime";
 const result = await render({
   program: { root: "users", templates },   // template-v1 documents, as text
   model: manifest,                          // the component manifest's text
-  snapshot: { users, selected },           // the root's scope values
+  snapshot,                                 // the root's scope values, by name
 });
 if (result.diagnostics) {
   throw new Error(result.diagnostics.diagnostics[0].message);
