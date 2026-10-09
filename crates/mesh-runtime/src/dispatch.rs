@@ -156,15 +156,22 @@ fn walk_children<'v>(
             // The occurrence's children, placed here, are the *caller's*: in
             // its template, with its composites on the way, and with the
             // enclosing composites' frames, not this one's.
-            RenderChild::Slot => {
+            RenderChild::Slot(name) => {
                 if let Some((on_the_way, caller, occurrence)) = frames.pop() {
                     let hosts = composites.split_off(on_the_way);
                     path.push(Step {
                         position: index,
                         kind: SLOT,
-                        component: String::new(),
+                        component: name.to_string(),
                     });
-                    walk_children(valid, caller, occurrence, path, composites, frames, found);
+                    let content = if name.is_empty() {
+                        Some(occurrence)
+                    } else {
+                        program::fill_for(occurrence, name)
+                    };
+                    if let Some(content) = content {
+                        walk_children(valid, caller, content, path, composites, frames, found);
+                    }
                     path.pop();
                     composites.extend(hosts);
                     frames.push((on_the_way, caller, occurrence));

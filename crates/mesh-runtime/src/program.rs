@@ -152,7 +152,12 @@ fn undeclared(manifest: &Manifest, template: &Template) -> Vec<String> {
     let Some(own) = manifest.components().get(&template.component) else {
         return vec![format!("no component `{}`", template.component)];
     };
-    for reserved in [CONDITIONAL_COMPONENT, REPEAT_COMPONENT, SLOT_COMPONENT] {
+    for reserved in [
+        CONDITIONAL_COMPONENT,
+        REPEAT_COMPONENT,
+        SLOT_COMPONENT,
+        FILL_COMPONENT,
+    ] {
         if template.root.component == reserved {
             problems.push(format!(
                 "a template's root can't be a `{reserved}`: a render has exactly one root node"
@@ -168,15 +173,21 @@ fn undeclared(manifest: &Manifest, template: &Template) -> Vec<String> {
     );
     let mut all = Vec::new();
     elements(&template.root, &mut all);
-    if all
+    let mut named = BTreeSet::new();
+    for slot in all
         .iter()
         .filter(|element| element.component == SLOT_COMPONENT)
-        .count()
-        > 1
     {
-        problems.push(format!(
-            "a template has at most one `{SLOT_COMPONENT}`: a composite has one place for its children"
-        ));
+        if !named.insert(slot_name(slot)) {
+            problems.push(if slot_name(slot).is_empty() {
+                format!("a template has at most one `{SLOT_COMPONENT}` without a name: a composite has one default place for its children")
+            } else {
+                format!(
+                    "a template has at most one `{SLOT_COMPONENT}` named `{}`",
+                    slot_name(slot)
+                )
+            });
+        }
     }
     problems
 }
@@ -200,6 +211,9 @@ fn walk_names(
     }
     if element.component == SLOT_COMPONENT {
         slot_problems(element, problems);
+    }
+    if element.component == FILL_COMPONENT {
+        fill_problems(element, problems);
     }
     let repeated = element.component == REPEAT_COMPONENT;
     if repeated {
@@ -305,16 +319,35 @@ pub(crate) fn repeat_name(element: &Element) -> Option<&str> {
         })
 }
 
-/// What a slot must be: a place, with no props, events or children of its own.
+/// What a slot must be: a place, with no events or children of its own, and at
+/// most a `name`, a non-empty string literal, which makes it a named slot.
 fn slot_problems(element: &Element, problems: &mut Vec<String>) {
-    if !element.props.is_empty() {
-        problems.push(format!("`{SLOT_COMPONENT}` has no props"));
+    if element.props.iter().any(|prop| prop.prop != "name") {
+        problems.push(format!("`{SLOT_COMPONENT}` has no props but `name`"));
+    }
+    if element.props.iter().any(|prop| prop.prop == "name") && slot_name(element).is_empty() {
+        problems.push(format!(
+            "the `name` of a `{SLOT_COMPONENT}` is a non-empty string literal"
+        ));
     }
     if !element.events.is_empty() {
         problems.push(format!("`{SLOT_COMPONENT}` can't have events"));
     }
     if !element.children.is_empty() {
         problems.push(format!("`{SLOT_COMPONENT}` can't have children"));
+    }
+}
+
+/// What a fill must be: for a named slot (`slot`, a non-empty string literal),
+/// with no events. Its children are free; where it may be is the assembly's.
+fn fill_problems(element: &Element, problems: &mut Vec<String>) {
+    if element.props.iter().any(|prop| prop.prop != "slot") || fill_name(element).is_empty() {
+        problems.push(format!(
+            "`{FILL_COMPONENT}` has exactly one prop, `slot`, a non-empty string literal naming the slot it fills"
+        ));
+    }
+    if !element.events.is_empty() {
+        problems.push(format!("`{FILL_COMPONENT}` can't have events"));
     }
 }
 
@@ -651,22 +684,81 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
                     ));
                 }
             }
-            // Rule 7: children only where the composite's template has a slot.
+            // Rule 7: children only where the composite's template has a slot
+            // for them: loose ones (and text) go to the default slot, and each
+            // `mesh-fill` to the slot of its name, once.
             let has_children = element.children.iter().any(|child| match child {
                 Child::Text { value, .. } => !value.trim().is_empty(),
-                _ => true,
+                Child::Element { element } => element.component != FILL_COMPONENT,
+                Child::Expression { .. } => true,
             });
             let mut inside = Vec::new();
             elements(&first[name].root, &mut inside);
-            let has_slot = inside.iter().any(|inner| inner.component == SLOT_COMPONENT);
-            if has_children && !has_slot {
+            let slots: BTreeSet<&str> = inside
+                .iter()
+                .filter(|inner| inner.component == SLOT_COMPONENT)
+                .map(|inner| slot_name(inner))
+                .collect();
+            if has_children && !slots.contains("") {
                 diagnostics.push(RuntimeDiagnostic::new(
                     RuntimeCode::COMPOSITE_CHILDREN,
                     format!(
-                        "`{name}` is a composite whose template has no `{SLOT_COMPONENT}`, so an occurrence of it can't have children"
+                        "`{name}` is a composite whose template has no default `{SLOT_COMPONENT}`, so an occurrence of it can't have children outside a `{FILL_COMPONENT}`"
                     ),
                     source(template, element.span),
                 ));
+            }
+            let mut filled = BTreeSet::new();
+            for child in &element.children {
+                let Child::Element { element: fill } = child else {
+                    continue;
+                };
+                if fill.component != FILL_COMPONENT {
+                    continue;
+                }
+                if !slots.contains(fill_name(fill)) {
+                    diagnostics.push(RuntimeDiagnostic::new(
+                        RuntimeCode::COMPOSITE_CHILDREN,
+                        format!(
+                            "`{name}`'s template has no `{SLOT_COMPONENT}` named `{}` for this `{FILL_COMPONENT}`",
+                            fill_name(fill)
+                        ),
+                        source(template, fill.span),
+                    ));
+                } else if !filled.insert(fill_name(fill)) {
+                    diagnostics.push(RuntimeDiagnostic::new(
+                        RuntimeCode::COMPOSITE_CHILDREN,
+                        format!(
+                            "an occurrence of `{name}` fills the slot `{}` more than once",
+                            fill_name(fill)
+                        ),
+                        source(template, fill.span),
+                    ));
+                }
+            }
+        }
+    }
+    // A fill belongs directly inside an occurrence of a composite.
+    for (_, template) in read {
+        let mut all = Vec::new();
+        elements(&template.root, &mut all);
+        for parent in all {
+            if first.contains_key(parent.component.as_str()) {
+                continue;
+            }
+            for child in &parent.children {
+                if let Child::Element { element: fill } = child {
+                    if fill.component == FILL_COMPONENT {
+                        diagnostics.push(RuntimeDiagnostic::new(
+                            RuntimeCode::COMPOSITE_CHILDREN,
+                            format!(
+                                "`{FILL_COMPONENT}` belongs directly inside an occurrence of a composite, not inside `{}`",
+                                parent.component
+                            ),
+                            source(template, fill.span),
+                        ));
+                    }
+                }
             }
         }
     }
@@ -874,6 +966,49 @@ pub(crate) const SLOT: u8 = 0x06;
 /// node: the render tree has the children, evaluated in the **caller's**
 /// scope, where the slot was. A template has at most one (the default slot).
 pub(crate) const SLOT_COMPONENT: &str = "mesh-slot";
+
+/// The component that names the slot some of an occurrence's children go to:
+/// `<card><mesh-fill slot="header">…</mesh-fill>…</card>`. Declared in the model
+/// like `mesh-slot`, with a required string prop `slot`. Never a node, and only
+/// ever a direct child of a composite occurrence; the slot it names is
+/// `<mesh-slot name="header" />` in the composite's template.
+pub(crate) const FILL_COMPONENT: &str = "mesh-fill";
+
+/// The string literal written for `prop` on `element`, if there is one.
+fn literal<'e>(element: &'e Element, prop: &str) -> Option<&'e str> {
+    element
+        .props
+        .iter()
+        .find_map(|written| match &written.value {
+            Expression::Literal {
+                value: mesh_template::Literal::String(text),
+                ..
+            } if written.prop == prop => Some(text.as_str()),
+            _ => None,
+        })
+}
+
+/// The name of a slot: its `name`, or `""` for the default slot.
+pub(crate) fn slot_name(slot: &Element) -> &str {
+    literal(slot, "name").unwrap_or("")
+}
+
+/// The name of the slot a fill is for: its `slot`.
+pub(crate) fn fill_name(fill: &Element) -> &str {
+    literal(fill, "slot").unwrap_or("")
+}
+
+/// The fill an occurrence has for the slot `name`, if any.
+pub(crate) fn fill_for<'e>(occurrence: &'e Element, name: &str) -> Option<&'e Element> {
+    occurrence.children.iter().find_map(|child| match child {
+        Child::Element { element }
+            if element.component == FILL_COMPONENT && fill_name(element) == name =>
+        {
+            Some(element.as_ref())
+        }
+        _ => None,
+    })
+}
 
 /// Whether any template of the program uses a repeat.
 pub(crate) fn uses_repeat(templates: &BTreeMap<String, Template>) -> bool {

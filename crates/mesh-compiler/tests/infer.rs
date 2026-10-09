@@ -157,3 +157,35 @@ fn the_reserved_tags_a_program_uses_are_declared_and_a_switch_declares_the_condi
     .diagnostics
     .is_empty());
 }
+
+#[test]
+fn named_slots_are_declared_with_the_props_the_language_gives_them() {
+    let sources = vec![
+        ("view".to_string(), "<panel><card heading={title}><mesh-fill slot=\"head\"><note>x</note></mesh-fill></card></panel>".to_string()),
+        ("card".to_string(), "<panel><mesh-slot name=\"head\" /><mesh-slot /></panel>".to_string()),
+    ];
+    let inferred = infer_components(MODEL, "view", &sources).unwrap();
+    let document: Value = serde_json::from_str(&inferred).unwrap();
+    let manifest = mesh_manifest::load(&inferred).unwrap();
+
+    assert_eq!(
+        document["components"]["mesh-slot"]["props"]["name"]["required"],
+        false
+    );
+    assert_eq!(
+        document["components"]["mesh-fill"]["props"]["slot"]["required"],
+        true
+    );
+    for (name, source) in &sources {
+        assert!(
+            compile_with(
+                source,
+                &CompileOptions::with_template(manifest.template(name).unwrap())
+            )
+            .diagnostics
+            .iter()
+            .all(|d| d.message.contains("title")),
+            "{name}"
+        );
+    }
+}

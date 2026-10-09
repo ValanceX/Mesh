@@ -8,7 +8,8 @@ use crate::number::number_to_text;
 use crate::patch::Patch;
 use crate::program::{
     self, alternatives, repeat_name, Program, Step, Valid, ALTERNATIVES, COMPOSITE, CONDITIONAL,
-    CONDITIONAL_COMPONENT, NODE, REPEAT, REPEAT_COMPONENT, SLOT, SLOT_COMPONENT, TEXT,
+    CONDITIONAL_COMPONENT, FILL_COMPONENT, NODE, REPEAT, REPEAT_COMPONENT, SLOT, SLOT_COMPONENT,
+    TEXT,
 };
 use crate::tree::{Memo, Node, RepeatItem, RepeatMemo, Run, Tree, TreeChild};
 use crate::types::{fits, Statics};
@@ -568,8 +569,9 @@ pub(crate) enum RenderChild<'t> {
     /// PROVISIONAL (§9.10 tracer): its child, once per item.
     Repeat(&'t Element),
     /// Where the children of the enclosing composite's occurrence go: the
-    /// caller's content, rendered in the caller's scope.
-    Slot,
+    /// caller's content, rendered in the caller's scope. The name is the
+    /// slot's (empty for the default slot).
+    Slot(&'t str),
 }
 
 pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
@@ -581,12 +583,16 @@ pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
                 if !run.is_empty() {
                     children.push(RenderChild::Run(std::mem::take(&mut run)));
                 }
+                // A fill is content for a named slot, never placed where it is written.
+                if element.component == FILL_COMPONENT {
+                    continue;
+                }
                 children.push(if element.component == CONDITIONAL_COMPONENT {
                     RenderChild::Conditional(element)
                 } else if element.component == REPEAT_COMPONENT {
                     RenderChild::Repeat(element)
                 } else if element.component == SLOT_COMPONENT {
-                    RenderChild::Slot
+                    RenderChild::Slot(program::slot_name(element))
                 } else {
                     RenderChild::Element(element)
                 });
@@ -1030,9 +1036,9 @@ impl<'v> Renderer<'v> {
                     )?;
                     built.repeats.push(memo);
                 }
-                RenderChild::Slot => {
+                RenderChild::Slot(name) => {
                     built.slotted = true;
-                    self.slot(position, path, old_below, previous, built)?;
+                    self.slot(position, name, path, old_below, previous, built)?;
                 }
             }
         }
@@ -1045,6 +1051,7 @@ impl<'v> Renderer<'v> {
     fn slot(
         &mut self,
         position: usize,
+        name: &str,
         path: &mut Vec<Step>,
         old_below: &Old<'_>,
         previous: Option<&Rc<Node>>,
@@ -1053,13 +1060,19 @@ impl<'v> Renderer<'v> {
         let Some(frame) = self.frames.pop() else {
             return Ok(()); // a template with a slot that is the root: no caller
         };
-        let result = match &frame.values {
-            None => Ok(()), // an occurrence with no children
-            Some(values) => {
+        // The default slot places the occurrence's own children (fills aside); a named one, its fill's.
+        let content = if name.is_empty() {
+            Some(frame.occurrence)
+        } else {
+            program::fill_for(frame.occurrence, name)
+        };
+        let result = match (&frame.values, content) {
+            (None, _) | (_, None) => Ok(()), // an occurrence with no children, or none for this slot
+            (Some(values), Some(content)) => {
                 path.push(Step {
                     position,
                     kind: SLOT,
-                    component: String::new(),
+                    component: name.to_string(),
                 });
                 self.site.push(position);
                 let scope = Scope {
@@ -1068,8 +1081,7 @@ impl<'v> Renderer<'v> {
                     payload: None,
                     statics: statics(self.valid, &frame.component, None),
                 };
-                let listed =
-                    self.render_list(&scope, frame.occurrence, path, old_below, previous, built);
+                let listed = self.render_list(&scope, content, path, old_below, previous, built);
                 self.site.pop();
                 path.pop();
                 listed

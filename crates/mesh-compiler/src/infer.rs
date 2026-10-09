@@ -30,7 +30,14 @@ fn reserved() -> Vec<(&'static str, Value)> {
     let props = |props: Value| json!({ "props": props, "events": {}, "commands": {}, "scope": {} });
 
     vec![
-        ("mesh-slot", none()),
+        (
+            "mesh-slot",
+            props(json!({ "name": { "type": { "kind": "string" }, "required": false } })),
+        ),
+        (
+            "mesh-fill",
+            props(json!({ "slot": { "type": { "kind": "string" }, "required": true } })),
+        ),
         ("mesh-switch", none()),
         ("mesh-default", none()),
         (
@@ -57,7 +64,7 @@ type Occurrence = BTreeMap<String, Ty>;
 
 /// `manifest` (its text) with an entry added for each component in
 /// `sources` that it does not declare, and for each reserved tag
-/// (`mesh-slot`, `mesh-switch`, `mesh-case`, `mesh-default`, `mesh-if`,
+/// (`mesh-slot`, `mesh-fill`, `mesh-switch`, `mesh-case`, `mesh-default`, `mesh-if`,
 /// `mesh-each`) that a source uses and it does not declare. `None` when there is nothing to add, or
 /// when the manifest cannot be read (the compile reports that).
 pub fn infer_components(

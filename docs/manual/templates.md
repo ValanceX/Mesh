@@ -427,6 +427,33 @@ Only the root template's scope comes from the snapshot. The root component's own
 
 **Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can raise events of its own: see [Composite events](#composite-events).
 
+### Named slots
+
+A template may have several slots, each with a `name`; the one without is the default slot. An occurrence says which content goes to which with `mesh-fill`.
+
+```xml
+<!-- the template of `card` -->
+<panel heading={heading}>
+  <mesh-slot name="header" />
+  <mesh-slot />
+  <mesh-slot name="footer" />
+</panel>
+
+<!-- an occurrence of it -->
+<card heading={title}>
+  <mesh-fill slot="footer"><note>{who}</note></mesh-fill>
+  <note>the body</note>
+  <mesh-fill slot="header"><note>{title}</note></mesh-fill>
+</card>
+```
+
+- **`mesh-fill`** is declared in the model like `mesh-slot`, with one required string prop, `slot`. It is never a node, and is only ever a direct child of a composite occurrence. Its children are the caller's, as the default slot's are, and may be anything an occurrence's children may be. The order the fills and the loose children are written in is not the order they are placed in: the template's slots decide.
+- **`mesh-slot`** takes an optional `name`, a non-empty string literal. A template has at most one slot of each name (and one without), and the slots may be anywhere an unnamed slot may.
+- **Loose children** (everything that is not a fill) go to the default slot, and need one: a composite with only named slots takes no loose children.
+- **Errors.** A fill for a slot the composite's template does not have, two fills for one slot, a fill outside a composite occurrence, and loose children without a default slot are `assembly-composite-children`. Two slots of one name, a `name` that is not a literal, and a fill without a literal `slot` are `assembly-malformed-template`.
+- **No fill is fine.** A slot nobody fills is empty.
+- **Identity.** A named slot's step is the default slot's with the name as its component, so no key in a program without named slots changes (`docs/manual/runtime.md`).
+
 ### Switch
 
 `mesh-switch` chooses among several alternatives by the first condition that holds, where `mesh-if` chooses between two. Like `mesh-if` it is declared in the model, it is never a node, and it is provisional.

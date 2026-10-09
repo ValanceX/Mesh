@@ -930,7 +930,7 @@ Location: `source`, every composite occurrence of it.
 
 ### `assembly-composite-children`
 
-A composite occurrence has children, text or elements, but the composite's template has no `mesh-slot` to place them. A composite takes children exactly when its template has a slot ([Children and the slot](templates.md#children-and-the-slot)). An occurrence of a composite that has a slot may have none.
+A composite occurrence has children that the composite's template has no slot for. A composite takes loose children (text or elements outside a `mesh-fill`) exactly when its template has a default `mesh-slot` ([Children and the slot](templates.md#children-and-the-slot)); and a `mesh-fill` needs a `mesh-slot` of its name, once, in an occurrence of a composite ([Named slots](templates.md#named-slots)). An occurrence of a composite that has slots may have no children.
 
 Location: `source`, the occurrence.
 
