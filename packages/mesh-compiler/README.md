@@ -35,9 +35,11 @@ The [Using MESH from JavaScript](https://github.com/ValanceX/Mesh/blob/main/docs
 - **`compileProgram({ model, root, components })`** compiles a program's components (each `{ component, source, path }`, in order) against one manifest (`model: { manifest, path }`), checks the program they make with `checkProgram`, and returns a promise of `{ components, assembly?, program? }`. `components` holds each component's diagnostics document, as `compile` returns it; `assembly` is `checkProgram`'s document, present when no component had an error; `program` is `{ model, root, templates }`, the parts `checkProgram` and the runtime take (the templates as text), present when nothing had an error. A component that is not listed has no template, so it is a primitive. The `CompileProgramInput` and `CompileProgramResult` types describe it.
 - **`init(module)`** loads the WebAssembly module: a URL, its bytes, or a compiled `WebAssembly.Module`. In Node you don't need it; the package loads its own. In a browser, call it once before the first check, with the URL of `@valancex/mesh-compiler/mesh.wasm` as your setup serves it. Automatic loading by bundlers isn't part of this package's contract.
 - **`version`**: the package's version.
-- **`MeshVersionError`**: the WebAssembly module isn't this version's. No check runs against it.
-- **`MeshInternalError`**: the compiler itself failed (a bug). The failed compiler instance is discarded, and the next check uses a fresh one.
-- A `TypeError` for arguments of the wrong type.
+- **`MeshVersionError`** (`code: "version-mismatch"`): the WebAssembly module isn't this version's. No check runs against it.
+- **`MeshInternalError`** (`code: "internal-error"`): the compiler itself failed (a bug). The failed compiler instance is discarded, and the next check uses a fresh one.
+- **`MeshUsageError`** (`code: "invalid-argument"`; a `TypeError`, so a `catch` on `TypeError` still works): an argument of the wrong type.
+
+Match on `code`, never on `message`. Calls run one at a time, in the order made, and can't be cancelled.
 
 Paths are identifiers: the package never touches the file system. Strings are passed as UTF-8, so a lone surrogate in a JavaScript string becomes U+FFFD, as with any UTF-8 encoding.
 

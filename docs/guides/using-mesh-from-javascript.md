@@ -143,9 +143,9 @@ const document = await check({ source, path: "page.mprx" });
 
 ## When something goes wrong
 
-- A `TypeError`: an argument isn't a string, or a model has no `component`.
-- `MeshVersionError`: the WebAssembly module isn't this version of the package's, for example a stale copy served in a browser. Nothing was checked.
-- `MeshInternalError`: the compiler itself failed, which is a bug; please report it with the input. The package discards the failed compiler and uses a fresh one for the next check.
+- `MeshUsageError` (a `TypeError`, `code: "invalid-argument"`): an argument isn't a string, or a model has no `component`.
+- `MeshVersionError` (`code: "version-mismatch"`): the WebAssembly module isn't this version of the package's, for example a stale copy served in a browser. Nothing was checked.
+- `MeshInternalError` (`code: "internal-error"`): the compiler itself failed, which is a bug; please report it with the input. The package discards the failed compiler and uses a fresh one for the next check.
 
 ## What it doesn't do
 

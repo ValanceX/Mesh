@@ -34,7 +34,21 @@ Templates come from the compiler: `mesh compile`, or `compile()` in [`@valancex/
 - **`init(source)`** loads the WebAssembly module from a URL, its bytes, or a `WebAssembly.Module`. Optional: the package loads its own module (the file next to its code) on the first call, in Node and in a browser. Call `init` to load another copy or to give the URL yourself, for example of `@valancex/mesh-runtime/mesh-runtime.wasm` as a bundler resolves it; a Vite 5 to 7 development server may need `@valancex/mesh-runtime` excluded from dependency optimization (`optimizeDeps.exclude`) for the automatic path to find its file.
 - **`version`** is the package's version, which is also its module's.
 
-A problem with your values is a diagnostic, never an exception. The promises reject only with a `TypeError` for arguments of the wrong type (including a snapshot that isn't a plain object, or a `render` this package didn't make), with `MeshVersionError` for a module of another version, and with `MeshInternalError` if the runtime itself fails; after that, the next call uses a fresh instance.
+A problem with your values is a diagnostic, never an exception. The promises reject only with:
+
+| Error | When | `code` |
+|---|---|---|
+| `MeshUsageError` (a `TypeError`, so existing `catch` on `TypeError` still works) | an argument of the wrong type (including a snapshot that isn't a plain object) | `invalid-argument` |
+| | a `Render` this package didn't make | `not-a-render` |
+| | a render whose copy in the module is gone and which has no snapshot of its own (see `updateChanges`) | `render-gone` |
+| `MeshVersionError` | a module of another version, or not a MESH module | `version-mismatch` |
+| `MeshInternalError` | the runtime itself failed; the next call uses a fresh instance | `internal-error` |
+
+Match on `code`, never on `message`. Codes are stable: never renamed, never reused for another meaning.
+
+**Calls and concurrency.** Calls to the package run one at a time, in the order they were made, whether or not you `await` each: a second call starts when the first has settled, and a call that rejects doesn't stop the ones after it. There is no cancellation: a call that has been made runs to completion. Nothing the package does continues after its promise settles, except the release of a render's copy in the module, which `release()` queues behind the calls already made.
+
+**Cleanup.** `render.release()` is synchronous from the caller's side and safe to call twice. Where the platform has `Symbol.dispose`, a render has `[Symbol.dispose]()`, which does the same, so `using render = ...` releases it at the end of a block.
 
 ## Your obligations as a host
 

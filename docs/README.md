@@ -30,6 +30,7 @@ Reference material for when you need exact details.
 
 - [**Evaluation and the boundary**](./MPRX-SPEC.md#97-evaluation): §9.7 and §9.8 of the spec, with the normative [number-to-text table](./tables/number-to-text.tsv) and its [reference generator](./tables/number_to_text.py).
 - [**Templates and programs**](./manual/templates.md): the compiled form of a template, the model fingerprint, and the assembly rules. Also a [JSON Schema](../schemas/template-v1.schema.json). `mesh compile` and `compile()` emit templates; `mesh check-program` and `checkProgram()` check programs.
+- [**API stability**](./manual/stability.md): what each public surface promises (stable, unreleased, provisional, internal).
 - [**The MESH runtime**](./manual/runtime.md): render and dispatch, the host's obligations, the render tree and `propText`, event resolution, keys, handler identifiers, command intents, and runtime diagnostics. Also JSON Schemas for [render trees and intents](../schemas/render-v1.schema.json) and [runtime diagnostics](../schemas/runtime-diagnostics-v1.schema.json).
 
 ## Background

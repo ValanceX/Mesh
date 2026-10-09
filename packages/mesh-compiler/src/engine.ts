@@ -25,6 +25,8 @@ import { version } from "./version.js";
  */
 export class MeshInternalError extends Error {
   override name = "MeshInternalError";
+  /** The stable code of this failure. Match on this, not on `message`. */
+  readonly code = "internal-error";
 }
 
 /**
@@ -33,6 +35,29 @@ export class MeshInternalError extends Error {
  */
 export class MeshVersionError extends Error {
   override name = "MeshVersionError";
+  /** The stable code of this failure. Match on this, not on `message`. */
+  readonly code = "version-mismatch";
+}
+
+/** Why a call was refused before it reached the module. */
+export type MeshUsageCode =
+  /** An argument is not of the type the call takes (`message` says which). */
+  "invalid-argument";
+
+/**
+ * A call that is wrong in a way types should have prevented: an argument of
+ * the wrong type. It is a `TypeError`, so code that catches
+ * `TypeError` still works, and it has a stable `code`. It is never how a
+ * problem with a program or snapshot is reported; those are diagnostics.
+ */
+export class MeshUsageError extends TypeError {
+  override name = "MeshUsageError";
+  /** The stable code of this failure. Match on this, not on `message`. */
+  readonly code: MeshUsageCode;
+  constructor(message: string, code: MeshUsageCode = "invalid-argument") {
+    super(message);
+    this.code = code;
+  }
 }
 
 /** What {@link init} accepts: where the module is, its bytes, or the module. */
@@ -341,19 +366,19 @@ function compileResult(value: unknown): CompileResult {
 function validate(input: CheckInput, compiling: boolean): void {
   const what = compiling ? "compile() takes an object: { source, path, model }" : "check() takes an object: { source, path, model? }";
   if (typeof input !== "object" || input === null) {
-    throw new TypeError(what);
+    throw new MeshUsageError(what);
   }
   const strings: [string, unknown][] = [
     ["source", input.source],
     ["path", input.path],
   ];
   if (compiling && input.model === undefined) {
-    throw new TypeError("compile() needs a model: { manifest, path, component }");
+    throw new MeshUsageError("compile() needs a model: { manifest, path, component }");
   }
   if (input.model !== undefined) {
     const model = input.model;
     if (typeof model !== "object" || model === null) {
-      throw new TypeError("model must be an object: { manifest, path, component }");
+      throw new MeshUsageError("model must be an object: { manifest, path, component }");
     }
     strings.push(
       ["model.manifest", model.manifest],
@@ -363,23 +388,23 @@ function validate(input: CheckInput, compiling: boolean): void {
   }
   for (const [name, value] of strings) {
     if (typeof value !== "string") {
-      throw new TypeError(`${name} must be a string`);
+      throw new MeshUsageError(`${name} must be a string`);
     }
   }
 }
 
 function validateProgram(input: ProgramInput): void {
   if (typeof input !== "object" || input === null) {
-    throw new TypeError("checkProgram() takes an object: { model, root, templates }");
+    throw new MeshUsageError("checkProgram() takes an object: { model, root, templates }");
   }
   if (typeof input.model !== "string") {
-    throw new TypeError("model must be a string");
+    throw new MeshUsageError("model must be a string");
   }
   if (typeof input.root !== "string") {
-    throw new TypeError("root must be a string");
+    throw new MeshUsageError("root must be a string");
   }
   if (!Array.isArray(input.templates) || !input.templates.every((t) => typeof t === "string")) {
-    throw new TypeError("templates must be an array of strings");
+    throw new MeshUsageError("templates must be an array of strings");
   }
 }
 

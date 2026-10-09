@@ -31,6 +31,8 @@ import { version } from "./version.js";
  */
 export class MeshInternalError extends Error {
   override name = "MeshInternalError";
+  /** The stable code of this failure. Match on this, not on `message`. */
+  readonly code = "internal-error";
 }
 
 /**
@@ -39,6 +41,34 @@ export class MeshInternalError extends Error {
  */
 export class MeshVersionError extends Error {
   override name = "MeshVersionError";
+  /** The stable code of this failure. Match on this, not on `message`. */
+  readonly code = "version-mismatch";
+}
+
+/** Why a call was refused before it reached the module. */
+export type MeshUsageCode =
+  /** An argument is not of the type the call takes (`message` says which). */
+  | "invalid-argument"
+  /** The `Render` passed was not made by this package's `render`, `update` or `updateChanges`. */
+  | "not-a-render"
+  /** The render's copy in the module is gone (released, or the module was replaced) and the call needs it. Render again from a whole snapshot. */
+  | "render-gone";
+
+/**
+ * A call that is wrong in a way types should have prevented: an argument of
+ * the wrong type, a `Render` this package did not make, or a render whose
+ * copy in the module is gone. It is a `TypeError`, so code that catches
+ * `TypeError` still works, and it has a stable `code`. It is never how a
+ * problem with a program or snapshot is reported; those are diagnostics.
+ */
+export class MeshUsageError extends TypeError {
+  override name = "MeshUsageError";
+  /** The stable code of this failure. Match on this, not on `message`. */
+  readonly code: MeshUsageCode;
+  constructor(message: string, code: MeshUsageCode = "invalid-argument") {
+    super(message);
+    this.code = code;
+  }
 }
 
 /** What {@link init} accepts: where the module is, its bytes, or the module. */
@@ -148,7 +178,7 @@ export class Render {
     kept?: Kept,
   ) {
     if (token !== MAKING) {
-      throw new TypeError("a Render comes from render(), update() or updateChanges()");
+      throw new MeshUsageError("a Render comes from render(), update() or updateChanges()", "not-a-render");
     }
     this.tree = tree;
     this.#root = root;
@@ -199,7 +229,7 @@ export class Render {
   /** The module's copy of `render`, if it has one that is still in the module in use. Throws a TypeError for a foreign object. */
   static keptOf(render: Render): Kept | undefined {
     if (!(typeof render === "object" && render !== null && #root in render)) {
-      throw new TypeError("update() takes a Render that render(), update() or updateChanges() returned");
+      throw new MeshUsageError("update() takes a Render that render(), update() or updateChanges() returned", "not-a-render");
     }
     return render.#kept;
   }
@@ -207,10 +237,25 @@ export class Render {
   /** The inputs dispatch passes back to the module. Throws a TypeError for a foreign object. */
   static inputsOf(render: Render): [string, Uint8Array, string, Uint8Array | undefined] {
     if (!(typeof render === "object" && render !== null && #root in render)) {
-      throw new TypeError("dispatch() takes a Render that render(), update() or updateChanges() returned");
+      throw new MeshUsageError("dispatch() takes a Render that render(), update() or updateChanges() returned", "not-a-render");
     }
     return [render.#root, render.#templates, render.#model, render.#snapshot];
   }
+}
+
+/** `using render = ...` ends the module's copy at the end of the block, as `release()` does. */
+export interface Render {
+  [Symbol.dispose](): void;
+}
+// Where the platform has `Symbol.dispose` (Node 20+, current browsers); elsewhere `release()` is the only spelling.
+if (typeof Symbol.dispose === "symbol") {
+  Object.defineProperty(Render.prototype, Symbol.dispose, {
+    value(this: Render): void {
+      this.release();
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 /** The module's exports this engine uses. They're internal to the package. */
@@ -480,7 +525,7 @@ async function runNow<T>(
   }
   if (result instanceof Refused) {
     // The runtime refused the host's value outright; the instance is fine.
-    throw new TypeError(result.message);
+    throw new MeshUsageError(result.message);
   }
   try {
     return shape(parse(result));
@@ -497,20 +542,20 @@ function enqueue<T>(work: () => Promise<T>): Promise<T> {
 
 function validateRender(input: RenderInput): void {
   if (typeof input !== "object" || input === null) {
-    throw new TypeError("render() takes an object: { program, model, snapshot }");
+    throw new MeshUsageError("render() takes an object: { program, model, snapshot }");
   }
   const program = input.program;
   if (typeof program !== "object" || program === null) {
-    throw new TypeError("program must be an object: { root, templates }");
+    throw new MeshUsageError("program must be an object: { root, templates }");
   }
   if (typeof program.root !== "string") {
-    throw new TypeError("program.root must be a string");
+    throw new MeshUsageError("program.root must be a string");
   }
   if (!Array.isArray(program.templates) || !program.templates.every((t) => typeof t === "string")) {
-    throw new TypeError("program.templates must be an array of strings");
+    throw new MeshUsageError("program.templates must be an array of strings");
   }
   if (typeof input.model !== "string") {
-    throw new TypeError("model must be a string");
+    throw new MeshUsageError("model must be a string");
   }
 }
 
@@ -547,10 +592,11 @@ function liveIn(kept: Kept | undefined): kept is Kept {
 }
 
 /** What a render with no snapshot of its own is refused with when its copy in the module is gone. */
-function gone(operation: string): TypeError {
-  return new TypeError(
+function gone(operation: string): MeshUsageError {
+  return new MeshUsageError(
     `${operation}() needs this render's copy in the module, which is gone (the render was released, or the module was replaced), ` +
       "and a render made from changes has no snapshot of its own: render again from a whole snapshot",
+    "render-gone",
   );
 }
 
@@ -608,12 +654,13 @@ export function updateChanges(
     const kept = Render.keptOf(previous);
     // Changes are only ever applied to the render they name, which only the module that holds it can say.
     if (!liveIn(kept)) {
-      throw new TypeError(
+      throw new MeshUsageError(
         "updateChanges() needs this render to be in the module: make it with update(), or render() with keep, and don't release it first",
+        "render-gone",
       );
     }
     if (typeof changes !== "object" || changes === null) {
-      throw new TypeError("updateChanges() takes the changes: { base, changes }");
+      throw new MeshUsageError("updateChanges() takes the changes: { base, changes }");
     }
     const encoded = encodeValue(changes as unknown as Record<string, unknown>);
     const verify = options?.verify === undefined ? undefined : encodeValue(options.verify);
@@ -640,20 +687,20 @@ export function updateChanges(
 
 function validateDeclaredEvents(input: DeclaredEventsInput): void {
   if (typeof input !== "object" || input === null) {
-    throw new TypeError("declaredEvents() takes an object: { program, model }");
+    throw new MeshUsageError("declaredEvents() takes an object: { program, model }");
   }
   const program = input.program;
   if (typeof program !== "object" || program === null) {
-    throw new TypeError("program must be an object: { root, templates }");
+    throw new MeshUsageError("program must be an object: { root, templates }");
   }
   if (typeof program.root !== "string") {
-    throw new TypeError("program.root must be a string");
+    throw new MeshUsageError("program.root must be a string");
   }
   if (!Array.isArray(program.templates) || !program.templates.every((t) => typeof t === "string")) {
-    throw new TypeError("program.templates must be an array of strings");
+    throw new MeshUsageError("program.templates must be an array of strings");
   }
   if (typeof input.model !== "string") {
-    throw new TypeError("model must be a string");
+    throw new MeshUsageError("model must be a string");
   }
 }
 
@@ -683,7 +730,7 @@ export function dispatch(render: Render, handler: string, payload?: unknown): Pr
     const [root, templates, model, snapshot] = Render.inputsOf(render);
     const kept = Render.keptOf(render);
     if (typeof handler !== "string") {
-      throw new TypeError("handler must be a string: a handler identifier from the render's tree");
+      throw new MeshUsageError("handler must be a string: a handler identifier from the render's tree");
     }
     const absent = payload === undefined;
     const encoded = absent ? new Uint8Array(0) : encodeValue(payload);

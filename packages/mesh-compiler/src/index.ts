@@ -62,7 +62,8 @@ export type {
   TemplateExpression,
   TemplateSpan,
 } from "./template.js";
-export { MeshInternalError, MeshVersionError } from "./engine.js";
+export { MeshInternalError, MeshUsageError, MeshVersionError } from "./engine.js";
+export type { MeshUsageCode } from "./engine.js";
 export { version } from "./version.js";
 
 /**

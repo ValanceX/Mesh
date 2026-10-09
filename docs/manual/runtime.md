@@ -54,7 +54,7 @@ A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any p
 - A missing property and a property that is `undefined` are both absent. A payload that isn't given is absent too.
 - `-0` crosses in as `-0`, and never comes out (§9.8.2).
 - A render keeps its snapshot as it was encoded when `render` was called, so changing the host's objects afterwards changes nothing.
-- A problem with the host's values is a diagnostic, never an exception. The promises reject only with a `TypeError` for arguments of the wrong JavaScript type, or a `render` the package didn't make; with `MeshVersionError` for a module of another version; and with `MeshInternalError` if the runtime itself fails.
+- A problem with the host's values is a diagnostic, never an exception. The promises reject only with a `MeshUsageError` (a `TypeError`, with a `code`: `invalid-argument`, `not-a-render` or `render-gone`) for a call that is wrong in a way types should have prevented; with `MeshVersionError` (`version-mismatch`) for a module of another version; and with `MeshInternalError` (`internal-error`) if the runtime itself fails. Match on the `code`, never the message. Calls run one at a time in the order made, and are not cancellable (see the package README).
 
 ## The render tree
 

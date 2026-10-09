@@ -74,7 +74,8 @@ export type {
   SourceSpan,
   TextRun,
 } from "./types.js";
-export { MeshInternalError, MeshVersionError, Render } from "./engine.js";
+export { MeshInternalError, MeshUsageError, MeshVersionError, Render } from "./engine.js";
+export type { MeshUsageCode } from "./engine.js";
 export { diff } from "./changes.js";
 export { version } from "./version.js";
 

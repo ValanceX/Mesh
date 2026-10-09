@@ -89,6 +89,7 @@ test("nothing reads the tree or an intent after parsing them", () => {
     { file: "engine.ts", text: "render.#root", reason: "the render's kept root name, passed back to the module" },
     { file: "patches.ts", text: "", reason: "applies the runtime's patches to a tree by key, moving parts and reading no value" },
     { file: "changes.ts", text: "", reason: "diff reads two host snapshots (not a tree or an intent) to compute edits; see the file's own test" },
+    { file: "engine.ts", text: "this.code = code", reason: "the package's own error stores its own stable code" },
     { file: "engine.ts", text: "result.events", reason: "the result document's envelope key, like `tree` and `intent`: the declared events are returned as the module wrote them" },
   ];
   assert.deepEqual(unexcused(find(pattern), exceptions), []);
