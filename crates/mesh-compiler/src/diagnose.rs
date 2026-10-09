@@ -4,7 +4,7 @@
 //! and computes suggestions. Analysis reports what it found and which
 //! names were available; this layer decides how to say it.
 
-use mesh_analysis::{Combination, Expectation, Fact, Operator};
+use mesh_analysis::{Combination, Expectation, Fact, Operator, SwitchProblem};
 use mesh_syntax::{
     BinaryOperator, Diagnostic, DiagnosticCode, Severity, Span, Suggestion, UnaryOperator,
 };
@@ -214,6 +214,21 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
         Fact::MissingRequiredField { record, field, .. } => (
             DiagnosticCode::MISSING_REQUIRED_FIELD,
             format!("the object is missing the field {field:?}, which {record} requires"),
+            Vec::new(),
+        ),
+        Fact::MalformedSwitch {
+            component, problem, ..
+        } => (
+            DiagnosticCode::INVALID_SWITCH,
+            match problem {
+                SwitchProblem::OutsideSwitch => format!("`{component}` belongs directly inside a `mesh-switch`"),
+                SwitchProblem::Placement => format!("`{component}` stands for several siblings, so it needs an element around it: it can't be the root, or the direct child of a `mesh-if`, `mesh-each`, `mesh-case` or `mesh-default`"),
+                SwitchProblem::NoCases => format!("`{component}` needs at least one `mesh-case`"),
+                SwitchProblem::NotACase => format!("`{component}` holds only `mesh-case`s and, last, one `mesh-default`: this isn't one"),
+                SwitchProblem::DefaultNotLast => format!("`{component}` is after a `mesh-default`, or a second one: the `mesh-default` is the last child, and the only one"),
+                SwitchProblem::BodyCount => format!("`{component}` needs exactly one element child, and nothing else"),
+                SwitchProblem::BadBody => format!("the child of `{component}` can't be a `mesh-if`, a `mesh-switch` or a `mesh-slot`: put it inside an element"),
+            },
             Vec::new(),
         ),
         Fact::ContentNotText { ty, .. } => (

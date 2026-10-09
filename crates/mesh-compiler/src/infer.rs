@@ -24,15 +24,41 @@ use serde_json::{json, Map, Value};
 
 use crate::{compile_with, CompileOptions};
 
-/// The reserved tag a template places its children with.
-const SLOT: &str = "mesh-slot";
+/// The reserved structural tags: each is declared, when a source uses it and the manifest does not, as the language defines it.
+fn reserved() -> Vec<(&'static str, Value)> {
+    let none = || entry(Map::new(), Map::new(), Map::new());
+    let props = |props: Value| json!({ "props": props, "events": {}, "commands": {}, "scope": {} });
+
+    vec![
+        ("mesh-slot", none()),
+        ("mesh-switch", none()),
+        ("mesh-default", none()),
+        (
+            "mesh-case",
+            props(json!({ "when": { "type": { "kind": "boolean" }, "required": true } })),
+        ),
+        (
+            "mesh-if",
+            props(json!({ "when": { "type": { "kind": "boolean" }, "required": true } })),
+        ),
+        (
+            "mesh-each",
+            props(json!({
+                "items": { "type": { "kind": "list", "element": { "kind": "any" } }, "required": true },
+                "as": { "type": { "kind": "string" }, "required": true },
+                "key": { "type": { "kind": "any" }, "required": true }
+            })),
+        ),
+    ]
+}
 
 /// What one occurrence of a composite passes: each prop, with its type.
 type Occurrence = BTreeMap<String, Ty>;
 
 /// `manifest` (its text) with an entry added for each component in
-/// `sources` that it does not declare, and for `mesh-slot` if it is
-/// missing and a source uses it. `None` when there is nothing to add, or
+/// `sources` that it does not declare, and for each reserved tag
+/// (`mesh-slot`, `mesh-switch`, `mesh-case`, `mesh-default`, `mesh-if`,
+/// `mesh-each`) that a source uses and it does not declare. `None` when there is nothing to add, or
 /// when the manifest cannot be read (the compile reports that).
 pub fn infer_components(
     manifest: &str,
@@ -50,9 +76,16 @@ pub fn infer_components(
         .collect();
     let mut changed = false;
 
-    if !declared.contains(SLOT) && sources.iter().any(|(_, source)| source.contains(SLOT)) {
-        components.insert(SLOT.to_string(), entry(Map::new(), Map::new(), Map::new()));
-        changed = true;
+    for (tag, declaration) in reserved() {
+        // A switch is written as `mesh-if`s, so a program that has one uses `mesh-if`.
+        let used = sources.iter().any(|(_, source)| {
+            opens(source, tag) || (tag == "mesh-if" && opens(source, "mesh-switch"))
+        });
+
+        if used && !declared.contains(tag) {
+            components.insert(tag.to_string(), declaration);
+            changed = true;
+        }
     }
 
     if inferred.is_empty() {
@@ -143,6 +176,18 @@ pub fn infer_components(
     }
 
     changed.then(|| document.to_string())
+}
+
+/// Whether `source` opens an element named `tag` (`<mesh-slot` but not `<mesh-slots`).
+fn opens(source: &str, tag: &str) -> bool {
+    let opening = format!("<{tag}");
+
+    source.match_indices(&opening).any(|(at, _)| {
+        source[at + opening.len()..]
+            .chars()
+            .next()
+            .is_none_or(|next| !(next.is_alphanumeric() || next == '-'))
+    })
 }
 
 fn visit<'a>(

@@ -4,7 +4,10 @@
 
 use crate::relation::{self, is_assignable, join};
 use crate::types::{FieldTy, Ty};
-use crate::{Analysis, Combination, Expectation, Fact, Operator, Resolution, Target, Typed};
+use crate::{
+    Analysis, Combination, Expectation, Fact, Operator, Resolution, SwitchProblem, Target, Typed,
+    CASE_COMPONENT, DEFAULT_COMPONENT, SWITCH_COMPONENT,
+};
 use mesh_manifest::{Component, Manifest, Template, Type};
 use mesh_semantic::{AttributeValue, Child, Element, Expression, Literal, ObjectMember};
 use mesh_syntax::{BinaryOperator, Span, UnaryOperator};
@@ -30,6 +33,7 @@ impl<'m> Walker<'m> {
             resolutions: Vec::new(),
             types: Vec::new(),
             loops: Vec::new(),
+            parents: Vec::new(),
         }
     }
 
@@ -85,6 +89,9 @@ struct Walker<'m> {
     /// type. A name here shadows a scope declaration and resolves to
     /// nothing a tool could navigate to.
     loops: Vec<(String, Ty)>,
+    /// The tags of the elements being walked, innermost last, the current
+    /// element not among them.
+    parents: Vec<String>,
 }
 
 /// The reserved component whose `as` names the item its children see.
@@ -102,6 +109,7 @@ impl<'m> Walker<'m> {
     /// Checks one element as an instance of the component its tag names,
     /// then its attribute values, its handlers and its children.
     fn element(&mut self, element: &Element) {
+        self.switch_shape(element);
         let manifest = self.manifest();
         let component = match manifest.components().get_key_value(&element.name) {
             Some((name, component)) => {
@@ -228,6 +236,7 @@ impl<'m> Walker<'m> {
             self.handler(&binding.name, &binding.handler, payload);
         }
 
+        self.parents.push(element.name.clone());
         for child in &element.children {
             match child {
                 Child::Text { .. } => {}
@@ -239,8 +248,124 @@ impl<'m> Walker<'m> {
                 Child::Element(child) => self.element(child),
             }
         }
+        self.parents.pop();
         if pushed {
             self.loops.pop();
+        }
+    }
+
+    /// The shape and place of a switch (docs/manual/templates.md, "Switch"):
+    /// what the rest of the walk, which checks each element as a component,
+    /// does not say.
+    fn switch_shape(&mut self, element: &Element) {
+        let problem = |walker: &mut Self, name: &str, problem, span| {
+            walker.facts.push(Fact::MalformedSwitch {
+                component: name.to_string(),
+                problem,
+                span,
+            });
+        };
+        let parent = self.parents.last().map(String::as_str);
+
+        match element.name.as_str() {
+            SWITCH_COMPONENT => {
+                // Several siblings, so never the only thing a parent allows.
+                if parent.is_none_or(|parent| {
+                    matches!(
+                        parent,
+                        "mesh-if" | "mesh-each" | CASE_COMPONENT | DEFAULT_COMPONENT
+                    )
+                }) {
+                    problem(
+                        self,
+                        &element.name,
+                        SwitchProblem::Placement,
+                        element.name_span,
+                    );
+                }
+                let mut cases = 0;
+                let mut defaulted = false;
+                for child in &element.children {
+                    match child {
+                        Child::Element(child) if child.name == CASE_COMPONENT && !defaulted => {
+                            cases += 1;
+                        }
+                        Child::Element(child) if child.name == DEFAULT_COMPONENT && !defaulted => {
+                            defaulted = true;
+                        }
+                        Child::Element(child)
+                            if child.name == DEFAULT_COMPONENT || child.name == CASE_COMPONENT =>
+                        {
+                            problem(
+                                self,
+                                &child.name,
+                                SwitchProblem::DefaultNotLast,
+                                child.name_span,
+                            );
+                        }
+                        Child::Element(child) => {
+                            problem(
+                                self,
+                                &element.name,
+                                SwitchProblem::NotACase,
+                                child.name_span,
+                            );
+                        }
+                        Child::Text { span, .. } => {
+                            problem(self, &element.name, SwitchProblem::NotACase, *span);
+                        }
+                        Child::Expression(expression) => {
+                            problem(
+                                self,
+                                &element.name,
+                                SwitchProblem::NotACase,
+                                expression.span(),
+                            );
+                        }
+                    }
+                }
+                if cases == 0 {
+                    problem(
+                        self,
+                        &element.name,
+                        SwitchProblem::NoCases,
+                        element.name_span,
+                    );
+                }
+            }
+            CASE_COMPONENT | DEFAULT_COMPONENT => {
+                if parent != Some(SWITCH_COMPONENT) {
+                    problem(
+                        self,
+                        &element.name,
+                        SwitchProblem::OutsideSwitch,
+                        element.name_span,
+                    );
+                }
+                let only_elements = element
+                    .children
+                    .iter()
+                    .all(|child| matches!(child, Child::Element(_)));
+                if !only_elements || element.children.len() != 1 {
+                    problem(
+                        self,
+                        &element.name,
+                        SwitchProblem::BodyCount,
+                        element.name_span,
+                    );
+                }
+                for child in &element.children {
+                    if let Child::Element(body) = child {
+                        if matches!(
+                            body.name.as_str(),
+                            "mesh-if" | "mesh-slot" | SWITCH_COMPONENT
+                        ) {
+                            problem(self, &element.name, SwitchProblem::BadBody, body.name_span);
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
     }
 

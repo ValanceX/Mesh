@@ -13,6 +13,11 @@ use mesh_semantic::{AttributeValue, Child, Element, Expression, Literal};
 use mesh_syntax::{BinaryOperator, Span, UnaryOperator};
 use mesh_template as t;
 
+use mesh_analysis::{CASE_COMPONENT, SWITCH_COMPONENT};
+
+/// The conditional a switch is written as.
+const CONDITIONAL_COMPONENT: &str = "mesh-if";
+
 /// The template of `component` whose source, `source`, lowered to `ir`
 /// and checked clean against the model whose fingerprint is
 /// `fingerprint`.
@@ -92,21 +97,97 @@ impl Emitter<'_> {
             children: element
                 .children
                 .iter()
-                .map(|child| match child {
-                    Child::Text { value, span } => t::Child::Text {
+                .flat_map(|child| match child {
+                    Child::Text { value, span } => vec![t::Child::Text {
                         value: value.clone(),
                         span: self.span(*span),
-                    },
-                    Child::Expression(expression) => t::Child::Expression {
+                    }],
+                    Child::Expression(expression) => vec![t::Child::Expression {
                         expression: self.expression(expression),
-                    },
-                    Child::Element(element) => t::Child::Element {
+                    }],
+                    Child::Element(element) if element.name == SWITCH_COMPONENT => {
+                        self.switch(element)
+                    }
+                    Child::Element(element) => vec![t::Child::Element {
                         element: Box::new(self.element(element)),
-                    },
+                    }],
                 })
                 .collect(),
             span: self.span(element.span),
         }
+    }
+
+    /// A `mesh-switch` is written as the conditionals it stands for, one
+    /// `mesh-if` per case (and for the default), each true only when no case
+    /// before it is: `<mesh-if when={!a && b}>`. The template, and so the
+    /// runtime, never sees a switch; and as each case is a conditional site,
+    /// a case's identity is the one a conditional's is (docs/manual/templates.md,
+    /// "Switch").
+    fn switch(&self, switch: &Element) -> Vec<t::Child> {
+        let mut earlier: Vec<t::Expression> = Vec::new();
+        let mut lowered = Vec::new();
+
+        for child in &switch.children {
+            let Child::Element(case) = child else {
+                unreachable!("a clean check guarantees a switch holds only cases and a default");
+            };
+            let own = (case.name == CASE_COMPONENT).then(|| {
+                case.attributes
+                    .iter()
+                    .find_map(|attribute| match &attribute.value {
+                        AttributeValue::Expression(expression) if attribute.name == "when" => {
+                            Some(self.expression(expression))
+                        }
+                        _ => None,
+                    })
+                    .expect("a clean check guarantees a case has a boolean `when`")
+            });
+            let span = self.span(case.span);
+            let not = |expression: &t::Expression| t::Expression::Unary {
+                operator: t::UnaryOperator::Not,
+                operand: Box::new(expression.clone()),
+                span,
+            };
+            let and = |left: t::Expression, right: t::Expression| t::Expression::Binary {
+                operator: t::BinaryOperator::And,
+                left: Box::new(left),
+                right: Box::new(right),
+                span,
+            };
+            // True when no earlier case is, and this one is (a default has no condition of its own).
+            let mut when = earlier.iter().map(not).reduce(and);
+            if let Some(own) = &own {
+                when = Some(match when {
+                    Some(none_before) => and(none_before, own.clone()),
+                    None => own.clone(),
+                });
+            }
+            let body = case.children.iter().find_map(|child| match child {
+                Child::Element(body) => Some(body),
+                _ => None,
+            });
+
+            if let (Some(when), Some(body)) = (when, body) {
+                lowered.push(t::Child::Element {
+                    element: Box::new(t::Element {
+                        component: CONDITIONAL_COMPONENT.to_string(),
+                        props: vec![t::Prop {
+                            prop: "when".to_string(),
+                            value: when,
+                            span,
+                        }],
+                        events: Vec::new(),
+                        children: vec![t::Child::Element {
+                            element: Box::new(self.element(body)),
+                        }],
+                        span,
+                    }),
+                });
+            }
+            earlier.extend(own);
+        }
+
+        lowered
     }
 
     fn expression(&self, expression: &Expression) -> t::Expression {

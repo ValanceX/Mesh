@@ -427,6 +427,24 @@ Only the root template's scope comes from the snapshot. The root component's own
 
 **Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can raise events of its own: see [Composite events](#composite-events).
 
+### Switch
+
+`mesh-switch` chooses among several alternatives by the first condition that holds, where `mesh-if` chooses between two. Like `mesh-if` it is declared in the model, it is never a node, and it is provisional.
+
+```xml
+<panel>
+  <mesh-switch>
+    <mesh-case when={kind == "heading"}><h1>{text}</h1></mesh-case>
+    <mesh-case when={kind == "item"}><li>{text}</li></mesh-case>
+    <mesh-default><p>{text}</p></mesh-default>
+  </mesh-switch>
+</panel>
+```
+
+- **Shape.** A switch holds one or more `mesh-case` elements, each with a boolean `when`, and optionally a last `mesh-default`. A case or default holds exactly one element (not a `mesh-if`, `mesh-switch` or `mesh-slot`: put those inside an element). A switch stands for several siblings, so it can't be a template's root or the direct child of a `mesh-if`, `mesh-each`, `mesh-case` or `mesh-default`: put an element around it. Anything else is `invalid-switch`.
+- **Meaning.** The first case whose `when` holds is rendered; if none does, the default; if there is none, nothing.
+- **How it is written.** The compiler writes a switch as the conditionals it stands for, one `mesh-if` per case, each true only when no earlier case is (`when={!a && b}`), and the default true when none is. The `template-v1` document and the runtime never see a switch, so nothing about the runtime, its identity rules or its updates is new: **each case is a conditional site of its own**, named as a conditional's alternatives are. A model that declares `mesh-switch` must therefore also declare `mesh-if`. A condition that appears in several lowered conditionals is evaluated in each.
+
 ### Inferred contracts
 
 A composite's contract (its props, scope and events) is already stated by the program, so `compileProgram` in `@valancex/mesh-compiler` (and `mesh_compiler::infer::infer_components` in Rust) writes the entry of any listed component the manifest does not declare:

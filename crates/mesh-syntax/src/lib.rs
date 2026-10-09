@@ -174,6 +174,9 @@ impl DiagnosticCode {
     /// An interpolation in content whose type is a list or a record, which
     /// has no text form (§9.7.8).
     pub const CONTENT_NOT_TEXT: DiagnosticCode = DiagnosticCode("content-not-text");
+    /// A `mesh-switch`, `mesh-case` or `mesh-default` that isn't shaped or
+    /// placed as the language says.
+    pub const INVALID_SWITCH: DiagnosticCode = DiagnosticCode("invalid-switch");
 
     /// Every code MESH can emit, in catalogue order. The diagnostics
     /// reference (`docs/manual/diagnostics.md`) documents each one, and a
@@ -226,6 +229,7 @@ impl DiagnosticCode {
         DiagnosticCode::MISSING_REQUIRED_FIELD,
         DiagnosticCode::NUMBER_LITERAL_OUT_OF_RANGE,
         DiagnosticCode::CONTENT_NOT_TEXT,
+        DiagnosticCode::INVALID_SWITCH,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -1013,6 +1017,7 @@ mod tests {
                 "missing-required-field",
                 "number-literal-out-of-range",
                 "content-not-text",
+                "invalid-switch",
             ]
         );
     }

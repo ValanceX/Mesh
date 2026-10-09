@@ -854,6 +854,22 @@ A value of type `any` isn't checked here: if it turns out to be a list or a reco
 
 ---
 
+### `invalid-switch`
+
+A `mesh-switch`, `mesh-case` or `mesh-default` that isn't shaped or placed as [a switch is](templates.md#switch). One code covers each way it can be wrong, and the message says which: a switch with no `mesh-case`; a child of a switch that isn't a `mesh-case` or the one last `mesh-default`; a `mesh-case` or `mesh-default` outside a switch; a case with anything but exactly one element child, or whose child is a `mesh-if`, a `mesh-switch` or a `mesh-slot`; a switch that is a template's root or the direct child of a `mesh-if`, `mesh-each`, `mesh-case` or `mesh-default`. Points at the element's tag name, or at the child that doesn't belong. A `mesh-case` with no `when`, or one that isn't a boolean, is the ordinary `missing-required-prop` or `type-mismatch`.
+
+```text
+error[invalid-switch]: `mesh-switch` needs at least one `mesh-case`
+ --> fixtures/check/fail/invalid-switch.mprx:1:18
+  |
+1 | <page title="x"><mesh-switch><mesh-default><text>none</text></mesh-default></mesh-switch></page>
+  |                  ^^^^^^^^^^^
+```
+
+**Fix:** give the switch a `mesh-case`, and put the `mesh-default` after the last one.
+
+---
+
 ## Assembly errors
 
 The runtime reports these before it evaluates anything, when it validates a program (`docs/manual/templates.md`, "The assembly rules"), and so does the compiler's program check, with the same codes and locations. Each is in a runtime diagnostics document.

@@ -115,6 +115,9 @@
       "commands": {},
       "scope": {}
     },
+    "mesh-switch": { "props": {}, "events": {}, "commands": {}, "scope": {} },
+    "mesh-default": { "props": {}, "events": {}, "commands": {}, "scope": {} },
+    "mesh-case": { "props": { "when": { "type": { "kind": "boolean" }, "required": true } }, "events": {}, "commands": {}, "scope": {} },
     "template": {
       "props": {},
       "events": {},

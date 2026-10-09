@@ -128,3 +128,32 @@ fn an_optional_prop_is_one_some_occurrences_leave_out() {
         serde_json::json!({ "type": { "kind": "optional", "type": { "kind": "string" } }, "required": false })
     );
 }
+
+#[test]
+fn the_reserved_tags_a_program_uses_are_declared_and_a_switch_declares_the_conditional_it_is_written_as(
+) {
+    let sources = vec![("view".to_string(), "<panel><mesh-switch><mesh-case when={flag}><note>x</note></mesh-case><mesh-default><note>y</note></mesh-default></mesh-switch></panel>".to_string())];
+    let bare = MODEL.replace("\"mesh-if\"", "\"unused\"");
+    let inferred = infer_components(&bare, "view", &sources).unwrap();
+    let components = &serde_json::from_str::<Value>(&inferred).unwrap()["components"];
+
+    for tag in ["mesh-switch", "mesh-case", "mesh-default", "mesh-if"] {
+        assert!(components[tag].is_object(), "{tag}");
+    }
+    assert!(
+        components["mesh-slot"].is_null(),
+        "a tag no source uses is not declared"
+    );
+    assert_eq!(
+        components["mesh-case"]["props"]["when"]["type"],
+        serde_json::json!({ "kind": "boolean" })
+    );
+
+    let manifest = mesh_manifest::load(&inferred).unwrap();
+    assert!(compile_with(
+        &sources[0].1,
+        &CompileOptions::with_template(manifest.template("view").unwrap())
+    )
+    .diagnostics
+    .is_empty());
+}
