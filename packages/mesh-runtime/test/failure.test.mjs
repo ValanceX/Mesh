@@ -32,7 +32,7 @@ test("a panic in render is a MeshInternalError, and the instance is never reused
   await init(readFileSync(testModule));
   const expected = await render(input);
   const failed = instanceForTests();
-  failed.mesh_render = () => failed.mesh_test_panic();
+  failed.mesh_render_kept = () => failed.mesh_test_panic();
   const error = await render(input).then(
     () => assert.fail("render should have failed"),
     (error) => error,
@@ -51,7 +51,7 @@ test("a panic in dispatch is a MeshInternalError, and the next dispatch works", 
   const tap = made.tree.root.events.tap;
   const expected = await dispatch(made, tap);
   const failed = instanceForTests();
-  failed.mesh_dispatch = () => failed.mesh_test_panic();
+  failed.mesh_dispatch_kept = () => failed.mesh_test_panic();
   await assert.rejects(dispatch(made, tap), MeshInternalError);
   const calls = neverCalledAgain(failed);
   assert.deepEqual(await dispatch(made, tap), expected, "a render outlives the instance that made it");
@@ -69,8 +69,8 @@ test("a result that isn't a document is a MeshInternalError", async () => {
 test("bytes the module refuses are a MeshInternalError", async () => {
   await init(readFileSync(testModule));
   const exports = instanceForTests();
-  const real = exports.mesh_render;
-  exports.mesh_render = (...args) => real(...args.slice(0, 2), 0, 0, ...args.slice(4));
+  const real = exports.mesh_render_kept;
+  exports.mesh_render_kept = (...args) => real(...args.slice(0, 2), 0, 0, ...args.slice(4));
   await assert.rejects(render(input), MeshInternalError);
   assert.ok((await render(input)).render);
 });

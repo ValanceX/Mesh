@@ -16,7 +16,7 @@ What each public surface of MESH promises. The tiers have one meaning each, ever
 | MPRX language, manifest, `template-v1`, `render-v1`, `runtime-diagnostics-v1`, the CLI and its JSON output | Stable |
 | `render`, `dispatch`, `declaredEvents`, `init`, `version`, `Render.tree`; `mesh_runtime::{render, dispatch, resolve}` | Stable |
 | `update`, `render-patch-v1`, `render.release()`, `mesh_runtime::update`, `update_with` | Unreleased |
-| `updateChanges`, `diff`, `render.version`, `render({ keep })`, `[Symbol.dispose]`; `mesh_runtime::{update_changes, Changes, Change}`; the changes document; the diagnostics `runtime-changes-base-mismatch`, `runtime-invalid-change`, `runtime-changes-disagree` | Unreleased |
+| `updateChanges`, `diff`, `render.version`, `[Symbol.dispose]`; `mesh_runtime::{update_changes, Changes, Change}`; the changes document; the diagnostics `runtime-changes-base-mismatch`, `runtime-invalid-change`, `runtime-changes-disagree` | Unreleased |
 | `MeshUsageError`, `MeshUsageCode` and the `code` of the other errors | Unreleased |
 | `mesh-slot` and composite children; composite events (forwarding a declared event); `assembly-composite-children` | Unreleased |
 | `mesh-if`, `mesh-each` and the identity steps they add (`0x04`, `0x05`) | Provisional |

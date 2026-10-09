@@ -28,7 +28,7 @@ So a host keeps each render until the renderer has drawn a newer one, and dispat
 
 A handler identifier names a handler at a node, and it is the same in every render of one program in which that node is present, so a mispaired dispatch doesn't fail: it silently uses the wrong values. The example below shows the difference.
 
-**Updating instead of rendering again.** When state changes and the program doesn't, a host can call `update(render, snapshot)` instead of `render()`. It returns the new render and the patches that turn the previous tree into the new one, for a renderer that applies patches. The host's obligations are the same, with one more: the module keeps each render `update` returns, so **call `release()` on a render you will no longer update from or dispatch with**, typically the previous one once its patches are applied. A render you forget is released when it is garbage collected, which can be late. See the [runtime manual](../manual/runtime.md#update).
+**Updating instead of rendering again.** When state changes and the program doesn't, a host can call `update(render, snapshot)` instead of `render()`. It returns the new render and the patches that turn the previous tree into the new one, for a renderer that applies patches. The host's obligations are the same, with one more: the module keeps each render, so **call `release()` on every render you will no longer update from or dispatch with**, typically the previous one once its patches are applied. A render you forget is released when it is garbage collected, which can be late. See the [runtime manual](../manual/runtime.md#update).
 
 ## When the program changes
 

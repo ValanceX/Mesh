@@ -48,7 +48,7 @@ for (const n of (process.argv.slice(2).map(Number).filter(Boolean).length ? proc
   });
   current.release();
   // The same chain from the changes form: one `set` of the changed label, the module keeping the snapshot.
-  let { render: kept } = await render({ program, model: MODEL, snapshot: base, keep: true });
+  let { render: kept } = await render({ program, model: MODEL, snapshot: base });
   const at = Math.floor(n / 2);
   let state = false;
   const changesMs = await least(15, async () => {

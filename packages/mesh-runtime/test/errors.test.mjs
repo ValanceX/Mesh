@@ -24,7 +24,7 @@ test("a Render this package did not make is refused with the code not-a-render",
 });
 
 test("a released render that has no snapshot of its own is refused with the code render-gone", async () => {
-  const { render: kept } = await render({ program: listProgram, model: LIST_MODEL, snapshot, keep: true });
+  const { render: kept } = await render({ program: listProgram, model: LIST_MODEL, snapshot });
   const made = await updateChanges(kept, { base: kept.version, changes: [{ op: "set", path: ["count"], value: 1 }] });
   made.render.release();
   await assert.rejects(update(made.render, snapshot), (error) => error instanceof MeshUsageError && error.code === "render-gone");
@@ -33,10 +33,22 @@ test("a released render that has no snapshot of its own is refused with the code
 });
 
 test("a render has [Symbol.dispose], which does what release() does (the `using` statement calls it)", async () => {
-  const kept = (await render({ program: listProgram, model: LIST_MODEL, snapshot, keep: true })).render;
+  const kept = (await render({ program: listProgram, model: LIST_MODEL, snapshot })).render;
   assert.equal(typeof kept.version, "number");
   assert.equal(typeof kept[Symbol.dispose], "function");
   kept[Symbol.dispose]();
   assert.equal(kept.version, undefined, "released");
   kept[Symbol.dispose](); // safe twice, as release() is
+});
+
+test("a diagnostic of a code with one reliable corrective action carries a hint, and others carry none", async () => {
+  const bad = await render({ program: listProgram, model: LIST_MODEL, snapshot: { ...snapshot, count: "many" } });
+  const [first] = bad.diagnostics.diagnostics;
+  assert.equal(first.code, "runtime-value-mismatch");
+  assert.equal(typeof first.hint, "string");
+  const { render: kept } = await render({ program: listProgram, model: LIST_MODEL, snapshot });
+  const refused = await updateChanges(kept, { base: kept.version + 1, changes: [] });
+  assert.equal(refused.diagnostics.diagnostics[0].code, "runtime-changes-base-mismatch");
+  assert.match(refused.diagnostics.diagnostics[0].hint, /version/);
+  kept.release();
 });

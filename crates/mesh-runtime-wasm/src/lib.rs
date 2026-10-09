@@ -10,10 +10,11 @@
 //! boundary between WebAssembly's linear memory and JavaScript. It links
 //! no parser: a host that renders needs no compiler.
 //!
-//! **Its one state between calls is the renders `update` keeps,** so that
-//! the next `update` from one needn't derive it again: a table of handles
-//! (`respond_update` makes one, `release` ends it). `render`, `dispatch`
-//! and `declared_events` keep nothing.
+//! **Its one state between calls is the renders it keeps,** so that the
+//! next `update` from one needn't derive it again: a table of handles
+//! (`respond_render_kept`, `respond_update` and `respond_update_changes`
+//! make one, `release` ends it). `dispatch` and `declared_events` keep
+//! nothing.
 //!
 //! Build it with Cargo alone:
 //!

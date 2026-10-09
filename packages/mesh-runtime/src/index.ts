@@ -46,6 +46,7 @@ export type {
   Change,
   Changes,
   PathStep,
+  RenderVersion,
   DeclaredEventsInput,
   DeclaredEventsResult,
   DispatchResult,
@@ -105,14 +106,14 @@ export function render(input: RenderInput): Promise<RenderResult> {
  * case `previous` is untouched and still dispatches. A change of structure
  * the patch format can't yet express gives one `replace` of the whole tree.
  *
- * **The module keeps the render it returns,** so the next `update` from it
- * reuses what the module already computed, and costs what the same update
- * costs in Rust. `previous` is kept too, and stays valid, until released.
- * Call `release()` on a render once it is no longer the one to update from or
- * dispatch with (typically: on `previous`, after its patches are applied). A
- * render that is never released is released when it is garbage collected, but
- * that can be late, and until then its copy is memory in the module. A render
- * made by `render()`, or one released, is derived again by its first `update`,
+ * **The module keeps every render, including this one's result,** so the next
+ * `update` from it reuses what the module already computed, and costs what
+ * the same update costs in Rust. `previous` is kept too, and stays valid,
+ * until released. Call `release()` on a render once it is no longer the one to
+ * update from or dispatch with (typically: on `previous`, after its patches
+ * are applied). A render that is never released is released when it is garbage
+ * collected, but that can be late, and until then its copy is memory in the
+ * module. A render that was released is derived again by its first `update`,
  * which then costs a render more.
  *
  * It rejects as {@link render} does.
@@ -139,12 +140,11 @@ export function update(previous: Render, snapshot: Record<string, unknown>): Pro
  * depends on them, not the size of the snapshot, and nothing of the snapshot
  * crosses the boundary.
  *
- * The render must be in the module: made by `update`, `updateChanges`, or
- * `render` with `keep`, and not released. A render made by this has no
- * snapshot outside the module, so once it is released (or the module is
- * replaced) it can't be updated or dispatched with: this rejects with a
- * `TypeError` for a render whose copy is gone, and the host renders again from
- * a whole snapshot.
+ * The render must still be in the module: not released, and the module not
+ * replaced. A render made by this has no snapshot outside the module, so once
+ * it is released (or the module is replaced) it can't be updated or
+ * dispatched with: this rejects with a `MeshUsageError` (`render-gone`) for a
+ * render whose copy is gone, and the host renders again from a whole snapshot.
  *
  * With `options.verify`, the whole snapshot the host believes it now has, the
  * changes are checked against it (`runtime-changes-disagree`, at the first

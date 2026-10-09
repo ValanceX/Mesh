@@ -1,6 +1,6 @@
 // Memory stays bounded under repeated calls: after a warm-up, neither the
 // instance's linear memory nor its count of live allocations grows, and
-// each render and dispatch releases everything it allocated.
+// each render and dispatch releases everything it allocated (a render is released by the caller, as it must be).
 // `MESH_MEMORY_CALLS` sets the count (10,000 by default).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -23,6 +23,8 @@ test("repeated renders and dispatches don't grow memory", { timeout: 30 * 60 * 1
       const node = result.render.tree.root.children.find((c) => c.type === "node");
       const [handler] = Object.values(node.events).concat(["hX"]);
       await dispatch(result.render, handler);
+      result.render.release();
+      await new Promise((resolve) => setTimeout(resolve, 0)); // the release is queued behind the calls
     }
   };
   for (let index = 0; index < 20; index++) await once(index);

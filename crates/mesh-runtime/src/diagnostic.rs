@@ -264,6 +264,25 @@ impl RuntimeDiagnostic {
 /// The runtime diagnostics document (`runtime-diagnostics-v1`) for
 /// `diagnostics`, in the order given. `model` is the manifest's text,
 /// which `model` locations are positions in.
+/// What to do about the diagnostic with `code`, for the codes a host meets
+/// most and for which one action reliably applies. It is the same for every
+/// diagnostic of the code, so it is never a guess about the particular case.
+pub fn hint(code: &str) -> Option<&'static str> {
+    Some(match code {
+        "runtime-missing-value" => "Give the value in the snapshot, or make its type optional in the manifest.",
+        "runtime-value-mismatch" => "Change the value to fit its manifest type at this path, or change the type in the manifest.",
+        "runtime-unknown-field" => "Remove the field from the snapshot, or declare it in the manifest's type.",
+        "runtime-handler-other-program" => "Dispatch with a handler identifier from the render of this program, and with that render.",
+        "runtime-unknown-handler" => "Dispatch with a handler identifier from the render's tree, and with the render whose tree was drawn.",
+        "runtime-invalid-key" => "Make the `key` expression give a string or a finite number for every item.",
+        "runtime-duplicate-key" => "Make each item's `key` unique among the items of the repeat.",
+        "runtime-changes-base-mismatch" => "Compute the changes against the render you are updating (its current `version`), and apply them once, in order.",
+        "runtime-invalid-change" => "Fix the edit at the location shown: a path starts at a scope name, then record field names and list indices, and each edit needs the parts its `op` takes.",
+        "runtime-changes-disagree" => "Recompute the changes from the two snapshots (`diff`), and check the path shown.",
+        _ => return None,
+    })
+}
+
 pub fn to_json(diagnostics: &[RuntimeDiagnostic], model: &str) -> String {
     let map = SourceMap::new(model);
     let position = |byte: usize| {
@@ -307,12 +326,16 @@ pub fn to_json(diagnostics: &[RuntimeDiagnostic], model: &str) -> String {
                 }),
                 Location::Handler => json!({ "kind": "handler" }),
             };
-            json!({
+            let mut document = json!({
                 "severity": "error",
                 "code": diagnostic.code,
                 "message": diagnostic.message,
                 "location": location,
-            })
+            });
+            if let Some(hint) = hint(diagnostic.code) {
+                document["hint"] = json!(hint);
+            }
+            document
         })
         .collect();
     json!({ "version": 1, "diagnostics": diagnostics }).to_string()

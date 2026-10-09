@@ -87,14 +87,16 @@ export interface RenderInput {
   readonly model: string;
   /** The root's scope values, by scope name: a plain object. */
   readonly snapshot: Record<string, unknown>;
-  /**
-   * Keep the render in the module, as `update` does for the render it makes, so
-   * that {@link updateChanges} can apply changes to it. The render then has a
-   * `version`, which those changes name, and the host releases it
-   * (`render.release()`) when it is done with it.
-   */
-  readonly keep?: boolean;
 }
+
+declare const versionBrand: unique symbol;
+
+/**
+ * A render's version: the number {@link Changes} name to say which render they
+ * were computed against. It is only ever read from `render.version`; a number
+ * from anywhere else is not one, and the type says so.
+ */
+export type RenderVersion = number & { readonly [versionBrand]: true };
 
 /** One step of a change's path: a record field's name or a list index. */
 export type PathStep = string | number;
@@ -108,7 +110,7 @@ export type Change =
 /** The edits to a render's snapshot, and the render they were computed against. */
 export interface Changes {
   /** The `version` of the render these changes are for. Changes for any other render are refused. */
-  readonly base: number;
+  readonly base: RenderVersion;
   /** The edits, applied in order: an edit sees the effect of those before it. */
   readonly changes: readonly Change[];
 }
@@ -144,7 +146,7 @@ export type DispatchResult =
 interface Kept {
   readonly handle: number;
   readonly generation: number;
-  readonly version: number;
+  readonly version: RenderVersion;
 }
 
 /** Only the engine makes renders. */
@@ -195,11 +197,11 @@ export class Render {
 
   /**
    * The number changes name to say which render they were computed against,
-   * while the module holds this render (it was made by `update` or
-   * `updateChanges`, or by `render` with `keep`, and not released); otherwise
+   * while the module holds this render (every render is held from the moment
+   * it is made, until `release()` or the module is replaced); otherwise
    * `undefined`.
    */
-  get version(): number | undefined {
+  get version(): RenderVersion | undefined {
     return this.#kept?.version;
   }
 
@@ -567,10 +569,9 @@ export function render(input: RenderInput): Promise<RenderResult> {
     const templates = encodeTexts(input.program.templates);
     const model = input.model;
     const snapshot = encodeValue(input.snapshot);
-    const keep = input.keep === true;
     return runNow(
       [encoder.encode(root), templates, encoder.encode(model), snapshot],
-      (exports, pointers) => (keep ? exports.mesh_render_kept(...pointers) : exports.mesh_render(...pointers)),
+      (exports, pointers) => exports.mesh_render_kept(...pointers),
       (result): RenderResult => {
         if (isDiagnostics(result.diagnostics)) {
           return Object.freeze({ diagnostics: result.diagnostics });
@@ -579,7 +580,7 @@ export function render(input: RenderInput): Promise<RenderResult> {
           throw new MeshInternalError("the runtime's result is neither a tree nor diagnostics");
         }
         const tree = result.tree as RenderTree;
-        const kept = keep ? keptFrom(result) : undefined;
+        const kept = keptFrom(result);
         return Object.freeze({ render: new Render(MAKING, tree, root, templates, model, snapshot, kept) });
       },
     );
@@ -606,7 +607,7 @@ function keptFrom(result: Record<string, unknown>): Kept {
   if (typeof result.handle !== "number" || typeof result.version !== "number" || generation === undefined) {
     throw new MeshInternalError("the runtime's result names no render");
   }
-  return { handle: result.handle, version: result.version, generation };
+  return { handle: result.handle, version: result.version as RenderVersion, generation };
 }
 
 /** Updates. See the package's `update`. */
@@ -655,7 +656,7 @@ export function updateChanges(
     // Changes are only ever applied to the render they name, which only the module that holds it can say.
     if (!liveIn(kept)) {
       throw new MeshUsageError(
-        "updateChanges() needs this render to be in the module: make it with update(), or render() with keep, and don't release it first",
+        "updateChanges() needs this render to be in the module: it has been released, or the module was replaced: render again from a whole snapshot",
         "render-gone",
       );
     }

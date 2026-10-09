@@ -14,7 +14,7 @@ import { generator, LIST_MODEL, listProgram, mutate } from "./common/list-progra
 const START = { title: "t", count: 0, flag: true, items: [{ id: 0, label: "a", done: false }, { id: 1, label: "b", done: true }] };
 const program = listProgram;
 const model = LIST_MODEL;
-const first = (snapshot) => render({ program, model, snapshot, keep: true });
+const first = (snapshot) => render({ program, model, snapshot });
 const rowHandler = (tree) => tree.root.children.find((c) => c.type === "node" && c.component === "row").events.tap;
 
 // --- diff --------------------------------------------------------------------
@@ -98,11 +98,9 @@ test("diff: what isn't plain data is given whole, for the runtime to judge", () 
 
 // --- updateChanges -----------------------------------------------------------
 
-test("a render kept has a version, and one not kept has none", async () => {
+test("every render has a version while the module holds it, and each is different", async () => {
   const kept = await first(START);
   assert.equal(typeof kept.render.version, "number");
-  const plain = await render({ program, model, snapshot: START });
-  assert.equal(plain.render.version, undefined);
   const other = await first(START);
   assert.notEqual(other.render.version, kept.render.version);
   kept.render.release();
@@ -210,8 +208,6 @@ test("verify mode catches changes that make a snapshot other than the one the ho
 });
 
 test("a render not in the module can't take changes, and says why", async () => {
-  const plain = await render({ program, model, snapshot: START });
-  await assert.rejects(updateChanges(plain.render, { base: 1, changes: [] }), TypeError);
   const { render: kept } = await first(START);
   kept.release();
   await assert.rejects(updateChanges(kept, { base: 1, changes: [] }), /needs this render to be in the module/);
@@ -251,7 +247,7 @@ test("when the module is replaced, a render with a snapshot of its own survives 
   const { render: kept } = await first(START);
   const made = await updateChanges(kept, { base: kept.version, changes: [{ op: "set", path: ["count"], value: 2 }] });
   const failed = instanceForTests();
-  failed.mesh_render = () => failed.mesh_test_panic();
+  failed.mesh_render_kept = () => failed.mesh_test_panic();
   await assert.rejects(render({ program, model, snapshot: START }));
   assert.notEqual(instanceForTests(), failed);
   await assert.rejects(updateChanges(kept, { base: kept.version, changes: [] }), TypeError);

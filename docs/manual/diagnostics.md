@@ -2,6 +2,8 @@
 
 This page lists every diagnostic MESH can produce: its code, what triggers it, how serious it is, and how to fix it. For the output formats, see the CLI manual: [human](./mesh-cli.md#diagnostic-format) and [JSON](./mesh-cli.md#json-output).
 
+Runtime diagnostics (the `assembly-*` and `runtime-*` codes) may also carry a **`hint`**, the corrective action, for the codes where one reliably applies; see [the runtime manual](./runtime.md#the-codes).
+
 Every diagnostic has a **code**, shown in brackets after its severity, `error[unterminated-tag]`, and as the `code` property in JSON output. Codes are machine-readable API, so programs should match on them, never on messages. They are stable:
 
 - A code is never renamed.

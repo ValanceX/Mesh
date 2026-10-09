@@ -12,12 +12,12 @@ How to read it: each finding has a principle, the evidence, a disposition, and w
 | M2 | 7 | A `Render` holds a resource (its copy in the module) but offered only `release()`. | **Done.** `[Symbol.dispose]()` where the platform has it, tested. The repo's Node 22 can't parse `using`, so the test calls the method. |
 | M3 | 8 | Serialization of calls and the absence of cancellation were stated in the manual but not in the package's contract. | **Done** (README, manual): calls run one at a time in order, no cancellation, nothing continues after a promise settles except queued release. |
 | M4 | 12, 15.4 | No page said which surfaces are stable, unreleased, provisional or internal. | **Done.** [API stability](../../manual/stability.md), linked from the docs index and the changelog. |
-| M5 | 4.5 | `Changes.base` and `Render.version` are plain `number`; a version can be confused with any number. | **Owner.** A branded `RenderVersion` type would catch it at compile time but forces a cast for literals in tests and hand-built changes. Unreleased, so cheap to change now. |
-| M6 | 2, 2.2 | `update` and `updateChanges` are two verbs for one operation; `render({ keep })` is a boolean-ish option that decides whether `updateChanges` is possible later. | **Owner.** Option A: keep as is. Option B: every render is kept (no `keep`), so `updateChanges` works on any render and `release()`/GC is the only lifecycle; costs module memory for renders never updated. Option C: one `update(render, snapshot \| changes)` (an overload by input shape, which 15.2 warns about). Recommendation: B, then keep two verbs. |
+| M5 | 4.5 | `Changes.base` and `Render.version` were plain `number`; a version could be confused with any number. | **Done.** `RenderVersion`, a branded number type, exported; `render.version` returns it and `Changes.base` takes it. Type-level only: a host that builds changes from JSON casts once, at the boundary it owns. |
+| M6 | 2, 2.2 | `update` and `updateChanges` are two verbs for one operation; `render({ keep })` decided whether `updateChanges` was possible later. | **Done (the recommended option).** `keep` is gone: every render is kept in the module until `release()` or GC, so `updateChanges` works on any render and the lifecycle is one thing. The two verbs stay: they take different inputs, and an overload by input shape is what 15.2 warns about. `dispatch` is unchanged. Cost: a render never released holds module memory until collected, which the docs say plainly. |
 | M7 | 4.4, 9.2 | `render.version` is `undefined` once released; use-after-release throws (`render-gone`) where most failures return diagnostics. | **Owner.** The throw is a programmer error and now has a code; the alternative is a `runtime-render-released` diagnostic. Kept as thrown because a diagnostic document is for problems with the program or snapshot. |
 | M8 | 3.3 | `Render` names an entity after a process. | **Not changed.** Released in 0.9.0; a rename is a migration, not a fix. Noted for a major version. |
 | M9 | 14, 12 | `diff` is exported from the runtime package though the runtime never uses it. | **Kept.** It is the host-side producer of `changes`; separating it into a package would add a dependency for the one consumer that needs it. Its tier and the review test that confines it are documented. |
-| M10 | 9.1 | Runtime diagnostics have `code`, `message`, `location` but no hint or corrective action. | **Owner.** Adding `hint` is additive to `runtime-diagnostics-v1` but touches every code. Worth doing for the codes users meet most; not done wholesale. |
+| M10 | 9.1 | Runtime diagnostics had `code`, `message`, `location` but no corrective action. | **Done for the ten codes where one action reliably applies** (a per-code `hint`, optional in the schema); not added where the right action depends on the case. |
 | M11 | 3.1, 17 | Rust and JavaScript names follow each language's convention (`update_changes` / `updateChanges`); `host_snapshot` has no JavaScript counterpart. | **Fine.** No change. |
 | M12 | 15.4 | The module's `mesh_*` exports are internal but listed beside the public ones in package source. | **Done** by the stability page (internal tier). The package already checks for them and documents them as internal. |
 | M13 | 13.2 | README and manual examples are not compiled or run. | **Owner.** Worth a test that extracts and runs the package README's snippets; not built. |
@@ -73,9 +73,9 @@ Both are released packages whose changes mostly alter behavior, packaging or typ
 
 Mesh: error codes and `MeshUsageError` in both JavaScript packages, `Symbol.dispose` on `Render`, the concurrency and error contract in the READMEs, manual and guide, and the stability page. Port: `unmount` contract and `Symbol.dispose`. Tests: Mesh runtime 95 passing (4 new), compiler 46, Port 312 (1 new). No released behavior changed.
 
-## Decisions for the owner
+## Decisions taken ("go for recommended")
 
-1. M6: keep `keep`, or keep every render (recommended), or merge the verbs.
-2. M5: brand the version type.
-3. Whether to take Nexus and Valance fixes in this review (a list by priority: N3, V1, V3, N4, N1 first), or in their own passes.
-4. M10: add `hint` to the most common runtime diagnostics.
+1. M6: every render is kept; `keep` removed; two verbs stay. Done.
+2. M5: `RenderVersion` brand. Done.
+3. Nexus and Valance: the recommended order was N3, V1, V3, N4, N1 first. See the section below for what was done and what was not.
+4. M10: hints on the common codes. Done.

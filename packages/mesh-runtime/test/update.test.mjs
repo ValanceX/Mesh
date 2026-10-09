@@ -137,14 +137,15 @@ test("a chain of updates matches full renders, and each render's module copy is 
 
   const states = [snapshot("a", "x", false), snapshot("b", "x", false), snapshot("b", "y", false), snapshot("c", "y", true)];
   let { render: current } = await render({ program, model: MODEL, snapshot: states[0] });
-  assert.equal(retained(), 0, "render() keeps nothing in the module");
+  assert.equal(retained(), 1, "render() keeps its result in the module");
   for (const [index, next] of states.slice(1).entries()) {
     const updated = await update(current, next);
-    // The new render is kept, and so is the previous one if an update made it, until released.
-    assert.equal(retained(), index === 0 ? 1 : 2);
+    // The new render is kept, and so is the previous one, until released.
+    assert.equal(retained(), 2);
     const { render: full } = await render({ program, model: MODEL, snapshot: next });
     assert.deepEqual(updated.render.tree, full.tree);
     assert.deepEqual(apply(current.tree, updated.patches), full.tree);
+    full.release();
     current.release();
     current.release(); // twice is safe
     current = updated.render;
@@ -178,7 +179,7 @@ test("a render from a module since replaced updates by deriving itself again", a
   const one = await update(first, snapshot("b", "x", false));
   // Make the next call fail, so the wrapper discards this instance (and its handles).
   const failed = instanceForTests();
-  failed.mesh_render = () => failed.mesh_test_panic();
+  failed.mesh_render_kept = () => failed.mesh_test_panic();
   await assert.rejects(render({ program, model: MODEL, snapshot: snapshot("a", "x", false) }));
   assert.notEqual(instanceForTests(), failed);
   const two = await update(one.render, snapshot("c", "x", false));
