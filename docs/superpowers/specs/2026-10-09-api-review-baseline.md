@@ -1,5 +1,7 @@
 # Baseline for the ecosystem API design review
 
+> A record of the freeze as it was. Since then `render({ keep })` was removed (every render is kept; see [the review](./2026-10-09-api-design-review.md), M6, and its second pass for a problem with that), and the review's other changes are listed there.
+
 Status: **frozen for review** (2026-10-09). No feature work continues on the `ccr-969a5158-vobqhh` branches until the review's principles are applied or set aside. This file records what was decided, what is built, and what the review covers, so the review starts from a fixed point.
 
 ## Decision

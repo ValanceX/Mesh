@@ -1,6 +1,6 @@
 # API Design Principles
 
-Version: 1.0. Scope: public APIs for libraries, frameworks, SDKs, services and platforms. Adopted for the ValanceX ecosystem (Mesh, Port, Nexus, Valance) on 2026-10-09; this is the standard as given, unedited, and the reviews that apply it are in [the review](../superpowers/specs/2026-10-09-api-design-review.md).
+Version: 1.0 (status: proposed standard). Scope: public APIs for libraries, frameworks, SDKs, services and platforms. Adopted for the ValanceX ecosystem (Mesh, Port, Nexus, Valance) on 2026-10-09; this is the standard as given, unedited, and the reviews that apply it are in [the review](../superpowers/specs/2026-10-09-api-design-review.md).
 
 ## 1. Purpose and design philosophy
 
