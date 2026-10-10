@@ -61,7 +61,7 @@
     "clicker": {
       "props": {},
       "events": { "tap": {} },
-      "commands": {}, "scope": {}
+      "commands": { "tap": { "parameters": [] } }, "scope": {}
     }
   }
 }

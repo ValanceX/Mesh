@@ -25,6 +25,8 @@ import { version } from "./version.js";
  */
 export class MeshInternalError extends Error {
   override name = "MeshInternalError";
+  /** The stable code of this failure. Match on this, not on `message`. */
+  readonly code = "internal-error";
 }
 
 /**
@@ -33,6 +35,31 @@ export class MeshInternalError extends Error {
  */
 export class MeshVersionError extends Error {
   override name = "MeshVersionError";
+  /** The stable code of this failure. Match on this, not on `message`. */
+  readonly code = "version-mismatch";
+}
+
+/** Why a call was refused before it reached the module. */
+export type MeshUsageCode =
+  /** An argument is not of the type the call takes (`message` says which). */
+  | "invalid-argument"
+  /** The WebAssembly module could not be loaded from the source `init` was given (or from the package's own file). */
+  | "module-unavailable";
+
+/**
+ * A call that is wrong in a way types should have prevented: an argument of
+ * the wrong type. It is a `TypeError`, so code that catches
+ * `TypeError` still works, and it has a stable `code`. It is never how a
+ * problem with a program or snapshot is reported; those are diagnostics.
+ */
+export class MeshUsageError extends TypeError {
+  override name = "MeshUsageError";
+  /** The stable code of this failure. Match on this, not on `message`. */
+  readonly code: MeshUsageCode;
+  constructor(message: string, code: MeshUsageCode = "invalid-argument", options?: { readonly cause?: unknown }) {
+    super(message, options);
+    this.code = code;
+  }
 }
 
 /** What {@link init} accepts: where the module is, its bytes, or the module. */
@@ -102,6 +129,7 @@ interface Exports {
   mesh_check(...args: number[]): number;
   mesh_compile(...args: number[]): number;
   mesh_check_program(...args: number[]): number;
+  mesh_infer(...args: number[]): number;
   mesh_result_ptr(): number;
   mesh_result_len(): number;
   mesh_result_clear(): void;
@@ -113,6 +141,7 @@ const CHECK_EXPORTS = [
   "mesh_check",
   "mesh_compile",
   "mesh_check_program",
+  "mesh_infer",
   "mesh_result_ptr",
   "mesh_result_len",
   "mesh_result_clear",
@@ -135,11 +164,20 @@ function isNode(): boolean {
 async function bytesOf(location: URL): Promise<BufferSource> {
   if (location.protocol === "file:" && isNode()) {
     const { readFile } = await import("node:fs/promises");
-    return readFile(location);
+    try {
+      return await readFile(location);
+    } catch (cause) {
+      throw new MeshUsageError(`could not read the MESH module at ${location.href}`, "module-unavailable", { cause });
+    }
   }
-  const response = await fetch(location);
+  let response: Response;
+  try {
+    response = await fetch(location);
+  } catch (cause) {
+    throw new MeshUsageError(`could not fetch the MESH module from ${location.href}`, "module-unavailable", { cause });
+  }
   if (!response.ok) {
-    throw new Error(`could not fetch the MESH module from ${location.href}: ${response.status}`);
+    throw new MeshUsageError(`could not fetch the MESH module from ${location.href}: ${response.status}`, "module-unavailable");
   }
   return response.arrayBuffer();
 }
@@ -150,9 +188,21 @@ async function compileModule(source: ModuleSource): Promise<WebAssembly.Module> 
   }
   if (typeof source === "string" || source instanceof URL) {
     const base = typeof location === "undefined" ? undefined : location.href;
-    return WebAssembly.compile(await bytesOf(new URL(source, base)));
+    return compiled_(await bytesOf(new URL(source, base)));
   }
-  return WebAssembly.compile(source);
+  if (!(source instanceof ArrayBuffer || ArrayBuffer.isView(source))) {
+    throw new MeshUsageError("init() takes a URL, a string, the module's bytes, or a WebAssembly.Module");
+  }
+  return compiled_(source);
+}
+
+/** Compiles `bytes`; bytes that aren't a WebAssembly module are not a MESH module either. */
+async function compiled_(bytes: BufferSource): Promise<WebAssembly.Module> {
+  try {
+    return await WebAssembly.compile(bytes);
+  } catch (cause) {
+    throw new MeshVersionError("these bytes aren't a WebAssembly module, so not a MESH module", { cause });
+  }
 }
 
 /** Instantiates `module` and checks it's a MESH module of this version (I10). */
@@ -218,8 +268,9 @@ async function current(): Promise<Exports> {
   }
   if (!compiled) {
     if (!isNode()) {
-      throw new Error(
+      throw new MeshUsageError(
         "@valancex/mesh-compiler: call init() with the URL of mesh.wasm before the first check",
+        "module-unavailable",
       );
     }
     const module = await compileModule(new URL("./mesh.wasm", import.meta.url));
@@ -341,19 +392,19 @@ function compileResult(value: unknown): CompileResult {
 function validate(input: CheckInput, compiling: boolean): void {
   const what = compiling ? "compile() takes an object: { source, path, model }" : "check() takes an object: { source, path, model? }";
   if (typeof input !== "object" || input === null) {
-    throw new TypeError(what);
+    throw new MeshUsageError(what);
   }
   const strings: [string, unknown][] = [
     ["source", input.source],
     ["path", input.path],
   ];
   if (compiling && input.model === undefined) {
-    throw new TypeError("compile() needs a model: { manifest, path, component }");
+    throw new MeshUsageError("compile() needs a model: { manifest, path, component }");
   }
   if (input.model !== undefined) {
     const model = input.model;
     if (typeof model !== "object" || model === null) {
-      throw new TypeError("model must be an object: { manifest, path, component }");
+      throw new MeshUsageError("model must be an object: { manifest, path, component }");
     }
     strings.push(
       ["model.manifest", model.manifest],
@@ -363,23 +414,23 @@ function validate(input: CheckInput, compiling: boolean): void {
   }
   for (const [name, value] of strings) {
     if (typeof value !== "string") {
-      throw new TypeError(`${name} must be a string`);
+      throw new MeshUsageError(`${name} must be a string`);
     }
   }
 }
 
 function validateProgram(input: ProgramInput): void {
   if (typeof input !== "object" || input === null) {
-    throw new TypeError("checkProgram() takes an object: { model, root, templates }");
+    throw new MeshUsageError("checkProgram() takes an object: { model, root, templates }");
   }
   if (typeof input.model !== "string") {
-    throw new TypeError("model must be a string");
+    throw new MeshUsageError("model must be a string");
   }
   if (typeof input.root !== "string") {
-    throw new TypeError("root must be a string");
+    throw new MeshUsageError("root must be a string");
   }
   if (!Array.isArray(input.templates) || !input.templates.every((t) => typeof t === "string")) {
-    throw new TypeError("templates must be an array of strings");
+    throw new MeshUsageError("templates must be an array of strings");
   }
 }
 
@@ -444,6 +495,32 @@ export function checkProgram(input: ProgramInput): Promise<RuntimeDiagnosticsDoc
       programResult,
     );
   });
+}
+
+/**
+ * The manifest with the contracts of the composites it leaves undeclared added, from the templates' own occurrences and handlers; `undefined` when
+ * there is nothing to add. Internal to `compileProgram`.
+ */
+export function inferComponents(
+  manifest: string,
+  root: string,
+  sources: ReadonlyArray<{ component: string; source: string }>,
+): Promise<string | undefined> {
+  return enqueue(async () =>
+    runNow(
+      [encoder.encode(manifest), encoder.encode(root), textList(sources.flatMap((entry) => [entry.component, entry.source]))],
+      (exports, pointers) => exports.mesh_infer(...pointers),
+      (value) => {
+        const found = (value as { manifest?: unknown } | null)?.manifest;
+
+        if (found !== null && typeof found !== "string") {
+          throw new MeshInternalError("the compiler's result isn't an inferred manifest");
+        }
+
+        return found ?? undefined;
+      },
+    ),
+  );
 }
 
 /**

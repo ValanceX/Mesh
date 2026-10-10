@@ -60,6 +60,7 @@ impl RuntimeCode {
     pub const COMPOSITE_EVENT: RuntimeCode = RuntimeCode("assembly-composite-event", Form::Source);
     pub const COMPOSITE_CHILDREN: RuntimeCode =
         RuntimeCode("assembly-composite-children", Form::Source);
+    pub const ROOT_FRAGMENT: RuntimeCode = RuntimeCode("assembly-root-fragment", Form::Source);
     // Input validation.
     pub const MISSING_VALUE: RuntimeCode = RuntimeCode("runtime-missing-value", Form::Input);
     pub const VALUE_MISMATCH: RuntimeCode = RuntimeCode("runtime-value-mismatch", Form::Input);
@@ -77,6 +78,11 @@ impl RuntimeCode {
     pub const HANDLER_OTHER_PROGRAM: RuntimeCode =
         RuntimeCode("runtime-handler-other-program", Form::Handler);
     pub const UNKNOWN_HANDLER: RuntimeCode = RuntimeCode("runtime-unknown-handler", Form::Handler);
+    // Changes to a render's snapshot (`update_changes`).
+    pub const CHANGES_BASE_MISMATCH: RuntimeCode =
+        RuntimeCode("runtime-changes-base-mismatch", Form::Input);
+    pub const INVALID_CHANGE: RuntimeCode = RuntimeCode("runtime-invalid-change", Form::Input);
+    pub const CHANGES_DISAGREE: RuntimeCode = RuntimeCode("runtime-changes-disagree", Form::Input);
     // Evaluation.
     pub const OPERAND_MISMATCH: RuntimeCode = RuntimeCode("runtime-operand-mismatch", Form::Source);
     pub const NOT_A_RECORD: RuntimeCode = RuntimeCode("runtime-not-a-record", Form::Source);
@@ -107,6 +113,7 @@ impl RuntimeCode {
         RuntimeCode::CYCLE,
         RuntimeCode::COMPOSITE_EVENT,
         RuntimeCode::COMPOSITE_CHILDREN,
+        RuntimeCode::ROOT_FRAGMENT,
         RuntimeCode::MISSING_VALUE,
         RuntimeCode::VALUE_MISMATCH,
         RuntimeCode::UNKNOWN_FIELD,
@@ -118,6 +125,9 @@ impl RuntimeCode {
         RuntimeCode::UNEXPECTED_PAYLOAD,
         RuntimeCode::HANDLER_OTHER_PROGRAM,
         RuntimeCode::UNKNOWN_HANDLER,
+        RuntimeCode::CHANGES_BASE_MISMATCH,
+        RuntimeCode::INVALID_CHANGE,
+        RuntimeCode::CHANGES_DISAGREE,
         RuntimeCode::OPERAND_MISMATCH,
         RuntimeCode::NOT_A_RECORD,
         RuntimeCode::MISSING_MEMBER,
@@ -256,6 +266,25 @@ impl RuntimeDiagnostic {
 /// The runtime diagnostics document (`runtime-diagnostics-v1`) for
 /// `diagnostics`, in the order given. `model` is the manifest's text,
 /// which `model` locations are positions in.
+/// What to do about the diagnostic with `code`, for the codes a host meets
+/// most and for which one action reliably applies. It is the same for every
+/// diagnostic of the code, so it is never a guess about the particular case.
+pub fn hint(code: &str) -> Option<&'static str> {
+    Some(match code {
+        "runtime-missing-value" => "Give the value in the snapshot, or make its type optional in the manifest.",
+        "runtime-value-mismatch" => "Change the value to fit its manifest type at this path, or change the type in the manifest.",
+        "runtime-unknown-field" => "Remove the field from the snapshot, or declare it in the manifest's type.",
+        "runtime-handler-other-program" => "Dispatch with a handler identifier from the render of this program, and with that render.",
+        "runtime-unknown-handler" => "Dispatch with a handler identifier from the render's tree, and with the render whose tree was drawn.",
+        "runtime-invalid-key" => "Make the `key` expression give a string or a finite number for every item.",
+        "runtime-duplicate-key" => "Make each item's `key` unique among the items of the repeat.",
+        "runtime-changes-base-mismatch" => "Compute the changes against the render you are updating (its current `version`), and apply them once, in order.",
+        "runtime-invalid-change" => "Fix the edit at the location shown: a path starts at a scope name, then record field names and list indices, and each edit needs the parts its `op` takes.",
+        "runtime-changes-disagree" => "Recompute the changes from the two snapshots (`diff`), and check the path shown.",
+        _ => return None,
+    })
+}
+
 pub fn to_json(diagnostics: &[RuntimeDiagnostic], model: &str) -> String {
     let map = SourceMap::new(model);
     let position = |byte: usize| {
@@ -299,12 +328,16 @@ pub fn to_json(diagnostics: &[RuntimeDiagnostic], model: &str) -> String {
                 }),
                 Location::Handler => json!({ "kind": "handler" }),
             };
-            json!({
+            let mut document = json!({
                 "severity": "error",
                 "code": diagnostic.code,
                 "message": diagnostic.message,
                 "location": location,
-            })
+            });
+            if let Some(hint) = hint(diagnostic.code) {
+                document["hint"] = json!(hint);
+            }
+            document
         })
         .collect();
     json!({ "version": 1, "diagnostics": diagnostics }).to_string()

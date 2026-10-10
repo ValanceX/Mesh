@@ -150,13 +150,29 @@ fn rule_5_no_cycles_direct_or_indirect() {
 }
 
 #[test]
-fn rule_6_no_composite_events() {
-    // `probe` declares events: with a template, it's a composite.
-    let probe = compile("probe", "<text>probe</text>");
-    let diagnostics = try_render(
-        "view",
-        &[page("<page><probe /><probe /></page>"), probe],
-        SNAPSHOT,
+fn rule_6_a_composites_events_and_commands_have_different_names() {
+    // A composite may declare events (it forwards them from its template, see
+    // events.rs), but a name that is both an event and a command of one
+    // composite would make a handler of that name in its template ambiguous.
+    const MODEL: &str = r#"{
+      "version": 1, "types": {},
+      "components": {
+        "page": { "props": {}, "events": {}, "commands": {}, "scope": {} },
+        "text": { "props": {}, "events": {}, "commands": {}, "scope": {} },
+        "dup":  { "props": {}, "events": { "go": {} }, "commands": { "go": { "parameters": [] } }, "scope": {} },
+        "view": { "props": {}, "events": {}, "commands": {}, "scope": {} }
+      }
+    }"#;
+    let view = compile_with(MODEL, "view", "<page><dup /><dup /></page>");
+    let dup = compile_with(MODEL, "dup", "<text>x</text>");
+    let texts = [view.as_str(), dup.as_str()];
+    let diagnostics = mesh_runtime::render(
+        &mesh_runtime::Program {
+            root: "view",
+            templates: &texts,
+        },
+        MODEL,
+        &common::snapshot("{}"),
     )
     .unwrap_err();
     assert_eq!(

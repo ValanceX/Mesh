@@ -12,7 +12,7 @@
  */
 
 import type { DiagnosticsDocument } from "./document.js";
-import { checkProgram, compile } from "./engine.js";
+import { checkProgram, compile, inferComponents, MeshUsageError } from "./engine.js";
 import type { ProgramInput } from "./engine.js";
 import type { RuntimeDiagnosticsDocument } from "./runtime-document.js";
 
@@ -28,7 +28,10 @@ export interface ProgramComponent {
 
 /** One program compile's inputs. */
 export interface CompileProgramInput {
-  /** The model: the manifest every template is compiled against, which is also the program's own. */
+  /**
+   * The model: the manifest every template is compiled against. A component listed in `components` that the manifest does not declare is
+   * inferred (props from the arguments its occurrences pass, events from the handlers its template forwards); one it declares is used as written.
+   */
   model: {
     /** The manifest's text. */
     manifest: string;
@@ -54,7 +57,7 @@ export interface CompileProgramResult {
    */
   assembly?: RuntimeDiagnosticsDocument;
   /**
-   * The program, as `checkProgram` and the runtime take it: the model's text, the root, and the templates as text, in the order of the input's
+   * The program, as `checkProgram` and the runtime take it: the model's text (the manifest with the inferred contracts added), the root, and the templates as text, in the order of the input's
    * `components`. Present exactly when no component had an error and the program check found none.
    */
   program?: ProgramInput;
@@ -62,11 +65,11 @@ export interface CompileProgramResult {
 
 function validate(input: CompileProgramInput): void {
   if (typeof input !== "object" || input === null) {
-    throw new TypeError("compileProgram() takes an object: { model, root, components }");
+    throw new MeshUsageError("compileProgram() takes an object: { model, root, components }");
   }
   const model = input.model;
   if (typeof model !== "object" || model === null) {
-    throw new TypeError("model must be an object: { manifest, path }");
+    throw new MeshUsageError("model must be an object: { manifest, path }");
   }
   const strings: [string, unknown][] = [
     ["model.manifest", model.manifest],
@@ -74,11 +77,11 @@ function validate(input: CompileProgramInput): void {
     ["root", input.root],
   ];
   if (!Array.isArray(input.components)) {
-    throw new TypeError("components must be an array of { component, source, path }");
+    throw new MeshUsageError("components must be an array of { component, source, path }");
   }
   input.components.forEach((entry: unknown, index) => {
     if (typeof entry !== "object" || entry === null) {
-      throw new TypeError(`components[${index}] must be an object: { component, source, path }`);
+      throw new MeshUsageError(`components[${index}] must be an object: { component, source, path }`);
     }
     const written = entry as Record<string, unknown>;
     strings.push(
@@ -89,7 +92,7 @@ function validate(input: CompileProgramInput): void {
   });
   for (const [name, value] of strings) {
     if (typeof value !== "string") {
-      throw new TypeError(`${name} must be a string`);
+      throw new MeshUsageError(`${name} must be a string`);
     }
   }
 }
@@ -97,7 +100,9 @@ function validate(input: CompileProgramInput): void {
 /** Compiles a program. See the package's `compileProgram`. */
 export async function compileProgram(input: CompileProgramInput): Promise<CompileProgramResult> {
   validate(input);
-  const { manifest, path } = input.model;
+  const { path } = input.model;
+  // A component the manifest does not declare gets its contract from the templates themselves (props from its occurrences, events from its handlers).
+  const manifest = (await inferComponents(input.model.manifest, input.root, input.components)) ?? input.model.manifest;
   const compiled = [];
   // Every component is compiled, so that one run reports every component's errors, not the first's.
   for (const entry of input.components) {

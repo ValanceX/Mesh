@@ -1,0 +1,6 @@
+error[invalid-switch]: `mesh-switch` needs at least one `mesh-case`
+ --> fixtures/check/fail/invalid-switch.mprx:1:18
+  |
+1 | <page title="x"><mesh-switch><mesh-default><text>none</text></mesh-default></mesh-switch></page>
+  |                  ^^^^^^^^^^^
+

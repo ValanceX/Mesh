@@ -425,7 +425,129 @@ Only the root template's scope comes from the snapshot. The root component's own
 
 **Nesting.** A composite's template may contain composite occurrences, to any depth, as long as the program has no cycle.
 
-**Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. v0.5 has no composite events: a composite can't raise events of its own.
+**Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can raise events of its own: see [Composite events](#composite-events).
+
+### Fragments
+
+MESH makes a node only where a template wrote an element. `mesh-fragment` is how a template writes **content without one**: text, or several nodes, where otherwise exactly one element is required. Nothing wraps content in a node on the author's behalf.
+
+```xml
+<!-- the template of `shout` -->
+<mesh-fragment>{who}!</mesh-fragment>
+
+<!-- used in a paragraph -->
+<para>hello <shout who={name} /> bye</para>   <!-- one text run: "hello Ada! bye" -->
+```
+
+- **Where it is placed.** A fragment is declared in the model like `mesh-slot`, with no props, and has no events. It may be a composite template's root, a `mesh-if` alternative, a `mesh-case` or `mesh-default` body, a `mesh-each` item, or simply a child among others, where its content is placed in the node around it.
+- **Never a node.** The render tree has its content, as children of the nearest node above. Text it places that is next to other text is one run (a render tree's runs are maximal).
+- **Not the program's root.** The root renders one node: a root template that starts with a fragment, or with a composite that does, is `assembly-root-fragment`.
+- **Identity.** A fragment adds a step (`0x07`, [runtime](runtime.md)) so its content's keys are its own; a repeat inside a fragment that is a repeat's item is made again on each update (it is not remembered per item).
+- **Switch and fragments.** A `mesh-switch` stands for several siblings, so it may be a fragment's child but not a template's root; a case whose body is text is `<mesh-case when={…}><mesh-fragment>text</mesh-fragment></mesh-case>`.
+
+### Named slots
+
+A template may have several slots, each with a `name`; the one without is the default slot. An occurrence says which content goes to which with `mesh-fill`.
+
+```xml
+<!-- the template of `card` -->
+<panel heading={heading}>
+  <mesh-slot name="header" />
+  <mesh-slot />
+  <mesh-slot name="footer" />
+</panel>
+
+<!-- an occurrence of it -->
+<card heading={title}>
+  <mesh-fill slot="footer"><note>{who}</note></mesh-fill>
+  <note>the body</note>
+  <mesh-fill slot="header"><note>{title}</note></mesh-fill>
+</card>
+```
+
+- **`mesh-fill`** is declared in the model like `mesh-slot`, with one required string prop, `slot`. It is never a node, and is only ever a direct child of a composite occurrence. Its children are the caller's, as the default slot's are, and may be anything an occurrence's children may be. The order the fills and the loose children are written in is not the order they are placed in: the template's slots decide.
+- **`mesh-slot`** takes an optional `name`, a non-empty string literal. A template has at most one slot of each name (and one without), and the slots may be anywhere an unnamed slot may.
+- **Loose children** (everything that is not a fill) go to the default slot, and need one: a composite with only named slots takes no loose children.
+- **Errors.** A fill for a slot the composite's template does not have, two fills for one slot, a fill outside a composite occurrence, and loose children without a default slot are `assembly-composite-children`. Two slots of one name, a `name` that is not a literal, and a fill without a literal `slot` are `assembly-malformed-template`.
+- **No fill is fine.** A slot nobody fills is empty.
+- **Identity.** A named slot's step is the default slot's with the name as its component, so no key in a program without named slots changes (`docs/manual/runtime.md`).
+
+### Switch
+
+`mesh-switch` chooses among several alternatives by the first condition that holds, where `mesh-if` chooses between two. Like `mesh-if` it is declared in the model, it is never a node, and it is provisional.
+
+```xml
+<panel>
+  <mesh-switch>
+    <mesh-case when={kind == "heading"}><h1>{text}</h1></mesh-case>
+    <mesh-case when={kind == "item"}><li>{text}</li></mesh-case>
+    <mesh-default><p>{text}</p></mesh-default>
+  </mesh-switch>
+</panel>
+```
+
+- **Shape.** A switch holds one or more `mesh-case` elements, each with a boolean `when`, and optionally a last `mesh-default`. A case or default holds exactly one element (not a `mesh-if`, `mesh-switch` or `mesh-slot`: put those inside an element). A switch stands for several siblings, so it can't be a template's root or the direct child of a `mesh-if`, `mesh-each`, `mesh-case` or `mesh-default`: put an element around it. Anything else is `invalid-switch`.
+- **Meaning.** The first case whose `when` holds is rendered; if none does, the default; if there is none, nothing.
+- **How it is written.** The compiler writes a switch as the conditionals it stands for, one `mesh-if` per case, each true only when no earlier case is (`when={!a && b}`), and the default true when none is. The `template-v1` document and the runtime never see a switch, so nothing about the runtime, its identity rules or its updates is new: **each case is a conditional site of its own**, named as a conditional's alternatives are. A model that declares `mesh-switch` must therefore also declare `mesh-if`. A condition that appears in several lowered conditionals is evaluated in each.
+
+### Inferred contracts
+
+A composite's contract (its props, scope and events) is already stated by the program, so `compileProgram` in `@valancex/mesh-compiler` (and `mesh_compiler::infer::infer_components` in Rust) writes the entry of any listed component the manifest does not declare:
+
+- **props** are the attributes its occurrences pass, with the types of the arguments they pass (all occurrences are read; where types are compatible they are joined, and where they are not the first is kept and the others are reported by the ordinary prop check). A prop every occurrence passes is required; one some leave out is optional. The scope is the same names and types;
+- **events** are the handlers its template names that are not commands, each with the type of the one argument it forwards (none if it forwards none), read after the composites it uses, so a forwarded `$event` has its payload type;
+- **`mesh-slot`** is declared if a template uses it and the manifest does not.
+
+A component the manifest declares is used as written, whatever the templates say: write the entry when you need a contract the templates don't state, such as a command of the composite's own, or a type wider than its callers pass. Inference reports nothing itself: the compile that follows, with the manifest it returns (the program's `model`), reports every problem as it would for a manifest written by hand. The root and the primitives are never inferred: the root's scope and commands come from the host, and a component with no template is a primitive.
+
+### Composite events
+
+A composite may declare **events** in the model, as any component does (`"events": { "select": { "payload": { "kind": "number" } } }`), and an occurrence binds them as any component's: `<card count={n} on.select={pick($event)} />`, where `pick` is a command of the template the occurrence is in. Inside the composite's own template, a handler **forwards** one of its events by naming it as the handler:
+
+```xml
+<!-- the template of `card`: its event `select` carries a number -->
+<panel>
+  <button on.tap={select(count)}>pick</button>
+  <button on.tap={close()}>close</button>
+</panel>
+```
+
+`select` is not a command of `card` but an event it declares, so `on.tap={select(count)}` is not a request to the host: it raises `select` on the occurrence of `card`, with `count` as the payload (one argument, of the event's payload type; none for an event without a payload, like `close`). The occurrence's handler then runs in the scope **its** template has, with `$event` the payload: `on.select={pick($event)}` is the page's `pick`, called with that number.
+
+- **No syntax is added.** A handler's name is looked up among the template's commands, then among its component's own events. A composite therefore can't have an event and a command of one name (rule 6), or a forward would be ambiguous.
+- **A forward nothing binds is not in the render tree.** If the occurrence doesn't bind `close`, the button has no `tap` event at all, so event resolution (§9.9) goes on to the nodes above it, as for any node without a binding. The same holds along a chain: a forward is live only if the occurrence binds the event, and, if that binding is a forward too, only if its occurrence does.
+- **It goes out through every composite on the way.** A composite's occurrence may itself forward the event (`<card on.select={chosen($event)} />` inside a `shell` that declares `chosen`), and it continues out until a command is reached. Each step evaluates its argument in the scope of the template the binding is in, and checks it against the event's declared payload type (`runtime-argument-mismatch`).
+- **Content a slot places forwards the caller's events.** A handler in children written in `shell`'s template, placed in a card's slot, names `shell`'s events, not `card`'s: the children are shell's (see [Children and the slot](#children-and-the-slot)).
+- **The host sees only commands.** The intent of a forwarded event names the command that finally handles it, with the component of the template that binds it (`view`'s `pick`, here). The runtime's declared events list the command bindings a host handles, so a forward is not in it.
+- **The compiler checks it.** A forward's argument is checked against the event's payload type, and its count against whether the event has one (`command-arity-mismatch` and `type-mismatch`, as for a command).
+
+### Children and the slot
+
+A composite occurrence may have **children**, if its template says where they go with a **slot**: the reserved element `mesh-slot`, which the model declares like `mesh-if`, with no props.
+
+```xml
+<!-- the template of `card`, with the prop and scope name `heading` -->
+<panel heading={heading}>
+  <note>top</note>
+  <mesh-slot />
+  <note>end</note>
+</panel>
+
+<!-- an occurrence of it, in the page's template -->
+<card heading={title}>
+  <note>hello {who}</note>
+  <button on.tap={greet(who)}>go</button>
+</card>
+```
+
+renders a `panel` holding `top`, the two children of the occurrence and `end`, in that order. The slot is never a node.
+
+- **The children are the caller's.** They are written in the template that has the occurrence, and mean what they mean there: `{who}` is the page's `who`, never the card's scope, which they cannot see; and `greet(who)` is the page's command, with the page's values. (For a card inside a repeat, they have the repeat's item too.) The slot only says where they go.
+- **Where it may be.** A slot is a child of an element of the composite's template: not the template's root, and not directly the child of a `mesh-if` or `mesh-each` (put it inside an element). It has no props, events or children, and a template has at most one (the default slot); anything else is a malformed template (rule 3a). A slot may be a child of a composite occurrence, which passes the content it was given on to another composite.
+- **No children is fine.** An occurrence with none leaves the slot empty. A template with a slot that is the program's root has no caller, so its slot is empty too. A composite without a slot takes no children (rule 7).
+- **Text beside a slot is one run.** A render tree's text runs are maximal (`docs/manual/runtime.md`), so the text before a slot and the first text after it are one run, and so on: `before <mesh-slot /> after` around the text `middle` renders as `before middle after`, named by the first run's key.
+- **Identity.** Content a slot places is named by the path of its place in the caller's template, **through the slot**: a step for the slot (kind `0x06`, at the slot's position, with no component), then the content's own steps. So the same content in two occurrences, or the host's own children beside it, never share a key, and a key is the same in every render of the program that has the part (spec §9.10).
+- **Conditionals and repeats among the children** work as anywhere: they are evaluated in the caller's scope, and a `mesh-each` among them has its items' keys as usual.
 
 ### The assembly rules
 
@@ -441,8 +563,8 @@ A program must satisfy these rules. Each broken rule is an **assembly error**. T
 | 4a | Every scope name of every composite used as an occurrence is bound by a prop of the same name. | `assembly-unbound-scope-name` | 4 |
 | 4b | Every such binding is sound. | `assembly-unsound-binding` | 4 |
 | 5 | **No cycles:** no composite expands itself, directly or through others. Every composite occurrence on a cycle is reported. | `assembly-cycle` | 4 |
-| 6 | **No composite declares events** in the model. | `assembly-composite-event` | 4 |
-| 7 | **No composite occurrence has children,** text or elements. Whitespace-only text isn't a child (§3). | `assembly-composite-children` | 4 |
+| 6 | **No composite declares an event and a command of the same name** in the model. (A composite may declare events: [Composite events](#composite-events).) | `assembly-composite-event` | 4 |
+| 7 | **No composite occurrence has children,** text or elements, **unless the composite's template has a `mesh-slot`** to place them. Whitespace-only text isn't a child (§3). | `assembly-composite-children` | 4 |
 
 Program validation's steps run in order, and a step that reports anything ends validation. Step 1 is the model itself (a manifest error). Within a step, every problem is reported.
 
@@ -467,8 +589,10 @@ With a model in which `user-card` has the prop `user: User` (required), the scop
 | a model where `user-card`'s prop is named `person` | `assembly-unbound-scope-name` at the occurrence (rule 4a) |
 | a model where `user-card`'s prop `user` isn't required, and its scope name `user` isn't optional | `assembly-unsound-binding` (rule 4b): an unwritten prop would bind absent |
 | `user-card`'s template containing `<user-card user={user} />` | `assembly-cycle` (rule 5) |
-| a model where `user-card` declares an event `select` | `assembly-composite-event` (rule 6) |
-| `<user-card user={first}>Ada</user-card>` | `assembly-composite-children` (rule 7) |
+| a model where `user-card` declares an event `select` and a command `select` | `assembly-composite-event` (rule 6) |
+| a model where `user-card` declares an event `select`, and its template has `on.click={select(user)}` | valid: the handler forwards `select` to the occurrence |
+| `<user-card user={first}>Ada</user-card>`, with no `mesh-slot` in `user-card`'s template | `assembly-composite-children` (rule 7) |
+| the same, with a `mesh-slot` in `user-card`'s template | valid: the children are placed at the slot |
 | `<user-card user={first}>  </user-card>` | valid: whitespace-only text isn't a child |
 | the valid program plus a template for `badge`, which nothing uses | valid: the unreached template is checked and ignored |
 | the valid program without `user-card`'s template | valid: `user-card` is then a primitive, and the render tree holds a `user-card` node |

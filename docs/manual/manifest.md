@@ -121,6 +121,29 @@ A command returns nothing. It may be invoked only as the whole handler of an `on
 
 The scope is every name the component's template may read, and nothing else is: a prop isn't in scope unless the scope lists it too, and there are no global names. The manifest doesn't say where a scope name's value comes from, whether a prop, state or anything else; that's for the runtime.
 
+### Custom elements
+
+A custom element (a Web Component) is a primitive like any other: the manifest declares its tag, its props and its events, and MESH gives it no behavior. A hyphenated tag, which a custom element's name must have, is a valid component name.
+
+- **Props with structure are fine.** A list or record prop is carried natively in the render tree and in a `setProp` patch, never as text (spec §9.7.8, §9.8.7), so a renderer realizes it in a target slot that holds the same structure: for the Web PORT, a DOM property such as `points`.
+- **Event names are identifiers,** like every manifest name (`pointSelected`, not `point-selected`). The renderer's table maps the MESH event to whatever its target calls it, and says what its payload is (the manifest declares the payload's type, and the binding takes it whole, as `show($event)`: MPRX has no member access on `$event`).
+- **Defining the element is the application's job,** not MESH's or the renderer's.
+
+```json
+"my-chart": {
+  "props": {
+    "points": { "type": { "kind": "list", "element": { "kind": "record", "fields": {
+      "x": { "type": { "kind": "number" }, "required": true },
+      "y": { "type": { "kind": "number" }, "required": true } } } }, "required": true }
+  },
+  "events": { "pointSelected": { "payload": { "kind": "record", "fields": {
+    "index": { "type": { "kind": "number" }, "required": true } } } } },
+  "commands": {}, "scope": {}
+}
+```
+
+The runtime's tests check that such a manifest's list and record props are carried natively, in a tree and in an update's patch.
+
 ## Types
 
 Every type is a JSON object with a `"kind"`. There are nine kinds, and no others:

@@ -39,6 +39,10 @@
         },
         "location": {
           "$ref": "#/$defs/location"
+        },
+        "hint": {
+          "description": "What to do about it, for the codes where one action reliably applies. It is the same for every diagnostic of a code, and may be absent. It may change between versions; match on `code`, not on this.",
+          "type": "string"
         }
       },
       "required": [

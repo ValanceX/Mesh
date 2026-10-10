@@ -329,6 +329,30 @@ impl Value {
         }
     }
 
+    /// Whether the two values are indistinguishable to evaluation: as
+    /// [`Value::equals`], but a number is its bits (so `0` and `-0`, which
+    /// divide differently, are two values, and a NaN is the same as itself).
+    /// A shared value is the same without looking inside.
+    pub(crate) fn identical(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Absent, Value::Absent) | (Value::Null, Value::Null) => true,
+            (Value::Boolean(a), Value::Boolean(b)) => a == b,
+            (Value::Number(a), Value::Number(b)) => a.to_bits() == b.to_bits(),
+            (Value::String(a), Value::String(b)) => Rc::ptr_eq(a, b) || a == b,
+            (Value::List(a), Value::List(b)) => {
+                Rc::ptr_eq(a, b)
+                    || (a.len() == b.len() && a.iter().zip(b.iter()).all(|(a, b)| a.identical(b)))
+            }
+            (Value::Record(a), Value::Record(b)) => {
+                Rc::ptr_eq(a, b)
+                    || (a.len() == b.len()
+                        && a.iter()
+                            .all(|(name, a)| b.get(name).is_some_and(|b| a.identical(b))))
+            }
+            _ => false,
+        }
+    }
+
     /// A short name of the value's kind, for messages.
     pub(crate) fn kind(&self) -> &'static str {
         match self {

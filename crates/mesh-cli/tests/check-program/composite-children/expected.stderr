@@ -1,6 +1,6 @@
-error[assembly-composite-children]: `card` is a composite, and a composite occurrence can't have children
+error[assembly-composite-children]: `card` is a composite whose template has no default `mesh-slot`, so an occurrence of it can't have children outside a `mesh-fill`
   --> view.template.json, the template of `view`, source bytes 9..52
 
-error[assembly-composite-children]: `card` is a composite, and a composite occurrence can't have children
+error[assembly-composite-children]: `card` is a composite whose template has no default `mesh-slot`, so an occurrence of it can't have children outside a `mesh-fill`
   --> view.template.json, the template of `view`, source bytes 55..84
 

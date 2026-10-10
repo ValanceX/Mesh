@@ -161,3 +161,18 @@ test("it needs no initialization and no module but the compiler's: a fresh proce
     assert.ok(imports.every((specifier) => specifier.startsWith("./") || specifier.startsWith("node:")), `${file}.js imports only the package's own modules: ${imports}`);
   }
 });
+
+test("a composite the manifest does not declare gets its contract from the templates, and a declared one is used as written", async () => {
+  const declared = JSON.parse(manifest);
+  const { users, "user-card": card, ...rest } = declared.components;
+  const undeclared = JSON.stringify({ ...declared, components: { ...rest, users } });
+  const result = await compileProgram({ model: { manifest: undeclared, path: "components.json" }, root: "users", components: sliceComponents });
+
+  assert.ok(result.program, JSON.stringify(result.components));
+  const inferred = JSON.parse(result.program.model).components;
+  assert.deepEqual(Object.keys(inferred["user-card"].props).sort(), Object.keys(card.props).sort());
+  assert.deepEqual(inferred.users, users, "a declared component is untouched");
+
+  const withCard = await compileProgram({ model, root: "users", components: sliceComponents });
+  assert.equal(withCard.program.model, manifest, "with every component declared the model is the manifest's text, as given");
+});

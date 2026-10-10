@@ -2,12 +2,18 @@
 //!
 //! It has no semantics of its own (I11). [`respond_render`] is
 //! [`mesh_runtime::render`], [`respond_dispatch`] is
-//! [`mesh_runtime::dispatch_from`] and [`respond_declared_events`] is
-//! [`mesh_runtime::declared_events`], each with its inputs decoded from
+//! [`mesh_runtime::dispatch_from`], [`respond_declared_events`] is
+//! [`mesh_runtime::declared_events`] and [`respond_update`] is
+//! [`mesh_runtime::update`], each with its inputs decoded from
 //! the byte encoding (`mesh_runtime::encoding`) and its result rendered
 //! as one JSON document; everything else only moves bytes across the
 //! boundary between WebAssembly's linear memory and JavaScript. It links
 //! no parser: a host that renders needs no compiler.
+//!
+//! **Its one state between calls is the renders `update` keeps,** so that the
+//! next `update` from one needn't derive it again: a table of handles
+//! (`respond_update` and `respond_update_changes` make one, `release`
+//! ends it). `render`, `dispatch` and `declared_events` keep nothing.
 //!
 //! Build it with Cargo alone:
 //!
@@ -49,7 +55,9 @@ impl From<EncodingError> for Refusal {
 
 /// Renders the program of `root` and the encoded `templates` against
 /// `model` and the encoded `snapshot`: `{"tree": <render-v1>}`, or
-/// `{"diagnostics": <runtime-diagnostics-v1>}`.
+/// `{"diagnostics": <runtime-diagnostics-v1>}`. The module keeps nothing, and
+/// the same inputs give the same bytes (a render's version is the wrapper's
+/// to give, never part of a render's result).
 pub fn respond_render(
     root: &str,
     templates: &[u8],
@@ -65,6 +73,216 @@ pub fn respond_render(
     };
     Ok(match mesh_runtime::render(&program, model, &snapshot) {
         Ok(render) => format!("{{\"tree\":{}}}", render.tree().to_json()),
+        Err(diagnostics) => format!(
+            "{{\"diagnostics\":{}}}",
+            mesh_runtime::to_json(&diagnostics, model)
+        ),
+    })
+}
+
+/// Renders the module holds for `update`, by handle. This is the module's
+/// only state between calls. A handle is made by [`respond_update`], never
+/// reused in this module's life, and ends at [`release`]; a module that is
+/// replaced (the wrapper discards one after a trap) takes its handles with it.
+mod retained {
+    use mesh_runtime::Render;
+    use std::cell::{Cell, RefCell};
+    use std::collections::BTreeMap;
+
+    thread_local! {
+        static TABLE: RefCell<BTreeMap<u32, Render>> = const { RefCell::new(BTreeMap::new()) };
+        static NEXT: Cell<u32> = const { Cell::new(1) };
+    }
+
+    pub(super) fn keep(render: Render) -> u32 {
+        let handle = NEXT.with(|next| {
+            let handle = next.get();
+            next.set(handle.checked_add(1).expect("handles don't run out"));
+            handle
+        });
+        TABLE.with(|table| table.borrow_mut().insert(handle, render));
+        handle
+    }
+
+    /// Runs `use_it` on the render `handle` names, in place: a render is
+    /// never copied out of the table.
+    pub(super) fn with<T>(handle: u32, use_it: impl FnOnce(&Render) -> T) -> Option<T> {
+        TABLE.with(|table| table.borrow().get(&handle).map(use_it))
+    }
+
+    pub(super) fn release(handle: u32) {
+        TABLE.with(|table| table.borrow_mut().remove(&handle));
+    }
+
+    pub(super) fn count() -> usize {
+        TABLE.with(|table| table.borrow().len())
+    }
+}
+
+/// Releases the render `handle` names. A handle that isn't kept (already
+/// released, or never made) is ignored.
+pub fn release(handle: u32) {
+    retained::release(handle);
+}
+
+/// How many renders the module holds. For the package's memory tests.
+pub fn retained_renders() -> usize {
+    retained::count()
+}
+
+/// Updates to the encoded `snapshot`: `{"handle": <n>, "patches":
+/// <render-patch-v1>}`, or `{"diagnostics": <runtime-diagnostics-v1>}`. The
+/// new render is kept under `new_version`, the version the wrapper gives it,
+/// which changes to it name as their base.
+///
+/// The new tree isn't in the result: the caller has the previous tree, and
+/// applying the patches to it gives the new one (the law of `render-patch-v1`),
+/// so a result costs what changed, not the size of the tree.
+///
+/// The previous render is the one `previous_handle` names, if the module
+/// holds it. Otherwise the module derives it from the render's own inputs
+/// as the wrapper kept them (the encoded `previous_bytes`), so a handle that
+/// was released, or came from a module since replaced, costs a render more
+/// and gives the same result. The new render is kept under a new handle, which
+/// the caller releases; the previous render stays kept (and valid) until the
+/// caller releases its handle, so a host can still dispatch with it until its
+/// renderer has applied the patches. A refused update keeps nothing.
+pub fn respond_update(
+    root: &str,
+    templates: &[u8],
+    model: &str,
+    previous_handle: Option<u32>,
+    previous_bytes: &[u8],
+    snapshot_bytes: &[u8],
+    new_version: u64,
+) -> Result<String, Refusal> {
+    let templates = decode_texts(templates)?;
+    let snapshot = decode_snapshot(snapshot_bytes)?;
+    // The snapshot goes to whichever update uses it, and is copied by neither.
+    let mut owned = Some(snapshot);
+    let kept = previous_handle.and_then(|handle| {
+        retained::with(handle, |previous| {
+            mesh_runtime::update_with(previous, owned.take().expect("not yet taken"))
+        })
+    });
+    let result = match kept {
+        Some(result) => result,
+        None => {
+            let snapshot = owned.take().expect("not taken: no render was kept");
+            let previous_snapshot = decode_snapshot(previous_bytes)?;
+            let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+            let program = Program {
+                root,
+                templates: &texts,
+            };
+            mesh_runtime::render(&program, model, &previous_snapshot)
+                .and_then(|previous| mesh_runtime::update_with(&previous, snapshot))
+        }
+    };
+    Ok(match result {
+        Ok(updated) => {
+            let patches = mesh_runtime::patches_to_json(&updated.patches);
+            let handle = retained::keep(updated.render.with_version(new_version));
+            format!("{{\"handle\":{handle},\"patches\":{patches}}}")
+        }
+        Err(diagnostics) => format!(
+            "{{\"diagnostics\":{}}}",
+            mesh_runtime::to_json(&diagnostics, model)
+        ),
+    })
+}
+
+/// Updates a render by the encoded `changes` (`mesh_runtime::update_changes`):
+/// `{"handle": <n>, "patches": <render-patch-v1>}`, or `{"diagnostics": ...}`;
+/// the new render is kept under `new_version`. With `verify_bytes`, the host's whole snapshot, the
+/// changes are checked against it.
+///
+/// The render is the one `previous_handle` names, if the module holds it.
+/// Otherwise the module derives it from the render's own inputs as the wrapper
+/// kept them (`previous_bytes`) and gives it `version`, the version the host
+/// was told, so changes that name that version apply to it. With neither a
+/// held render nor inputs it is a diagnostic, never a guess: changes are only
+/// ever applied to the render they were computed against.
+#[allow(clippy::too_many_arguments)]
+pub fn respond_update_changes(
+    root: &str,
+    templates: &[u8],
+    model: &str,
+    previous_handle: Option<u32>,
+    previous_bytes: &[u8],
+    version: u64,
+    new_version: u64,
+    changes_bytes: &[u8],
+    verify_bytes: Option<&[u8]>,
+) -> Result<String, Refusal> {
+    use mesh_runtime::{Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
+
+    let templates = decode_texts(templates)?;
+    let changes = decode_value(changes_bytes)?;
+    let verify = verify_bytes.map(decode_snapshot).transpose()?;
+    let result = match mesh_runtime::Changes::from_host(&changes) {
+        Err(diagnostics) => Err(diagnostics),
+        Ok(changes) => {
+            let held = previous_handle.and_then(|handle| {
+                retained::with(handle, |previous| {
+                    mesh_runtime::update_changes(previous, &changes, verify.as_ref())
+                })
+            });
+            match held {
+                Some(result) => result,
+                None if !previous_bytes.is_empty() => {
+                    let previous_snapshot = decode_snapshot(previous_bytes)?;
+                    let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+                    let program = Program {
+                        root,
+                        templates: &texts,
+                    };
+                    mesh_runtime::render(&program, model, &previous_snapshot).and_then(|previous| {
+                        mesh_runtime::update_changes(
+                            &previous.with_version(version),
+                            &changes,
+                            verify.as_ref(),
+                        )
+                    })
+                }
+                None => Err(vec![RuntimeDiagnostic::new(
+                    RuntimeCode::CHANGES_BASE_MISMATCH,
+                    "the module holds no such render (it was released, or the module was replaced) and the render has no snapshot to derive it from: these changes can't be applied; update with a whole snapshot",
+                    Location::Input(vec![PathSegment::Name("base".to_string())]),
+                )]),
+            }
+        }
+    };
+    Ok(match result {
+        Ok(updated) => {
+            let patches = mesh_runtime::patches_to_json(&updated.patches);
+            let handle = retained::keep(updated.render.with_version(new_version));
+            format!("{{\"handle\":{handle},\"patches\":{patches}}}")
+        }
+        Err(diagnostics) => format!(
+            "{{\"diagnostics\":{}}}",
+            mesh_runtime::to_json(&diagnostics, model)
+        ),
+    })
+}
+
+/// Dispatches `handler` against the kept render `handle` names, with the encoded
+/// `payload` (absent when `None`): `{"intent": <intent>}`, or `{"diagnostics":
+/// ...}`. A render made by changes has no snapshot outside the module, so this
+/// is how it is dispatched. A handle the module doesn't hold is a refusal.
+pub fn respond_dispatch_kept(
+    model: &str,
+    handle: u32,
+    handler: &str,
+    payload_bytes: Option<&[u8]>,
+) -> Result<String, Refusal> {
+    let payload = payload_bytes.map(decode_value).transpose()?;
+    let result = retained::with(handle, |render| {
+        mesh_runtime::dispatch(render, handler, payload.as_ref())
+    })
+    .ok_or_else(|| Refusal::Input("the module holds no such render".to_string()))?;
+    Ok(match result {
+        Ok(intent) => format!("{{\"intent\":{}}}", intent.to_json()),
         Err(diagnostics) => format!(
             "{{\"diagnostics\":{}}}",
             mesh_runtime::to_json(&diagnostics, model)

@@ -29,6 +29,44 @@ export interface RenderTree {
   readonly root: RenderNode;
 }
 
+/** What `update` returns to turn the previous tree into the new one: `render-patch-v1`. Frozen. */
+export interface RenderPatches {
+  readonly format: "mesh-render-patch";
+  readonly version: 1;
+  /** Applied in order. Applying them to the previous tree gives exactly the new render's tree. */
+  readonly patches: readonly RenderPatch[];
+}
+
+/** One operation of a patch list. A renderer applies it; it never compares lists. */
+export type RenderPatch =
+  | {
+      readonly op: "setProp";
+      readonly key: string;
+      readonly prop: string;
+      readonly value: BoundaryValue;
+      /** The runtime's text of the value, when it has one (`propText`). */
+      readonly propText?: string;
+    }
+  | { readonly op: "removeProp"; readonly key: string; readonly prop: string }
+  | { readonly op: "setText"; readonly key: string; readonly text: string }
+  /**
+   * A node (with its whole subtree) or text run is new under `parent`: before
+   * its child `before`, or last when there is none. Its keys aren't in the tree
+   * at this point.
+   */
+  | {
+      readonly op: "insert";
+      readonly parent: string;
+      readonly before?: string;
+      readonly node: RenderNode | TextRun;
+    }
+  /** The node or text run, and everything under it, is gone. */
+  | { readonly op: "remove"; readonly key: string }
+  /** The same node or text run, kept, now stands before its sibling `before`, or last when there is none. */
+  | { readonly op: "move"; readonly key: string; readonly before?: string }
+  /** A tree no other operation can turn into the next: draw it afresh, reusing nothing. The only operation of its list. */
+  | { readonly op: "replace"; readonly tree: RenderTree };
+
 /** A primitive occurrence. Composites never appear: they're expanded. */
 export interface RenderNode {
   readonly type: "node";
@@ -97,6 +135,8 @@ export interface RuntimeDiagnostic {
   code: string;
   /** The human-readable message. It may change between versions. */
   message: string;
+  /** What to do about it, for the codes where one action reliably applies; absent otherwise. It may change between versions. */
+  hint?: string;
   location: RuntimeLocation;
 }
 
@@ -168,7 +208,9 @@ export interface DeclaredEvent {
 export interface Host {
   /**
    * Keeps each render while its tree is drawn, since dispatch needs the
-   * render the renderer drew, not a newer one.
+   * render the renderer drew, not a newer one. A render `update` or
+   * `updateChanges` made is also held in the module: call its `release()` when
+   * the host no longer needs it.
    */
   keep(render: Render): void;
   /**

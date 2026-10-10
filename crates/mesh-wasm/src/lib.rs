@@ -72,6 +72,28 @@ pub fn respond_compile(
     format!("{{\"diagnostics\":{document},\"template\":{template}}}")
 }
 
+/// Infers the contracts of the composites a program leaves undeclared
+/// (`mesh_compiler::infer`), for the manifest `manifest`, the root `root`
+/// and the sources `sources` encodes (a text list of component, source
+/// pairs). The result is `{"manifest": <text> | null}`: the manifest with the
+/// entries added, or `null` when there is nothing to add. `None` if
+/// `sources` isn't a text list of pairs.
+pub fn respond_infer(manifest: &str, root: &str, sources: &[u8]) -> Option<String> {
+    let texts = mesh_runtime::encoding::decode_texts(sources).ok()?;
+
+    if texts.len() % 2 != 0 {
+        return None;
+    }
+
+    let pairs: Vec<(String, String)> = texts
+        .chunks(2)
+        .map(|pair| (pair[0].clone(), pair[1].clone()))
+        .collect();
+    let inferred = mesh_compiler::infer::infer_components(manifest, root, &pairs);
+
+    Some(serde_json::json!({ "manifest": inferred }).to_string())
+}
+
 /// Runs one program check and renders its result: the runtime
 /// diagnostics document `mesh check-program --format json` prints, for
 /// the program of `root` and the templates `templates` encodes (a text

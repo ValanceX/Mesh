@@ -50,6 +50,12 @@ pub fn number_to_text(value: f64) -> String {
     if value == 0.0 {
         return "0".to_string();
     }
+    // An integer below 10^15 is exactly its decimal digits (§9.7.7.1 prints
+    // every digit of an integer below 10^21), and is far the commonest key.
+    if value.fract() == 0.0 && value.abs() < 1e15 {
+        #[allow(clippy::cast_possible_truncation)]
+        return (value as i64).to_string();
+    }
     let (digits, point) = shortest_digits(value.abs());
     let text = layout(&digits, point);
     if value < 0.0 {

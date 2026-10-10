@@ -3,4 +3,4 @@
 {"arguments":[{"absent":true}],"command":{"component":"view","name":"setName"}}
 {"arguments":[{"value":"Countess"}],"command":{"component":"view","name":"setName"}}
 {"arguments":[{"value":{"any":["thing",1]}}],"command":{"component":"view","name":"take"}}
-{"diagnostics":[{"code":"runtime-value-mismatch","location":{"kind":"input","path":["$event","x"]},"message":"`$event.x` is a string, but must be a number","severity":"error"},{"code":"runtime-missing-value","location":{"kind":"input","path":["$event","y"]},"message":"`$event.y` is absent, but its field is required","severity":"error"}],"version":1}
+{"diagnostics":[{"code":"runtime-value-mismatch","hint":"Change the value to fit its manifest type at this path, or change the type in the manifest.","location":{"kind":"input","path":["$event","x"]},"message":"`$event.x` is a string, but must be a number","severity":"error"},{"code":"runtime-missing-value","hint":"Give the value in the snapshot, or make its type optional in the manifest.","location":{"kind":"input","path":["$event","y"]},"message":"`$event.y` is absent, but its field is required","severity":"error"}],"version":1}

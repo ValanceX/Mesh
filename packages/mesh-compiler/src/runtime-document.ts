@@ -19,6 +19,8 @@ export interface RuntimeDiagnostic {
   code: string;
   /** The human-readable message. It may change between versions. */
   message: string;
+  /** What to do about it, for the codes where one action reliably applies; absent otherwise. It may change between versions. */
+  hint?: string;
   location: RuntimeLocation;
 }
 

@@ -2,6 +2,8 @@
 
 This page lists every diagnostic MESH can produce: its code, what triggers it, how serious it is, and how to fix it. For the output formats, see the CLI manual: [human](./mesh-cli.md#diagnostic-format) and [JSON](./mesh-cli.md#json-output).
 
+Runtime diagnostics (the `assembly-*` and `runtime-*` codes) may also carry a **`hint`**, the corrective action, for the codes where one reliably applies; see [the runtime manual](./runtime.md#the-codes).
+
 Every diagnostic has a **code**, shown in brackets after its severity, `error[unterminated-tag]`, and as the `code` property in JSON output. Codes are machine-readable API, so programs should match on them, never on messages. They are stable:
 
 - A code is never renamed.
@@ -602,7 +604,7 @@ error[unknown-command]: unknown command "sav": the template's component doesn't 
 
 ### `command-arity-mismatch`
 
-A command is invoked with more or fewer arguments than it declares parameters. Every parameter is required. Points at the whole invocation.
+A command is invoked with more or fewer arguments than it declares parameters. Every parameter is required. Points at the whole invocation. The same holds for a handler that forwards one of the component's own events ([Composite events](templates.md#composite-events)): an event with a payload takes exactly one argument, and one without takes none.
 
 ```text
 error[command-arity-mismatch]: command "select" takes 1 argument, but 0 were given
@@ -852,6 +854,22 @@ A value of type `any` isn't checked here: if it turns out to be a list or a reco
 
 ---
 
+### `invalid-switch`
+
+A `mesh-switch`, `mesh-case` or `mesh-default` that isn't shaped or placed as [a switch is](templates.md#switch). One code covers each way it can be wrong, and the message says which: a switch with no `mesh-case`; a child of a switch that isn't a `mesh-case` or the one last `mesh-default`; a `mesh-case` or `mesh-default` outside a switch; a case with anything but exactly one element child, or whose child is a `mesh-if`, a `mesh-switch` or a `mesh-slot`; a switch that is a template's root or the direct child of a `mesh-if`, `mesh-each`, `mesh-case` or `mesh-default`. Points at the element's tag name, or at the child that doesn't belong. A `mesh-case` with no `when`, or one that isn't a boolean, is the ordinary `missing-required-prop` or `type-mismatch`.
+
+```text
+error[invalid-switch]: `mesh-switch` needs at least one `mesh-case`
+ --> fixtures/check/fail/invalid-switch.mprx:1:18
+  |
+1 | <page title="x"><mesh-switch><mesh-default><text>none</text></mesh-default></mesh-switch></page>
+  |                  ^^^^^^^^^^^
+```
+
+**Fix:** give the switch a `mesh-case`, and put the `mesh-default` after the last one.
+
+---
+
 ## Assembly errors
 
 The runtime reports these before it evaluates anything, when it validates a program (`docs/manual/templates.md`, "The assembly rules"), and so does the compiler's program check, with the same codes and locations. Each is in a runtime diagnostics document.
@@ -906,15 +924,23 @@ Location: `source`, every composite occurrence on the cycle.
 
 ### `assembly-composite-event`
 
-A composite declares events in the model; v0.5 has no composite events.
+A composite declares an event and a command of the same name. A composite may declare events (its template forwards them, [Composite events](templates.md#composite-events)), but then a handler in its template that names one of them would be either, so the names must differ.
 
 Location: `source`, every composite occurrence of it.
 
 ### `assembly-composite-children`
 
-A composite occurrence has children, text or elements; v0.5 has no children or slots for composites.
+A composite occurrence has children that the composite's template has no slot for. A composite takes loose children (text or elements outside a `mesh-fill`) exactly when its template has a default `mesh-slot` ([Children and the slot](templates.md#children-and-the-slot)); and a `mesh-fill` needs a `mesh-slot` of its name, once, in an occurrence of a composite ([Named slots](templates.md#named-slots)). An occurrence of a composite that has slots may have no children.
 
 Location: `source`, the occurrence.
+
+### `assembly-root-fragment`
+
+The program's root renders one node, but its root template's root is a `mesh-fragment`, or a composite whose template starts with one ([Fragments](templates.md#fragments)). A fragment makes no node. Points at the root of the root template.
+
+Location: `source`, the root template's root.
+
+**Fix:** put an element around it.
 
 ## Runtime errors
 
@@ -1057,6 +1083,28 @@ Location: `source`, the `key` expression.
 Two items of one repeat declare the same key, under strict equality: the same kind (`"1"` is not `1`) and the same value (`0` and `-0` are one). Nothing is rendered; the author's key was meant to be unique, and the runtime does not pick one of the items.
 
 Location: `source`, the `key` expression of the later item.
+
+### Changes
+
+These belong to `update` from changes ([runtime manual](runtime.md#changes)). A value that an edit gives and that doesn't fit its type is reported by the input codes above (`runtime-value-mismatch` and the rest), at its path in the snapshot.
+
+### `runtime-changes-base-mismatch`
+
+The changes were computed against another render than the one given: their `base` is not the render's version. Nothing is applied. This is the check that the host and the runtime agree on which snapshot the changes edit; changes for a render that has since been updated, or for a different one, are refused rather than applied to a snapshot they weren't made for.
+
+Location: `input`, `["base"]`.
+
+### `runtime-invalid-change`
+
+The changes document, or one edit, can't be applied: the document isn't `{ base, changes }`; an edit isn't `{ op, path, value? }`; `op` isn't `set`, `insert` or `remove`; a `path` is empty or has a segment that is neither a field name nor a non-negative integer; a `value` is missing from a `set` or `insert`, or given to a `remove`; or a path leads nowhere the type allows (a field a record doesn't have, an index past the end of a list, a record indexed like a list, a scope name that isn't one, removing a field the type doesn't let be absent). Nothing is applied: the edits are all or none.
+
+Location: `input`, the path in the changes document of the part that is wrong (`["changes", 2, "path", 1]`), or, for a path that leads nowhere, the edit's own path in the snapshot.
+
+### `runtime-changes-disagree`
+
+Only when the host asks for verification (`verify` with the whole snapshot it believes it now has): the snapshot the changes make is not that snapshot. The host's way of computing changes is wrong, and nothing is applied. The location is the first path, in the snapshot, where they differ.
+
+Location: `input`, the first path that differs.
 
 ### Internal errors
 

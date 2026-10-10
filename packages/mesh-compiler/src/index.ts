@@ -62,7 +62,8 @@ export type {
   TemplateExpression,
   TemplateSpan,
 } from "./template.js";
-export { MeshInternalError, MeshVersionError } from "./engine.js";
+export { MeshInternalError, MeshUsageError, MeshVersionError } from "./engine.js";
+export type { MeshUsageCode } from "./engine.js";
 export { version } from "./version.js";
 
 /**
@@ -70,7 +71,7 @@ export { version } from "./version.js";
  * model is given, and returns the diagnostics document. A problem with the
  * input is a diagnostic in the document, never an exception.
  *
- * It rejects with a `TypeError` for arguments of the wrong type, with
+ * It rejects with a `MeshUsageError` (`invalid-argument`) for arguments of the wrong type, with
  * `MeshVersionError` if the WebAssembly module isn't this version's, and
  * with `MeshInternalError` if the compiler itself fails. In a browser,
  * call {@link init} first.

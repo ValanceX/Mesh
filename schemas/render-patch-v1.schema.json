@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/render-patch-v1.schema.json",
+  "title": "MESH render patches, version 1",
+  "description": "What the MESH runtime's update produces (see docs/manual/runtime.md, \"Update\"): the operations that turn the previous render's tree into the new render's tree, when both come from one program. A renderer applies them in order. The law: applying them to the previous tree gives exactly the tree a full render of the new snapshot gives. A list is minimal in effect, not unique in form, so a renderer applies lists and never compares them. Nodes and text runs are named by their render-v1 keys, which the renderer compares only for equality; a key is the identity of MESH spec \u00a79.10, and parts are matched by key and never by position. A prop or text a patch doesn't mention is unchanged. Removals come first, then the insertions and moves that put the kept parts in the new order (each `before` names a sibling that exists at that point in the list, or is absent for last), then the changes inside the kept parts. A key that is removed and later appears again is a new part, not the old one. `replace` is for a tree no other operation can turn into the next (a different root, or a node whose event bindings differ, which one program never produces): draw it afresh, reusing nothing, and it is always the only operation of its list. This schema lists exactly the properties this MESH produces. A later MESH may add operations or properties without changing `version`, but a renderer that meets an operation it doesn't know must refuse the list, never skip it, since skipping would break the law; removing a property or changing a meaning is a new version. A later MESH may add properties without changing `version`, so consumers should ignore properties they don't know.",
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "mesh-render-patch"
+    },
+    "version": {
+      "const": 1
+    },
+    "patches": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/patch"
+      }
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "patches"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "key": {
+      "description": "A render-v1 key: a node's or text run's identity. Compare for equality only.",
+      "type": "string",
+      "pattern": "^k[A-Za-z0-9_-]{22}$"
+    },
+    "patch": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "The prop now has this value, and this MESH text if it has one (`propText`, as render-v1 carries it); a prop with no `propText` has none now.",
+          "properties": {
+            "op": {
+              "const": "setProp"
+            },
+            "key": {
+              "$ref": "#/$defs/key"
+            },
+            "prop": {
+              "type": "string"
+            },
+            "value": {
+              "$ref": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/render-v1.schema.json#/$defs/value"
+            },
+            "propText": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "key",
+            "prop",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "The prop is now absent, with its text.",
+          "properties": {
+            "op": {
+              "const": "removeProp"
+            },
+            "key": {
+              "$ref": "#/$defs/key"
+            },
+            "prop": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "key",
+            "prop"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A text run's new text.",
+          "properties": {
+            "op": {
+              "const": "setText"
+            },
+            "key": {
+              "$ref": "#/$defs/key"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "key",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A node or text run, with everything under it, is new under the node `parent`: before its child `before`, or last when `before` is absent. The `node` is a render-v1 node (with its whole subtree) or text run, whose keys are not in the tree at this point.",
+          "properties": {
+            "op": {
+              "const": "insert"
+            },
+            "parent": {
+              "$ref": "#/$defs/key"
+            },
+            "before": {
+              "$ref": "#/$defs/key"
+            },
+            "node": {
+              "oneOf": [
+                {
+                  "$ref": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/render-v1.schema.json#/$defs/node"
+                },
+                {
+                  "$ref": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/render-v1.schema.json#/$defs/text"
+                }
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "parent",
+            "node"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "The node or text run, and everything under it, is gone.",
+          "properties": {
+            "op": {
+              "const": "remove"
+            },
+            "key": {
+              "$ref": "#/$defs/key"
+            }
+          },
+          "required": [
+            "op",
+            "key"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "The same node or text run, kept with everything under it, now stands before its sibling `before`, or last when `before` is absent.",
+          "properties": {
+            "op": {
+              "const": "move"
+            },
+            "key": {
+              "$ref": "#/$defs/key"
+            },
+            "before": {
+              "$ref": "#/$defs/key"
+            }
+          },
+          "required": [
+            "op",
+            "key"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "The tree is this one: draw it afresh, as for a program change, reusing nothing.",
+          "properties": {
+            "op": {
+              "const": "replace"
+            },
+            "tree": {
+              "$ref": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/render-v1.schema.json"
+            }
+          },
+          "required": [
+            "op",
+            "tree"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

@@ -10,10 +10,14 @@ host ── program, model, snapshot ──▶ render ──▶ a render ──�
 host ◀── command intent ◀── dispatch ◀── the render, handler identifier, payload
 ```
 
-## The two operations
+## The operations
 
 - **render:** a program, a model and a snapshot in. Out: a **render**, or diagnostics.
 - **dispatch:** a render, a handler identifier and a payload in. Out: a **command intent**, or diagnostics.
+- **update:** a render and a new snapshot of the same program in. Out: the new **render** and the **patches** from the previous tree to its tree, or diagnostics ([Update](#update)).
+- **updateChanges:** a render and edits to its snapshot in. Out: as update ([Changes](#changes)).
+
+Render and dispatch are the two the lifecycle below is about; `declaredEvents` (a program's declared events, below) is another, and takes no snapshot.
 
 Each returns either its result and no diagnostics, or diagnostics and no result. The runtime has no warnings.
 
@@ -46,12 +50,12 @@ A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any p
 
 **From Rust,** `mesh_runtime::render(&program, model, &snapshot)` returns a `Render` or the diagnostics, and `mesh_runtime::dispatch(&render, handler, payload)` returns an `Intent` or the diagnostics. A `Program` is the root's name and the templates' texts; the model is the manifest's text; a snapshot is a `HostRecord` (`HostRecord::from_json` reads one). A host that keeps a render's program, model and snapshot rather than the `Render` itself calls `mesh_runtime::dispatch_from` with them, which validates them all again, as dispatch always does. `mesh_runtime::to_json` writes diagnostics as the document below.
 
-**From JavaScript,** `@valancex/mesh-runtime` has the same two operations (and a third, below): `render({ program: { root, templates }, model, snapshot })` resolves to `{ render }` or `{ diagnostics }`, and `dispatch(render, handler, payload?)` to `{ intent }` or `{ diagnostics }`. A third operation, `declaredEvents({ program, model })`, resolves to a program's [declared events](#the-declared-events) or `{ diagnostics }`. `render.tree` is the render tree, frozen. Its [README](../../packages/mesh-runtime/README.md) has the details. What a JavaScript host needs to know about its values (§9.8.6):
-- The package **encodes, and never judges.** Every value reaches the runtime, which reports what it can't accept: NaN, the infinities, a hole or `undefined` in an array, an unpaired surrogate, a `Map`, a `Date`, a class instance, a function, a `bigint` or a value that contains itself. So a JavaScript host gets exactly the diagnostics a native host gets for the same values.
+**From JavaScript,** `@valancex/mesh-runtime` has the same operations (`render`, `dispatch` and `update`, and `declaredEvents`, below): `render({ program: { root, templates }, model, snapshot })` resolves to `{ render }` or `{ diagnostics }`, and `dispatch(render, handler, payload?)` to `{ intent }` or `{ diagnostics }`. `update(render, snapshot)` resolves to `{ render, patches }` or `{ diagnostics }` (see [Update](#update)), and `declaredEvents({ program, model })` resolves to a program's [declared events](#the-declared-events) or `{ diagnostics }`. `render.tree` is the render tree, frozen. Its [README](../../packages/mesh-runtime/README.md) has the details. What a JavaScript host needs to know about its values (§9.8.6):
+- The package **encodes, and never judges.** (The one tree it reads is `update`'s: it applies the patches the module returns to the previous render's tree, as a renderer would, moving parts by key and reading no value, so that an update costs what changed and not the size of the tree. The package's review test names that file, and `changes.ts` (the host-side `diff`, which compares two host snapshots for sameness and is on no path of render, update or dispatch), as its only exceptions.) Every value reaches the runtime, which reports what it can't accept: NaN, the infinities, a hole or `undefined` in an array, an unpaired surrogate, a `Map`, a `Date`, a class instance, a function, a `bigint` or a value that contains itself. So a JavaScript host gets exactly the diagnostics a native host gets for the same values.
 - A missing property and a property that is `undefined` are both absent. A payload that isn't given is absent too.
 - `-0` crosses in as `-0`, and never comes out (§9.8.2).
 - A render keeps its snapshot as it was encoded when `render` was called, so changing the host's objects afterwards changes nothing.
-- A problem with the host's values is a diagnostic, never an exception. The promises reject only with a `TypeError` for arguments of the wrong JavaScript type, or a `render` the package didn't make; with `MeshVersionError` for a module of another version; and with `MeshInternalError` if the runtime itself fails.
+- A problem with the host's values is a diagnostic, never an exception. The promises reject only with a `MeshUsageError` (a `TypeError`, with a `code`: `invalid-argument`, `not-a-render` or `render-gone`) for a call that is wrong in a way types should have prevented; with `MeshVersionError` (`version-mismatch`) for a module of another version; and with `MeshInternalError` (`internal-error`) if the runtime itself fails. Match on the `code`, never the message. Calls run one at a time in the order made, and are not cancellable (see the package README).
 
 ## The render tree
 
@@ -62,7 +66,7 @@ The render tree is [`schemas/render-v1.schema.json`](../../schemas/render-v1.sch
   - `propText` (since v0.6) maps each prop whose value is a number, a boolean or `null` to that value's MESH text (§9.7.7): `"42"`, `"false"`, `"null"`. A string prop has no entry, since its text is its value; a list or record prop has none, since it has no text (§9.7.8); an absent prop has no entry in either map. The member is present exactly when some prop has an entry. A renderer that puts such a prop in a slot that holds only text uses this text (§9.8.7).
   - `events` maps each event binding's event name to its handler identifier.
   - `children` lists nodes and text runs, in order.
-- **Composites never appear.** A composite occurrence is replaced by what its template produced: exactly one node, since a template has one root element.
+- **Composites never appear.** A composite occurrence is replaced by what its template produced: one node, since a template has one root element, or, when that root is a [`mesh-fragment`](templates.md#fragments), the fragment's content, in place. MESH makes no node that no template wrote.
 - **A text run** is `{ "type": "text", "key", "text" }`: the text (§9.7.7) of a maximal sequence of adjacent literal text and interpolation children. A text run is present even when it's empty.
 
 The example's components are the slice's (`examples/slice/components.json`), and every value in it fits that manifest: `avatar`'s `src` is a `string?` and its `size` a `string`, and `button`'s `disabled` a `boolean`, whose text is in `propText`.
@@ -135,7 +139,9 @@ A key is the render-v1 token for a node's or text run's **identity** (spec §9.1
 - the root is step `(0, 0x01, its component)`;
 - the child whose **site** is at position `i` among a node's template children (spec §9.10.2) is `(i, 0x01, its component)` for a node, or `(i, 0x02, "")` for a text run. A maximal run of text and interpolations is one site, an element is one, and a [conditional](#conditionals-provisional) is one whether or not it produces a node. Without a conditional that is the child's index in the render tree's `children`, which is why every static program's keys are as they were;
 - a composite occurrence adds two steps: `(i, 0x03, the composite)`, then `(0, 0x01, the component of its template's root element)`, and further expansions nest the same way;
+- a `mesh-fragment` adds a step, `(i, 0x07, "")`, where `i` is its position among its siblings (`0` as a composite's root, a conditional's alternative or a repeat's item), then its content's own steps at their positions among its children: a fragment makes no node, so its content is children of the node around it, and the step keeps that content's keys apart from a sibling's;
 - a conditional alternative adds a step, `(i, 0x04, "consequent")` or `(i, 0x04, "alternate")`, where `i` is the conditional's site position, then the alternative's own steps at position `0`, as a composite's expansion does. This step is provisional (below).
+- content a composite's `mesh-slot` places adds a step, `(i, 0x06, "")`, where `i` is the slot's position among its siblings in the composite's template, then the content's own steps at their positions among the occurrence's children (in the caller's template): so the same content in two occurrences, or beside the host's own children, never shares a key. A named slot's step has the slot's name as its component, `(i, 0x06, "header")`, and its content's positions are those among its `mesh-fill`'s children; the default slot's step is as above, so no key of a program without named slots changes. The slot is never a node (`docs/manual/templates.md`, "Children and the slot").
 
 The key is `k` followed by the first 16 bytes of `H(string "mesh-key-v1", the program identity (32 bytes), count of steps, each step)`, in unpadded base64url: 22 characters. This is the static case of identity. How an identity that has an instance is encoded is not decided (spec §9.10.10, §9.10.12).
 
@@ -280,9 +286,74 @@ A renderer implements the rule for its target, and checks itself against `exampl
 
 ## Updates
 
-- **A change of values is a new render.** The whole program is evaluated again, and the result is a complete new render tree.
+- **A change of values is a new render,** or an *update*, which gives the same tree and says what changed. `render` evaluates the whole program again and gives a complete new tree; `update` (below) does that for a render's program and a new snapshot, and also returns the patches from the previous tree to the new one.
 - **Every render of a program names its nodes by identity, and a key is that identity.** For a static program every render has the same structure, keys and handler identifiers, so a renderer can match a new tree against the one it drew, node by node, by key, and update in place. For a program whose structure varies (a `mesh-if` or `mesh-each`, spec §9.10) the rule is the same for a tree that differs: match **by key, not by position**. A key in both trees is the same node, kept and moved if its order among its siblings changed; a key only in the new tree is created; a key only in the old one is removed. A tree from a **different** program (a template changed or was added) may have entirely different keys: a renderer draws it afresh, and never matches it against the old tree by key.
-- **Finding what changed is the renderer's job,** by comparing prop values and text at equal keys. The runtime does no dependency tracking, no caching of evaluation, and no diffing.
+- **Finding what changed is the runtime's job when the host asks.** `update` (below) renders a new snapshot of the same program and returns the patches from the previous tree to the new one. `render` alone still gives a complete tree, and a renderer that compares trees by key itself loses nothing.
+
+### Update
+
+`update(previous, snapshot)` (Rust: `mesh_runtime::update`; JavaScript: `update(render, snapshot)`) takes a render and a new snapshot of **the same program**, and returns the new render and a `render-patch-v1` list ([`schemas/render-patch-v1.schema.json`](../../schemas/render-patch-v1.schema.json)), or diagnostics. The host, as for a renderer's `update`, asserts program continuity: a different program is a `render`.
+
+- **The law.** Applying the patches, in order, to the previous render's tree gives exactly the tree a full `render` of the new snapshot gives. A list is minimal in effect, not unique in form, so a renderer applies lists and never compares them. The runtime's tests check the law over random snapshots of a program with a conditional, a keyed repeat and an optional prop, and check every list against the schema.
+- **The operations.** Parts are named by their render-v1 keys, and matched by key, never by position (spec §9.10).
+  - `setProp` (with `propText` when the value has text), `removeProp` and `setText` change a kept node or text run.
+  - `insert` adds a node (with its whole subtree) or text run under a parent, before a sibling or last; `remove` takes a part and everything under it away; `move` puts a kept part before a sibling, or last. A kept part is kept: a renderer keeps its realization across a `move`, and a key that is removed and later appears again is a new part.
+  - **The order of a list is the order to apply it in:** removals first, then the insertions and moves that bring the kept parts into the new order (each `before` names a sibling that exists at that point), then the changes inside kept parts. A list that reorders needs only moves and inserts, never a rebuild: moving one item of a long list to the front is one `move`.
+  - `replace` is for a tree no other operation can turn into the next (a different root, or a node whose event bindings differ, which one program never produces). It is always the only operation of its list, and a renderer draws it afresh, reusing nothing.
+- **What it skips.** A render's tree is shared, not copied, and each node remembers what it was computed from: the values, in its scope, of the scope names its subtree reads from outside it (a template says them statically: a name an expression mentions, less the name a repeat binds inside), of the names its own props read, and, for each text run, the values its text was made from. On `update`:
+  - **A node whose subtree's inputs are all identical is the previous node itself,** and its subtree is not looked at. A number is compared by its bits (so `0` and `-0` differ). If nothing the root reads has changed, the new render's tree *is* the previous tree and not one expression is evaluated.
+  - **A repeat remembers its items.** An item that is identical to the one at its place before, with what its node reads as it was, is reused without evaluating its key, building its path or hashing it. An item that moved, or came in, is rendered as before.
+  - **A node on a changed path is rebuilt from its parts:** its props are reused if the names they read are as they were, and so is each text run.
+  - **The patches skip the shared parts too:** the diff does not look inside a node that is the very same node in both trees, and a list of children in the same order needs no lookup tables.
+  - **A node that places a slot is rebuilt, not kept,** even when nothing it reads has changed: what it renders depends on the caller's content too, which its memo doesn't record. The content's own nodes are kept or rebuilt by their own memos, in the caller's scope, as any node is.
+  - **Still done on every update:** validating the snapshot (the work is the snapshot's size, and is what remains when nothing has changed), `mesh-if`'s `when`, `mesh-each`'s `items`, and a visit to each node on a changed path, and to each item of a repeat on one.
+- **A refused update changes nothing.** On diagnostics, `previous` is untouched and still dispatches.
+- **The handler identifiers are unchanged by an update,** since they come from identity (§9.10), so a drawn tree's handlers remain valid for the new render, and a part inserted by a patch has the handler identifiers a full render would give it.
+
+**Retained renders in the module.** In Rust a render is a value, and `update` takes the previous one by reference. The WebAssembly module, which a JavaScript host calls, keeps the renders `update` returns, so that the next `update` from one has what it needs and doesn't derive it again:
+
+- **`render()` keeps nothing in the module.** A render it returns has no copy there, so the first `update` or `updateChanges` from it derives the render again from its own inputs (a render more than the same update costs in Rust), and the render that update returns is kept. A host that renders and never releases, as every host did before `update` existed, holds nothing in the module; the package's memory test renders ten thousand times without releasing and checks that.
+- **`update` and `updateChanges` keep the render they return, under a handle the module never reuses,** and keeps `previous` too, until released: after an update the host may still dispatch with `previous` (events fired before its renderer applied the patches), or update from it again.
+- **`release()` on a render ends the module's copy of it.** A host calls it on a render it will no longer update from or dispatch with, typically `previous` once the patches are applied. It is safe to call twice, and a released render still works: it keeps its own inputs, so a later `update` or `updateChanges` derives it again (except a render `updateChanges` made, which has no snapshot outside the module and then fails with `render-gone`). A render that `update` or `updateChanges` made and that is never released is released when it is garbage collected, but that is up to the JavaScript engine and can be late, and the engine can't see the module's memory, so a loop that makes thousands of them without releasing can run the module out before it does: release what you update from. The package's memory test releases every render in a chain of ten thousand updates and checks that memory doesn't grow.
+- **A copy is good only in the module that made it.** The package discards its module after a trap and uses a new one, which has none of the old one's renders: a render whose copy is gone updates by deriving itself again, with the same result (a render `updateChanges` made has no snapshot of its own, and fails with `render-gone`).
+- **`dispatch` still evaluates against the render's own snapshot,** as before, and holds nothing in the module after the call.
+- **The module returns the patches, not the new tree.** The caller already has the previous tree, and applying the patches to it gives the new one (the law above), so what crosses the boundary on an update is what changed. The JavaScript package applies them (`src/patches.ts`) as a renderer would, over immutable data: the new tree is frozen and shares with the previous tree every part the patches didn't reach, so a part that didn't change is the very same object. The package's review test names that file as the one place it reads a tree, and checks that it makes no text and no number.
+- **The module's calls are one at a time,** so retention adds no ordering of its own: a `release` is queued behind the calls already made.
+
+Measured on one machine, a keyed list of 10,000 items with one changed (the least of 15 runs; `cargo test -p mesh-runtime --release --test update_baseline full_render -- --ignored --nocapture` in Rust, `node scripts/bench-update.mjs` in the package):
+
+| | full render | update, one item changed | update, nothing changed |
+|---|---|---|---|
+| Rust: expressions evaluated | 60,001 | 7 | 0 |
+| Rust: time | 91 ms | 21 ms | 12 ms |
+| Rust: time, from changes (below) | | 13 ms | |
+| JavaScript: time, across the module's boundary | 470 ms | 61 ms | |
+| JavaScript: time, from changes | | 22 ms | |
+
+At 1,000 items the update is 1.6 ms in Rust against 6.2 ms to render, and about 5 ms in JavaScript against 46 (1.7 ms from changes). What remains of a whole-snapshot update is the size of the snapshot, not of the tree: the snapshot is encoded, decoded and validated on every update (12 ms of the 21 in Rust, and the largest part of JavaScript's). Handing over the changes to the snapshot instead removes that ([Changes](#changes)).
+
+### Changes
+
+`update_changes(previous, changes, verify?)` (Rust: `mesh_runtime::update_changes`; JavaScript: `updateChanges(render, changes, { verify })`) is `update` for a host that knows what it changed. It takes the render and the **edits** to its snapshot and returns the new render and patches exactly as `update` does, but it neither encodes nor validates the snapshot: the previous render's values were validated when it was made, so only the values an edit gives are. What an edit doesn't touch is shared with the previous render, and a node that reads only it is kept by a pointer comparison. An update costs the edits and what depends on them.
+
+**The edits define the new snapshot.** The runtime applies them to the previous render's values, so the new snapshot is never a second copy that could disagree with them. A host that computes edits wrongly gets a snapshot it didn't intend; see **verify**.
+
+```json
+{ "base": 41, "changes": [
+  { "op": "set", "path": ["items", 5000, "label"], "value": "changed" },
+  { "op": "insert", "path": ["items", 0], "value": { "id": 99, "label": "new" } },
+  { "op": "remove", "path": ["items", 7] }
+] }
+```
+
+- **`op`.** `set` makes the value at `path` the given one (a scope name's, a record field's, made if the record lacks it and the type allows, or a list element's; a list's length appends one). `insert` puts a value at a list index, and the elements from there on are one later. `remove` takes a record field (which the type lets be absent) or a list element (the later ones are one earlier) away.
+- **`path`.** A non-empty list: a scope name first, then record field names (strings) and list indices (non-negative integers). Edits apply in order, each seeing those before it.
+- **`base`.** The `version` of the render the changes were computed against: a number each render has for life (`render.version`; `Render::version()` in Rust), different for every render the package or thread makes; the JavaScript package gives them, so a render's result never depends on how many came before it. Changes for any other render are refused (`runtime-changes-base-mismatch`), so changes made against a snapshot the runtime no longer holds are never applied to another. The version stands in for a digest of the snapshot: it costs nothing, and it detects the same mistake (changes for the wrong snapshot) without reading the snapshot.
+- **All or none.** Every edit is checked, with the document, before anything is done: a path that leads nowhere the type allows, a value that doesn't fit its type, a malformed edit. The first is `runtime-invalid-change`; a value's mismatch is reported by the input codes, at its path. On diagnostics `previous` is untouched and still dispatches.
+- **`verify`.** With the whole snapshot the host believes it now has, the runtime validates it, compares it with what the edits make, and refuses with `runtime-changes-disagree` at the first path that differs. It costs a whole validation, so it is for tests and development: the package's own tests run every chain with it.
+- **Computing the edits.** The host usually knows what it changed. A host that has the two snapshots can compute them: `diff(previous, next)` in `@valancex/mesh-runtime` returns the edits that turn one into the other, comparing values as the boundary does (a number by its bits, so `0` and `-0` differ), keeping an unchanged value as it is and descending into a record or list only where it changed. A list that changed at its ends gets an `insert`/`remove` at the ends and not a rewrite of every later element; a value that isn't a plain record, list or scalar is given whole, for the runtime to judge. `diff` is a host-side utility: nothing in render, update or dispatch calls it, and the package's review test checks that.
+
+**Limits in the JavaScript package.** The module holds the render's values, so a render made from changes has its snapshot only there: there is no copy in the host to derive it from, and `render.release()` ends the only one. While the module holds it, such a render does everything a render does: `dispatch`, `update(render, snapshot)` and `updateChanges` all work from it, and a host can switch between the two forms. After `release()`, or after the package replaced its module (a trap), they throw a `MeshUsageError` (`render-gone`) saying the copy in the module is gone, and the host makes a new `render`. `updateChanges` takes any render: if the module holds it, the changes apply there; if not (`render` made it, or it was released), the module derives it again from its own snapshot, under the version it was given, and applies them, which costs a render more. Only a render `updateChanges` made has no snapshot of its own to derive from.
 
 ## What renderers and hosts must do
 
@@ -307,13 +378,13 @@ Text for a number is §9.7.7.1's, in text runs and in `propText` alike, and noth
 
 ## Diagnostics
 
-When render or dispatch can't produce its result, it returns diagnostics instead: a **runtime diagnostics document**, [`schemas/runtime-diagnostics-v1.schema.json`](../../schemas/runtime-diagnostics-v1.schema.json). `mesh check-program` prints the same document. Every diagnostic is an error.
+When render, dispatch, update, updateChanges or declaredEvents can't produce its result, it returns diagnostics instead: a **runtime diagnostics document**, [`schemas/runtime-diagnostics-v1.schema.json`](../../schemas/runtime-diagnostics-v1.schema.json). `mesh check-program` prints the same document. Every diagnostic is an error.
 
 ```json runtime-diagnostics
 {
   "version": 1,
   "diagnostics": [
-    { "severity": "error", "code": "runtime-missing-value", "message": "the snapshot has no value for `user`, which is required", "location": { "kind": "input", "path": ["user"] } },
+    { "severity": "error", "code": "runtime-missing-value", "message": "the snapshot has no value for `user`, which is required", "hint": "Give the value in the snapshot, or make its type optional in the manifest.", "location": { "kind": "input", "path": ["user"] } },
     { "severity": "error", "code": "runtime-value-mismatch", "message": "`users[1].active` is a string, but must be a boolean", "location": { "kind": "input", "path": ["users", 1, "active"] } }
   ]
 }
@@ -356,6 +427,8 @@ A diagnostic's identity is its **code** and its **location**. Codes are stable a
 
 Every assembly and runtime code, with its location form, what it means and how to fix it, is in the [diagnostics reference](./diagnostics.md#assembly-errors), beside the compiler's codes.
 
+A runtime diagnostic may carry a **`hint`**: what to do about it, for the codes where one action reliably applies (a value that is missing or doesn't fit its type, an unknown field, a handler from another program or render, an invalid or duplicate key, and the three changes codes). It is the same for every diagnostic of a code, is absent for the others, and may change between versions like a message: match on `code`.
+
 ### Every case the v0.5 contract names
 
 | Case (outline, Definition of Done) | Code |
@@ -366,7 +439,7 @@ Every assembly and runtime code, with its location form, what it means and how t
 | two templates for one component; a missing root template | `assembly-duplicate-template`; `assembly-missing-root` |
 | an unbound scope name; a binding whose types don't fit; an optional prop bound to a scope name that isn't optional | `assembly-unbound-scope-name`; `assembly-unsound-binding`; `assembly-unsound-binding` |
 | a direct or indirect cycle | `assembly-cycle` |
-| a composite that declares events; a composite occurrence with children | `assembly-composite-event`; `assembly-composite-children` |
+| a composite that declares an event and a command of one name; a composite occurrence with children, where the template has no slot | `assembly-composite-event`; `assembly-composite-children` |
 | a missing required scope name; `null` where absence is expected; absence where `null` is expected | `runtime-missing-value`; `runtime-value-mismatch`; `runtime-missing-value` |
 | a wrong-kind value at depth | `runtime-value-mismatch` at its path |
 | a record with an undeclared field; one missing a field that doesn't read as optional | `runtime-unknown-field`; `runtime-missing-value` |

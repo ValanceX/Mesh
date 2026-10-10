@@ -3,7 +3,8 @@
 //! One call is: `mesh_alloc` and fill a buffer per input; `mesh_render`,
 //! `mesh_dispatch` or `mesh_declared_events`; `mesh_free` every input buffer; read the result at
 //! `mesh_result_ptr`/`mesh_result_len`; `mesh_result_clear`. After that,
-//! the call holds no memory in the module.
+//! the call holds no memory in the module, except the renders `mesh_update`
+//! and `mesh_update_changes` keep for the next update, until `mesh_release`.
 //!
 //! A call returns a status: 0, and the result document; 1, and nothing,
 //! if an input isn't UTF-8 or isn't the encoding (the wrapper's fault);
@@ -117,6 +118,145 @@ pub unsafe extern "C" fn mesh_render(
                 bytes(templates, templates_len),
                 model,
                 bytes(snapshot, snapshot_len),
+            )),
+            _ => None,
+        }
+    };
+    keep(result)
+}
+
+/// Updates (`crate::respond_update`): a render's inputs, as
+/// [`mesh_render`] took them, with the render's snapshot, then the new
+/// snapshot, encoded, then the new render's version and the previous render's
+/// handle, which is used when `has_handle` is not 0 and the module still
+/// holds it.
+///
+/// # Safety
+///
+/// Each pointer must point to its length's initialized bytes, unless that
+/// length is 0.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mesh_update(
+    root: *const u8,
+    root_len: usize,
+    templates: *const u8,
+    templates_len: usize,
+    model: *const u8,
+    model_len: usize,
+    previous: *const u8,
+    previous_len: usize,
+    snapshot: *const u8,
+    snapshot_len: usize,
+    new_version: f64,
+    handle: u32,
+    has_handle: u32,
+) -> u32 {
+    // SAFETY: the caller's guarantee, passed on for each input.
+    let result = unsafe {
+        match (text(root, root_len), text(model, model_len)) {
+            (Some(root), Some(model)) => Some(crate::respond_update(
+                root,
+                bytes(templates, templates_len),
+                model,
+                (has_handle != 0).then_some(handle),
+                bytes(previous, previous_len),
+                bytes(snapshot, snapshot_len),
+                new_version as u64,
+            )),
+            _ => None,
+        }
+    };
+    keep(result)
+}
+
+/// Releases the render `handle` names (`crate::release`).
+#[no_mangle]
+pub extern "C" fn mesh_release(handle: u32) {
+    crate::release(handle);
+}
+
+/// Updates a render by changes (`crate::respond_update_changes`): a render's
+/// inputs, as [`mesh_render`] took them but with the render's snapshot only;
+/// the encoded changes; the whole snapshot to verify them against, used when
+/// `has_verify` is not 0; the render's version, then the new render's; then
+/// its handle, used when `has_handle` is not 0 and the module still holds it.
+/// A version is a `f64` so that it crosses the boundary as a JavaScript
+/// number.
+///
+/// # Safety
+///
+/// Each pointer must point to its length's initialized bytes, unless that
+/// length is 0.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mesh_update_changes(
+    root: *const u8,
+    root_len: usize,
+    templates: *const u8,
+    templates_len: usize,
+    model: *const u8,
+    model_len: usize,
+    previous: *const u8,
+    previous_len: usize,
+    changes: *const u8,
+    changes_len: usize,
+    verify: *const u8,
+    verify_len: usize,
+    has_verify: u32,
+    version: f64,
+    new_version: f64,
+    handle: u32,
+    has_handle: u32,
+) -> u32 {
+    // SAFETY: the caller's guarantee, passed on for each input.
+    let result = unsafe {
+        match (text(root, root_len), text(model, model_len)) {
+            (Some(root), Some(model)) => Some(crate::respond_update_changes(
+                root,
+                bytes(templates, templates_len),
+                model,
+                (has_handle != 0).then_some(handle),
+                bytes(previous, previous_len),
+                version as u64,
+                new_version as u64,
+                bytes(changes, changes_len),
+                (has_verify != 0).then(|| bytes(verify, verify_len)),
+            )),
+            _ => None,
+        }
+    };
+    keep(result)
+}
+
+/// Dispatches against a kept render (`crate::respond_dispatch_kept`): the
+/// model's text, the handler identifier and the payload, encoded (absent when
+/// `has_payload` is 0); then the render's handle.
+///
+/// # Safety
+///
+/// Each pointer must point to its length's initialized bytes, unless that
+/// length is 0.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mesh_dispatch_kept(
+    model: *const u8,
+    model_len: usize,
+    handler: *const u8,
+    handler_len: usize,
+    payload: *const u8,
+    payload_len: usize,
+    has_payload: u32,
+    handle: u32,
+) -> u32 {
+    // SAFETY: the caller's guarantee, passed on for each input.
+    let result = unsafe {
+        match (text(model, model_len), text(handler, handler_len)) {
+            (Some(model), Some(handler)) => Some(crate::respond_dispatch_kept(
+                model,
+                handle,
+                handler,
+                (has_payload != 0).then(|| bytes(payload, payload_len)),
             )),
             _ => None,
         }
@@ -264,6 +404,12 @@ mod hooks {
 
     #[global_allocator]
     static ALLOCATOR: Counting = Counting;
+
+    /// How many renders the module holds for `update`.
+    #[no_mangle]
+    pub extern "C" fn mesh_retained_renders() -> usize {
+        crate::retained_renders()
+    }
 
     /// How many allocations are live.
     #[no_mangle]

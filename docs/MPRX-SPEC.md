@@ -75,7 +75,7 @@ v0.5 adds no syntax. It adds MPRX's evaluation (§9.7) and the boundary between 
 
 v0.6 adds no syntax either. It settles two questions PORT's first renderer raised (`docs/superpowers/specs/2026-09-27-mesh-port-semantic-resolution.md`): the text of a value applies to props too, delivered in the render tree as `propText` (§9.7.7, §9.7.8, §9.8.2), with the two ways a renderer may realize a value (§9.8.7); and event resolution (§9.9).
 
-*Last updated 2026-10-06. v0.9 is released as v0.9.0 (`compileProgram`: a compiler-package operation, with no change to the language or this specification), v0.8 is released as v0.8.0 (declared events: a runtime operation, with no change to the language or this specification), v0.7 is released as v0.7.0 (node identity, §9.10, with provisional conditional and repeated structure), v0.6 is released as v0.6.0, v0.5 as v0.5.0, v0.4 as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.9](./releases/v0.9.md), [v0.8](./releases/v0.8.md), [v0.7](./releases/v0.7.md), [v0.6](./releases/v0.6.md), [v0.5](./releases/v0.5.md), [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them and whose later passes implemented them. Any further grammar or semantics work starts a new spec.*
+*Last updated 2026-10-10. v0.10 is prepared as v0.10.0 (fine-grained updates, composition and inferred contracts: runtime and compiler operations, and the provisional `mesh-switch`, with no change to the language's syntax), v0.9 is released as v0.9.0 (`compileProgram`: a compiler-package operation, with no change to the language or this specification), v0.8 is released as v0.8.0 (declared events: a runtime operation, with no change to the language or this specification), v0.7 is released as v0.7.0 (node identity, §9.10, with provisional conditional and repeated structure), v0.6 is released as v0.6.0, v0.5 as v0.5.0, v0.4 as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.10](./releases/v0.10.md), [v0.9](./releases/v0.9.md), [v0.8](./releases/v0.8.md), [v0.7](./releases/v0.7.md), [v0.6](./releases/v0.6.md), [v0.5](./releases/v0.5.md), [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them and whose later passes implemented them. Any further grammar or semantics work starts a new spec.*
 
 ---
 
@@ -804,7 +804,7 @@ MESH event resolution chooses the binding (§9.9.2), the same on every target
 
 What v0.6 doesn't have, deliberately: MESH has **no built-in primitive catalog** (§9.1), so the prose meaning of a given primitive's events is stated with the component library its manifest describes, as MESH-level contract, not in a PORT's implementation. MESH has **no universal interaction vocabulary**, and needs none, since resolution takes applicable events rather than interactions. And the manifest records an event's name and payload only: it is **not an interaction registry**. A later MESH may add a catalog or a declaration form for event meaning; neither changes this section's rule.
 
-Composites have no events (`assembly-composite-event`) and don't appear in the render tree, so composite boundaries play no part in resolution.
+Composites don't appear in the render tree, so composite boundaries play no part in resolution: it is a rule about nodes. A composite's declared events (`docs/manual/templates.md`, "Composite events") don't change that: a handler in a composite's template that names one of its events is a binding of the node it is on, and an interaction still resolves to at most one. Where that binding goes is the host's runtime dispatch, which carries the event out to the occurrence's binding; a handler whose event no occurrence binds is not in the tree, so resolution goes on past it as it would past a node with no binding.
 
 #### 9.9.2 The rule
 
@@ -961,11 +961,12 @@ The syntax for conditional and repeated elements, and for declaring a key; the c
 - Array/object subscript access (§5)
 - Optional chaining (§7), and any other presence test for a value that
   may be absent (§9.2)
-- Slots and children for composites, and composite events
-  (`docs/ARCHITECTURE.md` §10 calls these out as eventual), and so
-  checking element children against a component (§9.1). v0.5 defines
-  composition without them: a program's composites, whose templates
-  are expanded in place (`docs/manual/templates.md`)
+- Checking element children against a component (§9.1). Composites have
+  slots and children: `mesh-slot` places the children of an occurrence,
+  or, with a `name`, the `mesh-fill` of that name, in the caller's
+  scope (`docs/manual/templates.md`, "Children and the slot" and
+  "Named slots"); and they declare and forward events (`docs/manual/templates.md`,
+  "Composite events")
 - Type annotations in MPRX, and types beyond §9.2: unions, nullable types
   separate from absence, generics beyond `list<T>`, function types, open
   records, implicit coercions, and narrowing

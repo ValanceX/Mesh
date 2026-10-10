@@ -3,8 +3,9 @@
 //! It renders a **program** of templates (`mesh-template`) against a
 //! host's **snapshot**, producing a render tree for a renderer to draw,
 //! and turns the events a renderer reports into **command intents** for
-//! the host. Its whole surface is two operations, render and dispatch,
-//! and `resolve`, the reference implementation of event resolution
+//! the host. Its surface is render, dispatch, `update` (render again,
+//! reusing what is unchanged, and say what changed as patches) and
+//! `declared_events`, and `resolve`, the reference implementation of event resolution
 //! (§9.9), a pure function of a render tree that renderers implement for
 //! their own targets.
 //!
@@ -16,11 +17,13 @@
 //! global state: identical inputs give identical results.
 
 mod boundary;
+mod changes;
 mod diagnostic;
 mod dispatch;
 pub mod encoding;
 mod eval;
 mod number;
+mod patch;
 mod program;
 mod render;
 mod resolve;
@@ -28,11 +31,15 @@ mod tree;
 mod types;
 mod value;
 
+pub use changes::{Change, Changes};
 pub use diagnostic::{to_json, Form, Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
 pub use dispatch::{dispatch, dispatch_from};
+#[doc(hidden)]
+pub use eval::evaluations;
 pub use number::number_to_text;
+pub use patch::{diff, patches_to_json, Patch};
 pub use program::{declared_events_to_json, DeclaredEvent, Program};
-pub use render::{render, Render};
+pub use render::{render, update, update_changes, update_with, Render, Update};
 pub use resolve::{resolve, Interaction, ResolveError, Resolved};
 pub use tree::{Intent, Node, Tree, TreeChild};
 pub use value::{HostKey, HostRecord, HostValue};

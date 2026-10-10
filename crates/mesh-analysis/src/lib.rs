@@ -28,6 +28,14 @@ mod types;
 pub use relation::{is_assignable, join, members, read_field};
 pub use types::{FieldTy, Ty};
 
+/// The reserved components of a switch: `mesh-switch` holds `mesh-case`s (each with a
+/// `when`) and at most one last `mesh-default`.
+pub const SWITCH_COMPONENT: &str = "mesh-switch";
+/// See [`SWITCH_COMPONENT`].
+pub const CASE_COMPONENT: &str = "mesh-case";
+/// See [`SWITCH_COMPONENT`].
+pub const DEFAULT_COMPONENT: &str = "mesh-default";
+
 /// Analyzes `ir` as the template of `template`'s component.
 pub fn analyze(ir: &mesh_semantic::Element, template: Template<'_>) -> Analysis {
     check::analyze(ir, template)
@@ -343,6 +351,37 @@ pub enum Fact {
     /// or an optional of one, which has no text form. Span: the
     /// interpolated expression.
     ContentNotText { ty: Ty, span: Span },
+    /// A `mesh-switch`, `mesh-case` or `mesh-default` that is not shaped or
+    /// placed as the language says ([`SwitchProblem`]). Span: the element's
+    /// tag name, or, for a child that does not belong, the child.
+    MalformedSwitch {
+        component: String,
+        problem: SwitchProblem,
+        span: Span,
+    },
+}
+
+/// What is wrong with a `mesh-switch` (or a `mesh-case` or `mesh-default`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SwitchProblem {
+    /// A `mesh-case` or `mesh-default` outside a `mesh-switch`.
+    OutsideSwitch,
+    /// A `mesh-switch` that is the template's root, or the direct child of a
+    /// `mesh-if`, a `mesh-each`, a `mesh-case` or a `mesh-default`: it stands
+    /// for several siblings, so it needs an element around it.
+    Placement,
+    /// A `mesh-switch` with no `mesh-case`.
+    NoCases,
+    /// A child of a `mesh-switch` that is not a `mesh-case` or a
+    /// `mesh-default`: text, an interpolation or another element.
+    NotACase,
+    /// A `mesh-default` that is not the last child, or a second one.
+    DefaultNotLast,
+    /// A `mesh-case` or `mesh-default` that does not have exactly one
+    /// element child and nothing else.
+    BodyCount,
+    /// The body of a case is a `mesh-if`, a `mesh-switch` or a `mesh-slot`.
+    BadBody,
 }
 
 impl Fact {
@@ -368,7 +407,8 @@ impl Fact {
             | Fact::DuplicateObjectKey { span, .. }
             | Fact::UnknownField { span, .. }
             | Fact::MissingRequiredField { span, .. }
-            | Fact::ContentNotText { span, .. } => *span,
+            | Fact::ContentNotText { span, .. }
+            | Fact::MalformedSwitch { span, .. } => *span,
         }
     }
 }
