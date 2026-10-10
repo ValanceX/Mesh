@@ -285,3 +285,19 @@ fn a_fragment_has_no_props_and_no_events() {
         ["assembly-malformed-template"]
     );
 }
+
+#[test]
+fn text_runs_are_maximal_whatever_made_them_adjacent() {
+    // A conditional that chooses nothing leaves the text on either side of it adjacent; a render tree's runs are maximal, so they are one.
+    let view = "<panel>a<mesh-if when={flag}><note>x</note></mesh-if>b</panel>";
+    let off = program(view, &[], &STATE.replace("true", "false"));
+    let on = program(view, &[], STATE);
+
+    assert_eq!(shape(&off), ["\"ab\""]);
+    assert_eq!(shape(&on), ["\"a\"", "note", "\"b\""]);
+
+    // And an update between the two agrees with a fresh render.
+    let updated = update(&on, &snapshot(&STATE.replace("true", "false"))).expect("updates");
+
+    assert_eq!(updated.render.tree(), off.tree());
+}

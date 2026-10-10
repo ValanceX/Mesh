@@ -417,8 +417,6 @@ struct Built {
     children: Vec<TreeChild>,
     runs: Vec<Run>,
     repeats: Vec<RepeatMemo>,
-    /// Whether a slot placed content, which may leave two text runs side by side.
-    slotted: bool,
 }
 
 /// Whether the subtree of `element` places a slot (its own, or one it forwards
@@ -435,6 +433,14 @@ fn contains_slot(element: &Element) -> bool {
 /// Runs of text a slot left side by side are one run (a render tree's text
 /// runs are maximal, §9.8), named by the first.
 fn coalesce(children: &mut Vec<TreeChild>) {
+    // Nearly always there is nothing to merge: look before building a list.
+    if !children
+        .windows(2)
+        .any(|pair| matches!(pair, [TreeChild::Text { .. }, TreeChild::Text { .. }]))
+    {
+        return;
+    }
+
     let mut merged: Vec<TreeChild> = Vec::with_capacity(children.len());
     for child in children.drain(..) {
         match (merged.last_mut(), child) {
@@ -904,9 +910,8 @@ impl<'v> Renderer<'v> {
         let listed = self.render_list(scope, element, path, &old_below, previous, &mut built);
         self.site = outer_site;
         listed?;
-        if built.slotted {
-            coalesce(&mut built.children);
-        }
+        // Text left side by side (by a slot, a fragment, or a conditional or repeat that chose nothing) is one run: a render tree's runs are maximal.
+        coalesce(&mut built.children);
         let Built {
             children,
             runs,
@@ -1016,7 +1021,6 @@ impl<'v> Renderer<'v> {
                     built.repeats.push(memo);
                 }
                 RenderChild::Slot(name) => {
-                    built.slotted = true;
                     self.slot(position, name, path, old_below, previous, built)?;
                 }
             }
@@ -1050,8 +1054,6 @@ impl<'v> Renderer<'v> {
             return Ok(());
         }
 
-        // Text beside it may now be adjacent: a render tree's runs are maximal.
-        built.slotted = true;
         self.site.push(position);
 
         let placed = if element.component == FRAGMENT_COMPONENT {
@@ -1236,7 +1238,6 @@ impl<'v> Renderer<'v> {
                 }
                 built.children.extend(kept.children.iter().cloned());
                 built.runs.extend(kept.runs.iter().cloned());
-                built.slotted |= kept.inline;
                 made.push(kept.clone());
                 continue;
             }
@@ -1292,14 +1293,12 @@ impl<'v> Renderer<'v> {
                 placed?;
                 let names = self.free(child);
                 let free = inputs_of(&names.iter().map(String::as_str).collect(), &values);
-                built.slotted = true;
                 RepeatItem {
                     canonical,
                     item: item.clone(),
                     children: inner_built.children,
                     free,
                     runs: inner_built.runs,
-                    inline: true,
                 }
             } else {
                 let rendered = self.occurrence(scope.component, child, 0, path, &values, old);
@@ -1311,7 +1310,6 @@ impl<'v> Renderer<'v> {
                     free: rendered.memo.free.clone(),
                     children: vec![TreeChild::Node(rendered)],
                     runs: Vec::new(),
-                    inline: false,
                 }
             };
             built.children.extend(made_item.children.iter().cloned());

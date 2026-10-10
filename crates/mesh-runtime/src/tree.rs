@@ -86,8 +86,6 @@ pub(crate) struct RepeatItem {
     pub free: Vec<(String, Scoped)>,
     /// The text runs of an item that is a fragment, so a reused item keeps them for the next update.
     pub runs: Vec<Run>,
-    /// Whether the item places its children without a node of its own.
-    pub inline: bool,
 }
 
 impl PartialEq for Memo {
