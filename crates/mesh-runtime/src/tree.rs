@@ -80,7 +80,14 @@ pub(crate) struct RepeatItem {
     /// The item's declared key, as the repeat canonicalizes it.
     pub canonical: Rc<str>,
     pub item: Scoped,
-    pub node: Rc<Node>,
+    /// What the item made: one node, or, for an item that is a fragment (or a composite that starts with one), its children.
+    pub children: Vec<TreeChild>,
+    /// The scope names the item reads from outside it, and their values: what it was made from.
+    pub free: Vec<(String, Scoped)>,
+    /// The text runs of an item that is a fragment, so a reused item keeps them for the next update.
+    pub runs: Vec<Run>,
+    /// Whether the item places its children without a node of its own.
+    pub inline: bool,
 }
 
 impl PartialEq for Memo {

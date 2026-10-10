@@ -60,6 +60,7 @@ impl RuntimeCode {
     pub const COMPOSITE_EVENT: RuntimeCode = RuntimeCode("assembly-composite-event", Form::Source);
     pub const COMPOSITE_CHILDREN: RuntimeCode =
         RuntimeCode("assembly-composite-children", Form::Source);
+    pub const ROOT_FRAGMENT: RuntimeCode = RuntimeCode("assembly-root-fragment", Form::Source);
     // Input validation.
     pub const MISSING_VALUE: RuntimeCode = RuntimeCode("runtime-missing-value", Form::Input);
     pub const VALUE_MISMATCH: RuntimeCode = RuntimeCode("runtime-value-mismatch", Form::Input);
@@ -112,6 +113,7 @@ impl RuntimeCode {
         RuntimeCode::CYCLE,
         RuntimeCode::COMPOSITE_EVENT,
         RuntimeCode::COMPOSITE_CHILDREN,
+        RuntimeCode::ROOT_FRAGMENT,
         RuntimeCode::MISSING_VALUE,
         RuntimeCode::VALUE_MISMATCH,
         RuntimeCode::UNKNOWN_FIELD,

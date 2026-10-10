@@ -7,7 +7,7 @@ use crate::diagnostic::{Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
 use crate::eval::Scope;
 use crate::program::{
     self, alternatives, uses_conditional, uses_repeat, Program, Step, Valid, ALTERNATIVES,
-    COMPOSITE, CONDITIONAL, NODE, SLOT,
+    COMPOSITE, CONDITIONAL, FRAGMENT, FRAGMENT_COMPONENT, NODE, SLOT,
 };
 use crate::render::{
     bind, is_live, render_children, snapshot_values, statics, Link, Render, RenderChild,
@@ -90,6 +90,17 @@ fn walk<'v>(
         );
         composites.pop();
         frames.pop();
+        path.pop();
+        return;
+    }
+    if element.component == FRAGMENT_COMPONENT {
+        // It makes no node: its content's sites are below a step of its own.
+        path.push(Step {
+            position,
+            kind: FRAGMENT,
+            component: String::new(),
+        });
+        walk_children(valid, component, element, path, composites, frames, found);
         path.pop();
         return;
     }

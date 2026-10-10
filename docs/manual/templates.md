@@ -427,6 +427,24 @@ Only the root template's scope comes from the snapshot. The root component's own
 
 **Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can raise events of its own: see [Composite events](#composite-events).
 
+### Fragments
+
+MESH makes a node only where a template wrote an element. `mesh-fragment` is how a template writes **content without one**: text, or several nodes, where otherwise exactly one element is required. Nothing wraps content in a node on the author's behalf.
+
+```xml
+<!-- the template of `shout` -->
+<mesh-fragment>{who}!</mesh-fragment>
+
+<!-- used in a paragraph -->
+<para>hello <shout who={name} /> bye</para>   <!-- one text run: "hello Ada! bye" -->
+```
+
+- **Where it is placed.** A fragment is declared in the model like `mesh-slot`, with no props, and has no events. It may be a composite template's root, a `mesh-if` alternative, a `mesh-case` or `mesh-default` body, a `mesh-each` item, or simply a child among others, where its content is placed in the node around it.
+- **Never a node.** The render tree has its content, as children of the nearest node above. Text it places that is next to other text is one run (a render tree's runs are maximal).
+- **Not the program's root.** The root renders one node: a root template that starts with a fragment, or with a composite that does, is `assembly-root-fragment`.
+- **Identity.** A fragment adds a step (`0x07`, [runtime](runtime.md)) so its content's keys are its own; a repeat inside a fragment that is a repeat's item is made again on each update (it is not remembered per item).
+- **Switch and fragments.** A `mesh-switch` stands for several siblings, so it may be a fragment's child but not a template's root; a case whose body is text is `<mesh-case when={…}><mesh-fragment>text</mesh-fragment></mesh-case>`.
+
 ### Named slots
 
 A template may have several slots, each with a `name`; the one without is the default slot. An occurrence says which content goes to which with `mesh-fill`.

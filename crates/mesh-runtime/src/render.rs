@@ -8,8 +8,8 @@ use crate::number::number_to_text;
 use crate::patch::Patch;
 use crate::program::{
     self, alternatives, repeat_name, Program, Step, Valid, ALTERNATIVES, COMPOSITE, CONDITIONAL,
-    CONDITIONAL_COMPONENT, FILL_COMPONENT, NODE, REPEAT, REPEAT_COMPONENT, SLOT, SLOT_COMPONENT,
-    TEXT,
+    CONDITIONAL_COMPONENT, FILL_COMPONENT, FRAGMENT, FRAGMENT_COMPONENT, NODE, REPEAT,
+    REPEAT_COMPONENT, SLOT, SLOT_COMPONENT, TEXT,
 };
 use crate::tree::{Memo, Node, RepeatItem, RepeatMemo, Run, Tree, TreeChild};
 use crate::types::{fits, Statics};
@@ -995,14 +995,7 @@ impl<'v> Renderer<'v> {
                     built.children.push(TreeChild::Text { key, text });
                 }
                 RenderChild::Element(child) => {
-                    built.children.push(TreeChild::Node(self.occurrence(
-                        scope.component,
-                        child,
-                        position,
-                        path,
-                        scope.values,
-                        old_below,
-                    )?));
+                    self.place(scope, child, position, path, old_below, previous, built)?;
                 }
                 RenderChild::Conditional(conditional) => {
                     // The slot is `position` whether or not a node comes of it.
@@ -1012,28 +1005,14 @@ impl<'v> Renderer<'v> {
                             kind: CONDITIONAL,
                             component: ALTERNATIVES[alternative].to_string(),
                         });
-                        let rendered = self.occurrence(
-                            scope.component,
-                            chosen,
-                            0,
-                            path,
-                            scope.values,
-                            old_below,
-                        );
+                        let placed = self.place(scope, chosen, 0, path, old_below, previous, built);
                         path.pop();
-                        built.children.push(TreeChild::Node(rendered?));
+                        placed?;
                     }
                 }
                 RenderChild::Repeat(repeat) => {
-                    let memo = self.repeat(
-                        scope,
-                        repeat,
-                        position,
-                        path,
-                        &mut built.children,
-                        old_below,
-                        previous,
-                    )?;
+                    let memo =
+                        self.repeat(scope, repeat, position, path, built, old_below, previous)?;
                     built.repeats.push(memo);
                 }
                 RenderChild::Slot(name) => {
@@ -1043,6 +1022,80 @@ impl<'v> Renderer<'v> {
             }
         }
         Ok(())
+    }
+
+    /// Places `element`, an occurrence at `position` in the template of `scope`'s component: a node, as one child of `built`; or, for what makes no node of its own (a
+    /// `mesh-fragment`, or a composite whose template starts with one), its content, in place, as the slot places the caller's.
+    #[allow(clippy::too_many_arguments)]
+    fn place(
+        &mut self,
+        scope: &Scope<'_, '_>,
+        element: &'v Element,
+        position: usize,
+        path: &mut Vec<Step>,
+        old: &Old<'_>,
+        previous: Option<&Rc<Node>>,
+        built: &mut Built,
+    ) -> Result<(), RuntimeDiagnostic> {
+        if !program::is_inline(self.valid, element) {
+            built.children.push(TreeChild::Node(self.occurrence(
+                scope.component,
+                element,
+                position,
+                path,
+                scope.values,
+                old,
+            )?));
+
+            return Ok(());
+        }
+
+        // Text beside it may now be adjacent: a render tree's runs are maximal.
+        built.slotted = true;
+        self.site.push(position);
+
+        let placed = if element.component == FRAGMENT_COMPONENT {
+            path.push(Step {
+                position,
+                kind: FRAGMENT,
+                component: String::new(),
+            });
+            let listed = self.render_list(scope, element, path, old, previous, built);
+            path.pop();
+            listed
+        } else {
+            let bound = bind(self.valid, scope, element);
+            match bound {
+                Err(diagnostic) => Err(diagnostic),
+                Ok(bound) => {
+                    let template = &self.valid.templates[&element.component];
+                    path.push(Step {
+                        position,
+                        kind: COMPOSITE,
+                        component: element.component.clone(),
+                    });
+                    self.frames.push(Frame {
+                        occurrence: element,
+                        component: scope.component.to_string(),
+                        values: (!element.children.is_empty() || !element.events.is_empty())
+                            .then(|| scope.values.clone()),
+                    });
+                    let inner = Scope {
+                        component: &template.component,
+                        values: &bound,
+                        payload: None,
+                        statics: statics(self.valid, &template.component, None),
+                    };
+                    let placed = self.place(&inner, &template.root, 0, path, old, previous, built);
+                    self.frames.pop();
+                    path.pop();
+                    placed
+                }
+            }
+        };
+
+        self.site.pop();
+        placed
     }
 
     /// A slot: the children of the innermost composite occurrence, rendered in
@@ -1105,7 +1158,7 @@ impl<'v> Renderer<'v> {
         repeat: &'v Element,
         position: usize,
         path: &mut Vec<Step>,
-        children: &mut Vec<TreeChild>,
+        built: &mut Built,
         old: &Old<'_>,
         previous: Option<&Rc<Node>>,
     ) -> Result<RepeatMemo, RuntimeDiagnostic> {
@@ -1172,9 +1225,7 @@ impl<'v> Renderer<'v> {
             // its node was made from is as it was, is the item's node again.
             if let Some(kept) = before
                 .and_then(|memo| memo.items.get(index))
-                .filter(|kept| {
-                    kept.item.identical(item) && unchanged(&kept.node.memo.free, &values)
-                })
+                .filter(|kept| kept.item.identical(item) && unchanged(&kept.free, &values))
             {
                 if !seen.insert(Rc::clone(&kept.canonical)) {
                     return Err(scope.error(
@@ -1183,7 +1234,9 @@ impl<'v> Renderer<'v> {
                         key.value.span(),
                     ));
                 }
-                children.push(TreeChild::Node(Rc::clone(&kept.node)));
+                built.children.extend(kept.children.iter().cloned());
+                built.runs.extend(kept.runs.iter().cloned());
+                built.slotted |= kept.inline;
                 made.push(kept.clone());
                 continue;
             }
@@ -1230,15 +1283,40 @@ impl<'v> Renderer<'v> {
                 kind: REPEAT,
                 component: canonical.to_string(),
             });
-            let rendered = self.occurrence(scope.component, child, 0, path, &values, old);
-            path.pop();
-            let rendered = rendered?;
-            made.push(RepeatItem {
-                canonical,
-                item: item.clone(),
-                node: Rc::clone(&rendered),
-            });
-            children.push(TreeChild::Node(rendered));
+            let made_item = if program::is_inline(self.valid, child) {
+                // An item that is a fragment places its content: what it made is its children, which it keeps as the node would be kept. A repeat inside it is
+                // not remembered (the items share a template position, so they would share a site): it is made again.
+                let mut inner_built = Built::default();
+                let placed = self.place(&inner, child, 0, path, old, previous, &mut inner_built);
+                path.pop();
+                placed?;
+                let names = self.free(child);
+                let free = inputs_of(&names.iter().map(String::as_str).collect(), &values);
+                built.slotted = true;
+                RepeatItem {
+                    canonical,
+                    item: item.clone(),
+                    children: inner_built.children,
+                    free,
+                    runs: inner_built.runs,
+                    inline: true,
+                }
+            } else {
+                let rendered = self.occurrence(scope.component, child, 0, path, &values, old);
+                path.pop();
+                let rendered = rendered?;
+                RepeatItem {
+                    canonical,
+                    item: item.clone(),
+                    free: rendered.memo.free.clone(),
+                    children: vec![TreeChild::Node(rendered)],
+                    runs: Vec::new(),
+                    inline: false,
+                }
+            };
+            built.children.extend(made_item.children.iter().cloned());
+            built.runs.extend(made_item.runs.iter().cloned());
+            made.push(made_item);
         }
         self.prefixes.pop();
         Ok(RepeatMemo {

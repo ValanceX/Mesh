@@ -215,6 +215,14 @@ fn walk_names(
     if element.component == FILL_COMPONENT {
         fill_problems(element, problems);
     }
+    if element.component == FRAGMENT_COMPONENT {
+        if !element.props.is_empty() {
+            problems.push(format!("`{FRAGMENT_COMPONENT}` has no props"));
+        }
+        if !element.events.is_empty() {
+            problems.push(format!("`{FRAGMENT_COMPONENT}` can't have events"));
+        }
+    }
     let repeated = element.component == REPEAT_COMPONENT;
     if repeated {
         repeat_problems(element, problems);
@@ -738,6 +746,24 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
             }
         }
     }
+    // The program renders one root node: its root template's root is not a fragment, nor a composite that expands to one.
+    if let Some((_, template)) = read.iter().find(|(_, template)| template.component == root) {
+        let mut at = &template.root;
+        for _ in 0..=read.len() {
+            if at.component == FRAGMENT_COMPONENT {
+                diagnostics.push(RuntimeDiagnostic::new(
+                    RuntimeCode::ROOT_FRAGMENT,
+                    format!("the root `{root}` renders one root node, but its template starts with a `{FRAGMENT_COMPONENT}`, which makes none: put an element around it"),
+                    source(template, template.root.span),
+                ));
+                break;
+            }
+            match first.get(at.component.as_str()) {
+                Some(next) => at = &next.root,
+                None => break,
+            }
+        }
+    }
     // A fill belongs directly inside an occurrence of a composite.
     for (_, template) in read {
         let mut all = Vec::new();
@@ -973,6 +999,27 @@ pub(crate) const SLOT_COMPONENT: &str = "mesh-slot";
 /// ever a direct child of a composite occurrence; the slot it names is
 /// `<mesh-slot name="header" />` in the composite's template.
 pub(crate) const FILL_COMPONENT: &str = "mesh-fill";
+
+/// A fragment (PROVISIONAL): its children are placed where it is, and it is never a node. The explicit way for a composite's template, or a
+/// conditional's alternative or a repeat's item, to be text or several nodes: nothing in MESH wraps content in a node of its own. Declared in the
+/// model like `mesh-slot`, with no props, and it has no events. A step of its own (`0x07`) keeps its content's keys apart from a sibling's.
+pub(crate) const FRAGMENT_COMPONENT: &str = "mesh-fragment";
+pub(crate) const FRAGMENT: u8 = 0x07;
+
+/// Whether `element` is placed without making a node of its own: a fragment, or a composite whose template's root is one (or is such a composite).
+pub(crate) fn is_inline(valid: &Valid, element: &Element) -> bool {
+    let mut at = element;
+    for _ in 0..=valid.templates.len() {
+        if at.component == FRAGMENT_COMPONENT {
+            return true;
+        }
+        match valid.templates.get(&at.component) {
+            Some(template) => at = &template.root,
+            None => return false,
+        }
+    }
+    false
+}
 
 /// The string literal written for `prop` on `element`, if there is one.
 fn literal<'e>(element: &'e Element, prop: &str) -> Option<&'e str> {

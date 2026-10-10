@@ -934,6 +934,14 @@ A composite occurrence has children that the composite's template has no slot fo
 
 Location: `source`, the occurrence.
 
+### `assembly-root-fragment`
+
+The program's root renders one node, but its root template's root is a `mesh-fragment`, or a composite whose template starts with one ([Fragments](templates.md#fragments)). A fragment makes no node. Points at the root of the root template.
+
+Location: `source`, the root template's root.
+
+**Fix:** put an element around it.
+
 ## Runtime errors
 
 The runtime reports these while rendering or dispatching (`docs/manual/runtime.md`): input errors about the host's values, evaluation errors from §9.7's checks, and one internal error. Every runtime diagnostic is an error, in a runtime diagnostics document (`schemas/runtime-diagnostics-v1.schema.json`), and its `location` has the form its entry names.

@@ -19,7 +19,7 @@ What each public surface of MESH promises. The tiers have one meaning each, ever
 | `updateChanges`, `diff`, `render.version`, `[Symbol.dispose]`; `mesh_runtime::{update_changes, Changes, Change}`; the changes document; the diagnostics `runtime-changes-base-mismatch`, `runtime-invalid-change`, `runtime-changes-disagree` | Stable |
 | `MeshUsageError` (including its `module-unavailable` code), `MeshUsageCode` and the `code` of the other errors, in both JavaScript packages; `RenderVersion`; the `hint` of a runtime diagnostic; `Render[Symbol.dispose]`; `mesh_runtime::Render::with_version` | Stable |
 | `mesh-slot`, `mesh-fill` (named slots) and composite children; composite events (forwarding a declared event); `assembly-composite-children`; inferred composite contracts (`compileProgram` for an undeclared component, `mesh_compiler::infer`) | Stable |
-| `mesh-if`, `mesh-each` and the identity steps they add (`0x04`, `0x05`); `mesh-switch`, `mesh-case`, `mesh-default` and `invalid-switch` | Provisional |
+| `mesh-if`, `mesh-each` and the identity steps they add (`0x04`, `0x05`); `mesh-switch`, `mesh-case`, `mesh-default` and `invalid-switch`; `mesh-fragment`, its identity step (`0x07`) and `assembly-root-fragment` | Provisional |
 | The module's exports (`mesh_*`) and its hook `mesh_retained_renders`; `mesh_runtime::evaluations`; the package's hidden test hooks | Internal |
 | Anything under `dist/` that the package's `exports` doesn't list | Internal |
 
