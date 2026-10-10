@@ -4,6 +4,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Documentation
+
+- `@valancex/mesh-compiler`'s README gains an install line and a stability section (found by validating the released set against the API design principles). It reaches npm with the next MESH release; the package has no behavior change to release on its own.
+
 ## [0.10.0] - 2026-10-10
 
 Fine-grained updates and composition: the runtime updates a render from a new snapshot or from changes and returns patches; composites have children, named slots and events; a program's composites need no declared contract; and `mesh-switch` chooses among alternatives. The public APIs were reviewed against the API design principles first: see [the review baseline](./docs/superpowers/specs/2026-10-09-api-review-baseline.md). See the [v0.10 release notes](./docs/releases/v0.10.md).

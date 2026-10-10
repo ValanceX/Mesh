@@ -6,6 +6,8 @@ Or compile it, and also get the component's **template**, exactly what `mesh com
 
 It's the Rust compiler itself, compiled to WebAssembly, not a reimplementation: this package adds no rule of its own.
 
+Install it with `npm install @valancex/mesh-compiler` (or `pnpm add`).
+
 ```js
 import { check } from "@valancex/mesh-compiler";
 
@@ -42,6 +44,10 @@ The [Using MESH from JavaScript](https://github.com/ValanceX/Mesh/blob/main/docs
 Match on `code`, never on `message`. Calls run one at a time, in the order made, and can't be cancelled.
 
 Paths are identifiers: the package never touches the file system. Strings are passed as UTF-8, so a lone surrogate in a JavaScript string becomes U+FFFD, as with any UTF-8 encoding.
+
+## Stability
+
+Every export listed above (`check`, `compile`, `checkProgram`, `compileProgram`, `init`, `version`, and the three error classes with their `code`s) is **stable**: before 1.0 a change to one is named in a release's notes, never silent, and diagnostic and error `code`s never change meaning. What each MESH surface promises is in [API stability](https://github.com/ValanceX/Mesh/blob/main/docs/manual/stability.md).
 
 ## Support
 
