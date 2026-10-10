@@ -57,6 +57,21 @@ jobs:
           npx tree-sitter generate
           git diff --exit-code -- src/
 
+  # The VS Code language extension's TextMate grammar, with the engine VS Code uses, on this
+  # repository's own MPRX (editors/vscode/README.md).
+  vscode-grammar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Grammar tests
+        working-directory: editors/vscode
+        run: |
+          npm ci --ignore-scripts
+          npm test
+
   # The whole workspace suite, natively, once per OS (outline v0.4 D9):
   # one runner each, on whatever architecture it has. Shipped binaries are
   # built and exercised per architecture elsewhere.

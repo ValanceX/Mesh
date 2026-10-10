@@ -134,4 +134,4 @@ Then run `hx --grammar build`, and copy `queries/highlights.scm` to `~/.config/h
 
 Any editor that can start a language server over stdio and send it `initializationOptions` can use `mesh-lsp`: start `mesh-lsp` with no arguments for `.mprx` files (and the manifest), with the `"mesh"` settings above as the initialization options.
 
-Zed and VS Code add languages through extensions, and MESH doesn't ship one yet. A future extension will only start `mesh-lsp` and pass these settings; all of MESH's behaviour stays in the server.
+Zed and VS Code add languages through extensions. For VS Code, [`editors/vscode`](../../editors/vscode) holds the MPRX language (a TextMate grammar and bracket rules, tested with VS Code's own engine against this repository's MPRX); it is not published yet. An extension that wires the server for a project (VALANCE's does) depends on it, starts `mesh-lsp` and passes the settings above; all of MESH's behaviour stays in the server.

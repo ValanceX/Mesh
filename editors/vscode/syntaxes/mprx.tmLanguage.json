@@ -1,0 +1,79 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "MPRX",
+  "scopeName": "source.mprx",
+  "patterns": [{ "include": "#content" }],
+  "repository": {
+    "content": {
+      "patterns": [
+        { "include": "#closing-tag" },
+        { "include": "#opening-tag" },
+        { "include": "#expression-block" }
+      ]
+    },
+    "opening-tag": {
+      "name": "meta.tag.mprx",
+      "begin": "(<)([A-Za-z_][A-Za-z0-9_-]*)",
+      "beginCaptures": { "1": { "name": "punctuation.definition.tag.begin.mprx" }, "2": { "name": "entity.name.tag.mprx" } },
+      "end": "(/?>)",
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.mprx" } },
+      "patterns": [
+        { "include": "#event-binding" },
+        { "include": "#attribute" }
+      ]
+    },
+    "closing-tag": {
+      "name": "meta.tag.mprx",
+      "match": "(</)([A-Za-z_][A-Za-z0-9_-]*)\\s*(>)",
+      "captures": { "1": { "name": "punctuation.definition.tag.begin.mprx" }, "2": { "name": "entity.name.tag.mprx" }, "3": { "name": "punctuation.definition.tag.end.mprx" } }
+    },
+    "event-binding": {
+      "begin": "\\b(on)(\\.)([A-Za-z_][A-Za-z0-9_]*)\\s*(=)",
+      "beginCaptures": { "1": { "name": "keyword.other.event.mprx" }, "2": { "name": "punctuation.separator.event.mprx" }, "3": { "name": "entity.other.attribute-name.event.mprx" }, "4": { "name": "punctuation.separator.key-value.mprx" } },
+      "end": "(?<=\\})|(?=/?>)",
+      "patterns": [{ "include": "#expression-block" }]
+    },
+    "attribute": {
+      "begin": "([A-Za-z_][A-Za-z0-9_]*)\\s*(=)",
+      "beginCaptures": { "1": { "name": "entity.other.attribute-name.mprx" }, "2": { "name": "punctuation.separator.key-value.mprx" } },
+      "end": "(?<=\"|\\})|(?=/?>)",
+      "patterns": [
+        { "include": "#string" },
+        { "include": "#expression-block" }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.double.mprx",
+      "begin": "\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.mprx" } },
+      "end": "\"",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.mprx" } },
+      "patterns": [{ "name": "constant.character.escape.mprx", "match": "\\\\." }]
+    },
+    "expression-block": {
+      "name": "meta.embedded.expression.mprx",
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.mprx" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.end.mprx" } },
+      "patterns": [{ "include": "#expression" }]
+    },
+    "expression": {
+      "patterns": [
+        { "include": "#string" },
+        { "name": "constant.numeric.mprx", "match": "\\b[0-9]+(\\.[0-9]+)?\\b" },
+        { "name": "constant.language.boolean.mprx", "match": "\\b(true|false)\\b" },
+        { "name": "constant.language.null.mprx", "match": "\\bnull\\b" },
+        { "name": "variable.language.event.mprx", "match": "\\$[A-Za-z_][A-Za-z0-9_]*" },
+        { "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\s*\\()", "captures": { "1": { "name": "entity.name.function.mprx" } } },
+        { "match": "(\\.)\\s*([A-Za-z_][A-Za-z0-9_]*)", "captures": { "1": { "name": "punctuation.accessor.mprx" }, "2": { "name": "variable.other.property.mprx" } } },
+        { "match": "([A-Za-z_][A-Za-z0-9_]*)(?=\\s*:)", "name": "variable.other.property.mprx" },
+        { "name": "variable.other.readwrite.mprx", "match": "[A-Za-z_][A-Za-z0-9_]*" },
+        { "name": "keyword.operator.mprx", "match": "<=|>=|==|!=|&&|\\|\\||[-+*/%<>!?:]" },
+        { "name": "punctuation.separator.comma.mprx", "match": "," },
+        { "name": "punctuation.section.group.mprx", "match": "[()\\[\\]]" },
+        { "name": "meta.object.mprx", "begin": "\\{", "end": "\\}", "patterns": [{ "include": "#expression" }] }
+      ]
+    }
+  }
+}
