@@ -117,3 +117,28 @@ test("a file that does not parse is still tokenized, never rejected (the compile
     assert.doesNotThrow(() => tokenize(readFileSync(file, "utf8")), file);
   }
 });
+
+test("blocks: openers, branches, closers and the name a repeat binds", () => {
+  const { tokens, closed } = tokenize('<list>{#if ready}<a />{:else if !failed && n > 1}<b />{:else}<c />{/if}{#each users as user (user.id)}<i>{user.name}</i>{/each}</list>');
+
+  assert.equal(scope(tokens, "if"), "keyword.control.conditional.mprx");
+  assert.equal(scope(tokens, "else", 0), "keyword.control.conditional.mprx");
+  assert.equal(scope(tokens, "if", 1), "keyword.control.conditional.mprx");
+  assert.equal(scope(tokens, "else", 1), "keyword.control.conditional.mprx");
+  assert.equal(scope(tokens, "if", 2), "keyword.control.block.mprx");
+  assert.equal(scope(tokens, "ready"), "variable.other.readwrite.mprx");
+  assert.equal(scope(tokens, "#"), "punctuation.definition.block.mprx");
+  assert.equal(scope(tokens, "each", 0), "keyword.control.loop.mprx");
+  assert.equal(scope(tokens, "as"), "keyword.control.loop.mprx");
+  assert.equal(scope(tokens, "user", 0), "variable.parameter.mprx");
+  assert.equal(scope(tokens, "id"), "variable.other.property.mprx");
+  assert.equal(scope(tokens, "each", 1), "keyword.control.block.mprx");
+  assert.ok(closed);
+});
+
+test("an expression block is still an expression block next to a block", () => {
+  const { tokens, closed } = tokenize("<p>{#if a}{b}{/if}</p>");
+
+  assert.equal(scope(tokens, "b"), "variable.other.readwrite.mprx");
+  assert.ok(closed);
+});

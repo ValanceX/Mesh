@@ -20,8 +20,8 @@ use mesh_syntax::{Child, Element, Expression, Span, Text};
 use tree_sitter::Node;
 
 use crate::{
-    field_text, lower_attribute, lower_event_binding, lower_expression, lower_expression_block,
-    nesting, span_of, text_of,
+    field_text, lower_attribute, lower_child, lower_event_binding, lower_expression,
+    lower_expression_block, nesting, span_of, text_of,
 };
 
 /// What [`recover`] kept of a file: the elements that parse, pruned of
@@ -172,6 +172,10 @@ fn recover_child<'t>(
             children.push(Child::Expression(lower_expression_block(inner, source)));
         }
         "expression_block" => dropped.push(inner),
+        // A block with no error is kept whole; one with an error is pruned to the elements inside it.
+        "if_block" | "each_block" if !inner.has_error() => {
+            children.push(lower_child(node, source));
+        }
         // The `element` wrapper, or anything else: whatever elements it
         // holds, in order.
         _ => children.extend(

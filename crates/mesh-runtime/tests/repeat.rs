@@ -62,16 +62,16 @@ const MODEL: &str = r#"{
 /// handlers whose arguments are the item's.
 const VIEW: &str = "<page>\
   <note>head</note>\
-  <mesh-each items={items} as=\"item\" key={item.id}>\
+  {#each items as item (item.id)}\
     <row on.tap={pick(item.id)} on.hold={name(item.label)}>{item.label}</row>\
-  </mesh-each>\
+  {/each}\
   <note>tail</note>\
 </page>";
 
 /// Two repeats, so that different sites can be given equal keys.
 const TWO: &str = "<page>\
-  <mesh-each items={items} as=\"item\" key={item.id}><row on.tap={pick(item.id)}>{item.label}</row></mesh-each>\
-  <mesh-each items={others} as=\"other\" key={other.id}><row on.tap={pick(other.id)}>{other.label}</row></mesh-each>\
+  {#each items as item (item.id)}<row on.tap={pick(item.id)}>{item.label}</row>{/each}\
+  {#each others as other (other.id)}<row on.tap={pick(other.id)}>{other.label}</row>{/each}\
 </page>";
 
 fn items(list: &[(&str, &str)]) -> String {
@@ -445,9 +445,8 @@ fn dispatch_against_a_snapshot_with_a_bad_key_fails_closed() {
 fn the_checker_requires_a_key_that_is_a_string_or_a_number() {
     let model = mesh_compiler::check::Model::load(MODEL, "typed").unwrap();
     let key = |expression: &str| {
-        let source = format!(
-            "<page><mesh-each items={{rows}} as=\"r\" key={{{expression}}}><note>x</note></mesh-each></page>"
-        );
+        let source =
+            format!("<page>{{#each rows as r ({expression})}}<note>x</note>{{/each}}</page>");
         mesh_compiler::check::template(&source, &model)
     };
     for accepted in ["r.s", "r.n", "r.a", "\"literal\"", "7", "r.n + 1"] {
@@ -473,7 +472,7 @@ fn the_checker_requires_a_key_that_is_a_string_or_a_number() {
         assert!(compiled.template.is_none(), "{rejected} should be refused");
         let message = &compiled.diagnostics[0].message;
         assert!(
-            message.contains("a repeat's key must be a string or a number"),
+            message.contains("the key of `{#each}` must be a string or a number"),
             "{message}"
         );
         assert_eq!(
@@ -498,14 +497,14 @@ fn the_item_is_in_scope_only_inside_the_repeat() {
         // outside it
         "<page><note>{item.label}</note></page>",
         // an `as` that isn't the name used
-        "<page><mesh-each items={items} as=\"x\" key={item.id}><note>a</note></mesh-each></page>",
+        "<page>{#each items as x (item.id)}<note>a</note>{/each}</page>",
     ] {
         let compiled = mesh_compiler::check::template(source, &model);
         assert!(compiled.template.is_none(), "{source}");
     }
     // Its fields are typed: an unknown one is the ordinary unknown-member error.
     let compiled = mesh_compiler::check::template(
-        "<page><mesh-each items={items} as=\"item\" key={item.id}><note>{item.nope}</note></mesh-each></page>",
+        "<page>{#each items as item (item.id)}<note>{item.nope}</note>{/each}</page>",
         &model,
     );
     assert!(compiled.template.is_none());
@@ -513,8 +512,15 @@ fn the_item_is_in_scope_only_inside_the_repeat() {
 
 #[test]
 fn a_malformed_repeat_is_refused() {
-    let refuse = |source: &str| {
-        let template = compile_with(MODEL, "bad", source);
+    use common::{compile_edited, edit_first};
+    use serde_json::{json, Value};
+
+    // Blocks make a well-formed repeat; the malformed ones are edits of its compiled template.
+    let base = "<page>{#each items as i (i)}<note>a</note>{/each}</page>";
+    let nested =
+        "<page>{#each items as i (i)}{#each items as j (j)}<note>a</note>{/each}{/each}</page>";
+    let refuse = |source: &str, edit: &dyn Fn(&mut Value)| {
+        let template = compile_edited(MODEL, "bad", source, |template| edit(template));
         let templates = [template.as_str()];
         mesh_runtime::check_program(
             &Program {
@@ -524,22 +530,56 @@ fn a_malformed_repeat_is_refused() {
             MODEL,
         )
     };
-    for source in [
-        // two children
-        "<page><mesh-each items={items} as=\"i\" key={i}><note>a</note><note>b</note></mesh-each></page>",
-        // none
-        "<page><mesh-each items={items} as=\"i\" key={i}></mesh-each></page>",
-        // text beside the child
-        "<page><mesh-each items={items} as=\"i\" key={i}><note>a</note>text</mesh-each></page>",
-        // a repeat as the repeated child
-        "<page><mesh-each items={items} as=\"i\" key={i}><mesh-each items={items} as=\"j\" key={j}><note>a</note></mesh-each></mesh-each></page>",
-        // an empty name
-        "<page><mesh-each items={items} as=\"\" key=\"k\"><note>a</note></mesh-each></page>",
-        // the repeat as the template's root
-        "<mesh-each items={items} as=\"i\" key={i}><note>a</note></mesh-each>",
-    ] {
-        let diagnostics = refuse(source);
-        assert_eq!(codes(&diagnostics), ["assembly-malformed-template"], "{source}");
+    type Case<'a> = (&'a str, &'a str, &'a dyn Fn(&mut Value));
+    let cases: [Case; 6] = [
+        ("two children", base, &|template| {
+            edit_first(template, "mesh-each", |element| {
+                let child = element["children"][0].clone();
+                element["children"].as_array_mut().unwrap().push(child);
+            });
+        }),
+        ("none", base, &|template| {
+            edit_first(template, "mesh-each", |element| {
+                element["children"] = json!([]);
+            });
+        }),
+        ("text beside the child", base, &|template| {
+            edit_first(template, "mesh-each", |element| {
+                let span = element["span"].clone();
+                element["children"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({ "kind": "text", "value": "text", "span": span }));
+            });
+        }),
+        ("a repeat as the repeated child", nested, &|template| {
+            edit_first(template, "mesh-each", |element| {
+                // The block wrapped the lone block in a fragment; the runtime is shown the repeat itself.
+                let inner = element["children"][0]["element"]["children"][0].clone();
+                element["children"][0] = inner;
+            });
+        }),
+        ("an empty name", base, &|template| {
+            edit_first(template, "mesh-each", |element| {
+                for prop in element["props"].as_array_mut().unwrap() {
+                    if prop["prop"] == "as" {
+                        prop["value"]["value"] = json!("");
+                    }
+                }
+            });
+        }),
+        ("the repeat as the template's root", base, &|template| {
+            let repeat = template["root"]["children"][0]["element"].clone();
+            template["root"] = repeat;
+        }),
+    ];
+    for (name, source, edit) in cases {
+        let diagnostics = refuse(source, edit);
+        assert_eq!(
+            codes(&diagnostics),
+            ["assembly-malformed-template"],
+            "{name}"
+        );
     }
 }
 

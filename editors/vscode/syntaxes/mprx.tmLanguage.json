@@ -8,7 +8,49 @@
       "patterns": [
         { "include": "#closing-tag" },
         { "include": "#opening-tag" },
+        { "include": "#block-close" },
+        { "include": "#block-else" },
+        { "include": "#block-else-if" },
+        { "include": "#block-if" },
+        { "include": "#block-each" },
         { "include": "#expression-block" }
+      ]
+    },
+    "block-if": {
+      "name": "meta.block.open.mprx",
+      "begin": "(\\{)(#)(if)\\b",
+      "beginCaptures": { "1": { "name": "punctuation.section.embedded.begin.mprx" }, "2": { "name": "punctuation.definition.block.mprx" }, "3": { "name": "keyword.control.conditional.mprx" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.end.mprx" } },
+      "patterns": [{ "include": "#expression" }]
+    },
+    "block-else-if": {
+      "name": "meta.block.branch.mprx",
+      "begin": "(\\{)(:)(else)\\s+(if)\\b",
+      "beginCaptures": { "1": { "name": "punctuation.section.embedded.begin.mprx" }, "2": { "name": "punctuation.definition.block.mprx" }, "3": { "name": "keyword.control.conditional.mprx" }, "4": { "name": "keyword.control.conditional.mprx" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.end.mprx" } },
+      "patterns": [{ "include": "#expression" }]
+    },
+    "block-else": {
+      "name": "meta.block.branch.mprx",
+      "match": "(\\{)(:)(else)\\s*(\\})",
+      "captures": { "1": { "name": "punctuation.section.embedded.begin.mprx" }, "2": { "name": "punctuation.definition.block.mprx" }, "3": { "name": "keyword.control.conditional.mprx" }, "4": { "name": "punctuation.section.embedded.end.mprx" } }
+    },
+    "block-close": {
+      "name": "meta.block.close.mprx",
+      "match": "(\\{)(/)(if|each)\\s*(\\})",
+      "captures": { "1": { "name": "punctuation.section.embedded.begin.mprx" }, "2": { "name": "punctuation.definition.block.mprx" }, "3": { "name": "keyword.control.block.mprx" }, "4": { "name": "punctuation.section.embedded.end.mprx" } }
+    },
+    "block-each": {
+      "name": "meta.block.open.mprx",
+      "begin": "(\\{)(#)(each)\\b",
+      "beginCaptures": { "1": { "name": "punctuation.section.embedded.begin.mprx" }, "2": { "name": "punctuation.definition.block.mprx" }, "3": { "name": "keyword.control.loop.mprx" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.end.mprx" } },
+      "patterns": [
+        { "match": "\\b(as)\\s+([A-Za-z_][A-Za-z0-9_]*)", "captures": { "1": { "name": "keyword.control.loop.mprx" }, "2": { "name": "variable.parameter.mprx" } } },
+        { "include": "#expression" }
       ]
     },
     "opening-tag": {

@@ -118,7 +118,7 @@ fn a_fragment_may_be_several_nodes() {
 
 #[test]
 fn a_conditional_alternative_may_be_a_fragment() {
-    let view = "<panel><mesh-if when={flag}><mesh-fragment><note>x</note><note>y</note></mesh-fragment><mesh-fragment>off</mesh-fragment></mesh-if></panel>";
+    let view = "<panel>{#if flag}<mesh-fragment><note>x</note><note>y</note></mesh-fragment>{:else}<mesh-fragment>off</mesh-fragment>{/if}</panel>";
 
     assert_eq!(shape(&program(view, &[], STATE)), ["note", "note"]);
     assert_eq!(
@@ -140,7 +140,7 @@ fn a_fragment_that_is_written_among_children_places_them_in_place() {
 
 #[test]
 fn a_repeat_item_may_be_a_fragment_and_each_item_keeps_its_own_keys() {
-    let view = "<panel><mesh-each items={items} as=\"item\" key={item.id}><mesh-fragment><note>{item.label}</note><note>·</note></mesh-fragment></mesh-each></panel>";
+    let view = "<panel>{#each items as item (item.id)}<mesh-fragment><note>{item.label}</note><note>·</note></mesh-fragment>{/each}</panel>";
     let rendered = program(view, &[], STATE);
     let mut keys = Vec::new();
 
@@ -179,7 +179,7 @@ fn a_fragment_composite_places_a_slot_in_the_middle() {
 
 #[test]
 fn an_event_inside_a_fragment_dispatches_with_the_scope_it_had_in_the_repeat() {
-    let view = "<panel><mesh-each items={items} as=\"item\" key={item.id}><row id={item.id} /></mesh-each></panel>";
+    let view = "<panel>{#each items as item (item.id)}<row id={item.id} />{/each}</panel>";
     let rendered = program(view, &[("row", ROW)], STATE);
     let handlers: Vec<String> = rendered
         .tree()
@@ -201,7 +201,7 @@ fn an_event_inside_a_fragment_dispatches_with_the_scope_it_had_in_the_repeat() {
 
 #[test]
 fn an_update_agrees_with_a_fresh_render_over_changes_of_every_kind() {
-    let view = "<panel><shout who={who} /><mesh-if when={flag}><mesh-fragment><note>on</note><pair label={who} /></mesh-fragment></mesh-if><mesh-each items={items} as=\"item\" key={item.id}><row id={item.id} /></mesh-each><wrap><note>{who}</note></wrap></panel>";
+    let view = "<panel><shout who={who} />{#if flag}<mesh-fragment><note>on</note><pair label={who} /></mesh-fragment>{/if}{#each items as item (item.id)}<row id={item.id} />{/each}<wrap><note>{who}</note></wrap></panel>";
     let others = all(&[
         ("shout", SHOUT),
         ("pair", PAIR),
@@ -289,7 +289,7 @@ fn a_fragment_has_no_props_and_no_events() {
 #[test]
 fn text_runs_are_maximal_whatever_made_them_adjacent() {
     // A conditional that chooses nothing leaves the text on either side of it adjacent; a render tree's runs are maximal, so they are one.
-    let view = "<panel>a<mesh-if when={flag}><note>x</note></mesh-if>b</panel>";
+    let view = "<panel>a{#if flag}<note>x</note>{/if}b</panel>";
     let off = program(view, &[], &STATE.replace("true", "false"));
     let on = program(view, &[], STATE);
 

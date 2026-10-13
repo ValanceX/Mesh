@@ -1,5 +1,5 @@
-//! `mesh-switch` (docs/manual/templates.md, "Switch"): the compiler writes it as the conditionals it stands for, so the runtime has nothing new to do and these tests
-//! pin what a program written with a switch means: the first case whose `when` holds is rendered, else the default, else nothing; each case is its own site;
+//! A chain of branches, `{#if} … {:else if} … {:else} … {/if}` (docs/manual/templates.md, "Blocks"): the compiler writes it as the conditionals it stands for, so the runtime has
+//! nothing new to do and these tests pin what a program written with one means: the first case whose `when` holds is rendered, else the default, else nothing; each case is its own site;
 //! and `update` between cases gives the tree a fresh render gives.
 
 mod common;
@@ -12,10 +12,6 @@ const MODEL: &str = r#"{
   "components": {
     "panel": { "props": {}, "events": {}, "commands": {}, "scope": {} },
     "note":  { "props": {}, "events": {}, "commands": {}, "scope": {} },
-    "mesh-if": { "props": { "when": { "type": { "kind": "boolean" }, "required": true } }, "events": {}, "commands": {}, "scope": {} },
-    "mesh-switch":  { "props": {}, "events": {}, "commands": {}, "scope": {} },
-    "mesh-default": { "props": {}, "events": {}, "commands": {}, "scope": {} },
-    "mesh-case": { "props": { "when": { "type": { "kind": "boolean" }, "required": true } }, "events": {}, "commands": {}, "scope": {} },
     "view": { "props": {}, "events": {}, "commands": {},
       "scope": { "kind": { "kind": "string" }, "count": { "kind": "number" } } }
   }
@@ -23,16 +19,11 @@ const MODEL: &str = r#"{
 
 const WITH_DEFAULT: &str = r#"<panel>
   <note>before</note>
-  <mesh-switch>
-    <mesh-case when={kind == "a"}><note>A</note></mesh-case>
-    <mesh-case when={count > 1}><note>many</note></mesh-case>
-    <mesh-case when={count > 0}><note>one</note></mesh-case>
-    <mesh-default><note>none</note></mesh-default>
-  </mesh-switch>
+  {#if kind == "a"}<note>A</note>{:else if count > 1}<note>many</note>{:else if count > 0}<note>one</note>{:else}<note>none</note>{/if}
   <note>after</note>
 </panel>"#;
 
-const WITHOUT_DEFAULT: &str = r#"<panel><mesh-switch><mesh-case when={kind == "a"}><note>A</note></mesh-case></mesh-switch></panel>"#;
+const WITHOUT_DEFAULT: &str = r#"<panel>{#if kind == "a"}<note>A</note>{/if}</panel>"#;
 
 fn drawn(source: &str, state: &str) -> Render {
     let template = compile_with(MODEL, "view", source);
@@ -118,7 +109,8 @@ fn an_update_between_cases_is_the_tree_a_fresh_render_gives() {
 #[test]
 fn each_case_is_its_own_site_so_two_cases_never_share_a_key() {
     // The same note in two cases: switching between them is a different part of the tree each time, never a kept one.
-    let source = r#"<panel><mesh-switch><mesh-case when={kind == "a"}><note>same</note></mesh-case><mesh-default><note>same</note></mesh-default></mesh-switch></panel>"#;
+    let source =
+        r#"<panel>{#if kind == "a"}<note>same</note>{:else}<note>same</note>{/if}</panel>"#;
     let a = drawn(source, r#"{"kind":"a","count":0}"#);
     let b = drawn(source, r#"{"kind":"b","count":0}"#);
     let key = |render: &Render| match &render.tree().root.children[0] {

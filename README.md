@@ -114,9 +114,9 @@ mesh/
 
 ## Status
 
-**v0.10.0 prepared** (2026-10-10; not yet released: v0.9.0 is the latest release). See the [release notes](./docs/releases/v0.10.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.11.0 prepared** (2026-10-13; not yet released: v0.10.0 is the latest release). See the [release notes](./docs/releases/v0.11.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
-- The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), and event bindings (`on.click={...}`)
+- The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), event bindings (`on.click={...}`), and control-flow blocks (`{#if}` … `{:else if}` … `{:else}` … `{/if}`, `{#each items as item (key)}` … `{/each}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings
 - Checking against a component manifest (`mesh check --model`): every component, prop, event, reference and command is resolved, every expression is typed, and every value is checked against its declaration
 - rustc-style diagnostics with stable codes, located syntax errors, and did-you-mean suggestions; warnings don't fail the check

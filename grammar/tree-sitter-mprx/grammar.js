@@ -68,8 +68,56 @@ module.exports = grammar({
     child: $ => choice(
       $.text,
       $.expression_block,
+      $.if_block,
+      $.each_block,
       alias($._nested_element, $.element),
     ),
+
+    // Control flow is syntax, not elements (docs/MPRX-SPEC.md, "Blocks").
+    if_block: $ => seq(
+      field('keyword', $.if_open),
+      field('condition', $.expression),
+      '}',
+      repeat($.child),
+      repeat($.else_if_clause),
+      optional($.else_clause),
+      $.if_close,
+    ),
+
+    else_if_clause: $ => seq(
+      field('keyword', $.else_if_open),
+      field('condition', $.expression),
+      '}',
+      repeat($.child),
+    ),
+
+    else_clause: $ => seq(
+      field('keyword', $.else_open),
+      repeat($.child),
+    ),
+
+    each_block: $ => seq(
+      field('keyword', $.each_open),
+      field('items', $.expression),
+      alias($.identifier, $.as_keyword),
+      field('binding', $.identifier),
+      optional(seq('(', field('key', $.expression), ')')),
+      '}',
+      repeat($.child),
+      $.each_close,
+    ),
+
+    if_open: $ => token(seq('{#', 'if')),
+
+    each_open: $ => token(seq('{#', 'each')),
+
+    else_if_open: $ => token(seq('{:else', /\s+/, 'if')),
+
+    else_open: $ => token(seq('{:else', /\s*/, '}')),
+
+    if_close: $ => token(seq('{/if', /\s*/, '}')),
+
+    each_close: $ => token(seq('{/each', /\s*/, '}')),
 
     // `_nested_element` (and the `_nested_self_closing_element` /
     // `_nested_container_element` rules below it) are structurally

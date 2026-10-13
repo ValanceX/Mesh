@@ -188,8 +188,15 @@ impl Server {
                     unit: self.unit,
                 };
                 self.navigation(compiled, position)
-                    .and_then(|(facts, model, _, offset)| {
-                        navigate::definition(facts, model, &snapshot.uri, manifest_text, offset)
+                    .and_then(|(facts, model, text, offset)| {
+                        navigate::definition(
+                            facts,
+                            model,
+                            &snapshot.uri,
+                            manifest_text,
+                            (document, text),
+                            offset,
+                        )
                     })
                     .map_or(Value::Null, |location| json!(location))
             }

@@ -174,6 +174,20 @@ pub enum Expectation {
     /// rule is the checker's, not the prop's declared type's; `expected`
     /// in the mismatch is the nearer of the two, and the message says both.
     RepeatKey,
+    /// The condition or the list of a block: not a prop of a component the
+    /// author wrote, so it is named as the block's.
+    Block(BlockPart),
+}
+
+/// The part of a block that expected a type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockPart {
+    /// The condition of `{#if}`.
+    IfCondition,
+    /// The condition of `{:else if}`.
+    ElseIfCondition,
+    /// The list of `{#each}`.
+    EachItems,
 }
 
 /// A unary or binary operator.
@@ -214,6 +228,9 @@ pub enum Target {
     Event { component: String, event: String },
     /// A name in the template's scope.
     Scope(String),
+    /// The name a `{#each}` binds, at its declaration (`item` in `as item`) and wherever the key or the body reads it.
+    /// `declaration` is where it is bound.
+    Binding { name: String, declaration: Span },
     /// A command of the template's component.
     Command(String),
 }
@@ -351,37 +368,6 @@ pub enum Fact {
     /// or an optional of one, which has no text form. Span: the
     /// interpolated expression.
     ContentNotText { ty: Ty, span: Span },
-    /// A `mesh-switch`, `mesh-case` or `mesh-default` that is not shaped or
-    /// placed as the language says ([`SwitchProblem`]). Span: the element's
-    /// tag name, or, for a child that does not belong, the child.
-    MalformedSwitch {
-        component: String,
-        problem: SwitchProblem,
-        span: Span,
-    },
-}
-
-/// What is wrong with a `mesh-switch` (or a `mesh-case` or `mesh-default`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SwitchProblem {
-    /// A `mesh-case` or `mesh-default` outside a `mesh-switch`.
-    OutsideSwitch,
-    /// A `mesh-switch` that is the template's root, or the direct child of a
-    /// `mesh-if`, a `mesh-each`, a `mesh-case` or a `mesh-default`: it stands
-    /// for several siblings, so it needs an element around it.
-    Placement,
-    /// A `mesh-switch` with no `mesh-case`.
-    NoCases,
-    /// A child of a `mesh-switch` that is not a `mesh-case` or a
-    /// `mesh-default`: text, an interpolation or another element.
-    NotACase,
-    /// A `mesh-default` that is not the last child, or a second one.
-    DefaultNotLast,
-    /// A `mesh-case` or `mesh-default` that does not have exactly one
-    /// element child and nothing else.
-    BodyCount,
-    /// The body of a case is a `mesh-if`, a `mesh-switch` or a `mesh-slot`.
-    BadBody,
 }
 
 impl Fact {
@@ -407,8 +393,7 @@ impl Fact {
             | Fact::DuplicateObjectKey { span, .. }
             | Fact::UnknownField { span, .. }
             | Fact::MissingRequiredField { span, .. }
-            | Fact::ContentNotText { span, .. }
-            | Fact::MalformedSwitch { span, .. } => *span,
+            | Fact::ContentNotText { span, .. } => *span,
         }
     }
 }

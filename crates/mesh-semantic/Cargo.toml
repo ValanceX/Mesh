@@ -12,3 +12,6 @@ workspace = true
 
 [dependencies]
 mesh-syntax.workspace = true
+
+[dev-dependencies]
+mesh-parser.workspace = true

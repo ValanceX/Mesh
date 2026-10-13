@@ -181,13 +181,19 @@ pub fn candidates(
     };
     let manifest = template.manifest();
     let mut out: Vec<Candidate> = match completion.context {
+        // A block is not a component: the reserved elements it replaced are offered nowhere.
         Context::TagName => manifest
             .components()
             .keys()
+            .filter(|name| mesh_semantic::retired_block(name).is_none())
             .map(|name| candidate(name.clone(), CandidateKind::Component, None, false))
             .collect(),
         Context::AttributeName { tag } => {
-            let Some(component) = manifest.components().get(&tag) else {
+            let Some(component) = manifest
+                .components()
+                .get(&tag)
+                .filter(|_| mesh_semantic::retired_block(&tag).is_none())
+            else {
                 return Vec::new();
             };
             let props = |required: bool| {
@@ -215,7 +221,11 @@ pub fn candidates(
             props(true).chain(props(false)).chain(events).collect()
         }
         Context::EventName { tag } => {
-            let Some(component) = manifest.components().get(&tag) else {
+            let Some(component) = manifest
+                .components()
+                .get(&tag)
+                .filter(|_| mesh_semantic::retired_block(&tag).is_none())
+            else {
                 return Vec::new();
             };
             component

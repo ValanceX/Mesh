@@ -4,6 +4,28 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-13
+
+Control flow becomes syntax. Conditional and repeated structure are written as blocks, `{#if}` and `{#each}`, and the reserved elements they replaced (`mesh-if`, `mesh-each`, `mesh-switch`, `mesh-case`, `mesh-default`) are errors. **Breaking before 1.0**: a project that uses those elements must rewrite them as blocks, and moves its runtime and compiler packages together. The runtime, `template-v1`, `render-v1`, node identities and handler identifiers are unchanged. See the [release notes](./docs/releases/v0.11.md).
+
+### Added
+
+- **Blocks.** `{#if condition}`, any number of `{:else if condition}`, an optional `{:else}`, and `{/if}`; and `{#each items as item (key)}` … `{/each}`, whose key is mandatory. A branch or body that is exactly one element is that element; anything else is wrapped in a `mesh-fragment` automatically. A block cannot be the document, text cannot contain `{#`, `{:` or `{/`, and a block counts as three levels toward the nesting limit. A chain of `{:else if}` branches replaces `mesh-switch`.
+- **Built-in constructs.** `mesh-if`, `mesh-each` and `mesh-fragment` need no declaration in a manifest (`mesh_manifest::Manifest::component`, `BUILT_IN_COMPONENTS`); one that declares them is used as declared, and the model fingerprint is unaffected. `compileProgram` no longer declares them for a program that uses blocks; it still declares `mesh-slot` and `mesh-fill`.
+- **Diagnostics.** `retired-element` (a reserved element written as an element; the message names the block to write) and `missing-repeat-key`. Syntax errors in blocks keep `syntax-error` with specific messages: a block never closed, a closer or `{:else}` with no open block, a malformed opener, a block as the document.
+- **Binding.** The name `as` binds is a binding: analysis resolves it for typing and scoping (`Target::Binding`), hover shows its type, and go-to-definition goes to where it is bound.
+- **Tooling.** The Tree-sitter grammar, its highlight queries and the TextMate grammar recognize blocks; completion offers values after `{#if`, `{:else if` and `{#each`.
+
+### Changed
+
+- **Breaking: the reserved elements are errors.** `<mesh-if>`, `<mesh-each>`, `<mesh-switch>`, `<mesh-case>` and `<mesh-default>` are `retired-element`. Diagnostics about a block name the block ("the condition of `{#if}`", "the key of `{#each}`").
+- **Component listing offers nothing for a block.** Tag completion no longer lists a model's `mesh-if`, `mesh-each`, `mesh-switch`, `mesh-case` or `mesh-default`; they resolve no component.
+- All crates and packages move to 0.11.0 together.
+
+### Removed
+
+- **`invalid-switch` is no longer reported.** A chain of branches cannot be malformed as a `mesh-switch` could. The code stays in the catalogue, because codes are never reused.
+
 ## [0.10.0] - 2026-10-10
 
 Fine-grained updates and composition: the runtime updates a render from a new snapshot or from changes and returns patches; composites have children, named slots and events; a program's composites need no declared contract; and `mesh-switch` chooses among alternatives. The public APIs were reviewed against the API design principles first: see [the review baseline](./docs/superpowers/specs/2026-10-09-api-review-baseline.md). See the [v0.10 release notes](./docs/releases/v0.10.md).

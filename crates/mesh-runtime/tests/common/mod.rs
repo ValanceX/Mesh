@@ -26,6 +26,57 @@ pub fn compile_with(model: &str, component: &str, source: &str) -> String {
     mesh_template::to_json(&template)
 }
 
+/// The path of child indexes from `element` to the first element named `component`, at or under it, depth first.
+fn path_to(element: &serde_json::Value, component: &str) -> Option<Vec<usize>> {
+    if element["component"] == component {
+        return Some(Vec::new());
+    }
+    for (index, child) in element["children"].as_array()?.iter().enumerate() {
+        if let Some(inner) = child.get("element") {
+            if let Some(mut path) = path_to(inner, component) {
+                path.insert(0, index);
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+fn element_at<'a>(element: &'a mut serde_json::Value, path: &[usize]) -> &'a mut serde_json::Value {
+    match path.split_first() {
+        None => element,
+        Some((index, rest)) => element_at(&mut element["children"][*index]["element"], rest),
+    }
+}
+
+/// Edits the first element named `component` in a compiled template (as JSON).
+pub fn edit_first(
+    template: &mut serde_json::Value,
+    component: &str,
+    edit: impl FnOnce(&mut serde_json::Value),
+) {
+    let path = path_to(&template["root"], component)
+        .unwrap_or_else(|| panic!("the template has a `{component}`"));
+    edit(element_at(&mut template["root"], &path));
+}
+
+/// The template of `component` compiled from `source`, then edited as JSON. For a
+/// malformed construct the language can no longer write: control flow is syntax, so
+/// a conditional with three alternatives, or a repeat with no body, is made by
+/// editing the template of a well-formed one.
+pub fn compile_edited(
+    model: &str,
+    component: &str,
+    source: &str,
+    edit: impl FnOnce(&mut serde_json::Value),
+) -> String {
+    let mut template: serde_json::Value =
+        serde_json::from_str(&compile_with(model, component, source))
+            .expect("a compiled template is JSON");
+    edit(&mut template);
+    template.to_string()
+}
+
 pub fn compile(component: &str, source: &str) -> String {
     compile_with(MODEL, component, source)
 }

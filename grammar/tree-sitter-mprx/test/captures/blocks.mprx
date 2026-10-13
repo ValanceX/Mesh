@@ -1,0 +1,12 @@
+<list>
+  {#if ready}
+    <item />
+  {:else if failed && !retry}
+    Failed
+  {:else}
+    <spinner />
+  {/if}
+  {#each users as user (user.id)}
+    <item name={user.name} />
+  {/each}
+</list>

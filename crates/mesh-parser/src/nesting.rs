@@ -16,7 +16,8 @@ use crate::{span_of, ParseError};
 /// The deepest that MESH supports nesting elements and expressions. MPRX
 /// itself has no limit: this is a resource limit of this implementation
 /// (outline D12), and a later version may change it. Every element and
-/// every expression inside another counts as one level, and so does each
+/// every expression inside another counts as one level, a block (`{#if}`,
+/// `{#each}`) counts as three, and so does each
 /// pair of parentheses: `<a><b x={-(y)} /></a>` is 5 levels deep at `y`.
 /// That is deeper than any handwritten UI goes, and shallow enough that
 /// the recursive stages after parsing fit in a small thread stack.
@@ -30,7 +31,7 @@ pub(crate) fn check(root: Node) -> Option<ParseError> {
     // `syntax_errors::collect`. Each entry carries its nesting depth.
     let mut stack = vec![(root, 0)];
     while let Some((node, depth)) = stack.pop() {
-        let depth = depth + usize::from(is_level(node));
+        let depth = depth + levels(node);
         if depth > MAX_NESTING_DEPTH {
             return Some(ParseError {
                 code: DiagnosticCode::NESTING_TOO_DEEP,
@@ -48,17 +49,28 @@ pub(crate) fn check(root: Node) -> Option<ParseError> {
     None
 }
 
-/// Whether `node` is one level of nesting: an element or an expression.
-/// A member access's object is a `member_access` node rather than an
-/// `expression`, so it is counted on its own.
-fn is_level(node: Node) -> bool {
-    matches!(node.kind(), "element" | "expression" | "member_access")
+/// How many levels of nesting `node` is: an element or an expression is
+/// one, a block three (its branch or body, the content inside it, and
+/// the block itself), anything else none. A member access's object is a
+/// `member_access` node rather than an `expression`, so it is counted on
+/// its own.
+fn levels(node: Node) -> usize {
+    match node.kind() {
+        "element" | "expression" | "member_access" => 1,
+        "if_block" | "each_block" => 3,
+        _ => 0,
+    }
 }
 
 /// Where a level that is too deep is reported: an element at its tag name,
 /// since the whole element can span many lines, and an expression as a
 /// whole.
 fn level_span(node: Node) -> Span {
+    if matches!(node.kind(), "if_block" | "each_block") {
+        return node
+            .child_by_field_name("keyword")
+            .map_or_else(|| span_of(node), span_of);
+    }
     node.child(0)
         .filter(|_| node.kind() == "element")
         .and_then(|element| element.child_by_field_name("name"))

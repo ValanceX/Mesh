@@ -46,9 +46,9 @@ const TWICE = "<page><button on.tap={go()}>a</button><button on.tap={go()}>b</bu
 const CARD = "<button on.tap={pick()}>pick</button>";
 const USERS = "<page><card /><card /><button on.tap={refresh()}>refresh</button></page>";
 const OTHER = "<page><card /><button on.tap={reset()}>reset</button></page>";
-const COND = "<page><note>x</note><mesh-if when={show}><button on.tap={go()}>shown</button></mesh-if></page>";
+const COND = "<page><note>x</note>{#if show}<button on.tap={go()}>shown</button>{/if}</page>";
 const LIST =
-  '<page><mesh-each items={items} as="item" key={item.id}><row><button on.tap={open(item.id)}>o</button></row></mesh-each></page>';
+  '<page>{#each items as item (item.id)}<row><button on.tap={open(item.id)}>o</button></row>{/each}</page>';
 
 /** A program: its root, and each component's source; templates compiled by the real compiler. */
 async function program(root, sources) {

@@ -53,11 +53,18 @@ pub(super) struct Model<'a> {
 enum Hovered<'a> {
     Declaration(&'a Resolution),
     Type(&'a Typed),
+    /// The name a `{#each}` binds, with the type of one item.
+    Binding(&'a Resolution, &'a Typed),
 }
 
 fn hovered(facts: Facts<'_>, offset: usize) -> Option<Hovered<'_>> {
     let resolution = facts.resolution_at(offset);
     let typed = facts.typed_at(offset);
+    if let (Some(resolution), Some(typed)) = (resolution, typed) {
+        if matches!(resolution.target, Target::Binding { .. }) && resolution.span == typed.span {
+            return Some(Hovered::Binding(resolution, typed));
+        }
+    }
     match (resolution, typed) {
         (Some(resolution), Some(typed)) if length(resolution.span) <= length(typed.span) => {
             Some(Hovered::Declaration(resolution))
@@ -87,6 +94,17 @@ pub(super) fn hover(
             (resolution.span, block, sentence)
         }
         Hovered::Type(typed) => (typed.span, typed_block(&typed.ty, model.manifest), None),
+        Hovered::Binding(resolution, typed) => {
+            let Target::Binding { name, .. } = &resolution.target else {
+                return None;
+            };
+
+            (
+                resolution.span,
+                with_definition(format!("{name}: {}", typed.ty), &typed.ty, model.manifest),
+                Some("Bound by `{#each}` to one item of its list.".to_string()),
+            )
+        }
     };
     let value = match (markdown, sentence) {
         (true, Some(sentence)) => format!("```\n{block}\n```\n\n{sentence}"),
@@ -112,8 +130,10 @@ fn declaration(target: &Target, model: Model<'_>) -> Option<(String, Option<Stri
     let manifest = model.manifest;
     let components = manifest.components();
     Some(match target {
+        // Described with its type, in `hover`.
+        Target::Binding { .. } => return None,
         Target::Component(name) => {
-            let component = components.get(name)?;
+            let component = manifest.component(name)?.1;
             let mut lines = Vec::new();
             for (prop, field) in &component.props {
                 let mark = if field.required { "" } else { "?" };
@@ -133,7 +153,7 @@ fn declaration(target: &Target, model: Model<'_>) -> Option<(String, Option<Stri
             (block, None)
         }
         Target::Prop { component, prop } => {
-            let field = components.get(component)?.props.get(prop)?;
+            let field = manifest.component(component)?.1.props.get(prop)?;
             let ty = Ty::from(&field.ty);
             let kind = if field.required {
                 "Required"
@@ -146,7 +166,7 @@ fn declaration(target: &Target, model: Model<'_>) -> Option<(String, Option<Stri
             )
         }
         Target::Event { component, event } => {
-            let declared = components.get(component)?.events.get(event)?;
+            let declared = manifest.component(component)?.1.events.get(event)?;
             let line = event_line(event, declared.payload.as_ref());
             match &declared.payload {
                 Some(payload) => (
@@ -216,9 +236,17 @@ pub(super) fn definition(
     model: Model<'_>,
     manifest_uri: &str,
     manifest_text: Text<'_>,
+    template: (&str, Text<'_>),
     offset: usize,
 ) -> Option<Location> {
     let resolution = facts.resolution_at(offset)?;
+    // A name a block binds is declared in the template itself, not in the manifest.
+    if let Target::Binding { declaration, .. } = &resolution.target {
+        return Some(Location {
+            uri: Uri::from_str(template.0).ok()?,
+            range: template.1.range(*declaration),
+        });
+    }
     let span = model
         .manifest
         .span_of(declaration_of(&resolution.target, model.component))?;
@@ -237,6 +265,8 @@ pub(super) fn declaration_of<'a>(target: &'a Target, component: &'a str) -> Decl
         Target::Event { component, event } => Declaration::Event { component, event },
         Target::Scope(name) => Declaration::Scope { component, name },
         Target::Command(command) => Declaration::Command { component, command },
+        // Declared in the template, which has no manifest declaration; `definition` answers it before this.
+        Target::Binding { .. } => Declaration::Component(component),
     }
 }
 

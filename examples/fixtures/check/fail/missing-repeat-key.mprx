@@ -1,0 +1,5 @@
+<page title="x">
+  {#each users as person}
+    <text>{person.name}</text>
+  {/each}
+</page>

@@ -1,0 +1,6 @@
+error[missing-repeat-key]: `{#each}` needs a key, which identifies each item across updates: write `{#each items as item (key)}`, with a string or a number that is different for each item
+ --> fixtures/check/fail/missing-repeat-key.mprx:2:3
+  |
+2 |   {#each users as person}
+  |   ^^^^^^
+

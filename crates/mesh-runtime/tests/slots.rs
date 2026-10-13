@@ -200,7 +200,7 @@ fn text_beside_a_slot_is_one_run_as_a_render_tree_has_it() {
 #[test]
 fn a_conditional_and_a_repeat_among_the_children_work_in_the_callers_scope() {
     let rendered = program(
-        "<page><card heading={title}><mesh-if when={flag}><note>on</note></mesh-if><mesh-each items={items} as=\"item\" key={item.id}><note>{item.label}</note></mesh-each></card></page>",
+        "<page><card heading={title}>{#if flag}<note>on</note>{/if}{#each items as item (item.id)}<note>{item.label}</note>{/each}</card></page>",
         &[("card", CARD)],
         STATE,
     );
@@ -309,7 +309,7 @@ fn a_handler_in_content_forwarded_through_two_composites_reaches_the_callers_com
 #[test]
 fn a_handler_in_a_repeated_content_item_has_the_items_values() {
     let rendered = program(
-        "<page><card heading={title}><mesh-each items={items} as=\"item\" key={item.id}><button on.tap={pick(item.id)}>{item.label}</button></mesh-each></card></page>",
+        "<page><card heading={title}>{#each items as item (item.id)}<button on.tap={pick(item.id)}>{item.label}</button>{/each}</card></page>",
         &[("card", CARD)],
         STATE,
     );
@@ -377,11 +377,24 @@ fn a_slot_must_be_well_formed() {
         ("a slot as the template's root", "<mesh-slot />"),
         (
             "a slot as a conditional's alternative",
-            "<panel heading={heading}><mesh-if when={true}><mesh-slot /></mesh-if></panel>",
+            "<panel heading={heading}>{#if true}<mesh-slot />{/if}</panel>",
         ),
     ];
     for (what, source) in bad {
-        let template = std::panic::catch_unwind(|| compile("card", source));
+        let template = std::panic::catch_unwind(|| {
+            let mut template = compile("card", source);
+            if what.starts_with("a slot as a conditional's alternative") {
+                // The block wrapped the lone slot in a fragment, which is well formed. The malformed form, a slot as
+                // the alternative itself, can no longer be written, so it is made by editing the compiled template.
+                template = common::compile_edited(MODEL, "card", source, |template| {
+                    common::edit_first(template, "mesh-if", |element| {
+                        let slot = element["children"][0]["element"]["children"][0].clone();
+                        element["children"][0] = slot;
+                    });
+                });
+            }
+            template
+        });
         // Some of these the compiler itself refuses; the rest the runtime must.
         if let Ok(template) = template {
             let view = compile("view", "<page><card heading={title} /></page>");
@@ -456,7 +469,7 @@ fn random_state(rng: &mut Rng, base: &Value) -> Value {
 fn an_updates_tree_is_a_renders_with_slots_in_play() {
     // Content with a conditional and a repeat, placed by one card, forwarded by
     // a shell into another, and a card of the page's own outside any content.
-    let view = "<page><card heading={title}><note>{who}</note><mesh-if when={flag}><note>on</note></mesh-if><mesh-each items={items} as=\"item\" key={item.id}><button on.tap={pick(item.id)}>{item.label}</button></mesh-each></card><shell label={who}><note>{title}</note></shell><note>{title}</note></page>";
+    let view = "<page><card heading={title}><note>{who}</note>{#if flag}<note>on</note>{/if}{#each items as item (item.id)}<button on.tap={pick(item.id)}>{item.label}</button>{/each}</card><shell label={who}><note>{title}</note></shell><note>{title}</note></page>";
     let others = [("card", CARD), ("shell", SHELL)];
     let mut rng = Rng(11);
     let mut checked = 0;

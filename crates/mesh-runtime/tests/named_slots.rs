@@ -125,7 +125,7 @@ fn a_fill_is_the_callers_content_so_it_reads_the_callers_scope_and_calls_the_cal
 
 #[test]
 fn a_fill_may_hold_conditionals_and_text_and_an_update_agrees_with_a_fresh_render() {
-    let view = r#"<page><card heading={title}><mesh-fill slot="header">hello <mesh-if when={flag}><note>on</note></mesh-if></mesh-fill>body</card></page>"#;
+    let view = r#"<page><card heading={title}><mesh-fill slot="header">hello {#if flag}<note>on</note>{/if}</mesh-fill>body</card></page>"#;
     let mut current = program(view, &[("card", CARD)], STATE);
 
     for state in [

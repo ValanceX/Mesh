@@ -1546,6 +1546,7 @@ fn copies_every_span_from_the_ast() {
         mesh_semantic::Element {
             name: "page".to_string(),
             name_span: at(1),
+            construct: None,
             attributes: vec![mesh_semantic::Attribute {
                 name: "title".to_string(),
                 name_span: at(2),

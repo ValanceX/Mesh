@@ -1,0 +1,12 @@
+<page title="x">
+  {#if flag}
+    <text>{name}</text>
+  {:else if count > 1}
+    <text>many</text>
+  {:else}
+    first <text>{count}</text>
+  {/if}
+  {#each users as person (person.name)}
+    <button on.click={select(person)}>{person.name}</button>
+  {/each}
+</page>

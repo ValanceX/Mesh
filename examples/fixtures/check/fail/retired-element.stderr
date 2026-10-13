@@ -1,0 +1,6 @@
+error[retired-element]: `<mesh-if>` is no longer an element: write a block: `{#if condition} … {/if}`
+ --> fixtures/check/fail/retired-element.mprx:1:18
+  |
+1 | <page title="x"><mesh-if when={flag}><text>x</text></mesh-if></page>
+  |                  ^^^^^^^
+

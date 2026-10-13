@@ -176,3 +176,33 @@ test("a composite the manifest does not declare gets its contract from the templ
   const withCard = await compileProgram({ model, root: "users", components: sliceComponents });
   assert.equal(withCard.program.model, manifest, "with every component declared the model is the manifest's text, as given");
 });
+
+test("a program of blocks declares nothing for control flow, and the runtime still renders it", async () => {
+  const bare = JSON.stringify({
+    version: 1,
+    types: {},
+    components: {
+      page: { props: {}, events: {}, commands: {}, scope: { rows: { kind: "list", element: { kind: "record", fields: { id: { type: { kind: "number" }, required: true } } } }, on: { kind: "boolean" } } },
+      note: { props: {}, events: {}, commands: {}, scope: {} },
+    },
+  });
+  const page = '<note>{#if on}<note>yes</note>{:else}text {#each rows as row (row.id)}<note>{row.id}</note>{/each}{/if}</note>';
+  const result = await compileProgram({ model: { manifest: bare, path: "components.json" }, root: "page", components: [{ component: "page", source: page, path: "page.mprx" }] });
+
+  assert.ok(result.program, JSON.stringify(result.components));
+  const declared = Object.keys(JSON.parse(result.program.model).components);
+  for (const name of ["mesh-if", "mesh-each", "mesh-switch", "mesh-case", "mesh-default", "mesh-fragment"]) {
+    assert.ok(!declared.includes(name), `${name} is built in, so the program's model does not declare it`);
+  }
+  assert.deepEqual(result.assembly.diagnostics, []);
+});
+
+test("a reserved element written as an element is a retired-element error that names the block", async () => {
+  const bare = JSON.stringify({ version: 1, types: {}, components: { page: { props: {}, events: {}, commands: {}, scope: { on: { kind: "boolean" } } }, note: { props: {}, events: {}, commands: {}, scope: {} } } });
+  const result = await compileProgram({ model: { manifest: bare, path: "components.json" }, root: "page", components: [{ component: "page", source: "<note><mesh-if when={on}><note>x</note></mesh-if></note>", path: "page.mprx" }] });
+
+  assert.equal(result.program, undefined);
+  const found = result.components[0].diagnostics.diagnostics.find((diagnostic) => diagnostic.code === "retired-element");
+  assert.ok(found, JSON.stringify(result.components));
+  assert.match(found.message, /\{#if condition\}/);
+});

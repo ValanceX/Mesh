@@ -17,13 +17,36 @@ use mesh_syntax::Span;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
     pub name: String,
-    /// The opening tag's name, e.g. `user-card` in `<user-card ...>`.
+    /// The opening tag's name, e.g. `user-card` in `<user-card ...>`. For a
+    /// [`Construct`], the block's keyword: `{#if`, `{:else if`, `{#each`.
     pub name_span: Span,
+    /// What a block lowered to this element, or `None` for an element that was
+    /// written as one. Only lowering sets it, so it is how a tool tells a block
+    /// from an element named the same.
+    pub construct: Option<Construct>,
     pub attributes: Vec<Attribute>,
     pub event_bindings: Vec<EventBinding>,
     pub children: Vec<Child>,
     /// The whole element, from `<` to its closing `>` or `/>`.
     pub span: Span,
+}
+
+/// The construct a block lowers to. Blocks are syntax, not elements, and the constructs they lower
+/// to are built in: a manifest need not declare them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Construct {
+    /// `{#if condition} … {/if}` with no other branch: the conditional `mesh-if`.
+    If,
+    /// An `{#if}` with `{:else if}` or `{:else}` branches: the choice among them, `mesh-switch`.
+    Switch,
+    /// One branch of a [`Construct::Switch`]. `first` is the `{#if}` branch; the others are `{:else if}`.
+    Case { first: bool },
+    /// The `{:else}` branch of a [`Construct::Switch`].
+    Default,
+    /// `{#each items as item (key)} … {/each}`: the repeat `mesh-each`.
+    Each,
+    /// The `mesh-fragment` that wraps a branch or body that is not exactly one element.
+    Fragment,
 }
 
 /// The Semantic IR form of an [`mesh_syntax::Attribute`].
@@ -310,9 +333,20 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
         diagnostics.extend(child_diagnostics);
     }
 
+    if let Some(block) = retired_block(&ast.name) {
+        diagnostics.push(mesh_syntax::Diagnostic {
+            severity: mesh_syntax::Severity::Error,
+            code: mesh_syntax::DiagnosticCode::RETIRED_ELEMENT,
+            message: format!("`<{}>` is no longer an element: write {block}", ast.name),
+            span: ast.name_span,
+            suggestions: Vec::new(),
+        });
+    }
+
     let element = Element {
         name: ast.name.clone(),
         name_span: ast.name_span,
+        construct: None,
         attributes,
         event_bindings,
         children,
@@ -436,6 +470,245 @@ fn lower_child(child: &mesh_syntax::Child) -> (Option<Child>, Vec<mesh_syntax::D
         mesh_syntax::Child::Element(element) => {
             let (lowered, diagnostics) = lower_element(element);
             (Some(Child::Element(Box::new(lowered))), diagnostics)
+        }
+        mesh_syntax::Child::Block(block) => {
+            let (lowered, diagnostics) = lower_block(block);
+            (Some(Child::Element(Box::new(lowered))), diagnostics)
+        }
+    }
+}
+
+/// What to write instead of a reserved element that blocks replaced, or `None` for any other tag.
+pub fn retired_block(tag: &str) -> Option<&'static str> {
+    match tag {
+        "mesh-if" => Some("a block: `{#if condition} … {/if}`"),
+        "mesh-each" => Some("a block: `{#each items as item (key)} … {/each}`"),
+        "mesh-switch" => Some("a chain of branches: `{#if a} … {:else if b} … {:else} … {/if}`"),
+        "mesh-case" => Some("a branch: `{#if a} … {:else if b} … {/if}`"),
+        "mesh-default" => Some("the last branch: `{:else} …` inside `{#if} … {/if}`"),
+        _ => None,
+    }
+}
+
+const CONDITIONAL: &str = "mesh-if";
+const SWITCH: &str = "mesh-switch";
+const CASE: &str = "mesh-case";
+const DEFAULT: &str = "mesh-default";
+const REPEAT: &str = "mesh-each";
+const FRAGMENT: &str = "mesh-fragment";
+
+fn construct_element(
+    name: &str,
+    construct: Construct,
+    keyword: Span,
+    attributes: Vec<Attribute>,
+    children: Vec<Child>,
+    span: Span,
+) -> Element {
+    Element {
+        name: name.to_string(),
+        name_span: keyword,
+        construct: Some(construct),
+        attributes,
+        event_bindings: Vec::new(),
+        children,
+        span,
+    }
+}
+
+/// The children of a branch or body: exactly one element is that element; anything else (text, several
+/// nodes, none, a lone block or slot) is wrapped in a fragment, so that a branch is always one element.
+fn body(
+    children: Vec<(Option<Child>, Vec<mesh_syntax::Diagnostic>)>,
+    keyword: Span,
+    span: Span,
+    diagnostics: &mut Vec<mesh_syntax::Diagnostic>,
+) -> Vec<Child> {
+    let mut lowered = Vec::new();
+
+    for (child, found) in children {
+        diagnostics.extend(found);
+        if let Some(child) = child {
+            if let Child::Expression(expression) = &child {
+                out_of_range_literals(expression, diagnostics);
+            }
+            lowered.push(child);
+        }
+    }
+
+    let alone = matches!(
+        lowered.as_slice(),
+        [Child::Element(element)] if element.construct.is_none() && element.name != "mesh-slot"
+    );
+
+    if alone {
+        lowered
+    } else {
+        vec![Child::Element(Box::new(construct_element(
+            FRAGMENT,
+            Construct::Fragment,
+            keyword,
+            Vec::new(),
+            lowered,
+            span,
+        )))]
+    }
+}
+
+fn condition_attribute(keyword: Span, condition: &mesh_syntax::Expression) -> Attribute {
+    let value = lower_expression(condition);
+
+    Attribute {
+        name: "when".to_string(),
+        name_span: keyword,
+        span: value.span(),
+        value: AttributeValue::Expression(value),
+    }
+}
+
+/// Lowers a block to the construct it stands for. The runtime, the template format and node identities
+/// are unchanged: `{#if}` is the conditional, a chain of branches the choice among them, `{#each}` the
+/// repeat, and each of them was an element before blocks existed.
+fn lower_block(block: &mesh_syntax::Block) -> (Element, Vec<mesh_syntax::Diagnostic>) {
+    let mut diagnostics = Vec::new();
+
+    match block {
+        mesh_syntax::Block::If(block) => {
+            let first = &block.branches[0];
+            let mut condition_diagnostics = Vec::new();
+            for branch in &block.branches {
+                let condition = lower_expression(&branch.condition);
+                out_of_range_literals(&condition, &mut condition_diagnostics);
+            }
+            diagnostics.extend(condition_diagnostics);
+
+            if block.branches.len() == 1 && block.otherwise.is_none() {
+                let children = body(
+                    first.children.iter().map(lower_child).collect(),
+                    first.keyword_span,
+                    first.span,
+                    &mut diagnostics,
+                );
+
+                return (
+                    construct_element(
+                        CONDITIONAL,
+                        Construct::If,
+                        first.keyword_span,
+                        vec![condition_attribute(first.keyword_span, &first.condition)],
+                        children,
+                        block.span,
+                    ),
+                    diagnostics,
+                );
+            }
+
+            let mut cases = Vec::new();
+            for (index, branch) in block.branches.iter().enumerate() {
+                let children = body(
+                    branch.children.iter().map(lower_child).collect(),
+                    branch.keyword_span,
+                    branch.span,
+                    &mut diagnostics,
+                );
+                cases.push(Child::Element(Box::new(construct_element(
+                    CASE,
+                    Construct::Case { first: index == 0 },
+                    branch.keyword_span,
+                    vec![condition_attribute(branch.keyword_span, &branch.condition)],
+                    children,
+                    branch.span,
+                ))));
+            }
+            if let Some(otherwise) = &block.otherwise {
+                let children = body(
+                    otherwise.children.iter().map(lower_child).collect(),
+                    otherwise.keyword_span,
+                    otherwise.span,
+                    &mut diagnostics,
+                );
+                cases.push(Child::Element(Box::new(construct_element(
+                    DEFAULT,
+                    Construct::Default,
+                    otherwise.keyword_span,
+                    Vec::new(),
+                    children,
+                    otherwise.span,
+                ))));
+            }
+
+            (
+                construct_element(
+                    SWITCH,
+                    Construct::Switch,
+                    first.keyword_span,
+                    Vec::new(),
+                    cases,
+                    block.span,
+                ),
+                diagnostics,
+            )
+        }
+        mesh_syntax::Block::Each(block) => {
+            let items = lower_expression(&block.items);
+            let mut attributes = vec![
+                Attribute {
+                    name: "items".to_string(),
+                    name_span: block.keyword_span,
+                    span: items.span(),
+                    value: AttributeValue::Expression(items),
+                },
+                Attribute {
+                    name: "as".to_string(),
+                    name_span: block.keyword_span,
+                    span: block.binding_span,
+                    value: AttributeValue::String {
+                        value: block.binding.clone(),
+                        span: block.binding_span,
+                    },
+                },
+            ];
+            match &block.key {
+                Some(key) => {
+                    let key = lower_expression(key);
+                    attributes.push(Attribute {
+                        name: "key".to_string(),
+                        name_span: block.keyword_span,
+                        span: key.span(),
+                        value: AttributeValue::Expression(key),
+                    });
+                }
+                None => diagnostics.push(mesh_syntax::Diagnostic {
+                    severity: mesh_syntax::Severity::Error,
+                    code: mesh_syntax::DiagnosticCode::MISSING_REPEAT_KEY,
+                    message: "`{#each}` needs a key, which identifies each item across updates: write `{#each items as item (key)}`, with a string or a number that is different for each item".to_string(),
+                    span: block.keyword_span,
+                    suggestions: Vec::new(),
+                }),
+            }
+            for attribute in &attributes {
+                if let AttributeValue::Expression(expression) = &attribute.value {
+                    out_of_range_literals(expression, &mut diagnostics);
+                }
+            }
+            let children = body(
+                block.children.iter().map(lower_child).collect(),
+                block.keyword_span,
+                block.span,
+                &mut diagnostics,
+            );
+
+            (
+                construct_element(
+                    REPEAT,
+                    Construct::Each,
+                    block.keyword_span,
+                    attributes,
+                    children,
+                    block.span,
+                ),
+                diagnostics,
+            )
         }
     }
 }

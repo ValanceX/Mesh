@@ -1,0 +1,6 @@
+error[syntax-error]: a block cannot be the document: put it inside an element
+ --> fixtures/fail/block-as-the-document.mprx:1:1
+  |
+1 | {#if flag}<text>x</text>{/if}
+  | ^^^^
+

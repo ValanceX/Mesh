@@ -247,6 +247,8 @@ fn corpus() -> Vec<(String, String, String, String)> {
 struct Expected<'a> {
     hover: Option<(Span, Option<String>)>,
     definition: Option<Declaration<'a>>,
+    /// Where a name a block binds is declared: in the template itself, not the manifest.
+    binding: Option<Span>,
 }
 
 fn expected<'a>(analysis: &'a Analysis, component: &'a str, offset: usize) -> Expected<'a> {
@@ -259,14 +261,24 @@ fn expected<'a>(analysis: &'a Analysis, component: &'a str, offset: usize) -> Ex
         (_, Some(t)) => Some((t.span, Some(t.ty.to_string()))),
         (None, None) => None,
     };
-    let definition = resolution.map(|resolution| match &resolution.target {
-        Target::Component(name) => Declaration::Component(name),
-        Target::Prop { component, prop } => Declaration::Prop { component, prop },
-        Target::Event { component, event } => Declaration::Event { component, event },
-        Target::Scope(name) => Declaration::Scope { component, name },
-        Target::Command(command) => Declaration::Command { component, command },
+    // A name a block binds is declared in the template, not the manifest: it has no manifest declaration to go to.
+    let definition = resolution.and_then(|resolution| match &resolution.target {
+        Target::Component(name) => Some(Declaration::Component(name)),
+        Target::Prop { component, prop } => Some(Declaration::Prop { component, prop }),
+        Target::Event { component, event } => Some(Declaration::Event { component, event }),
+        Target::Scope(name) => Some(Declaration::Scope { component, name }),
+        Target::Command(command) => Some(Declaration::Command { component, command }),
+        Target::Binding { .. } => None,
     });
-    Expected { hover, definition }
+    let binding = resolution.and_then(|resolution| match &resolution.target {
+        Target::Binding { declaration, .. } => Some(*declaration),
+        _ => None,
+    });
+    Expected {
+        hover,
+        definition,
+        binding,
+    }
 }
 
 fn navigation_agrees_with_analysis(encoding: &str) {
@@ -317,6 +329,17 @@ fn navigation_agrees_with_analysis(encoding: &str) {
             }
 
             let location = client.definition(&uri, line, character);
+            if let Some(declaration) = want.binding {
+                let got = span_of_range(&source, &location["range"], unit);
+                assert_eq!(got, declaration, "{name}: binding definition at {offset}");
+                assert_eq!(
+                    location["uri"],
+                    Value::String(uri.clone()),
+                    "{name} at {offset}"
+                );
+                checked += 1;
+                continue;
+            }
             match want
                 .definition
                 .and_then(|declaration| manifest.span_of(declaration))
