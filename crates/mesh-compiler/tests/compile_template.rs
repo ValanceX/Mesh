@@ -255,15 +255,38 @@ fn a_templates_names_are_its_resolutions() {
         .unwrap();
         let options = CompileOptions::with_template(manifest.template(model.component()).unwrap());
         let analysis = compile_with(&text, &options).analysis.expect("analysed");
+        // A name a block binds resolves to its binding, not to a declaration of the manifest's, and the template holds
+        // it as a plain reference. And a chain of branches is written as one conditional per branch, each holding the
+        // earlier conditions again, so for a template of blocks the names are compared as sets.
+        let bound: Vec<String> = analysis
+            .resolutions()
+            .iter()
+            .filter_map(|resolution| match &resolution.target {
+                mesh_analysis::Target::Binding { name, .. } => Some(name.clone()),
+                _ => None,
+            })
+            .collect();
         let mut resolved: Vec<String> = analysis
             .resolutions()
             .iter()
+            .filter(|resolution| {
+                !matches!(resolution.target, mesh_analysis::Target::Binding { .. })
+            })
             .map(|resolution| format!("{:?}", resolution.target))
             .collect();
         let mut held = Vec::new();
         names(&template.root, &mut held);
+        held.retain(|name| {
+            !bound
+                .iter()
+                .any(|bound| *name == format!("{:?}", mesh_analysis::Target::Scope(bound.clone())))
+        });
         resolved.sort();
         held.sort();
+        if text.contains("{#") {
+            resolved.dedup();
+            held.dedup();
+        }
         assert_eq!(held, resolved, "{}", path.display());
     }
 }
@@ -271,15 +294,22 @@ fn a_templates_names_are_its_resolutions() {
 fn names(element: &mesh_template::Element, out: &mut Vec<String>) {
     use mesh_analysis::Target;
     let component = &element.component;
-    out.push(format!("{:?}", Target::Component(component.clone())));
+    // A block lowers to a construct that is built in, and resolves no component of the manifest's: only the
+    // expressions inside it hold names.
+    let block = ["mesh-if", "mesh-each", "mesh-fragment"].contains(&component.as_str());
+    if !block {
+        out.push(format!("{:?}", Target::Component(component.clone())));
+    }
     for prop in &element.props {
-        out.push(format!(
-            "{:?}",
-            Target::Prop {
-                component: component.clone(),
-                prop: prop.prop.clone()
-            }
-        ));
+        if !block {
+            out.push(format!(
+                "{:?}",
+                Target::Prop {
+                    component: component.clone(),
+                    prop: prop.prop.clone()
+                }
+            ));
+        }
         expression_names(&prop.value, out);
     }
     for binding in &element.events {

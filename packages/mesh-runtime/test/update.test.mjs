@@ -24,7 +24,7 @@ const MODEL = JSON.stringify({
   },
 });
 const VIEW =
-  "<page title={title} on.tap={pick()}><note>hello {who}</note><mesh-if when={flag}><note>on</note></mesh-if></page>";
+  "<page title={title} on.tap={pick()}><note>hello {who}</note>{#if flag}<note>on</note>{/if}</page>";
 const program = { root: "view", templates: [await template("view", VIEW, MODEL)] };
 
 /** A reference applier for render-patch-v1 over a render-v1 tree. */

@@ -17,7 +17,7 @@ const MODEL = JSON.stringify({
     view: { props: {}, events: {}, commands: {}, scope: { items: { kind: "list", element: { kind: "record", fields: { id: { type: { kind: "number" }, required: true }, label: { type: { kind: "string" }, required: true } } } } } },
   },
 });
-const SOURCE = '<page><mesh-each items={items} as="item" key={item.id}><row title={item.label}>{item.label}</row></mesh-each></page>';
+const SOURCE = '<page>{#each items as item (item.id)}<row title={item.label}>{item.label}</row>{/each}</page>';
 const compiled = await compile({ source: SOURCE, path: "view.mprx", model: { manifest: MODEL, path: "m.json", component: "view" } });
 const program = { root: "view", templates: [JSON.stringify(compiled.template)] };
 

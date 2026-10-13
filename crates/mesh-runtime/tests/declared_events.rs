@@ -43,8 +43,8 @@ const TWICE: &str = "<page><button on.tap={go()}>a</button><button on.tap={go()}
 const CARD: &str = "<button on.tap={pick()}>pick</button>";
 const USERS: &str = "<page><card /><card /><button on.tap={refresh()}>refresh</button></page>";
 const OTHER: &str = "<page><card /><button on.tap={reset()}>reset</button></page>";
-const COND: &str = "<page><note>x</note><mesh-if when={show}><button on.tap={go()}>shown</button></mesh-if></page>";
-const LIST: &str = "<page><mesh-each items={items} as=\"item\" key={item.id}><row><button on.tap={open(item.id)}>o</button></row></mesh-each></page>";
+const COND: &str = "<page><note>x</note>{#if show}<button on.tap={go()}>shown</button>{/if}</page>";
+const LIST: &str = "<page>{#each items as item (item.id)}<row><button on.tap={open(item.id)}>o</button></row>{/each}</page>";
 
 struct Case {
     root: &'static str,

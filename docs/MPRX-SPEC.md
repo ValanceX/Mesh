@@ -75,7 +75,7 @@ v0.5 adds no syntax. It adds MPRX's evaluation (§9.7) and the boundary between 
 
 v0.6 adds no syntax either. It settles two questions PORT's first renderer raised (`docs/superpowers/specs/2026-09-27-mesh-port-semantic-resolution.md`): the text of a value applies to props too, delivered in the render tree as `propText` (§9.7.7, §9.7.8, §9.8.2), with the two ways a renderer may realize a value (§9.8.7); and event resolution (§9.9).
 
-*Last updated 2026-10-10. v0.10 is prepared as v0.10.0 (fine-grained updates, composition and inferred contracts: runtime and compiler operations, and the provisional `mesh-switch`, with no change to the language's syntax), v0.9 is released as v0.9.0 (`compileProgram`: a compiler-package operation, with no change to the language or this specification), v0.8 is released as v0.8.0 (declared events: a runtime operation, with no change to the language or this specification), v0.7 is released as v0.7.0 (node identity, §9.10, with provisional conditional and repeated structure), v0.6 is released as v0.6.0, v0.5 as v0.5.0, v0.4 as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.10](./releases/v0.10.md), [v0.9](./releases/v0.9.md), [v0.8](./releases/v0.8.md), [v0.7](./releases/v0.7.md), [v0.6](./releases/v0.6.md), [v0.5](./releases/v0.5.md), [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them and whose later passes implemented them. Any further grammar or semantics work starts a new spec.*
+*Last updated 2026-10-13. v0.11 is prepared as v0.11.0 (blocks: conditional and repeated structure become syntax, `{#if}` and `{#each}`, and the reserved elements are retired; breaking before 1.0; see the [v0.11](./releases/v0.11.md) release notes), v0.10 is released as v0.10.0 (fine-grained updates, composition and inferred contracts: runtime and compiler operations, and the provisional `mesh-switch`, with no change to the language's syntax), v0.9 is released as v0.9.0 (`compileProgram`: a compiler-package operation, with no change to the language or this specification), v0.8 is released as v0.8.0 (declared events: a runtime operation, with no change to the language or this specification), v0.7 is released as v0.7.0 (node identity, §9.10, with provisional conditional and repeated structure), v0.6 is released as v0.6.0, v0.5 as v0.5.0, v0.4 as v0.4.0, v0.3 as v0.3.0, v0.2 as v0.2.0, and v0.1 as v0.1.0 (see the [v0.10](./releases/v0.10.md), [v0.9](./releases/v0.9.md), [v0.8](./releases/v0.8.md), [v0.7](./releases/v0.7.md), [v0.6](./releases/v0.6.md), [v0.5](./releases/v0.5.md), [v0.4](./releases/v0.4.md), [v0.3](./releases/v0.3.md), [v0.2](./releases/v0.2.md) and [v0.1](./releases/v0.1.md) release notes). v0.1's Pass 4 details are in `docs/superpowers/specs/2026-09-23-mesh-v0.1-pass-4-design.md`, and its Pass 5 is outlined in `docs/superpowers/specs/2026-09-22-mesh-v0.1-pass-3-5-outline.md`. v0.5 adds semantics without syntax: §9.7 and §9.8, per `docs/superpowers/specs/2026-09-25-mesh-v0.5-outline.md`, whose Pass 0 wrote them and whose later passes implemented them. Any further grammar or semantics work starts a new spec.*
 
 ---
 
@@ -169,13 +169,18 @@ container_element      ::= '<' tag_name element_modifier* '>' child* '</' tag_na
 element_modifier        ::= attribute | event_binding
 attribute               ::= identifier '=' attribute_value
 attribute_value          ::= string | expression_block
-child                    ::= text | expression_block | element
+child                    ::= text | expression_block | block | element
 text                     ::= [^<{]+
 expression_block          ::= '{' expression '}'
+block                    ::= if_block | each_block
+if_block                 ::= '{#if' expression '}' child* else_if* else? '{/if}'
+else_if                  ::= '{:else if' expression '}' child*
+else                     ::= '{:else}' child*
+each_block               ::= '{#each' expression 'as' identifier ('(' expression ')')? '}' child* '{/each}'
 ```
 
-`child` allows three things: plain text, an `{expr}` block, or a nested
-`element`. Expressions are valid in child/content position as of Pass 2,
+`child` allows four things: plain text, an `{expr}` block, a control-flow
+[block](#31-blocks), or a nested `element`. Expressions are valid in child/content position as of Pass 2,
 not just in attribute values — `docs/ARCHITECTURE.md`'s own example,
 `<text>{user.name}</text>`, puts an expression directly in element
 content, and `container_element`'s grammar now uses `repeat($.child)` so
@@ -186,10 +191,29 @@ supports files nested at most 128 levels deep. That is a resource limit
 of this implementation, not a rule of the language, and a later version
 may change it. Every element counts as a level, and so does every expression inside another
 one and every pair of parentheses, so `<a><b x={-(y)} /></a>` is 5
-levels deep at `y`. A deeper file is rejected by `mesh-parser` with a
+levels deep at `y`. A block counts as three levels (the block, its branch or body, and the content in
+it), so `<a>{#if x}<b />{/if}</a>` is 5 levels deep at `<b />`: the element `a`, the block, and `b`, with the
+two levels the block adds between. A deeper file is rejected by `mesh-parser` with a
 `nesting-too-deep` error, like a syntax error: it gets no AST, and so
 no IR. The limit (`mesh_parser::MAX_NESTING_DEPTH`) keeps the
 recursive stages after parsing within a small, fixed stack.
+
+### 3.1 Blocks
+
+Conditional and repeated structure are part of the language, not elements. A block is a child of an element:
+
+- **`{#if condition}`** opens a conditional. Zero or more **`{:else if condition}`** branches follow, then an optional **`{:else}`**, and **`{/if}`** closes it. Every condition is boolean (§9.4). With no `{:else}`, a chain in which no condition holds renders nothing. A chain of `{:else if}` branches is the language's multi-way choice.
+- **`{#each items as item (key)}`** opens a repeat and **`{/each}`** closes it. `items` is a list. `item` is a name bound to one element, readable in the key and in the body but not in `items`, and it is a binding, not a read of state. The **key** identifies an item across updates (§9.10.3), is a string or a number, and is mandatory: a repeat without one is `missing-repeat-key`.
+- **Branch and body content.** A branch or body that is exactly one element is that element. Anything else (text, an expression, several nodes, none, or a lone block or slot) is wrapped in a `mesh-fragment` automatically. The fragment, slot and fill constructs stay elements.
+- **Placement.** A block is a child of an element, so it cannot be the document (a document is one element).
+- **Text.** Text cannot contain the block delimiters `{#`, `{:` and `{/`; to show them, write a string expression, as for `<`: `{"{#if}"}`.
+- **Nesting.** A block counts as three levels toward the nesting limit.
+- **The reserved elements are retired.** `mesh-if`, `mesh-each`, `mesh-switch`, `mesh-case` and `mesh-default`, written as elements, are `retired-element` errors whose message names the block to write.
+
+A block means what the retired element it replaces meant: `{#if}` with no other branch is the conditional (§9.10.2), a chain is the choice among its branches, one conditional site per branch, each true only when no branch before it is, and `{#each}` is the repeat. The runtime, the `template-v1` and `render-v1` documents, node identities and handler identifiers are unchanged, and a program written with the retired elements compiles to the same templates apart from source spans. The constructs a block lowers to are built in: a manifest need not declare them, and one that does is used as declared.
+
+Diagnostics about a block name the block ("the condition of `{#if}`", "the key of `{#each}`"). Syntax errors in blocks keep the code `syntax-error` with a message located at the block: a block never closed, a closer or `{:else}` with no open block, a malformed opener.
+
 
 **Whitespace in child content:** whitespace-only text children are
 formatting and are omitted from the semantic model; text containing any
@@ -840,7 +864,7 @@ With `click` as the applicable event of both `card` and `button`: an interaction
 
 ### 9.10 Node identity
 
-*A contract, and the provisional constructs that implement it.* MPRX has no syntax for a conditional or repeated element. The runtime gives two reserved components, `mesh-if` and `mesh-each`, those meanings as provisional tracers (§9.10.12), and every program that uses neither is **static** (§9.10.10). For a static program this section changes nothing the compiler or runtime does: its keys and handler identifiers are the ones `docs/manual/runtime.md` encodes. What this section fixes is what any construct that lets one program's renders differ in structure **must preserve**, and the tracers keep it. It adds no syntax and no schema member.
+*A contract, and the constructs that implement it.* Conditional and repeated structure are written as [blocks](#31-blocks) (`{#if}`, `{#each}`), which lower to two built-in constructs, `mesh-if` and `mesh-each`; the runtime's behavior for those constructs stays provisional (§9.10.12). Every program that uses neither is **static** (§9.10.10). For a static program this section changes nothing the compiler or runtime does: its keys and handler identifiers are the ones `docs/manual/runtime.md` encodes. What this section fixes is what any construct that lets one program's renders differ in structure **must preserve**, and the tracers keep it. It adds no syntax and no schema member.
 
 #### 9.10.1 Semantic identity
 
@@ -949,7 +973,7 @@ Each vector in `identity/` is a pair of hand-written render-v1 trees, the identi
 
 #### 9.10.12 What is not decided
 
-A provisional tracer implements conditional sites with a reserved component, `mesh-if`, to show the identity rules can be kept (`docs/manual/runtime.md`, "Conditionals (provisional)"). It is not the language's conditional. A second, `mesh-each`, does the same for repeated sites (`docs/manual/runtime.md`, "Repeated structure (provisional)"): the key is evaluated per item at render, and dispatch finds an item by rendering the stored inputs and recording each handler's scope. It is not the language's repetition, and it does not settle the questions below.
+The `{#if}` block lowers to a built-in construct, `mesh-if`, whose behavior is provisional, and implements conditional sites in a way that shows the identity rules can be kept (`docs/manual/runtime.md`, "Conditionals (provisional)"). The block, not the construct, is the language's conditional. A second, `mesh-each`, which `{#each}` lowers to, does the same for repeated sites (`docs/manual/runtime.md`, "Repeated structure (provisional)"): the key is evaluated per item at render, and dispatch finds an item by rendering the stored inputs and recording each handler's scope. The block is the language's repetition; the construct's spelling and encoding do not settle the questions below.
 
 The syntax for conditional and repeated elements, and for declaring a key; the compiler's implementation; the **encoding** of an identity into a key (the tracer writes a repeat's key as `s:` and the string, or `n:` and the number's text, inside the hash of the path; that is an implementation detail and not part of this contract, whose only requirement is that equal keys mean equal identities), and what happens if two collide; whether other kinds of value may be keys; nested repeated sites; any change to render-v1; how a renderer reconciles; how hydration transports identity; the mechanism by which dispatch recovers an item's scope, as against the requirement that it come from the program and the snapshot (§9.10.7); and whether a target may cache a realization across an absence.
 
@@ -978,7 +1002,7 @@ The syntax for conditional and repeated elements, and for declaring a key; the c
   primitive's event (§9.9.1)
 - Syntax for conditional elements, repeated elements, and the declaration
   of an item's key. §9.10 states the identity any such construct must
-  preserve, and the runtime's provisional `mesh-if` and `mesh-each`
+  preserve, and the runtime's provisional `mesh-if` and `mesh-each` (which blocks lower to)
   (§9.10.12) keep it; neither is MPRX syntax, and their spelling is not
   decided
 

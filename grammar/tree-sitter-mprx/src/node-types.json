@@ -142,11 +142,19 @@
       "required": true,
       "types": [
         {
+          "type": "each_block",
+          "named": true
+        },
+        {
           "type": "element",
           "named": true
         },
         {
           "type": "expression_block",
+          "named": true
+        },
+        {
+          "type": "if_block",
           "named": true
         },
         {
@@ -257,6 +265,70 @@
     }
   },
   {
+    "type": "each_block",
+    "named": true,
+    "fields": {
+      "binding": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "items": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      },
+      "key": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      },
+      "keyword": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "each_open",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "as_keyword",
+          "named": true
+        },
+        {
+          "type": "child",
+          "named": true
+        },
+        {
+          "type": "each_close",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "element",
     "named": true,
     "fields": {},
@@ -270,6 +342,68 @@
         },
         {
           "type": "self_closing_element",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "else_clause",
+    "named": true,
+    "fields": {
+      "keyword": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "else_open",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "child",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "else_if_clause",
+    "named": true,
+    "fields": {
+      "condition": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      },
+      "keyword": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "else_if_open",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "child",
           "named": true
         }
       ]
@@ -370,6 +504,54 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "if_block",
+    "named": true,
+    "fields": {
+      "condition": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      },
+      "keyword": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "if_open",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "child",
+          "named": true
+        },
+        {
+          "type": "else_clause",
+          "named": true
+        },
+        {
+          "type": "else_if_clause",
+          "named": true
+        },
+        {
+          "type": "if_close",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -682,6 +864,26 @@
     "named": false
   },
   {
+    "type": "as_keyword",
+    "named": true
+  },
+  {
+    "type": "each_close",
+    "named": true
+  },
+  {
+    "type": "each_open",
+    "named": true
+  },
+  {
+    "type": "else_if_open",
+    "named": true
+  },
+  {
+    "type": "else_open",
+    "named": true
+  },
+  {
     "type": "event_value",
     "named": true
   },
@@ -691,6 +893,14 @@
   },
   {
     "type": "identifier",
+    "named": true
+  },
+  {
+    "type": "if_close",
+    "named": true
+  },
+  {
+    "type": "if_open",
     "named": true
   },
   {

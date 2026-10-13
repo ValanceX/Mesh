@@ -26,9 +26,10 @@ const MODEL: &str = r#"{
   }
 }"#;
 
-const VIEW: &str = "<panel><card heading={title}><note>hi</note></card><mesh-each items={items} as=\"item\" key={item.id}><row id={item.id} label={item.label} on.chosen={pick($event)} /></mesh-each></panel>";
+const VIEW: &str = "<panel><card heading={title}><note>hi</note></card>{#each items as item (item.id)}<row id={item.id} label={item.label} on.chosen={pick($event)} />{/each}</panel>";
 const CARD: &str = "<panel><note>{heading}</note><mesh-slot /></panel>";
-const ROW: &str = "<panel><button on.tap={chosen(id)}>{label}</button><mesh-if when={flag}><note>x</note></mesh-if></panel>";
+const ROW: &str =
+    "<panel><button on.tap={chosen(id)}>{label}</button>{#if flag}<note>x</note>{/if}</panel>";
 
 fn sources() -> Vec<(String, String)> {
     vec![
@@ -83,7 +84,7 @@ fn the_inferred_manifest_checks_every_template() {
         .iter()
         .any(|d| d.message.contains("flag")));
 
-    sources[2].1 = ROW.replace("<mesh-if when={flag}><note>x</note></mesh-if>", "");
+    sources[2].1 = ROW.replace("{#if flag}<note>x</note>{/if}", "");
     let fixed = infer_components(MODEL, "view", &sources).unwrap();
     let manifest = mesh_manifest::load(&fixed).unwrap();
 
@@ -117,7 +118,7 @@ fn an_optional_prop_is_one_some_occurrences_leave_out() {
         ),
         (
             "card".to_string(),
-            "<panel><mesh-if when={flag}><note>x</note></mesh-if></panel>".to_string(),
+            "<panel>{#if flag}<note>x</note>{/if}</panel>".to_string(),
         ),
     ];
     let inferred = infer_components(MODEL, "view", &sources).unwrap();
@@ -130,32 +131,42 @@ fn an_optional_prop_is_one_some_occurrences_leave_out() {
 }
 
 #[test]
-fn the_reserved_tags_a_program_uses_are_declared_and_a_switch_declares_the_conditional_it_is_written_as(
-) {
-    let sources = vec![("view".to_string(), "<panel><mesh-switch><mesh-case when={flag}><note>x</note></mesh-case><mesh-default><note>y</note></mesh-default></mesh-switch></panel>".to_string())];
-    let bare = MODEL.replace("\"mesh-if\"", "\"unused\"");
-    let inferred = infer_components(&bare, "view", &sources).unwrap();
+fn control_flow_is_not_declared_and_the_reserved_elements_a_program_writes_are() {
+    // A model that declares nothing for control flow.
+    let mut document: Value = serde_json::from_str(MODEL).unwrap();
+    for tag in ["mesh-if", "mesh-each"] {
+        document["components"].as_object_mut().unwrap().remove(tag);
+    }
+    let bare = document.to_string();
+
+    // Blocks lower to constructs that are built in: nothing is added to the model for them.
+    let blocks = vec![("view".to_string(), "<panel>{#if flag}<note>x</note>{:else}<note>y</note>{/if}{#each items as i (i.id)}<note>z</note>{/each}</panel>".to_string())];
+    assert_eq!(
+        infer_components(&bare, "view", &blocks),
+        None,
+        "a program of blocks adds nothing"
+    );
+
+    // An element the language keeps is declared when a source writes it.
+    let written = vec![(
+        "view".to_string(),
+        "<panel><mesh-fragment><note>x</note>text</mesh-fragment><mesh-slot /></panel>".to_string(),
+    )];
+    let inferred = infer_components(&bare, "view", &written).unwrap();
     let components = &serde_json::from_str::<Value>(&inferred).unwrap()["components"];
 
-    for tag in ["mesh-switch", "mesh-case", "mesh-default", "mesh-if"] {
+    for tag in ["mesh-fragment", "mesh-slot"] {
         assert!(components[tag].is_object(), "{tag}");
     }
-    assert!(
-        components["mesh-slot"].is_null(),
-        "a tag no source uses is not declared"
-    );
-    assert_eq!(
-        components["mesh-case"]["props"]["when"]["type"],
-        serde_json::json!({ "kind": "boolean" })
-    );
-
-    let manifest = mesh_manifest::load(&inferred).unwrap();
-    assert!(compile_with(
-        &sources[0].1,
-        &CompileOptions::with_template(manifest.template("view").unwrap())
-    )
-    .diagnostics
-    .is_empty());
+    for tag in [
+        "mesh-if",
+        "mesh-each",
+        "mesh-switch",
+        "mesh-case",
+        "mesh-default",
+    ] {
+        assert!(components[tag].is_null(), "{tag} is not declared");
+    }
 }
 
 #[test]

@@ -253,3 +253,39 @@ fn a_newer_change_makes_it_content_modified() {
     );
     drop(release);
 }
+
+// --- Blocks ----------------------------------------------------------------
+
+#[test]
+fn after_a_block_opener_the_names_a_value_may_be() {
+    for opener in [
+        "{#if |",
+        "{#if user.active}<text>a</text>{:else if |",
+        "{#each |",
+    ] {
+        let (_workspace, mut client, uri) = users_page();
+        let marked = page(opener);
+        let list = complete_at(&mut client, &uri, &marked);
+
+        assert_eq!(labels(&list), ["compact", "user"], "{opener}");
+    }
+}
+
+#[test]
+fn a_block_is_not_offered_as_a_tag() {
+    // A model written before blocks may still declare the reserved elements; they are not components to write.
+    let manifest = example("components.json").replace(
+        "\"users-page\"",
+        "\"mesh-if\": { \"props\": { \"when\": { \"type\": { \"kind\": \"boolean\" }, \"required\": true } }, \"events\": {}, \"commands\": {}, \"scope\": {} }, \"users-page\"",
+    );
+    let (_workspace, mut client, uri) = server(&manifest, true, test_options());
+    let list = complete_at(&mut client, &uri, &page("<|"));
+
+    assert!(
+        !labels(&list)
+            .iter()
+            .any(|label| label.starts_with("mesh-if")),
+        "{:?}",
+        labels(&list)
+    );
+}

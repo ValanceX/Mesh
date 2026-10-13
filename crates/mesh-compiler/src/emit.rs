@@ -9,11 +9,9 @@
 //! nearest binary64 value (§9.7.3), and spans gain their UTF-16 offsets.
 
 use crate::source_map::SourceMap;
-use mesh_semantic::{AttributeValue, Child, Element, Expression, Literal};
+use mesh_semantic::{AttributeValue, Child, Construct, Element, Expression, Literal};
 use mesh_syntax::{BinaryOperator, Span, UnaryOperator};
 use mesh_template as t;
-
-use mesh_analysis::{CASE_COMPONENT, SWITCH_COMPONENT};
 
 /// The conditional a switch is written as.
 const CONDITIONAL_COMPONENT: &str = "mesh-if";
@@ -105,7 +103,7 @@ impl Emitter<'_> {
                     Child::Expression(expression) => vec![t::Child::Expression {
                         expression: self.expression(expression),
                     }],
-                    Child::Element(element) if element.name == SWITCH_COMPONENT => {
+                    Child::Element(element) if element.construct == Some(Construct::Switch) => {
                         self.switch(element)
                     }
                     Child::Element(element) => vec![t::Child::Element {
@@ -131,7 +129,7 @@ impl Emitter<'_> {
             let Child::Element(case) = child else {
                 unreachable!("a clean check guarantees a switch holds only cases and a default");
             };
-            let own = (case.name == CASE_COMPONENT).then(|| {
+            let own = matches!(case.construct, Some(Construct::Case { .. })).then(|| {
                 case.attributes
                     .iter()
                     .find_map(|attribute| match &attribute.value {

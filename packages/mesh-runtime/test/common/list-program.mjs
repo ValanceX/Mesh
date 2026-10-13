@@ -61,7 +61,7 @@ export const LIST_MODEL = JSON.stringify({
   },
 });
 const LIST_VIEW =
-  '<page title={title} count={count + 1} tag={tag} on.tap={pick(count)}><note>{title} has {count}</note><mesh-if when={flag}><note>on</note><note>off</note></mesh-if><mesh-each items={items} as="item" key={item.id}><row label={item.label} done={item.done} on.tap={pick(item.id)}>{item.label}</row></mesh-each></page>';
+  '<page title={title} count={count + 1} tag={tag} on.tap={pick(count)}><note>{title} has {count}</note>{#if flag}<note>on</note>{:else}<note>off</note>{/if}{#each items as item (item.id)}<row label={item.label} done={item.done} on.tap={pick(item.id)}>{item.label}</row>{/each}</page>';
 export const listProgram = { root: "view", templates: [await template("view", LIST_VIEW, LIST_MODEL)] };
 
 /** A small deterministic generator, so the test needs no dependency. */

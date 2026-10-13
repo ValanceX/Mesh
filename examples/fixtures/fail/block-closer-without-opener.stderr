@@ -1,0 +1,6 @@
+error[syntax-error]: `{/if}` with no open `{#if}`
+ --> fixtures/fail/block-closer-without-opener.mprx:3:3
+  |
+3 |   {/if}
+  |   ^^^^^
+

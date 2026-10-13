@@ -1,0 +1,4 @@
+<page title="x">
+  {#if flag}
+    <text>x</text>
+</page>

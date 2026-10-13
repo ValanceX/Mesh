@@ -105,6 +105,8 @@ const UNCAPTURED: &[&str] = &[
     "source_file",
     "element",
     "child",
+    // A branch of a block: its keyword and its contents are captured on their own.
+    "else_clause",
     "text",
     "expression",
     "literal",

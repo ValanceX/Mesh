@@ -21,6 +21,23 @@
 (attribute "=" @punctuation.delimiter)
 (event_binding "=" @punctuation.delimiter)
 
+; Blocks. The openers and closers are single tokens; the braces of the
+; opener's expression part are the tokens' own.
+
+(if_open) @keyword.conditional
+(if_block "}" @punctuation.special)
+(else_if_open) @keyword.conditional
+(else_if_clause "}" @punctuation.special)
+(else_open) @keyword.conditional
+(if_close) @keyword.conditional
+
+(each_open) @keyword.repeat
+(each_block (as_keyword) @keyword.repeat)
+(each_block binding: (identifier) @variable.parameter)
+(each_block ["(" ")"] @punctuation.bracket)
+(each_block "}" @punctuation.special)
+(each_close) @keyword.repeat
+
 ; Expressions
 
 (expression_block ["{" "}"] @punctuation.special)

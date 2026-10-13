@@ -14,6 +14,7 @@
 
 use mesh_syntax::{Diagnostic, DiagnosticCode, Severity, Span};
 use std::collections::BTreeMap;
+use std::sync::OnceLock;
 
 mod json;
 mod validate;
@@ -195,7 +196,73 @@ pub struct Manifest {
     spans: BTreeMap<DeclarationKey, Span>,
 }
 
+/// The names of the components the language itself gives meaning to when a template is written with
+/// blocks: the conditional and the repeat a block lowers to, and the fragment that wraps a branch or body
+/// that is not exactly one element. A manifest need not declare them (docs/MPRX-SPEC.md, "Blocks"); one
+/// that does is used as declared.
+pub const BUILT_IN_COMPONENTS: [&str; 3] = ["mesh-if", "mesh-each", "mesh-fragment"];
+
+/// The components a block can lower to, for analysis: [`BUILT_IN_COMPONENTS`] and the choice among branches
+/// (`mesh-switch`, `mesh-case`, `mesh-default`), which a template never names (it is emitted as conditionals)
+/// and so which [`Manifest::component`] does not offer.
+pub fn construct_component(name: &str) -> Option<(&'static str, &'static Component)> {
+    built_in_components()
+        .get_key_value(name)
+        .map(|(name, component)| (name.as_str(), component))
+}
+
+fn built_in_components() -> &'static BTreeMap<String, Component> {
+    static BUILT_IN: OnceLock<BTreeMap<String, Component>> = OnceLock::new();
+
+    BUILT_IN.get_or_init(|| {
+        let required = |ty| Field { ty, required: true };
+        let component = |props: Vec<(&str, Field)>| Component {
+            props: props
+                .into_iter()
+                .map(|(name, field)| (name.to_string(), field))
+                .collect(),
+            events: BTreeMap::new(),
+            commands: BTreeMap::new(),
+            scope: BTreeMap::new(),
+        };
+
+        BTreeMap::from([
+            (
+                "mesh-if".to_string(),
+                component(vec![("when", required(Type::Boolean))]),
+            ),
+            (
+                "mesh-each".to_string(),
+                component(vec![
+                    ("items", required(Type::List(Box::new(Type::Any)))),
+                    ("as", required(Type::String)),
+                    ("key", required(Type::Any)),
+                ]),
+            ),
+            ("mesh-fragment".to_string(), component(Vec::new())),
+            ("mesh-switch".to_string(), component(Vec::new())),
+            (
+                "mesh-case".to_string(),
+                component(vec![("when", required(Type::Boolean))]),
+            ),
+            ("mesh-default".to_string(), component(Vec::new())),
+        ])
+    })
+}
+
 impl Manifest {
+    /// The component `name` is: the manifest's own declaration, or, for a built-in
+    /// ([`BUILT_IN_COMPONENTS`]) it does not declare, the language's. The name is the key as stored.
+    pub fn component(&self, name: &str) -> Option<(&str, &Component)> {
+        match self.components.get_key_value(name) {
+            Some((name, component)) => Some((name.as_str(), component)),
+            None if BUILT_IN_COMPONENTS.contains(&name) => built_in_components()
+                .get_key_value(name)
+                .map(|(name, component)| (name.as_str(), component)),
+            None => None,
+        }
+    }
+
     /// The named types, by name.
     pub fn types(&self) -> &BTreeMap<String, Type> {
         &self.types

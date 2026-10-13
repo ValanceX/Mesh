@@ -119,6 +119,8 @@ pub fn context_at(source: &str, offset: usize) -> Option<Completion> {
             }
             _ => None,
         },
+        // K7: a block's condition or list starts right after its opener.
+        "if_open" | "each_open" | "else_if_open" => Some(Context::Value),
         "(" | "," | "[" | "?" | ":" | "!" | "-" | "+" | "*" | "/" | "%" | "<=" | ">=" | "=="
         | "!=" | "&&" | "||" | ">" => value_after(p),
         _ => None,
@@ -193,6 +195,8 @@ fn value_after(token: Node) -> Option<Context> {
     let parent = token.parent()?;
     let value = match (token.kind(), parent.kind()) {
         ("(" | ",", "command_invocation") => true,
+        // K7: the key of an `{#each}`.
+        ("(", "each_block") => true,
         ("[" | ",", "array_expression") => true,
         ("?" | ":", "conditional_expression") => true,
         (":", "object_member") => true,

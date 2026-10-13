@@ -175,8 +175,17 @@ impl DiagnosticCode {
     /// has no text form (§9.7.8).
     pub const CONTENT_NOT_TEXT: DiagnosticCode = DiagnosticCode("content-not-text");
     /// A `mesh-switch`, `mesh-case` or `mesh-default` that isn't shaped or
-    /// placed as the language says.
+    /// placed as the language says. Retired: nothing reports it since
+    /// blocks replaced the multi-way element, and the code stays in the
+    /// catalogue because codes are never reused.
     pub const INVALID_SWITCH: DiagnosticCode = DiagnosticCode("invalid-switch");
+    /// A reserved element written as an element (`<mesh-if>`, `<mesh-each>`,
+    /// `<mesh-switch>`, `<mesh-case>`, `<mesh-default>`): control flow is
+    /// written as a block, and the message names the one to write.
+    pub const RETIRED_ELEMENT: DiagnosticCode = DiagnosticCode("retired-element");
+    /// A `{#each}` block without the `(key)` that identifies its items
+    /// across updates.
+    pub const MISSING_REPEAT_KEY: DiagnosticCode = DiagnosticCode("missing-repeat-key");
 
     /// Every code MESH can emit, in catalogue order. The diagnostics
     /// reference (`docs/manual/diagnostics.md`) documents each one, and a
@@ -230,6 +239,8 @@ impl DiagnosticCode {
         DiagnosticCode::NUMBER_LITERAL_OUT_OF_RANGE,
         DiagnosticCode::CONTENT_NOT_TEXT,
         DiagnosticCode::INVALID_SWITCH,
+        DiagnosticCode::RETIRED_ELEMENT,
+        DiagnosticCode::MISSING_REPEAT_KEY,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -530,6 +541,72 @@ pub enum Child {
     Text(Text),
     Expression(Expression),
     Element(Box<Element>),
+    /// A control-flow block: `{#if}` or `{#each}`.
+    Block(Box<Block>),
+}
+
+/// A control-flow block, written in the children of an element.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Block {
+    If(IfBlock),
+    Each(EachBlock),
+}
+
+impl Block {
+    /// The whole block, from its opener to its closer.
+    pub fn span(&self) -> Span {
+        match self {
+            Block::If(block) => block.span,
+            Block::Each(block) => block.span,
+        }
+    }
+}
+
+/// `{#if condition} … {:else if condition} … {:else} … {/if}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IfBlock {
+    /// The `{#if}` branch first, then each `{:else if}` in order. Never empty.
+    pub branches: Vec<IfBranch>,
+    /// The `{:else}` branch, if written.
+    pub otherwise: Option<ElseBranch>,
+    /// From `{#if` to `{/if}`.
+    pub span: Span,
+}
+
+/// One conditional branch of an [`IfBlock`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IfBranch {
+    pub condition: Expression,
+    /// The keyword as written: `{#if` or `{:else if`.
+    pub keyword_span: Span,
+    pub children: Vec<Child>,
+    pub span: Span,
+}
+
+/// The `{:else}` branch of an [`IfBlock`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ElseBranch {
+    /// The whole `{:else}`.
+    pub keyword_span: Span,
+    pub children: Vec<Child>,
+    pub span: Span,
+}
+
+/// `{#each items as item (key)} … {/each}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EachBlock {
+    pub items: Expression,
+    /// The keyword as written: `{#each`.
+    pub keyword_span: Span,
+    /// The name bound to one element, readable in the key and the body.
+    pub binding: String,
+    pub binding_span: Span,
+    /// The key expression, if written. Mandatory in a valid program: a
+    /// block without one is reported while lowering.
+    pub key: Option<Expression>,
+    pub children: Vec<Child>,
+    /// From `{#each` to `{/each}`.
+    pub span: Span,
 }
 
 #[cfg(test)]
@@ -1018,6 +1095,8 @@ mod tests {
                 "number-literal-out-of-range",
                 "content-not-text",
                 "invalid-switch",
+                "retired-element",
+                "missing-repeat-key",
             ]
         );
     }

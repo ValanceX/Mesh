@@ -193,7 +193,7 @@ fn a_composite_may_use_its_own_commands_beside_forwarding() {
 #[test]
 fn a_composite_in_a_repeat_gives_each_item_its_own_values() {
     let rendered = program(
-        "<page><mesh-each items={items} as=\"item\" key={item.id}><card count={item.id} on.select={pick(item.id)} /></mesh-each></page>",
+        "<page>{#each items as item (item.id)}<card count={item.id} on.select={pick(item.id)} />{/each}</page>",
         &[("card", CARD)],
     );
     let selects: Vec<String> = button_nodes(&rendered)
@@ -288,7 +288,8 @@ fn the_compiler_checks_a_forward_against_the_events_payload() {
 
 #[test]
 fn an_updates_tree_has_the_forwards_a_render_has() {
-    let view = "<page><mesh-if when={flag}><card count={n} on.select={pick($event)} /></mesh-if><card count={n} /></page>";
+    let view =
+        "<page>{#if flag}<card count={n} on.select={pick($event)} />{/if}<card count={n} /></page>";
     let first = program(view, &[("card", CARD)]);
     let flipped = STATE.replace("true", "false");
     let updated = update(&first, &snapshot(&flipped)).expect("updates");

@@ -5,11 +5,10 @@
 use crate::relation::{self, is_assignable, join};
 use crate::types::{FieldTy, Ty};
 use crate::{
-    Analysis, Combination, Expectation, Fact, Operator, Resolution, SwitchProblem, Target, Typed,
-    CASE_COMPONENT, DEFAULT_COMPONENT, SWITCH_COMPONENT,
+    Analysis, BlockPart, Combination, Expectation, Fact, Operator, Resolution, Target, Typed,
 };
 use mesh_manifest::{Component, Manifest, Template, Type};
-use mesh_semantic::{AttributeValue, Child, Element, Expression, Literal, ObjectMember};
+use mesh_semantic::{AttributeValue, Child, Construct, Element, Expression, Literal, ObjectMember};
 use mesh_syntax::{BinaryOperator, Span, UnaryOperator};
 use std::collections::BTreeMap;
 
@@ -88,14 +87,21 @@ struct Walker<'m> {
     /// enclosing `mesh-each` elements, innermost last, each with its item
     /// type. A name here shadows a scope declaration and resolves to
     /// nothing a tool could navigate to.
-    loops: Vec<(String, Ty)>,
+    loops: Vec<(String, Ty, Span)>,
     /// The tags of the elements being walked, innermost last, the current
     /// element not among them.
     parents: Vec<String>,
 }
 
-/// The reserved component whose `as` names the item its children see.
-const REPEAT_COMPONENT: &str = "mesh-each";
+/// The reserved elements that blocks replaced. Written as elements they are reported while lowering, so a missing
+/// declaration is not reported again.
+const RETIRED: [&str; 5] = [
+    "mesh-if",
+    "mesh-each",
+    "mesh-switch",
+    "mesh-case",
+    "mesh-default",
+];
 
 impl<'m> Walker<'m> {
     fn manifest(&self) -> &'m Manifest {
@@ -109,37 +115,47 @@ impl<'m> Walker<'m> {
     /// Checks one element as an instance of the component its tag names,
     /// then its attribute values, its handlers and its children.
     fn element(&mut self, element: &Element) {
-        self.switch_shape(element);
         let manifest = self.manifest();
-        let component = match manifest.components().get_key_value(&element.name) {
-            Some((name, component)) => {
-                self.resolve(element.name_span, Target::Component(name.clone()));
-                Some((name.as_str(), component))
-            }
-            None => {
-                self.facts.push(Fact::UnknownComponent {
-                    name: element.name.clone(),
-                    span: element.name_span,
-                    candidates: manifest.components().keys().cloned().collect(),
-                });
-                None
-            }
+        // A block lowered to this element: it is the language's, not a component of the manifest's, so no tool is
+        // offered it and nothing about it resolves.
+        let tracked = element.construct.is_none();
+        let component = match element.construct {
+            // Declared, a manifest's own is used; otherwise the language's.
+            Some(_) => manifest
+                .component(&element.name)
+                .or_else(|| mesh_manifest::construct_component(&element.name)),
+            None => match manifest.component(&element.name) {
+                Some((name, component)) => {
+                    self.resolve(element.name_span, Target::Component(name.to_string()));
+                    Some((name, component))
+                }
+                None => {
+                    if !RETIRED.contains(&element.name.as_str()) {
+                        self.facts.push(Fact::UnknownComponent {
+                            name: element.name.clone(),
+                            span: element.name_span,
+                            candidates: manifest.components().keys().cloned().collect(),
+                        });
+                    }
+                    None
+                }
+            },
         };
 
         if let Some((name, component)) = component {
             self.missing_props(element, name, component);
         }
 
-        let repeating = element.name == REPEAT_COMPONENT;
+        let repeating = element.construct == Some(Construct::Each);
         let mut pushed = false;
-        let mut bound: Option<String> = None;
+        let mut bound: Option<(String, Span)> = None;
         let mut attributes: Vec<&_> = element.attributes.iter().collect();
         if repeating {
             // `items` first, so `key` sees the binding whatever the order written.
             attributes.sort_by_key(|attribute| attribute.name != "items");
             bound = element.attributes.iter().find_map(|attribute| {
                 match (&attribute.value, attribute.name.as_str()) {
-                    (AttributeValue::String { value, .. }, "as") => Some(value.clone()),
+                    (AttributeValue::String { value, span }, "as") => Some((value.clone(), *span)),
                     _ => None,
                 }
             });
@@ -150,16 +166,27 @@ impl<'m> Walker<'m> {
             if let Some((name, component)) = component {
                 match component.props.get_key_value(&attribute.name) {
                     Some((prop, field)) => {
-                        self.resolve(
-                            attribute.name_span,
-                            Target::Prop {
+                        if tracked {
+                            self.resolve(
+                                attribute.name_span,
+                                Target::Prop {
+                                    component: name.to_string(),
+                                    prop: prop.clone(),
+                                },
+                            );
+                        }
+                        let expectation = match (element.construct, prop.as_str()) {
+                            (Some(Construct::If | Construct::Case { first: true }), _) => {
+                                Expectation::Block(BlockPart::IfCondition)
+                            }
+                            (Some(Construct::Case { first: false }), _) => {
+                                Expectation::Block(BlockPart::ElseIfCondition)
+                            }
+                            (Some(Construct::Each), _) => Expectation::Block(BlockPart::EachItems),
+                            _ => Expectation::Prop {
                                 component: name.to_string(),
                                 prop: prop.clone(),
                             },
-                        );
-                        let expectation = Expectation::Prop {
-                            component: name.to_string(),
-                            prop: prop.clone(),
                         };
                         expected = Some((Ty::from(&field.ty), expectation));
                     }
@@ -189,9 +216,18 @@ impl<'m> Walker<'m> {
                 (AttributeValue::Expression(expression), Some((expected, expectation))) => {
                     let ty = self.check(expression, Place::Value, &expected, expectation);
                     if repeating && attribute.name == "items" {
-                        if let (Some(name), Some(ty)) = (&bound, ty) {
+                        if let (Some((name, declaration)), Some(ty)) = (&bound, ty) {
                             let ty = self.item_of(&ty);
-                            self.loops.push((name.clone(), ty));
+                            // The binding is a declaration, not a read: it resolves to itself and has the item's type.
+                            self.resolve(
+                                *declaration,
+                                Target::Binding {
+                                    name: name.clone(),
+                                    declaration: *declaration,
+                                },
+                            );
+                            self.typed(*declaration, ty.clone());
+                            self.loops.push((name.clone(), ty, *declaration));
                             pushed = true;
                         }
                     }
@@ -254,121 +290,6 @@ impl<'m> Walker<'m> {
         }
     }
 
-    /// The shape and place of a switch (docs/manual/templates.md, "Switch"):
-    /// what the rest of the walk, which checks each element as a component,
-    /// does not say.
-    fn switch_shape(&mut self, element: &Element) {
-        let problem = |walker: &mut Self, name: &str, problem, span| {
-            walker.facts.push(Fact::MalformedSwitch {
-                component: name.to_string(),
-                problem,
-                span,
-            });
-        };
-        let parent = self.parents.last().map(String::as_str);
-
-        match element.name.as_str() {
-            SWITCH_COMPONENT => {
-                // Several siblings, so never the only thing a parent allows.
-                if parent.is_none_or(|parent| {
-                    matches!(
-                        parent,
-                        "mesh-if" | "mesh-each" | CASE_COMPONENT | DEFAULT_COMPONENT
-                    )
-                }) {
-                    problem(
-                        self,
-                        &element.name,
-                        SwitchProblem::Placement,
-                        element.name_span,
-                    );
-                }
-                let mut cases = 0;
-                let mut defaulted = false;
-                for child in &element.children {
-                    match child {
-                        Child::Element(child) if child.name == CASE_COMPONENT && !defaulted => {
-                            cases += 1;
-                        }
-                        Child::Element(child) if child.name == DEFAULT_COMPONENT && !defaulted => {
-                            defaulted = true;
-                        }
-                        Child::Element(child)
-                            if child.name == DEFAULT_COMPONENT || child.name == CASE_COMPONENT =>
-                        {
-                            problem(
-                                self,
-                                &child.name,
-                                SwitchProblem::DefaultNotLast,
-                                child.name_span,
-                            );
-                        }
-                        Child::Element(child) => {
-                            problem(
-                                self,
-                                &element.name,
-                                SwitchProblem::NotACase,
-                                child.name_span,
-                            );
-                        }
-                        Child::Text { span, .. } => {
-                            problem(self, &element.name, SwitchProblem::NotACase, *span);
-                        }
-                        Child::Expression(expression) => {
-                            problem(
-                                self,
-                                &element.name,
-                                SwitchProblem::NotACase,
-                                expression.span(),
-                            );
-                        }
-                    }
-                }
-                if cases == 0 {
-                    problem(
-                        self,
-                        &element.name,
-                        SwitchProblem::NoCases,
-                        element.name_span,
-                    );
-                }
-            }
-            CASE_COMPONENT | DEFAULT_COMPONENT => {
-                if parent != Some(SWITCH_COMPONENT) {
-                    problem(
-                        self,
-                        &element.name,
-                        SwitchProblem::OutsideSwitch,
-                        element.name_span,
-                    );
-                }
-                let only_elements = element
-                    .children
-                    .iter()
-                    .all(|child| matches!(child, Child::Element(_)));
-                if !only_elements || element.children.len() != 1 {
-                    problem(
-                        self,
-                        &element.name,
-                        SwitchProblem::BodyCount,
-                        element.name_span,
-                    );
-                }
-                for child in &element.children {
-                    if let Child::Element(body) = child {
-                        if matches!(
-                            body.name.as_str(),
-                            "mesh-if" | "mesh-slot" | SWITCH_COMPONENT
-                        ) {
-                            problem(self, &element.name, SwitchProblem::BadBody, body.name_span);
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
     /// A repeat's key must be a string or a finite number (§9.10.4). The
     /// finiteness is a value's, so statically the type must be `string` or
     /// `number`, or `any`, which every check leaves to the runtime. A
@@ -427,7 +348,9 @@ impl<'m> Walker<'m> {
                 .attributes
                 .iter()
                 .any(|attribute| &attribute.name == prop);
-            if field.required && !supplied {
+            // A repeat without a key is reported while lowering, with a message of its own.
+            let reported = element.construct == Some(Construct::Each) && prop == "key";
+            if field.required && !supplied && !reported {
                 self.facts.push(Fact::MissingRequiredProp {
                     component: name.to_string(),
                     prop: prop.clone(),
@@ -730,16 +653,24 @@ impl<'m> Walker<'m> {
                 Literal::Boolean(_) => Ty::Boolean,
                 Literal::Null => Ty::Null,
             }),
-            Expression::Reference { name, .. }
-                if self.loops.iter().any(|(bound, _)| bound == name) =>
+            Expression::Reference { name, span }
+                if self.loops.iter().any(|(bound, _, _)| bound == name) =>
             {
-                let (_, ty) = self
+                let (_, ty, declaration) = self
                     .loops
                     .iter()
                     .rev()
-                    .find(|(bound, _)| bound == name)
+                    .find(|(bound, _, _)| bound == name)
                     .expect("just found");
-                Some(ty.clone())
+                let (ty, declaration) = (ty.clone(), *declaration);
+                self.resolve(
+                    *span,
+                    Target::Binding {
+                        name: name.clone(),
+                        declaration,
+                    },
+                );
+                Some(ty)
             }
             Expression::Reference { name, span } => {
                 let scope = &self.template.component().scope;

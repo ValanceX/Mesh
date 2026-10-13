@@ -67,7 +67,35 @@ Text runs until the next `<` or `{`. To show either character literally, put it 
 <text>{"a < b"} and {"{braces}"}</text>
 ```
 
+Text cannot contain the block delimiters `{#`, `{:` or `{/` either (they begin [blocks](#conditions-and-lists), below). To show one, write a string expression, as you do for `<`: `<text>{"{#if}"}</text>`.
+
 Text is kept exactly as written, with no trimming or collapsing. Whitespace-only text between tags, such as indentation and newlines, is treated as formatting and is left out of the compiled output.
+
+## Conditions and lists
+
+Showing something only sometimes, or once for each item of a list, is written with a **block** in an element's content. A block is syntax, not an element.
+
+```xml
+<panel>
+  {#if user.active}
+    <text>{user.name} is online</text>
+  {:else if user.invited}
+    <text>{user.name} has not joined yet</text>
+  {:else}
+    <text>{user.name} is away</text>
+  {/if}
+
+  {#each users as person (person.id)}
+    <user-card user={person} />
+  {/each}
+</panel>
+```
+
+- `{#if condition}` … `{:else if condition}` … `{:else}` … `{/if}`. Conditions are booleans. The first that holds chooses its branch, then the `{:else}`; with no `{:else}` and no true condition, nothing is shown.
+- `{#each items as item (key)}` … `{/each}` repeats its body for each element of a list. `item` is the name bound to one element; use it in the key and in the body (not in the list itself). The key says which item is which when the list changes, so it must be a string or a number that is different for each item (`person.id`, not the position). It is required: `{#each users as person}` is `error[missing-repeat-key]`.
+- A branch or body can hold one element, or text, several nodes, or another block: anything but exactly one element is wrapped in a `mesh-fragment` for you, so you never write one for this.
+- A block goes inside an element: a document is one element, so a file cannot start with `{#if}`.
+- The old elements `<mesh-if>`, `<mesh-each>`, `<mesh-switch>`, `<mesh-case>` and `<mesh-default>` are errors (`error[retired-element]`) that tell you which block to write.
 
 ## Expressions
 
@@ -150,6 +178,9 @@ On its own, `mesh check` verifies structure, so `<user-card user={usr} />` passe
 | `data={ k: "v" }` | `error[single-brace-object]` | `data={{ k: "v" }}` |
 | `<text>a < b</text>` | `error[less-than-in-text]` | `<text>{"a < b"}</text>` |
 | `data-id="1"` | `error[hyphenated-attribute-name]` | `dataId="1"` |
+| `{#each rows as row}` | `error[missing-repeat-key]` | `{#each rows as row (row.id)}` |
+| `<mesh-if when={ok}>…</mesh-if>` | `error[retired-element]` | `{#if ok}…{/if}` |
+| `{#if ok}…` with no `{/if}` | `error[syntax-error]` | Close the block with `{/if}` |
 | `label="A" label="B"` | `warning[duplicate-attribute]` | Remove the one you don't mean |
 
 Every diagnostic has a code in brackets, like `less-than-in-text`. Look it up in the [diagnostics reference](../manual/diagnostics.md) for the full explanation and fix.

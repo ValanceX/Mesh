@@ -4,7 +4,7 @@
 //! and computes suggestions. Analysis reports what it found and which
 //! names were available; this layer decides how to say it.
 
-use mesh_analysis::{Combination, Expectation, Fact, Operator, SwitchProblem};
+use mesh_analysis::{BlockPart, Combination, Expectation, Fact, Operator};
 use mesh_syntax::{
     BinaryOperator, Diagnostic, DiagnosticCode, Severity, Span, Suggestion, UnaryOperator,
 };
@@ -147,7 +147,7 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
         } if *expectation == Expectation::RepeatKey => (
             DiagnosticCode::TYPE_MISMATCH,
             format!(
-                "a repeat's key must be a string or a number, found {actual}{}",
+                "the key of `{{#each}}` must be a string or a number, found {actual}{}",
                 if *possibly_absent {
                     ", which may be absent"
                 } else {
@@ -216,21 +216,6 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
             format!("the object is missing the field {field:?}, which {record} requires"),
             Vec::new(),
         ),
-        Fact::MalformedSwitch {
-            component, problem, ..
-        } => (
-            DiagnosticCode::INVALID_SWITCH,
-            match problem {
-                SwitchProblem::OutsideSwitch => format!("`{component}` belongs directly inside a `mesh-switch`"),
-                SwitchProblem::Placement => format!("`{component}` stands for several siblings, so it needs an element around it: it can't be the root, or the direct child of a `mesh-if`, `mesh-each`, `mesh-case` or `mesh-default`"),
-                SwitchProblem::NoCases => format!("`{component}` needs at least one `mesh-case`"),
-                SwitchProblem::NotACase => format!("`{component}` holds only `mesh-case`s and, last, one `mesh-default`: this isn't one"),
-                SwitchProblem::DefaultNotLast => format!("`{component}` is after a `mesh-default`, or a second one: the `mesh-default` is the last child, and the only one"),
-                SwitchProblem::BodyCount => format!("`{component}` needs exactly one element child, and nothing else"),
-                SwitchProblem::BadBody => format!("the child of `{component}` can't be a `mesh-if`, a `mesh-switch` or a `mesh-slot`: put it inside an element"),
-            },
-            Vec::new(),
-        ),
         Fact::ContentNotText { ty, .. } => (
             DiagnosticCode::CONTENT_NOT_TEXT,
             format!("a value of type {ty} can't be shown as text: interpolate one of its fields, or a string, number, boolean or null"),
@@ -264,7 +249,12 @@ fn expecting(expectation: &Expectation) -> String {
         }
         Expectation::Field { field } => format!("the field {field:?}"),
         Expectation::Element => "the list element".to_string(),
-        Expectation::RepeatKey => "a repeat's key".to_string(),
+        Expectation::RepeatKey => "the key of `{#each}`".to_string(),
+        Expectation::Block(BlockPart::IfCondition) => "the condition of `{#if}`".to_string(),
+        Expectation::Block(BlockPart::ElseIfCondition) => {
+            "the condition of `{:else if}`".to_string()
+        }
+        Expectation::Block(BlockPart::EachItems) => "the list of `{#each}`".to_string(),
     }
 }
 

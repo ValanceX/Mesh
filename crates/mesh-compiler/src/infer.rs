@@ -24,7 +24,9 @@ use serde_json::{json, Map, Value};
 
 use crate::{compile_with, CompileOptions};
 
-/// The reserved structural tags: each is declared, when a source uses it and the manifest does not, as the language defines it.
+/// The reserved structural elements a program may write: each is declared, when a source writes it and the manifest does not, as the language
+/// defines it. Control flow is not among them: a block lowers to constructs that are built in (`mesh-if`, `mesh-each`, and the `mesh-fragment` that
+/// wraps a branch or body that is not exactly one element), which a manifest need not declare.
 fn reserved() -> Vec<(&'static str, Value)> {
     let none = || entry(Map::new(), Map::new(), Map::new());
     let props = |props: Value| json!({ "props": props, "events": {}, "commands": {}, "scope": {} });
@@ -38,25 +40,7 @@ fn reserved() -> Vec<(&'static str, Value)> {
             "mesh-fill",
             props(json!({ "slot": { "type": { "kind": "string" }, "required": true } })),
         ),
-        ("mesh-switch", none()),
         ("mesh-fragment", none()),
-        ("mesh-default", none()),
-        (
-            "mesh-case",
-            props(json!({ "when": { "type": { "kind": "boolean" }, "required": true } })),
-        ),
-        (
-            "mesh-if",
-            props(json!({ "when": { "type": { "kind": "boolean" }, "required": true } })),
-        ),
-        (
-            "mesh-each",
-            props(json!({
-                "items": { "type": { "kind": "list", "element": { "kind": "any" } }, "required": true },
-                "as": { "type": { "kind": "string" }, "required": true },
-                "key": { "type": { "kind": "any" }, "required": true }
-            })),
-        ),
     ]
 }
 
@@ -85,10 +69,7 @@ pub fn infer_components(
     let mut changed = false;
 
     for (tag, declaration) in reserved() {
-        // A switch is written as `mesh-if`s, so a program that has one uses `mesh-if`.
-        let used = sources.iter().any(|(_, source)| {
-            opens(source, tag) || (tag == "mesh-if" && opens(source, "mesh-switch"))
-        });
+        let used = sources.iter().any(|(_, source)| opens(source, tag));
 
         if used && !declared.contains(tag) {
             components.insert(tag.to_string(), declaration);

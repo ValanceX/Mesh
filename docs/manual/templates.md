@@ -439,11 +439,11 @@ MESH makes a node only where a template wrote an element. `mesh-fragment` is how
 <para>hello <shout who={name} /> bye</para>   <!-- one text run: "hello Ada! bye" -->
 ```
 
-- **Where it is placed.** A fragment is declared in the model like `mesh-slot`, with no props, and has no events. It may be a composite template's root, a `mesh-if` alternative, a `mesh-case` or `mesh-default` body, a `mesh-each` item, or simply a child among others, where its content is placed in the node around it.
+- **Where it is placed.** A fragment is built in (a model need not declare it), has no props and no events. It may be a composite template's root, a branch or body of a [block](#blocks), or simply a child among others, where its content is placed in the node around it. A block writes one for you where its branch or body is not exactly one element.
 - **Never a node.** The render tree has its content, as children of the nearest node above. Text it places that is next to other text is one run (a render tree's runs are maximal).
 - **Not the program's root.** The root renders one node: a root template that starts with a fragment, or with a composite that does, is `assembly-root-fragment`.
 - **Identity.** A fragment adds a step (`0x07`, [runtime](runtime.md)) so its content's keys are its own; a repeat inside a fragment that is a repeat's item is made again on each update (it is not remembered per item).
-- **Switch and fragments.** A `mesh-switch` stands for several siblings, so it may be a fragment's child but not a template's root; a case whose body is text is `<mesh-case when={…}><mesh-fragment>text</mesh-fragment></mesh-case>`.
+- **Blocks and fragments.** A block stands for several siblings, so it may be a fragment's child but not a template's root.
 
 ### Named slots
 
@@ -472,23 +472,39 @@ A template may have several slots, each with a `name`; the one without is the de
 - **No fill is fine.** A slot nobody fills is empty.
 - **Identity.** A named slot's step is the default slot's with the name as its component, so no key in a program without named slots changes (`docs/manual/runtime.md`).
 
-### Switch
+### Blocks
 
-`mesh-switch` chooses among several alternatives by the first condition that holds, where `mesh-if` chooses between two. Like `mesh-if` it is declared in the model, it is never a node, and it is provisional.
+Conditional and repeated structure are syntax, not elements ([spec §3.1](../MPRX-SPEC.md#31-blocks)). A model declares nothing for them, and a tool that lists a model's components has nothing to offer for them.
 
 ```xml
 <panel>
-  <mesh-switch>
-    <mesh-case when={kind == "heading"}><h1>{text}</h1></mesh-case>
-    <mesh-case when={kind == "item"}><li>{text}</li></mesh-case>
-    <mesh-default><p>{text}</p></mesh-default>
-  </mesh-switch>
+  {#if kind == "heading"}
+    <h1>{text}</h1>
+  {:else if kind == "item"}
+    <li>{text}</li>
+  {:else}
+    <p>{text}</p>
+  {/if}
+
+  {#each rows as row (row.id)}
+    <item label={row.label} />
+  {/each}
 </panel>
 ```
 
-- **Shape.** A switch holds one or more `mesh-case` elements, each with a boolean `when`, and optionally a last `mesh-default`. A case or default holds exactly one element (not a `mesh-if`, `mesh-switch` or `mesh-slot`: put those inside an element). A switch stands for several siblings, so it can't be a template's root or the direct child of a `mesh-if`, `mesh-each`, `mesh-case` or `mesh-default`: put an element around it. Anything else is `invalid-switch`.
-- **Meaning.** The first case whose `when` holds is rendered; if none does, the default; if there is none, nothing.
-- **How it is written.** The compiler writes a switch as the conditionals it stands for, one `mesh-if` per case, each true only when no earlier case is (`when={!a && b}`), and the default true when none is. The `template-v1` document and the runtime never see a switch, so nothing about the runtime, its identity rules or its updates is new: **each case is a conditional site of its own**, named as a conditional's alternatives are. A model that declares `mesh-switch` must therefore also declare `mesh-if`. A condition that appears in several lowered conditionals is evaluated in each.
+- **`{#if condition}`** opens a conditional, zero or more **`{:else if condition}`** follow, then an optional **`{:else}`**, and **`{/if}`** closes it. Conditions are boolean. The first condition that holds chooses its branch; with none, the `{:else}` branch; with no `{:else}`, nothing is rendered.
+- **`{#each items as item (key)}`** opens a repeat and **`{/each}`** closes it. `item` is the name bound to one element, readable in the key and in the body, not in `items`. The key identifies an item across updates, is a string or a number, and is **mandatory** (`missing-repeat-key`).
+- **A branch or body is one element.** If it is exactly one element it is that element; anything else (text, several nodes, none, a lone block or slot) is wrapped in a `mesh-fragment` automatically, so `{#if ok}Saved {count} item(s){/if}` needs no fragment written.
+- **A block is a child of an element.** It cannot be the document, because a document is one element.
+- **Text cannot contain `{#`, `{:` or `{/`.** To show one, write a string expression: `{"{#if}"}`.
+- **Nesting.** A block counts as three levels toward the nesting limit.
+- **The elements they replace are errors.** `mesh-if`, `mesh-each`, `mesh-switch`, `mesh-case` and `mesh-default` as elements are `retired-element`, and the message names the block to write.
+
+**How a block is written.** The compiler writes a block as the construct it stands for, and the `template-v1` document is the one it was: `{#if}` with no other branch is a `mesh-if` with a boolean `when`; a chain is written as one `mesh-if` per branch, each true only when no earlier branch is (`when={!a && b}`), and `{:else}` true when none is; `{#each}` is a `mesh-each` with `items`, `as` and `key`; a branch or body that needed a wrapper has a `mesh-fragment`. The runtime, node identities and handler identifiers are unchanged: **each branch is a conditional site of its own**, named as a conditional's alternatives are. A condition that appears in several lowered conditionals is evaluated in each.
+
+**Built in.** `mesh-if`, `mesh-each` and `mesh-fragment` need no declaration in the model: a manifest that does not declare them gets the language's (a boolean `when`; a list `items`, a string `as` and a `key`; no props), one that does declare them is used as declared, and the model fingerprint covers only what is declared. `compileProgram` therefore no longer adds them for a program that uses blocks; it still declares `mesh-slot` and `mesh-fill` where a program writes them, and `mesh-fragment` where a program writes one.
+
+A mistake in a block is reported at the block and names it: "the condition of `{#if}`", "the list of `{#each}`", "the key of `{#each}`". The name `as` binds is a binding, not a read of state: an editor can hover it and go to where it is bound.
 
 ### Inferred contracts
 
@@ -496,7 +512,7 @@ A composite's contract (its props, scope and events) is already stated by the pr
 
 - **props** are the attributes its occurrences pass, with the types of the arguments they pass (all occurrences are read; where types are compatible they are joined, and where they are not the first is kept and the others are reported by the ordinary prop check). A prop every occurrence passes is required; one some leave out is optional. The scope is the same names and types;
 - **events** are the handlers its template names that are not commands, each with the type of the one argument it forwards (none if it forwards none), read after the composites it uses, so a forwarded `$event` has its payload type;
-- **`mesh-slot`** is declared if a template uses it and the manifest does not.
+- **`mesh-slot`** (and `mesh-fill`, and a `mesh-fragment` a template writes) is declared if a template uses it and the manifest does not. Control flow is not: blocks lower to built-in constructs.
 
 A component the manifest declares is used as written, whatever the templates say: write the entry when you need a contract the templates don't state, such as a command of the composite's own, or a type wider than its callers pass. Inference reports nothing itself: the compile that follows, with the manifest it returns (the program's `model`), reports every problem as it would for a manifest written by hand. The root and the primitives are never inferred: the root's scope and commands come from the host, and a component with no template is a primitive.
 

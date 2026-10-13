@@ -268,3 +268,120 @@ Self-closing element with an attribute and an event binding in source order
           expression: (expression
             (reference
               (identifier))))))))
+
+================================================================================
+A conditional block with an else-if and an else branch
+================================================================================
+
+<list>
+  {#if ready}
+    <item />
+  {:else if failed}
+    Failed
+  {:else}
+    <spinner />
+  {/if}
+</list>
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (container_element
+      name: (tag_name)
+      (child
+        (text))
+      (child
+        (if_block
+          keyword: (if_open)
+          condition: (expression
+            (reference
+              (identifier)))
+          (child
+            (text))
+          (child
+            (element
+              (self_closing_element
+                name: (tag_name))))
+          (child
+            (text))
+          (else_if_clause
+            keyword: (else_if_open)
+            condition: (expression
+              (reference
+                (identifier)))
+            (child
+              (text)))
+          (else_clause
+            keyword: (else_open)
+            (child
+              (text))
+            (child
+              (element
+                (self_closing_element
+                  name: (tag_name))))
+            (child
+              (text)))
+          (if_close)))
+      (child
+        (text))
+      (tag_name))))
+
+================================================================================
+A repeat block with a key
+================================================================================
+
+<list>{#each users as user (user.id)}<item />{/each}</list>
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (container_element
+      name: (tag_name)
+      (child
+        (each_block
+          keyword: (each_open)
+          items: (expression
+            (reference
+              (identifier)))
+          (as_keyword)
+          binding: (identifier)
+          key: (expression
+            (member_access
+              object: (reference
+                (identifier))
+              property: (identifier)))
+          (child
+            (element
+              (self_closing_element
+                name: (tag_name))))
+          (each_close)))
+      (tag_name))))
+
+================================================================================
+A repeat block without a key still parses (the compiler asks for the key)
+================================================================================
+
+<list>{#each users as user}<item />{/each}</list>
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (container_element
+      name: (tag_name)
+      (child
+        (each_block
+          keyword: (each_open)
+          items: (expression
+            (reference
+              (identifier)))
+          (as_keyword)
+          binding: (identifier)
+          (child
+            (element
+              (self_closing_element
+                name: (tag_name))))
+          (each_close)))
+      (tag_name))))

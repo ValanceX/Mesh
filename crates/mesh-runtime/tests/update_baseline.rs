@@ -28,8 +28,8 @@ const MODEL: &str = r#"{
   }
 }"#;
 
-const VIEW: &str = "<page><mesh-each items={items} as=\"item\" key={item.id}>\
-  <row title={item.label}>{item.label}</row></mesh-each></page>";
+const VIEW: &str = "<page>{#each items as item (item.id)}\
+  <row title={item.label}>{item.label}</row>{/each}</page>";
 
 fn items(n: usize, changed: Option<usize>) -> String {
     let rows: Vec<String> = (0..n)

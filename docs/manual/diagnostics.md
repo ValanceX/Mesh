@@ -57,6 +57,13 @@ The file doesn't match the MPRX grammar, and the problem isn't one of the more s
 | `expected a root element, but the file is empty` | The file is empty, or only whitespace. Reported at `1:1`. |
 | `expected a single root element, found another one here` | A second top-level element. Points at the extra element. |
 | `expected an expression` | An operator is missing its operand, as in `{count +}` or `{}`. Points just after the operator. |
+| `` `{#if}` is never closed: expected `{/if}` `` (or `{#each}`, `{/each}`) | A [block](templates.md#blocks) opened and not closed, or still open where the element it is in ends. Points at the opener. |
+| `` `{/if}` with no open `{#if}` `` (or `{/each}`, `{:else}`, `{:else if}`) | A closer or branch with no open block of its kind. Points at it. |
+| `` `{/each}` closes a block that is not open `` | A closer for the other kind of block than the one open. |
+| `` malformed `{#if}` `` / `` malformed `{#each}` `` / `` malformed `{:else}` `` | A block opener that is not well formed: no condition, no list, no `as` and name, an empty key. The message says which and what to write. |
+| `` `{:else if}` after `{:else}` `` | `{:else}` is the last branch of an `{#if}`. |
+| `` unknown block `{#when` `` | The blocks are `{#if}` and `{#each}`. |
+| `a block cannot be the document: put it inside an element` | A document is one element, so a block sits inside an element. Points at the opener. |
 | `invalid syntax` | Anything else. Points at the smallest region the parser could isolate. |
 | `expected a single root element` | An internal safeguard. Valid or invalid input isn't expected to trigger it. |
 | `failed to parse source` | An internal safeguard: the parser couldn't produce any tree at all. |
@@ -854,19 +861,41 @@ A value of type `any` isn't checked here: if it turns out to be a list or a reco
 
 ---
 
-### `invalid-switch`
+### `retired-element`
 
-A `mesh-switch`, `mesh-case` or `mesh-default` that isn't shaped or placed as [a switch is](templates.md#switch). One code covers each way it can be wrong, and the message says which: a switch with no `mesh-case`; a child of a switch that isn't a `mesh-case` or the one last `mesh-default`; a `mesh-case` or `mesh-default` outside a switch; a case with anything but exactly one element child, or whose child is a `mesh-if`, a `mesh-switch` or a `mesh-slot`; a switch that is a template's root or the direct child of a `mesh-if`, `mesh-each`, `mesh-case` or `mesh-default`. Points at the element's tag name, or at the child that doesn't belong. A `mesh-case` with no `when`, or one that isn't a boolean, is the ordinary `missing-required-prop` or `type-mismatch`.
+A reserved element that [blocks](templates.md#blocks) replaced, written as an element: `<mesh-if>`, `<mesh-each>`, `<mesh-switch>`, `<mesh-case>` or `<mesh-default>`. Control flow is syntax, not an element, so the message names the block to write instead: `{#if condition} … {/if}`, `{#each items as item (key)} … {/each}`, or a chain `{#if a} … {:else if b} … {:else} … {/if}`. Points at the tag name. The element is reported once: not also as an unknown component.
 
 ```text
-error[invalid-switch]: `mesh-switch` needs at least one `mesh-case`
- --> fixtures/check/fail/invalid-switch.mprx:1:18
+error[retired-element]: `<mesh-if>` is no longer an element: write a block: `{#if condition} … {/if}`
+ --> fixtures/check/fail/retired-element.mprx:1:18
   |
-1 | <page title="x"><mesh-switch><mesh-default><text>none</text></mesh-default></mesh-switch></page>
-  |                  ^^^^^^^^^^^
+1 | <page title="x"><mesh-if when={flag}><text>x</text></mesh-if></page>
+  |                  ^^^^^^^
 ```
 
-**Fix:** give the switch a `mesh-case`, and put the `mesh-default` after the last one.
+**Fix:** write the block the message names. `<mesh-if when={a}>X</mesh-if>` is `{#if a}X{/if}`; `<mesh-each items={xs} as="x" key={x.id}>X</mesh-each>` is `{#each xs as x (x.id)}X{/each}`; a `mesh-switch` of cases is `{#if a}…{:else if b}…{:else}…{/if}`.
+
+---
+
+### `missing-repeat-key`
+
+An `{#each}` block without its `(key)`. The key identifies each item across updates, so it is mandatory: write `{#each items as item (key)}`, with a string or a number that is different for each item. Points at the `{#each` keyword. A key that is present but has the wrong type is a `type-mismatch` ("the key of `{#each}`").
+
+```text
+error[missing-repeat-key]: `{#each}` needs a key, which identifies each item across updates: write `{#each items as item (key)}`, with a string or a number that is different for each item
+ --> fixtures/check/fail/missing-repeat-key.mprx:2:3
+  |
+2 |   {#each users as person}
+  |   ^^^^^^
+```
+
+**Fix:** add the key after the item's name: `{#each users as person (person.id)}`.
+
+---
+
+### `invalid-switch`
+
+**Retired.** Nothing reports this code any more: the multi-way element it described (`mesh-switch` with `mesh-case` and `mesh-default`) was replaced by a chain of `{:else if}` branches in an `{#if}` block, which cannot be malformed in those ways, and writing the element at all is a [`retired-element`](#retired-element). The code stays in the catalogue because a code is never reused for a different meaning.
 
 ---
 

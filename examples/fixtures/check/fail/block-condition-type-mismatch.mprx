@@ -1,0 +1,1 @@
+<page title="x">{#if count}<text>x</text>{/if}</page>

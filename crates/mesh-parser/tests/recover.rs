@@ -46,6 +46,7 @@ fn element(element: &Element) -> String {
             Child::Text(text) => Some(format!("{:?}", text.value.trim())),
             Child::Expression(_) => Some("{…}".to_string()),
             Child::Element(child) => Some(self::element(child)),
+            Child::Block(_) => Some("{#…}".to_string()),
         })
         .collect();
     let mut out = element.name.clone();

@@ -28,8 +28,12 @@ pub(crate) struct Valid {
 }
 
 impl Valid {
+    /// The component `name` is: declared by the model, or, for a built-in the model does not declare, the language's.
     pub(crate) fn component(&self, name: &str) -> &Component {
-        &self.manifest.components()[name]
+        self.manifest
+            .component(name)
+            .map(|(_, component)| component)
+            .expect("a validated program names only components the model has")
     }
 
     pub(crate) fn is_composite(&self, component: &str) -> bool {
@@ -201,8 +205,7 @@ fn walk_names(
     loops: &mut Vec<String>,
     problems: &mut Vec<String>,
 ) {
-    let components = manifest.components();
-    let Some(component) = components.get(&element.component) else {
+    let Some((_, component)) = manifest.component(&element.component) else {
         problems.push(format!("no component `{}`", element.component));
         return;
     };

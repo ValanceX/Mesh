@@ -64,11 +64,15 @@ fn read(path: &Path) -> String {
 }
 
 /// Every `.mprx` directly in `dir`, sorted.
+///
+/// Not the ones with blocks: what a program with control flow renders differs in structure with its data, and an
+/// item's key can repeat in generated data. Those are pinned by `conditional.rs` and `repeat.rs`.
 fn sources(dir: &str) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = fs::read_dir(root().join(dir))
         .unwrap_or_else(|err| panic!("should list {dir}: {err}"))
         .map(|entry| entry.expect("a directory entry").path())
         .filter(|path| path.extension().is_some_and(|ext| ext == "mprx"))
+        .filter(|path| !read(path).contains("{#"))
         .collect();
     files.sort();
     files

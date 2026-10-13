@@ -49,10 +49,10 @@ const MODEL: &str = r#"{
 
 const VIEW: &str = "<page title={title} count={count + 1} tag={tag}>\
   <note>{title} has {count}</note>\
-  <mesh-if when={flag}><note>on</note><note>off</note></mesh-if>\
-  <mesh-each items={items} as=\"item\" key={item.id}>\
+  {#if flag}<note>on</note>{:else}<note>off</note>{/if}\
+  {#each items as item (item.id)}\
     <row label={item.label} done={item.done} on.tap={pick(item.id)}>{item.label}</row>\
-  </mesh-each>\
+  {/each}\
 </page>";
 
 fn program_render(state: &Value) -> Render {

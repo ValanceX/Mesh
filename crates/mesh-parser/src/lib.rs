@@ -5,13 +5,15 @@
 //! never exposed as the application's final UI model.
 
 use mesh_syntax::{
-    ArrayExpression, Attribute, AttributeValue, BinaryExpression, BinaryOperator, BooleanLiteral,
-    Child, CommandInvocation, ConditionalExpression, DiagnosticCode, Element, EventBinding,
-    EventValue, Expression, Literal, MemberAccess, NullLiteral, NumberLiteral, ObjectExpression,
-    ObjectKey, ObjectMember, Reference, Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
+    ArrayExpression, Attribute, AttributeValue, BinaryExpression, BinaryOperator, Block,
+    BooleanLiteral, Child, CommandInvocation, ConditionalExpression, DiagnosticCode, EachBlock,
+    Element, ElseBranch, EventBinding, EventValue, Expression, IfBlock, IfBranch, Literal,
+    MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember, Reference,
+    Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
 };
 use tree_sitter::Node;
 
+mod blocks;
 mod context;
 mod nesting;
 mod recover;
@@ -74,9 +76,15 @@ pub fn parse(source: &str) -> ParseResult {
 
     let root = tree.root_node();
     if root.has_error() {
+        // A block's delimiters say what is wrong with it better than the recovery tree does.
+        let block_errors = blocks::scan(source);
         return ParseResult {
             ast: None,
-            errors: syntax_errors::collect(root, source),
+            errors: if block_errors.is_empty() {
+                syntax_errors::collect(root, source)
+            } else {
+                block_errors
+            },
         };
     }
 
@@ -84,6 +92,14 @@ pub fn parse(source: &str) -> ParseResult {
         return ParseResult {
             ast: None,
             errors: vec![error],
+        };
+    }
+
+    let block_errors = blocks::check_tree(root, source);
+    if !block_errors.is_empty() {
+        return ParseResult {
+            ast: None,
+            errors: block_errors,
         };
     }
 
@@ -174,9 +190,137 @@ fn lower_child(node: Node, source: &str) -> Child {
                 .expect("element node always wraps a self_closing_element or container_element"),
             source,
         ))),
+        "if_block" => Child::Block(Box::new(Block::If(lower_if_block(inner, source)))),
+        "each_block" => Child::Block(Box::new(Block::Each(lower_each_block(inner, source)))),
         other => {
             unreachable!("unexpected child node kind {other:?} inside a successfully-parsed tree")
         }
+    }
+}
+
+/// The `child` nodes among `node`'s direct children, lowered.
+fn lower_children(node: Node, source: &str) -> Vec<Child> {
+    let mut cursor = node.walk();
+    node.children(&mut cursor)
+        .filter(|n| n.kind() == "child")
+        .map(|n| lower_child(n, source))
+        .collect()
+}
+
+/// The span from the start of `keyword` to the end of the last of `children`, or of `keyword`
+/// when there are none.
+fn branch_span(keyword: Span, children: &[Child], end: usize) -> Span {
+    let _ = children;
+    Span {
+        start_byte: keyword.start_byte,
+        end_byte: end.max(keyword.end_byte),
+    }
+}
+
+fn lower_if_block(node: Node, source: &str) -> IfBlock {
+    let mut cursor = node.walk();
+    let parts: Vec<Node> = node.children(&mut cursor).collect();
+    let end_of = |index: usize| {
+        parts
+            .get(index + 1)
+            .map_or(node.end_byte(), |next| next.start_byte())
+    };
+    let mut branches = Vec::new();
+    let mut otherwise = None;
+
+    // The first branch: `{#if` condition `}` and the children up to the first clause.
+    let keyword = node
+        .child_by_field_name("keyword")
+        .map(span_of)
+        .unwrap_or(Span {
+            start_byte: node.start_byte(),
+            end_byte: node.start_byte(),
+        });
+    let first_end = parts
+        .iter()
+        .position(|n| matches!(n.kind(), "else_if_clause" | "else_clause" | "if_close"))
+        .unwrap_or(parts.len());
+    let condition = node
+        .child_by_field_name("condition")
+        .map(|n| lower_expression(n, source))
+        .unwrap_or_else(|| missing_expression(node));
+    let children: Vec<Child> = parts[..first_end]
+        .iter()
+        .filter(|n| n.kind() == "child")
+        .map(|n| lower_child(*n, source))
+        .collect();
+    branches.push(IfBranch {
+        condition,
+        keyword_span: keyword,
+        children,
+        span: branch_span(keyword, &[], end_of(first_end.saturating_sub(1))),
+    });
+
+    for (index, part) in parts.iter().enumerate() {
+        match part.kind() {
+            "else_if_clause" => {
+                let keyword = part
+                    .child_by_field_name("keyword")
+                    .map(span_of)
+                    .unwrap_or_else(|| span_of(*part));
+                let condition = part
+                    .child_by_field_name("condition")
+                    .map(|n| lower_expression(n, source))
+                    .unwrap_or_else(|| missing_expression(*part));
+                branches.push(IfBranch {
+                    condition,
+                    keyword_span: keyword,
+                    children: lower_children(*part, source),
+                    span: branch_span(keyword, &[], end_of(index)),
+                });
+            }
+            "else_clause" => {
+                let keyword = part
+                    .child_by_field_name("keyword")
+                    .map(span_of)
+                    .unwrap_or_else(|| span_of(*part));
+                otherwise = Some(ElseBranch {
+                    keyword_span: keyword,
+                    children: lower_children(*part, source),
+                    span: branch_span(keyword, &[], end_of(index)),
+                });
+            }
+            _ => {}
+        }
+    }
+
+    IfBlock {
+        branches,
+        otherwise,
+        span: span_of(node),
+    }
+}
+
+fn lower_each_block(node: Node, source: &str) -> EachBlock {
+    let keyword = node
+        .child_by_field_name("keyword")
+        .map(span_of)
+        .unwrap_or(Span {
+            start_byte: node.start_byte(),
+            end_byte: node.start_byte(),
+        });
+    let items = node
+        .child_by_field_name("items")
+        .map(|n| lower_expression(n, source))
+        .unwrap_or_else(|| missing_expression(node));
+    let (binding, binding_span) = field_text(node, "binding", source);
+    let key = node
+        .child_by_field_name("key")
+        .map(|n| lower_expression(n, source));
+
+    EachBlock {
+        items,
+        keyword_span: keyword,
+        binding,
+        binding_span,
+        key,
+        children: lower_children(node, source),
+        span: span_of(node),
     }
 }
 

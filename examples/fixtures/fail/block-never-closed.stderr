@@ -1,0 +1,6 @@
+error[syntax-error]: `{#if}` is never closed: expected `{/if}` before the end of the element it is in
+ --> fixtures/fail/block-never-closed.mprx:2:3
+  |
+2 |   {#if flag}
+  |   ^^^^^^^^^^
+

@@ -305,9 +305,13 @@ fn example_manifest_declares_what_the_examples_name() {
     );
 }
 
+/// Codes nothing reports any more. A code is never reused, so it stays in the
+/// catalogue, and with nothing to report there is no fixture to pin.
+const RETIRED_CODES: [&str; 1] = ["invalid-switch"];
+
 /// Every code that checking against a model can produce (every code
-/// after the `manifest-*` ones) has a fail fixture named after it, whose
-/// expected output reports that code.
+/// after the `manifest-*` ones, the retired ones apart) has a fail fixture
+/// named after it, whose expected output reports that code.
 #[test]
 fn every_model_code_has_its_own_fail_fixture() {
     let codes = mesh_syntax::DiagnosticCode::ALL;
@@ -319,7 +323,10 @@ fn every_model_code_has_its_own_fail_fixture() {
     assert!(first < codes.len(), "no model codes yet");
 
     let mut missing = Vec::new();
-    for code in &codes[first..] {
+    for code in codes[first..]
+        .iter()
+        .filter(|code| !RETIRED_CODES.contains(&code.as_str()))
+    {
         let fixture = PathBuf::from(format!("fixtures/check/fail/{code}.mprx"));
         if !examples_dir().join(&fixture).is_file() {
             missing.push(format!("{}: no such fixture", fixture.display()));

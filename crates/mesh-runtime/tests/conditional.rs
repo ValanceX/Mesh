@@ -41,24 +41,23 @@ const MODEL: &str = r#"{
 /// Two alternatives of different components, between static siblings, with a
 /// second conditional before them that can insert a sibling.
 const VIEW: &str = "<page>\
-  <mesh-if when={lead}><note>lead</note></mesh-if>\
+  {#if lead}<note>lead</note>{/if}\
   <note>before</note>\
-  <mesh-if when={show}>\
-    <button on.tap={pick()} on.hold={hold()}>A</button>\
-    <chip on.tap={drop()}>B</chip>\
-  </mesh-if>\
+  {#if show}\
+    <button on.tap={pick()} on.hold={hold()}>A</button>{:else}\
+    <chip on.tap={drop()}>B</chip>{/if}\
   <note>after</note>\
 </page>";
 
 /// One alternative: when `show` is false there is no occurrence.
 const SOLO: &str = "<page>\
   <note>before</note>\
-  <mesh-if when={show}><button on.tap={pick()}>A</button></mesh-if>\
+  {#if show}<button on.tap={pick()}>A</button>{/if}\
   <note>after</note>\
 </page>";
 
 /// Two alternatives of the SAME component in the same place.
-const TWIN: &str = "<page><mesh-if when={show}><note>one</note><note>two</note></mesh-if></page>";
+const TWIN: &str = "<page>{#if show}<note>one</note>{:else}<note>two</note>{/if}</page>";
 
 fn render(root: &str, source: &str, values: &str) -> Render {
     let template = compile_with(MODEL, root, source);
@@ -350,8 +349,14 @@ fn every_tree_is_valid_render_v1_unchanged() {
 
 #[test]
 fn a_malformed_conditional_is_refused() {
-    let refuse = |source: &str| {
-        let template = compile_with(MODEL, "bad", source);
+    use common::{compile_edited, edit_first};
+    use serde_json::{json, Value};
+
+    // Blocks make a well-formed conditional; the malformed ones are edits of its compiled template.
+    let base = "<page>{#if show}<note>a</note>{/if}</page>";
+    let nested = "<page>{#if show}{#if show}<note>a</note>{/if}{/if}</page>";
+    let refuse = |source: &str, edit: &dyn Fn(&mut Value)| {
+        let template = compile_edited(MODEL, "bad", source, |template| edit(template));
         let templates = [template.as_str()];
         mesh_runtime::check_program(
             &Program {
@@ -361,31 +366,55 @@ fn a_malformed_conditional_is_refused() {
             MODEL,
         )
     };
-    for source in [
-        // three alternatives
-        "<page><mesh-if when={show}><note>a</note><note>b</note><note>c</note></mesh-if></page>",
-        // text among the alternatives
-        "<page><mesh-if when={show}><note>a</note>text</mesh-if></page>",
-        // a conditional as an alternative
-        "<page><mesh-if when={show}><mesh-if when={show}><note>a</note></mesh-if></mesh-if></page>",
-        // no alternative at all
-        "<page><mesh-if when={show}></mesh-if></page>",
-        // a conditional can't be a template's root
-        "<mesh-if when={show}><note>a</note></mesh-if>",
-    ] {
-        let diagnostics = refuse(source);
+    type Case<'a> = (&'a str, &'a str, &'a dyn Fn(&mut Value));
+    let cases: [Case; 5] = [
+        ("three alternatives", base, &|template| {
+            edit_first(template, "mesh-if", |element| {
+                let child = element["children"][0].clone();
+                element["children"]
+                    .as_array_mut()
+                    .unwrap()
+                    .extend([child.clone(), child]);
+            });
+        }),
+        ("text among the alternatives", base, &|template| {
+            edit_first(template, "mesh-if", |element| {
+                let span = element["span"].clone();
+                element["children"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({ "kind": "text", "value": "text", "span": span }));
+            });
+        }),
+        ("a conditional as an alternative", nested, &|template| {
+            edit_first(template, "mesh-if", |element| {
+                // The block wrapped the lone block in a fragment; the runtime is shown the conditional itself.
+                let inner = element["children"][0]["element"]["children"][0].clone();
+                element["children"][0] = inner;
+            });
+        }),
+        ("no alternative at all", base, &|template| {
+            edit_first(template, "mesh-if", |element| {
+                element["children"] = json!([]);
+            });
+        }),
+        ("a conditional as the template's root", base, &|template| {
+            let conditional = template["root"]["children"][0]["element"].clone();
+            template["root"] = conditional;
+        }),
+    ];
+    for (name, source, edit) in cases {
+        let diagnostics = refuse(source, edit);
         assert_eq!(
             codes(&diagnostics),
             ["assembly-malformed-template"],
-            "{source}"
+            "{name}"
         );
     }
     // A condition that isn't a boolean never gets as far as the runtime: the compiler's
     // ordinary prop check refuses it.
     let model = mesh_compiler::check::Model::load(MODEL, "bad").unwrap();
-    let compiled = mesh_compiler::check::template(
-        "<page><mesh-if when=\"yes\"><note>a</note></mesh-if></page>",
-        &model,
-    );
+    let compiled =
+        mesh_compiler::check::template("<page>{#if yes}<note>a</note>{/if}</page>", &model);
     assert!(compiled.template.is_none() && !compiled.diagnostics.is_empty());
 }
