@@ -4,9 +4,17 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-13
+
+The editor formats and indents MPRX. Nothing in the language, the compiler, the runtime or any document format changes. See the [v0.12 release notes](./docs/releases/v0.12.md).
+
 ### Added
 
 - **Formatting and indentation.** `mesh-lsp` answers `textDocument/formatting`, `rangeFormatting` and `onTypeFormatting` (after a newline), from the new `mesh-format` crate: indentation by the nesting of elements and blocks, one attribute per line in a tag written over several lines, nothing but whitespace between tokens changed (the formatter checks its own result and refuses a source that does not parse). The VS Code language configuration gains indentation and Enter rules, and the extension turns on `editor.autoIndent` and `editor.formatOnType` for MPRX.
+
+### Changed
+
+- All crates and packages move to 0.12.0 together.
 
 ## [0.11.0] - 2026-10-13
 
