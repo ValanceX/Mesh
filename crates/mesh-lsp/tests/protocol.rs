@@ -45,6 +45,12 @@ fn initialize_advertises_the_capabilities() {
         capabilities["codeActionProvider"]["codeActionKinds"],
         json!(["quickfix"])
     );
+    assert_eq!(capabilities["documentFormattingProvider"], true);
+    assert_eq!(capabilities["documentRangeFormattingProvider"], true);
+    assert_eq!(
+        capabilities["documentOnTypeFormattingProvider"]["firstTriggerCharacter"],
+        "\n"
+    );
     assert_eq!(result["serverInfo"]["name"], "mesh-lsp");
     assert_eq!(result["serverInfo"]["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(
@@ -133,7 +139,7 @@ fn a_request_after_shutdown_is_invalid() {
 #[test]
 fn an_unknown_request_is_method_not_found() {
     let (mut client, _) = Client::initialized(init(json!({})));
-    let response = client.request("textDocument/formatting", json!({}));
+    let response = client.request("textDocument/rename", json!({}));
     assert_error(&response, ErrorCode::MethodNotFound);
     still_answers(&mut client);
 }

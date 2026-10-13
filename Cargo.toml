@@ -9,6 +9,7 @@ members = [
     "crates/mesh-template",
     "crates/mesh-runtime",
     "crates/mesh-compiler",
+    "crates/mesh-format",
     "crates/mesh-lsp",
     "crates/mesh-cli",
     "crates/mesh-wasm",
@@ -34,6 +35,7 @@ mesh-analysis = { path = "crates/mesh-analysis" }
 mesh-template = { path = "crates/mesh-template" }
 mesh-runtime = { path = "crates/mesh-runtime" }
 mesh-compiler = { path = "crates/mesh-compiler" }
+mesh-format = { path = "crates/mesh-format" }
 
 [workspace.lints.rust]
 warnings = "deny"

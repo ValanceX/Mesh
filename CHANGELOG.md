@@ -4,6 +4,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Added
+
+- **Formatting and indentation.** `mesh-lsp` answers `textDocument/formatting`, `rangeFormatting` and `onTypeFormatting` (after a newline), from the new `mesh-format` crate: indentation by the nesting of elements and blocks, one attribute per line in a tag written over several lines, nothing but whitespace between tokens changed (the formatter checks its own result and refuses a source that does not parse). The VS Code language configuration gains indentation and Enter rules, and the extension turns on `editor.autoIndent` and `editor.formatOnType` for MPRX.
+
 ## [0.11.0] - 2026-10-13
 
 Control flow becomes syntax. Conditional and repeated structure are written as blocks, `{#if}` and `{#each}`, and the reserved elements they replaced (`mesh-if`, `mesh-each`, `mesh-switch`, `mesh-case`, `mesh-default`) are errors. **Breaking before 1.0**: a project that uses those elements must rewrite them as blocks, and moves its runtime and compiler packages together. The runtime, `template-v1`, `render-v1`, node identities and handler identifiers are unchanged. See the [release notes](./docs/releases/v0.11.md).

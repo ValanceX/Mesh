@@ -6,11 +6,41 @@
   "private": true,
   "license": "MIT",
   "publisher": "valancex",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Programming Languages"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
   "contributes": {
-    "languages": [{ "id": "mprx", "aliases": ["MPRX"], "extensions": [".mprx"], "configuration": "./language-configuration.json" }],
-    "grammars": [{ "language": "mprx", "scopeName": "source.mprx", "path": "./syntaxes/mprx.tmLanguage.json" }]
+    "languages": [
+      {
+        "id": "mprx",
+        "aliases": [
+          "MPRX"
+        ],
+        "extensions": [
+          ".mprx"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mprx",
+        "scopeName": "source.mprx",
+        "path": "./syntaxes/mprx.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[mprx]": {
+        "editor.autoIndent": "full",
+        "editor.formatOnType": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.detectIndentation": false
+      }
+    }
   },
   "scripts": {
     "test": "node --test --test-concurrency=1 \"test/*.test.mjs\""
