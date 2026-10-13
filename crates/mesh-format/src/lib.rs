@@ -10,7 +10,7 @@
 //! attributes is free, so a tag already written over several lines gets one
 //! attribute per line, with its closing `>` or `/>` on a line of its own.
 //!
-//! [`format`] checks its own work: the tokens of the result must be exactly
+//! [`format`](fn@format) checks its own work: the tokens of the result must be exactly
 //! those of the source, or it returns [`Error::Unsafe`] and the source stands.
 //! A source that does not parse is not formatted ([`Error::Syntax`]): the
 //! structure the indentation follows is not known.
