@@ -1,0 +1,14 @@
+[package]
+name = "mesh-format"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "The MPRX formatter: indentation and tag layout, changing nothing but whitespace between tokens."
+
+[lints]
+workspace = true
+
+[dependencies]
+mesh-parser.workspace = true

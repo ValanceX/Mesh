@@ -10,6 +10,7 @@
 
 mod complete;
 mod documents;
+mod format;
 mod manifest;
 mod navigate;
 mod requests;
@@ -23,7 +24,8 @@ use documents::{Buffer, Document};
 use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CompletionParams,
-    DocumentChanges, GotoDefinitionParams, HoverParams, MessageType, OneOf,
+    DocumentChanges, DocumentFormattingParams, DocumentOnTypeFormattingParams,
+    DocumentRangeFormattingParams, GotoDefinitionParams, HoverParams, MessageType, OneOf,
     OptionalVersionedTextDocumentIdentifier, TextDocumentEdit, TextEdit, WorkspaceEdit,
 };
 use manifest::ManifestState;
@@ -284,6 +286,33 @@ impl Server {
                     Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
                 }
             }
+            (Protocol::Running, "textDocument/formatting") => {
+                match decode::<DocumentFormattingParams>(&method, params) {
+                    Ok(params) => {
+                        let edits = self.format_document(&params);
+                        self.respond(id, json!(edits))?;
+                    }
+                    Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
+                }
+            }
+            (Protocol::Running, "textDocument/rangeFormatting") => {
+                match decode::<DocumentRangeFormattingParams>(&method, params) {
+                    Ok(params) => {
+                        let edits = self.format_range(&params);
+                        self.respond(id, json!(edits))?;
+                    }
+                    Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
+                }
+            }
+            (Protocol::Running, "textDocument/onTypeFormatting") => {
+                match decode::<DocumentOnTypeFormattingParams>(&method, params) {
+                    Ok(params) => {
+                        let edits = self.format_on_type(&params);
+                        self.respond(id, json!(edits))?;
+                    }
+                    Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
+                }
+            }
             (Protocol::Running, "textDocument/hover") => {
                 match decode::<HoverParams>(&method, params) {
                     Ok(params) => {
@@ -460,6 +489,9 @@ impl Server {
                     "hoverProvider": true,
                     "definitionProvider": true,
                     "completionProvider": { "triggerCharacters": ["<", "."], "resolveProvider": false },
+                    "documentFormattingProvider": true,
+                    "documentRangeFormattingProvider": true,
+                    "documentOnTypeFormattingProvider": { "firstTriggerCharacter": "\n" },
                     "workspace": { "workspaceFolders": { "supported": false } }
                 },
                 "serverInfo": { "name": "mesh-lsp", "version": env!("CARGO_PKG_VERSION") }

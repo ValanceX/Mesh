@@ -11,6 +11,7 @@ What it does today:
 - **Hover:** the type of the expression under the cursor, and what a name is declared as in the manifest.
 - **Go to definition:** from a tag, prop, event, command or scope name to where the manifest declares it.
 - **Completion** of tags, props, events, scope names, record members and commands, from the manifest.
+- **Formatting:** Format Document, Format Selection, and the indentation of the new line after Enter, by the nesting of elements and blocks.
 
 Syntax highlighting comes from the grammar's Tree-sitter queries, not from the server. The [editor setup guide](../guides/editor-setup.md) sets up both.
 
@@ -106,6 +107,19 @@ Completion offers only names the manifest declares, and each only where the comp
 
 Everything else is in name order. It works while the file is broken, which it almost always is while you type: after `user.`, after `<avatar `, after a bare `<`. Like hover, it needs a model; without one it offers nothing. It doesn't complete attribute values, text inside strings, closing tags, object keys, `$event`, or argument lists.
 
+## Formatting
+
+`textDocument/formatting`, `textDocument/rangeFormatting` and `textDocument/onTypeFormatting` (trigger character: a newline) are answered from the document's current text. They need no model and no check, and are never held.
+
+The formatter changes **whitespace between tokens and nothing else**, so a formatted template compiles to the same template apart from source positions:
+
+- Whitespace-only text between tags, `{expressions}` and block markers is formatting (§3 of the specification), and is re-indented: one level per element and per `{#if}` / `{#each}`, with `{:else}`, `{:else if}` and the closers one level out. A run of blank lines becomes one blank line; the text ends with one newline.
+- A tag written over several lines gets one attribute per line, and its `>` or `/>` on a line of its own. A tag on one line is left on one line.
+- Text with a character other than whitespace in it is meaning: it is kept exactly as written, as is everything inside `{…}`.
+- Indentation follows the editor's `tabSize` and `insertSpaces`.
+
+A document with syntax errors is not formatted (the structure its indentation follows is not known): the answer is no edits. Format Selection applies the edits of the whole formatting that touch the selection. After Enter, the new line is indented by the scope it is in, whether or not the document parses yet.
+
 ## Requests right after typing
 
 A hover, definition or completion request made before the new text has been checked waits for that check, which then runs at once instead of after the usual 150 ms. If you change the text again before it's answered, it's answered with `ContentModified`, which editors treat as "ask again".
@@ -122,6 +136,7 @@ A message that isn't JSON-RPC at all (not JSON, or JSON without a method or id) 
 
 ## Limitations
 
+- **Formatting keeps what is on a line.** It never joins or splits lines, wraps a long line, or re-indents the lines of a text that has content in it; those are the author's.
 - **One workspace root:** the first workspace folder, or `rootUri`. Multi-root workspaces aren't supported.
 - **Paths compare exactly.** On a case-insensitive file system, write `components` keys with the same case the editor uses.
 - **Disk changes to the manifest** are seen automatically only if the client supports registering file watchers dynamically (Neovim doesn't on Linux). Otherwise they're seen when you open the manifest in the editor or change the settings.

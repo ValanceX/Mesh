@@ -7,5 +7,21 @@
     { "open": "\"", "close": "\"", "notIn": ["string"] }
   ],
   "surroundingPairs": [["{", "}"], ["(", ")"], ["[", "]"], ["\"", "\""], ["<", ">"]],
-  "wordPattern": "[A-Za-z_][A-Za-z0-9_-]*"
+  "wordPattern": "[A-Za-z_][A-Za-z0-9_-]*",
+  "indentationRules": {
+    "increaseIndentPattern": "^\\s*(<[A-Za-z][^<]*[^/<]>|<[A-Za-z][^<>]*|>|\\{#[^}]*\\}|\\{:[^}]*\\})\\s*$",
+    "decreaseIndentPattern": "^\\s*(</[A-Za-z][^>]*>|/?>|\\{/[^}]*\\}|\\{:[^}]*\\})"
+  },
+  "onEnterRules": [
+    {
+      "beforeText": "^\\s*<[A-Za-z][^<]*[^/<]>\\s*$",
+      "afterText": "^\\s*</[A-Za-z][^>]*>",
+      "action": { "indent": "indentOutdent" }
+    },
+    {
+      "beforeText": "^\\s*\\{#[^}]*\\}\\s*$",
+      "afterText": "^\\s*\\{/[^}]*\\}",
+      "action": { "indent": "indentOutdent" }
+    }
+  ]
 }

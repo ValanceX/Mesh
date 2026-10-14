@@ -55,7 +55,7 @@ error[mismatched-closing-tag]: mismatched closing tag: opened with "title", clos
 
 Warnings (such as a duplicate attribute) are printed the same way but don't fail the check.
 
-The same checks run in your editor, as you type, through the `mesh-lsp` language server: diagnostics, quick fixes, hover, go to definition and completion. `cargo install --path crates/mesh-lsp`, then follow the [editor setup guide](./docs/guides/editor-setup.md).
+The same checks run in your editor, as you type, through the `mesh-lsp` language server: diagnostics, quick fixes, hover, go to definition, completion, and formatting and indentation. `cargo install --path crates/mesh-lsp`, then follow the [editor setup guide](./docs/guides/editor-setup.md).
 
 New to MESH? The [getting-started guide](./docs/guides/getting-started.md) walks through it step by step.
 
@@ -94,6 +94,7 @@ mesh/
 │   ├── mesh-compiler/        compile API, diagnostics, and rendering
 │   ├── mesh-runtime/         the runtime: render and dispatch, MPRX's one evaluator
 │   ├── mesh-runtime-wasm/    the runtime, built for WebAssembly
+│   ├── mesh-format/          the formatter: whitespace between tokens, nothing else
 │   ├── mesh-lsp/             the language server, a client of the compiler
 │   ├── mesh-wasm/            the compiler, built for WebAssembly
 │   └── mesh-cli/             the `mesh` command-line tool
@@ -114,14 +115,14 @@ mesh/
 
 ## Status
 
-**v0.11.0 prepared** (2026-10-13; not yet released: v0.10.0 is the latest release). See the [release notes](./docs/releases/v0.11.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.12.0 prepared** (2026-10-13; not yet released: v0.11.0 is the latest release): the editor formats and indents MPRX. See the [release notes](./docs/releases/v0.12.md), the [v0.11 notes](./docs/releases/v0.11.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), event bindings (`on.click={...}`), and control-flow blocks (`{#if}` … `{:else if}` … `{:else}` … `{/if}`, `{#each items as item (key)}` … `{/each}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings
 - Checking against a component manifest (`mesh check --model`): every component, prop, event, reference and command is resolved, every expression is typed, and every value is checked against its declaration
 - rustc-style diagnostics with stable codes, located syntax errors, and did-you-mean suggestions; warnings don't fail the check
 - JSON diagnostics (`mesh check --format json`)
-- The `mesh-lsp` language server: the compiler's own diagnostics and quick fixes as you type, hover, go to definition, and completion from the manifest, also on files with syntax errors (see its [manual](./docs/manual/mesh-lsp.md))
+- The `mesh-lsp` language server: the compiler's own diagnostics and quick fixes as you type, hover, go to definition, completion from the manifest, and formatting, also on files with syntax errors (except formatting, which needs a file that parses) (see its [manual](./docs/manual/mesh-lsp.md))
 - Syntax highlighting from the grammar's Tree-sitter queries, and an [editor setup guide](./docs/guides/editor-setup.md) verified in Neovim
 - MESH in JavaScript: `@valancex/mesh-compiler` is the compiler in WebAssembly, for Node and browsers, returning exactly what `mesh check --format json` prints (see [Using MESH from JavaScript](./docs/guides/using-mesh-from-javascript.md))
 - `mesh-lsp` from npm: `npm install -g @valancex/mesh-lsp` installs the native server for Linux, macOS or Windows

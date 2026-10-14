@@ -2,15 +2,45 @@
   "name": "mprx-vscode",
   "displayName": "MPRX",
   "description": "The MPRX language for VS Code: syntax highlighting and bracket rules. Diagnostics, hover and completion come from mesh-lsp (docs/guides/editor-setup.md); a framework extension wires them.",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "private": true,
   "license": "MIT",
   "publisher": "valancex",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Programming Languages"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
   "contributes": {
-    "languages": [{ "id": "mprx", "aliases": ["MPRX"], "extensions": [".mprx"], "configuration": "./language-configuration.json" }],
-    "grammars": [{ "language": "mprx", "scopeName": "source.mprx", "path": "./syntaxes/mprx.tmLanguage.json" }]
+    "languages": [
+      {
+        "id": "mprx",
+        "aliases": [
+          "MPRX"
+        ],
+        "extensions": [
+          ".mprx"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mprx",
+        "scopeName": "source.mprx",
+        "path": "./syntaxes/mprx.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[mprx]": {
+        "editor.autoIndent": "full",
+        "editor.formatOnType": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.detectIndentation": false
+      }
+    }
   },
   "scripts": {
     "test": "node --test --test-concurrency=1 \"test/*.test.mjs\""
