@@ -184,3 +184,14 @@ fn a_new_line_in_the_middle_of_text_keeps_the_previous_indentation() {
     let line = source.find("\n\n").unwrap() + 1;
     assert_eq!(indent_for_line(source, line, &two()), "    ");
 }
+
+#[test]
+fn leaves_a_space_between_two_interpolations_alone() {
+    // The space is content (docs/superpowers/specs/2026-10-16-mprx-whitespace-between-interpolations.md, W-7), not formatting.
+    let source = "<text>{first} {last}</text>\n";
+    assert_eq!(fmt(source), source);
+    assert_eq!(
+        fmt("<page>\n<text>{first}  {last}</text>\n</page>\n"),
+        "<page>\n  <text>{first}  {last}</text>\n</page>\n"
+    );
+}

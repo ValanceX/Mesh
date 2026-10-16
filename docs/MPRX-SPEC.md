@@ -216,7 +216,14 @@ Diagnostics about a block name the block ("the condition of `{#if}`", "the key o
 
 
 **Whitespace in child content:** whitespace-only text children are
-formatting and are omitted from the semantic model; text containing any
+formatting and are omitted from the semantic model, with one exception: a
+whitespace-only text child with no line break (`\n` or `\r`) that has an
+interpolation as the child immediately before it and one immediately after
+it is content, kept verbatim as part of the text run, so `{a} {b}` reads
+"a b" (`{a}` and `{b}` on separate lines still read "ab": a line break is
+layout). Whitespace next to an element, a block, a slot or an edge of the
+content is dropped as before. A space that must sit at a line break or
+beside an element is written as a string expression, `{" "}`. Text containing any
 non-whitespace character is preserved verbatim, with no trimming,
 collapsing, or normalization. "Whitespace-only" is exactly Rust's
 `str::trim().is_empty()` (Unicode-aware), applied during AST -> IR

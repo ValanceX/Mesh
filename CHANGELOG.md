@@ -4,6 +4,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Changed
+
+- **A space between two interpolations is content.** `<text>{first} {last}</text>` rendered `AdaLovelace`, because the space is a whitespace-only text child and those are formatting (§3). A whitespace-only text child with no line break, between two interpolations, is now kept, so it renders `Ada Lovelace`. A line break stays formatting (`{a}` and `{b}` on separate lines read `ab`), and so does whitespace next to an element, a block, a slot or an edge; `{" "}` still writes a space anywhere. **A change in rendered text**, so a minor version; a program with no such space renders exactly as before, with the same keys and handler identifiers. See the [design note](./docs/superpowers/specs/2026-10-16-mprx-whitespace-between-interpolations.md).
+
 ## [0.12.0] - 2026-10-13
 
 The editor formats and indents MPRX. Nothing in the language, the compiler, the runtime or any document format changes. See the [v0.12 release notes](./docs/releases/v0.12.md).
