@@ -4,7 +4,7 @@ What each public surface of MESH promises. The tiers have one meaning each, ever
 
 | Tier | Meaning |
 |---|---|
-| **Stable** | In a released version (0.12.0 or earlier). Changes that break it wait for a version that says so in the [changelog](../../CHANGELOG.md); until 1.0 that can be a minor version. Diagnostic and error **codes** never change meaning and are never renamed or reused. |
+| **Stable** | In a released version (0.13.0 or earlier). Changes that break it wait for a version that says so in the [changelog](../../CHANGELOG.md); until 1.0 that can be a minor version. Diagnostic and error **codes** never change meaning and are never renamed or reused. |
 | **Unreleased** | In the changelog's "Unreleased" section. Complete and tested, but not in any release: it may change before one, and the changelog will say how. |
 | **Provisional** | Named so in the documentation (the constructs blocks lower to: `mesh-if`, `mesh-each`, `mesh-fragment`). Its names and exact behavior are not final, even after a release. |
 | **Internal** | Not a contract. It exists because something else needs it, and may change in any release without notice. |

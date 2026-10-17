@@ -324,8 +324,22 @@ fn lower_element(ast: &mesh_syntax::Element) -> (Element, Vec<mesh_syntax::Diagn
     }
 
     let mut children = Vec::new();
-    for child in &ast.children {
-        let (lowered, child_diagnostics) = lower_child(child);
+    for (at, child) in ast.children.iter().enumerate() {
+        let (lowered, child_diagnostics) = if is_space_between_interpolations(&ast.children, at) {
+            let mesh_syntax::Child::Text(text) = child else {
+                unreachable!("a space between interpolations is a text child")
+            };
+
+            (
+                Some(Child::Text {
+                    value: text.value.clone(),
+                    span: text.span,
+                }),
+                Vec::new(),
+            )
+        } else {
+            lower_child(child)
+        };
         if let Some(Child::Expression(expression)) = &lowered {
             out_of_range_literals(expression, &mut diagnostics);
         }
@@ -476,6 +490,23 @@ fn lower_child(child: &mesh_syntax::Child) -> (Option<Child>, Vec<mesh_syntax::D
             (Some(Child::Element(Box::new(lowered))), diagnostics)
         }
     }
+}
+
+/// A whitespace-only text child with no line break and an interpolation on each side: a space someone wrote between two parts of a text run, so it is content, not formatting. A line break
+/// makes it layout (indentation), and next to anything but an interpolation it is dropped as before (docs/superpowers/specs/2026-10-16-mprx-whitespace-between-interpolations.md, W-1 to W-3).
+fn is_space_between_interpolations(children: &[mesh_syntax::Child], at: usize) -> bool {
+    let mesh_syntax::Child::Text(text) = &children[at] else {
+        return false;
+    };
+
+    at > 0
+        && text.value.trim().is_empty()
+        && !text.value.contains(['\n', '\r'])
+        && matches!(children[at - 1], mesh_syntax::Child::Expression(_))
+        && matches!(
+            children.get(at + 1),
+            Some(mesh_syntax::Child::Expression(_))
+        )
 }
 
 /// What to write instead of a reserved element that blocks replaced, or `None` for any other tag.

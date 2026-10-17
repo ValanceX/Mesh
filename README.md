@@ -115,7 +115,7 @@ mesh/
 
 ## Status
 
-**v0.12.0 prepared** (2026-10-13; not yet released: v0.11.0 is the latest release): the editor formats and indents MPRX. See the [release notes](./docs/releases/v0.12.md), the [v0.11 notes](./docs/releases/v0.11.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.13.0 prepared** (2026-10-17; not yet released: v0.12.0 is the latest release): a space written between two interpolations is content, so `{first} {last}` reads "Ada Lovelace". See the [release notes](./docs/releases/v0.13.md), the [v0.12 notes](./docs/releases/v0.12.md) (the editor formats and indents MPRX; released 2026-10-13), the [v0.11 notes](./docs/releases/v0.11.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), event bindings (`on.click={...}`), and control-flow blocks (`{#if}` … `{:else if}` … `{:else}` … `{/if}`, `{#each items as item (key)}` … `{/each}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings

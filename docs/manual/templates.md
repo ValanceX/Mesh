@@ -14,7 +14,7 @@ MPRX goes through three stages: **source syntax → semantic resolution → runt
 - **Its compiler version,** for provenance and debugging only. It never affects whether the template runs.
 - **Its element tree, as checked:**
   - only the attributes and event bindings §3's duplicate resolution keeps (the last of each name);
-  - no whitespace-only text (§3);
+  - no whitespace-only text (§3), except a space with no line break between two interpolations, which is content (`{a} {b}`);
   - every attribute, event binding, child and expression.
 - **For every name, what it resolved to** ([below](#names)).
 - **Literal values:** each number literal as the binary64 value it converts to (§9.7.3), and each quoted attribute value and piece of literal text as its string.
