@@ -65,7 +65,7 @@ fn levels(node: Node) -> usize {
 /// Where a level that is too deep is reported: an element at its tag name,
 /// since the whole element can span many lines, and an expression as a
 /// whole.
-fn level_span(node: Node) -> Span {
+pub(crate) fn level_span(node: Node) -> Span {
     if matches!(node.kind(), "if_block" | "each_block") {
         return node
             .child_by_field_name("keyword")

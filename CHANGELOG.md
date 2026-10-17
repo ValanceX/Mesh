@@ -4,6 +4,19 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+Defects and limits (direction work package 0). In the free window: each break names its replacement in a diagnostic.
+
+### Added
+
+- **`runtime-nesting-too-deep`.** A render nests at most 512 levels (an element, a composite's expansion, a fragment, a slot or a repeated item is one each). About 680 nested composites used to crash the WebAssembly runtime with `MeshInternalError`; now it is a diagnostic and nothing is rendered. Not host-configurable.
+- **`input-too-large`, `too-many-elements`, `too-many-attributes`.** A source over 64 KB, more than 5,000 elements, or more than 64 attributes (event bindings count) on one element is one error at the first place past the limit, before anything else is checked. **Sources over 64 KB that used to check now fail**; split them into components.
+
+### Fixed
+
+- **A compiled `template-v1` is read at the documented depth.** `serde_json`'s own limit of 128 JSON levels refused a template at about 42 nested elements (an element is three levels), though 128 are documented. The reader now bounds the depth itself at 1,024 JSON levels and refuses deeper with `assembly-malformed-template`.
+- **The checker is linear in siblings and attributes.** Every position lookup scanned its line, so a source on one line (generated or minified UI) cost the square of its size: 8,000 siblings took 4.9 s and 10,000 attributes 15 s in WebAssembly; they now take about 0.2 s. `SourceMap` answers by search.
+- Conformance READMEs no longer say MPRX cannot express conditionals or repeats.
+
 ## [0.13.0] - 2026-10-17
 
 A change to how MPRX reads text: a space written between two interpolations is content. Nothing else in the language, the compiler, the runtime or any document format changes. See the [v0.13 release notes](./docs/releases/v0.13.md).

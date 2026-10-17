@@ -40,6 +40,16 @@ pub struct LineColumn {
     pub column: usize,
 }
 
+/// A character of more than one byte, and the surplus up to and including it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Wide {
+    start: usize,
+    /// Bytes beyond UTF-16 code units, summed.
+    over_utf16: usize,
+    /// Bytes beyond characters, summed.
+    over_chars: usize,
+}
+
 /// A map from byte offsets to lines and columns, and back, for one
 /// source text.
 ///
@@ -68,9 +78,13 @@ pub struct LineColumn {
 pub struct SourceMap {
     /// The byte offset each line starts at: 0, then one past every `\n`.
     line_starts: Vec<usize>,
-    /// The same starts, as offsets in UTF-16 code units from the start of
-    /// the source, a byte-order mark included.
-    line_starts_utf16: Vec<usize>,
+    /// Each character that is more than one byte (every one that isn't
+    /// ASCII, a byte-order mark included): where it starts, and, summed over
+    /// it and every one before it, how many more bytes than UTF-16 code
+    /// units and how many more bytes than characters there are. What precedes
+    /// a byte, in any unit, is the byte offset less the last of these before
+    /// it, found by search, so it doesn't depend on how long a line is.
+    wide: Vec<Wide>,
     /// The length of the source, to catch a map used with another text.
     len: usize,
     /// The length of a leading byte-order mark: 0 or 3.
@@ -78,21 +92,28 @@ pub struct SourceMap {
 }
 
 impl SourceMap {
-    /// Maps `source`. O(n) in its length.
+    /// Maps `source`. O(n) in its length; a lookup by byte offset is O(log n).
     pub fn new(source: &str) -> SourceMap {
         let mut line_starts = vec![0];
-        let mut line_starts_utf16 = vec![0];
-        let mut utf16 = 0;
+        let mut wide = Vec::new();
+        let (mut over_utf16, mut over_chars) = (0, 0);
         for (index, c) in source.char_indices() {
-            utf16 += c.len_utf16();
             if c == '\n' {
                 line_starts.push(index + 1);
-                line_starts_utf16.push(utf16);
+            }
+            if c.len_utf8() > 1 {
+                over_utf16 += c.len_utf8() - c.len_utf16();
+                over_chars += c.len_utf8() - 1;
+                wide.push(Wide {
+                    start: index,
+                    over_utf16,
+                    over_chars,
+                });
             }
         }
         SourceMap {
             line_starts,
-            line_starts_utf16,
+            wide,
             len: source.len(),
             bom: if source.starts_with(BOM) {
                 BOM.len_utf8()
@@ -134,11 +155,21 @@ impl SourceMap {
         let line = self.line_starts.partition_point(|&start| start <= byte) - 1;
         let text = self.line_text(source, line);
         let byte = byte.clamp(text.start, text.end);
-        let column = source[text.start..byte]
-            .chars()
-            .map(|c| unit.width(c))
-            .sum();
+        // Widths add, so the column is the difference of two offsets.
+        let column = self.units_before(byte, unit) - self.units_before(text.start, unit);
         LineColumn { line, column }
+    }
+
+    /// How many `unit`s precede `byte`, a character boundary, in the source.
+    fn units_before(&self, byte: usize, unit: ColumnUnit) -> usize {
+        // The characters that start before `byte` end at or before it.
+        let before = self.wide.partition_point(|wide| wide.start < byte);
+        let last = before.checked_sub(1).map(|last| &self.wide[last]);
+        byte - match unit {
+            ColumnUnit::Utf8 => 0,
+            ColumnUnit::Utf16 => last.map_or(0, |wide| wide.over_utf16),
+            ColumnUnit::Char => last.map_or(0, |wide| wide.over_chars),
+        }
     }
 
     /// The offset of `byte` in UTF-16 code units from the start of the
@@ -151,9 +182,7 @@ impl SourceMap {
     pub fn utf16_offset(&self, source: &str, byte: usize) -> usize {
         self.check(source);
         let byte = source.floor_char_boundary(byte);
-        let line = self.line_starts.partition_point(|&start| start <= byte) - 1;
-        let start = self.line_starts[line];
-        self.line_starts_utf16[line] + source[start..byte].encode_utf16().count()
+        self.units_before(byte, ColumnUnit::Utf16)
     }
 
     /// The byte offset of `position`, whose column counts `unit`.

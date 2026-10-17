@@ -91,6 +91,12 @@ impl DiagnosticCode {
     /// Elements and expressions nested more than
     /// `mesh_parser::MAX_NESTING_DEPTH` levels deep.
     pub const NESTING_TOO_DEEP: DiagnosticCode = DiagnosticCode("nesting-too-deep");
+    /// A source longer than `mesh_parser::MAX_SOURCE_BYTES`.
+    pub const INPUT_TOO_LARGE: DiagnosticCode = DiagnosticCode("input-too-large");
+    /// More than `mesh_parser::MAX_ELEMENTS` elements in one source.
+    pub const TOO_MANY_ELEMENTS: DiagnosticCode = DiagnosticCode("too-many-elements");
+    /// More than `mesh_parser::MAX_ATTRIBUTES` attributes on one element.
+    pub const TOO_MANY_ATTRIBUTES: DiagnosticCode = DiagnosticCode("too-many-attributes");
     /// A component manifest that isn't valid JSON.
     pub const MANIFEST_SYNTAX_ERROR: DiagnosticCode = DiagnosticCode("manifest-syntax-error");
     /// A component manifest whose arrays and objects nest more than
@@ -241,6 +247,9 @@ impl DiagnosticCode {
         DiagnosticCode::INVALID_SWITCH,
         DiagnosticCode::RETIRED_ELEMENT,
         DiagnosticCode::MISSING_REPEAT_KEY,
+        DiagnosticCode::INPUT_TOO_LARGE,
+        DiagnosticCode::TOO_MANY_ELEMENTS,
+        DiagnosticCode::TOO_MANY_ATTRIBUTES,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -1097,6 +1106,9 @@ mod tests {
                 "invalid-switch",
                 "retired-element",
                 "missing-repeat-key",
+                "input-too-large",
+                "too-many-elements",
+                "too-many-attributes",
             ]
         );
     }

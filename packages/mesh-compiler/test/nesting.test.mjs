@@ -58,8 +58,9 @@ test("one level past the limit is one nesting-too-deep", async () => {
   assert.deepEqual(document.diagnostics.map((diagnostic) => diagnostic.code), ["nesting-too-deep"]);
 });
 
+// 30,000 levels of `[` and `]` is 60 KB, as much as fits in the source limit (G5).
 test("far past the limit is still one nesting-too-deep", async () => {
-  for (const depth of [5_000, 100_000]) {
+  for (const depth of [5_000, 30_000]) {
     const source = `<a x={${"[".repeat(depth)}${"]".repeat(depth)}} />`;
     const document = await check({ source, path: "deep.mprx" });
     assert.deepEqual(document.diagnostics.map((diagnostic) => diagnostic.code), ["nesting-too-deep"], `${depth}`);

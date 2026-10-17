@@ -517,7 +517,8 @@ fn every_syntax_code_is_a_known_code() {
 /// ancestors, and an `ERROR` checked against its siblings.
 #[test]
 fn locates_errors_in_deeply_nested_sources() {
-    let depth = 20_000;
+    // As deep as fits in the 64 KB source limit (G5).
+    let depth = 9_000;
     let nest = |inner: &str| format!("{}{inner}{}", "<p>".repeat(depth), "</p>".repeat(depth));
     // Every case's error starts inside the innermost `<p>`, which ends at
     // this byte.
@@ -556,7 +557,7 @@ fn locates_errors_in_deeply_nested_sources() {
 /// `<q ...>` tag, not as a node left over from the `{{b +}}` branch.
 #[test]
 fn reads_the_right_parent_after_a_sibling_with_an_error() {
-    let depth = 20_000;
+    let depth = 9_000;
     let inner = "<q a={{b +}} c-d=\"1\" />";
     let deep = format!("{}{inner}{}", "<p>".repeat(depth), "</p>".repeat(depth));
     let inside = 3 * depth;

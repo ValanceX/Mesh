@@ -15,11 +15,13 @@ use tree_sitter::Node;
 
 mod blocks;
 mod context;
+mod limits;
 mod nesting;
 mod recover;
 mod syntax_errors;
 
 pub use context::{context_at, Completion, Context};
+pub use limits::{MAX_ATTRIBUTES, MAX_ELEMENTS, MAX_SOURCE_BYTES};
 pub use nesting::MAX_NESTING_DEPTH;
 pub use recover::{recover, Recovered, RecoveredExpression};
 
@@ -53,8 +55,17 @@ pub struct ParseResult {
 /// exactly one root element. Syntax errors are located: `errors` holds
 /// one [`ParseError`] per error region, in source order, each with the
 /// narrowest useful span. A file too deeply nested gets one
-/// `nesting-too-deep` error, at the first place it goes too deep.
+/// `nesting-too-deep` error, at the first place it goes too deep. One past
+/// the size, element or attribute limits ([`MAX_SOURCE_BYTES`],
+/// [`MAX_ELEMENTS`], [`MAX_ATTRIBUTES`]) gets one error likewise.
 pub fn parse(source: &str) -> ParseResult {
+    if let Some(error) = limits::check_size(source) {
+        return ParseResult {
+            ast: None,
+            errors: vec![error],
+        };
+    }
+
     let mut parser = tree_sitter::Parser::new();
     parser
         .set_language(&tree_sitter_mprx::language())
@@ -88,7 +99,7 @@ pub fn parse(source: &str) -> ParseResult {
         };
     }
 
-    if let Some(error) = nesting::check(root) {
+    if let Some(error) = nesting::check(root).or_else(|| limits::check_tree(root)) {
         return ParseResult {
             ast: None,
             errors: vec![error],
