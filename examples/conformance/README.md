@@ -49,6 +49,6 @@ A renderer implements the rule against its own target (hit testing, then the wal
 
 ## `identity/`: node identity (spec §9.10)
 
-Unlike the directories above, this one is **not** a real program. MPRX can't yet express a conditional or repeated element, so no MESH produces the trees. `identity/cases.json` holds hand-written before/after render-v1 trees, the identity of every node in each, and what the contract says happened between them: kept, created, removed, moved, and which handler identifiers stay the same. It also gives the pairing that matching by position would make, so a renderer can see exactly where that is wrong. It needs no MPRX, no manifest and no compiler.
+Unlike the directories above, this one is **not** a real program, though MPRX does express conditionals and repeats (`{#if}` and `{#each}`, since v0.11). The vectors are written as render-v1 trees by hand, so they pin the rule without depending on a compiler or runtime, and no MESH produced them. `identity/cases.json` holds hand-written before/after render-v1 trees, the identity of every node in each, and what the contract says happened between them: kept, created, removed, moved, and which handler identifiers stay the same. It also gives the pairing that matching by position would make, so a renderer can see exactly where that is wrong. It needs no MPRX, no manifest and no compiler.
 
 See [`identity/README.md`](./identity/README.md) for the format and the meaning of each outcome.
