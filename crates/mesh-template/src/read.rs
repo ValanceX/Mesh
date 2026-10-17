@@ -58,8 +58,7 @@ struct Document {
 /// Properties the format doesn't define are ignored, as the format's
 /// promise requires of readers.
 pub fn from_json(text: &str) -> Result<Template, Refusal> {
-    let value: Value = serde_json::from_str(text)
-        .map_err(|error| malformed("", format!("the template isn't JSON: {error}")))?;
+    let value = value_from_json(text).map_err(|why| malformed("", why))?;
     let Value::Object(object) = &value else {
         return Err(malformed("", "a template is a JSON object"));
     };
@@ -105,6 +104,69 @@ pub fn from_json(text: &str) -> Result<Template, Refusal> {
         }),
         _ => Err(Refusal::Malformed(problems)),
     }
+}
+
+/// The most levels of arrays and objects a template document may nest.
+/// MPRX nests 128 levels, an element counts as one, and an element is three
+/// levels of JSON (the element, its `children`, and a child's `element`),
+/// with a few more inside an expression: this is well beyond that, and low
+/// enough that the recursive reading and checking that follow fit in a small
+/// stack. `serde_json`'s own limit of 128 levels refused a template at about 42
+/// nested elements, though 128 are documented.
+pub const MAX_JSON_DEPTH: usize = 1024;
+
+/// The byte offset of the first `[` or `{` that opens a level deeper than
+/// [`MAX_JSON_DEPTH`], if there is one. Iterative, so it can't overflow;
+/// it only counts brackets outside strings, and leaves anything malformed
+/// to the parser.
+fn too_deep(text: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (offset, byte) in text.bytes().enumerate() {
+        if in_string {
+            match (escaped, byte) {
+                (true, _) => escaped = false,
+                (false, b'\\') => escaped = true,
+                (false, b'"') => in_string = false,
+                _ => {}
+            }
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'[' | b'{' => {
+                depth += 1;
+                if depth > MAX_JSON_DEPTH {
+                    return Some(offset);
+                }
+            }
+            b']' | b'}' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Parses a template document as a JSON value, for every reader of one
+/// (`from_json`, and the runtime's identity and error paths), refusing it,
+/// with the reason, if it isn't JSON or nests deeper than
+/// [`MAX_JSON_DEPTH`]. `serde_json`'s own depth limit is off, since
+/// [`too_deep`] has already bounded the document.
+pub fn value_from_json(text: &str) -> Result<Value, String> {
+    use serde::Deserialize;
+    if let Some(offset) = too_deep(text) {
+        return Err(format!(
+            "the template nests more than {MAX_JSON_DEPTH} levels of JSON deep (at byte \
+             {offset}); an element takes three, and MPRX nests 128 levels"
+        ));
+    }
+    let mut deserializer = serde_json::Deserializer::from_str(text);
+    deserializer.disable_recursion_limit();
+    let value = Value::deserialize(&mut deserializer)
+        .and_then(|value| deserializer.end().map(|()| value))
+        .map_err(|error| format!("the template isn't JSON: {error}"))?;
+    Ok(value)
 }
 
 fn problem(path: &str, message: impl Into<String>) -> Problem {

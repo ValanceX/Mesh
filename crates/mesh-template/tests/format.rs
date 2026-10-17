@@ -296,3 +296,30 @@ fn a_record_field_name_is_any_string() {
         "a member access's field is an identifier"
     );
 }
+
+/// A template nested past `MAX_JSON_DEPTH` is refused as malformed, in
+/// bounded time and stack, not crashed on, and one nested far deeper than
+/// serde_json's own limit of 128 levels (about 42 elements) reads.
+#[test]
+fn json_depth_is_limited_by_the_format_not_the_parser() {
+    let deep = |levels: usize| {
+        let mut document = example();
+        document["root"]["children"] = Value::Null;
+        let text = document.to_string().replace(
+            "\"children\":null",
+            &format!("\"children\":{}{}", "[".repeat(levels), "]".repeat(levels)),
+        );
+        text
+    };
+    let refused = malformed_text(&deep(100_000));
+    assert_eq!(refused.len(), 1);
+    assert!(refused[0].contains("levels of JSON deep"), "{}", refused[0]);
+    // Past serde_json's limit, within ours: refused for what it is (a
+    // children list of lists), not for its depth.
+    let inside = malformed_text(&deep(500));
+    assert!(!inside[0].contains("levels of JSON deep"), "{}", inside[0]);
+    // Brackets inside strings don't count.
+    let mut document = example();
+    document["compiler"] = json!("[".repeat(5_000));
+    assert!(from_json(&document.to_string()).is_ok());
+}

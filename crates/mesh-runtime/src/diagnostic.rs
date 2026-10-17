@@ -98,6 +98,8 @@ impl RuntimeCode {
     // Repeated structure (PROVISIONAL, §9.10 tracer).
     pub const INVALID_KEY: RuntimeCode = RuntimeCode("runtime-invalid-key", Form::Source);
     pub const DUPLICATE_KEY: RuntimeCode = RuntimeCode("runtime-duplicate-key", Form::Source);
+    // Limits.
+    pub const NESTING_TOO_DEEP: RuntimeCode = RuntimeCode("runtime-nesting-too-deep", Form::Source);
     // Internal.
     pub const KEY_COLLISION: RuntimeCode = RuntimeCode("runtime-key-collision", Form::Source);
 
@@ -138,6 +140,7 @@ impl RuntimeCode {
         RuntimeCode::ABSENT_ELEMENT_OUTPUT,
         RuntimeCode::INVALID_KEY,
         RuntimeCode::DUPLICATE_KEY,
+        RuntimeCode::NESTING_TOO_DEEP,
         RuntimeCode::KEY_COLLISION,
     ];
 

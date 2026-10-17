@@ -26,7 +26,7 @@ mod types;
 mod write;
 
 pub use fingerprint::{fingerprint, Fingerprint, ParseFingerprintError};
-pub use read::{from_json, Problem, Refusal};
+pub use read::{from_json, value_from_json, Problem, Refusal, MAX_JSON_DEPTH};
 pub use types::{
     BinaryOperator, Child, Element, EventBinding, Expression, Field, Literal, Offset, Prop, Span,
     Template, UnaryOperator,

@@ -423,7 +423,7 @@ At runtime, each written prop's value is evaluated in the enclosing template and
 
 Only the root template's scope comes from the snapshot. The root component's own props play no part. The root is exempt from the binding rules, unless it is also used as a composite occurrence somewhere, which is then a cycle (rule 5).
 
-**Nesting.** A composite's template may contain composite occurrences, to any depth, as long as the program has no cycle.
+**Nesting.** A composite's template may contain composite occurrences, as long as the program has no cycle, and a render may nest 512 levels (an element, a composite's expansion, a fragment, a slot or a repeated item is one each); deeper is `runtime-nesting-too-deep`. A template document may nest 1,024 levels of JSON, which holds the 128 levels of MPRX nesting (an element is three levels of JSON); deeper is `assembly-malformed-template`.
 
 **Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can raise events of its own: see [Composite events](#composite-events).
 

@@ -665,6 +665,15 @@ pub(crate) fn statics<'m>(
     }
 }
 
+/// The deepest a render nests, counted in steps of the path to a node: an
+/// element, a composite's expansion, a fragment, a slot and a repeated item
+/// are one each. It is a resource limit of this implementation (decision
+/// U12, outline D12), not host-configurable, and a later version may change
+/// it. Beyond it a render fails closed with `runtime-nesting-too-deep`
+/// instead of exhausting the stack of the module (about 680 nested
+/// composites crashed the WebAssembly runtime before this limit).
+const MAX_RENDER_NESTING: usize = 512;
+
 struct Renderer<'v> {
     valid: &'v Valid,
     keys: HashSet<String>,
@@ -710,6 +719,26 @@ impl<'v> Renderer<'v> {
         }
     }
 
+    /// Refuses to go deeper than [`MAX_RENDER_NESTING`] below `path`.
+    fn within_limit(
+        &self,
+        scope: &Scope<'_, '_>,
+        path: &[Step],
+        span: mesh_template::Span,
+    ) -> Result<(), RuntimeDiagnostic> {
+        if path.len() >= MAX_RENDER_NESTING {
+            return Err(scope.error(
+                RuntimeCode::NESTING_TOO_DEEP,
+                format!(
+                    "this is nested more than {MAX_RENDER_NESTING} levels deep, \
+                     the deepest MESH renders"
+                ),
+                span,
+            ));
+        }
+        Ok(())
+    }
+
     fn key(
         &mut self,
         path: &[Step],
@@ -744,6 +773,7 @@ impl<'v> Renderer<'v> {
             payload: None,
             statics: statics(self.valid, component, None),
         };
+        self.within_limit(&scope, path, element.span)?;
         if self.valid.is_composite(&element.component) {
             let bound = bind(self.valid, &scope, element)?;
             let template = &self.valid.templates[&element.component];
@@ -1041,6 +1071,7 @@ impl<'v> Renderer<'v> {
         previous: Option<&Rc<Node>>,
         built: &mut Built,
     ) -> Result<(), RuntimeDiagnostic> {
+        self.within_limit(scope, path, element.span)?;
         if !program::is_inline(self.valid, element) {
             built.children.push(TreeChild::Node(self.occurrence(
                 scope.component,

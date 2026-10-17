@@ -145,7 +145,7 @@ pub(crate) fn validate(
 
 /// A malformed template's `component`, if it has a string one.
 fn readable_component(text: &str) -> Option<String> {
-    let value: serde_json::Value = serde_json::from_str(text).ok()?;
+    let value = mesh_template::value_from_json(text).ok()?;
     value.get("component")?.as_str().map(str::to_string)
 }
 
@@ -829,7 +829,7 @@ fn identity(program: &Program<'_>) -> [u8; 32] {
         .templates
         .iter()
         .map(|text| {
-            let value: serde_json::Value = serde_json::from_str(text).expect("validated");
+            let value = mesh_template::value_from_json(text).expect("validated");
             let component = value["component"].as_str().expect("validated").to_string();
             (component, canonical_digest(&value))
         })

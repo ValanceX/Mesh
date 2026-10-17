@@ -1135,6 +1135,14 @@ Only when the host asks for verification (`verify` with the whole snapshot it be
 
 Location: `input`, the first path that differs.
 
+### Limits
+
+### `runtime-nesting-too-deep`
+
+A render nests more than 512 levels deep, counting each element, each composite's expansion, each fragment, slot and repeated item as one. Nothing is rendered. Before this limit, about 680 nested composites (fewer with several elements to a level) crashed the WebAssembly runtime with an internal error. The limit is not configurable by the host; to stay under it, flatten the composites or split the view. (Decision U12 of the direction documents.)
+
+Location: `source`, the element that would be the 513th level.
+
 ### Internal errors
 
 ### `runtime-key-collision`
