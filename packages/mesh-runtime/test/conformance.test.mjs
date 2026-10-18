@@ -213,7 +213,7 @@ const snippetRender = async (dir, step) => {
   return result.render;
 };
 
-for (const dir of ["snippets", "forwarder"]) {
+for (const dir of ["snippets", "forwarder", "passing"]) {
 test(`${dir}: every step renders its committed tree, and an update is a render`, async () => {
   const steps = snippetSteps(dir);
   assert.ok(steps.length >= 3);

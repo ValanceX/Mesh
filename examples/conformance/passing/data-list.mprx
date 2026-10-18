@@ -1,0 +1,5 @@
+<list>
+  {#each items as item (item.id)}
+    {@render row(item)}
+  {/each}
+</list>

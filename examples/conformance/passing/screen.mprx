@@ -1,0 +1,16 @@
+<page>
+  {#snippet fmt(p)}<row label={p.name} on.press={select(p.id)} />{/snippet}
+  {#snippet note(q)}<item label={q.name} />{/snippet}
+  <data-list items={people} row={fmt} />
+  <data-list items={people} row={note} />
+  <data-list items={people} row={fmt} />
+  <shell items={people} row={note} />
+  {#each people as person (person.id)}
+    {#snippet one()}<text>{person.name}</text>{/snippet}
+    <panel title={title} header={one} />
+  {/each}
+  <panel title="Bare" />
+  {#snippet head()}<text>{title}</text>{/snippet}
+  <panel title="Both" header={head}><text>{title}</text></panel>
+  {#if flag}<panel title="Flag" header={head} />{/if}
+</page>

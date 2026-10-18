@@ -1,0 +1,9 @@
+{
+  "root": "screen",
+  "templates": [
+    "screen",
+    "data-list",
+    "shell",
+    "panel"
+  ]
+}

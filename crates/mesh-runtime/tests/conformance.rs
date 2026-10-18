@@ -677,3 +677,4 @@ macro_rules! snippet_vectors {
 
 snippet_vectors!(snippets, "snippets");
 snippet_vectors!(forwarder, "forwarder");
+snippet_vectors!(passing, "passing");
