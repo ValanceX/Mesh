@@ -1,0 +1,9 @@
+{
+  "root": "screen",
+  "templates": [
+    "screen",
+    "pass",
+    "relay",
+    "labelled"
+  ]
+}

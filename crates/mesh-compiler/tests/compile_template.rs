@@ -379,3 +379,36 @@ fn expression_names(expression: &Expression, out: &mut Vec<String>) {
         }
     }
 }
+
+/// A template that is only `{@render children()}` (decision U13) is a `mesh-fragment` around the render, and so a `template-v2`; version 1 never carries it.
+#[test]
+fn a_template_that_is_a_render_tag_is_a_fragment_and_a_version_2_document() {
+    const MODEL: &str = r#"{ "version": 1, "types": {}, "components": { "fwd": {
+        "props": { "children": { "type": { "kind": "snippet", "params": [] }, "required": true } },
+        "events": {}, "commands": {}, "scope": { "children": { "kind": "snippet", "params": [] } } } } }"#;
+    let model = check::Model::load(MODEL, "fwd").expect("the model loads");
+    let result = check::template("{@render children()}\n", &model);
+    let template = result
+        .template
+        .unwrap_or_else(|| panic!("it compiles: {:#?}", result.diagnostics));
+    let written: Value = serde_json::from_str(&mesh_template::to_json(&template)).unwrap();
+
+    assert_eq!(written["root"]["component"], "mesh-fragment");
+    assert_eq!(written["root"]["children"][0]["element"]["component"], "mesh-render");
+    assert_eq!(written["version"], 2);
+
+    let [v1, v2] = validators();
+    assert!(v2.is_valid(&written));
+    assert!(!v1.is_valid(&written), "version 1 has no snippets");
+
+    let mut as_v1 = written.clone();
+    as_v1["version"] = Value::from(1);
+    assert!(
+        mesh_template::from_json(&as_v1.to_string()).is_err(),
+        "a version 1 document with a render is malformed"
+    );
+    assert_eq!(
+        mesh_template::from_json(&written.to_string()).as_ref(),
+        Ok(&template)
+    );
+}

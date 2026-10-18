@@ -1,0 +1,8 @@
+{
+  "title": "Yo",
+  "flag": false,
+  "people": [
+    { "id": 2, "name": "Grace" },
+    { "id": 1, "name": "Ada" }
+  ]
+}

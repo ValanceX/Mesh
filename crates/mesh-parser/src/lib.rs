@@ -114,6 +114,31 @@ pub fn parse(source: &str) -> ParseResult {
         };
     }
 
+    // A render tag that is the whole document (decision U13) is a composite that only forwards a snippet. It is read as the fragment around the tag
+    // that the author would write to say the same: the template's root is `<mesh-fragment>{@render …}</mesh-fragment>`.
+    if let Some(tag) = root
+        .named_child(0)
+        .filter(|node| node.kind() == "render_tag")
+    {
+        let span = span_of(tag);
+        let keyword = tag.child_by_field_name("keyword").map_or(span, span_of);
+
+        return ParseResult {
+            ast: Some(Element {
+                name: "mesh-fragment".to_string(),
+                name_span: keyword,
+                closing_name: None,
+                attributes: Vec::new(),
+                event_bindings: Vec::new(),
+                children: vec![Child::Block(Box::new(Block::Render(lower_render_tag(
+                    tag, source,
+                ))))],
+                span,
+            }),
+            errors: vec![],
+        };
+    }
+
     let Some(element_node) = root.named_child(0).and_then(|element| element.child(0)) else {
         return ParseResult {
             ast: None,

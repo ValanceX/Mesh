@@ -222,3 +222,49 @@ fn malformed_snippets_and_render_tags_say_what_to_write() {
         );
     }
 }
+
+#[test]
+fn a_render_tag_may_be_the_whole_document_and_is_read_as_a_fragment_around_it() {
+    for source in [
+        "{@render children()}",
+        "{@render children()}\n",
+        "  {@render row(a, 1)}  \n",
+    ] {
+        let result = parse(source);
+        let ast = result
+            .ast
+            .unwrap_or_else(|| panic!("{source:?}: {:?}", result.errors));
+
+        assert_eq!(ast.name, "mesh-fragment", "{source:?}");
+        assert_eq!(ast.children.len(), 1, "{source:?}");
+        let Child::Block(block) = &ast.children[0] else {
+            panic!("a block")
+        };
+        let Block::Render(tag) = block.as_ref() else {
+            panic!("a render tag")
+        };
+
+        assert!(tag.name == "children" || tag.name == "row");
+        assert_eq!(
+            &source[tag.span.start_byte..tag.span.end_byte]
+                .chars()
+                .next(),
+            &Some('{')
+        );
+    }
+}
+
+#[test]
+fn a_render_tag_document_has_nothing_else_beside_it() {
+    for source in [
+        "{@render a()}{@render b()}",
+        "{@render a()} text",
+        "{@render a()}<b />",
+        "<b />{@render a()}",
+    ] {
+        let result = parse(source);
+
+        assert!(result.ast.is_none(), "{source:?} is not a document");
+        assert!(!result.errors.is_empty(), "{source:?} says why");
+    }
+}

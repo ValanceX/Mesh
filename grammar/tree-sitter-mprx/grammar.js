@@ -31,6 +31,12 @@ const PREC = {
 // in sync in one edit going forward (see the comment above
 // `_nested_self_closing_element` for why the two call sites need to exist
 // as separate symbols in the first place).
+const renderTag = $ => seq(
+  field('keyword', $.render_open),
+  field('call', $.command_invocation),
+  '}',
+);
+
 const selfClosingElement = $ => seq(
   '<',
   field('name', $.tag_name),
@@ -55,7 +61,8 @@ module.exports = grammar({
   extras: $ => [/\s/],
 
   rules: {
-    source_file: $ => $.element,
+    // A render tag may be the whole document: a composite that only forwards a snippet (decision U13). The parser reads it as a fragment around the tag.
+    source_file: $ => choice($.element, alias($._root_render_tag, $.render_tag)),
 
     element: $ => choice(
       $.self_closing_element,
@@ -125,11 +132,11 @@ module.exports = grammar({
       $.snippet_close,
     ),
 
-    render_tag: $ => seq(
-      field('keyword', $.render_open),
-      field('call', $.command_invocation),
-      '}',
-    ),
+    render_tag: renderTag,
+
+    // The document's own copy, for the reason `_nested_element` is a copy of `element` (see there): reached from `source_file` the tag is followed by the end of
+    // input, from `child` by more content, and shared states would offer `text` after the document's last tag.
+    _root_render_tag: renderTag,
 
     snippet_open: $ => token(seq('{#', 'snippet')),
 

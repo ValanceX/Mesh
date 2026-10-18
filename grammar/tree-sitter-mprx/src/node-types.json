@@ -801,6 +801,10 @@
         {
           "type": "element",
           "named": true
+        },
+        {
+          "type": "render_tag",
+          "named": true
         }
       ]
     }

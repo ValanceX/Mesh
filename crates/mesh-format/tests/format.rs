@@ -203,3 +203,12 @@ fn snippets_indent_like_blocks_and_a_render_tag_is_a_leaf() {
     assert_eq!(fmt(source), expected);
     assert_eq!(fmt(expected), expected, "formatting is idempotent");
 }
+
+#[test]
+fn a_document_that_is_a_render_tag_is_left_as_it_is() {
+    assert_eq!(fmt("{@render children()}\n"), "{@render children()}\n");
+    assert_eq!(
+        fmt("  {@render row( a,1 )}  \n\n"),
+        "{@render row( a,1 )}\n"
+    );
+}

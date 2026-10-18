@@ -198,38 +198,39 @@ test("enums: an event whose payload or argument is not a variant is refused", as
 // rendered for `snapshot.json` and for each `step-N.snapshot.json` after it, each against its committed
 // tree; updating from a step to the next is the render of the next; and `cases.json` relates the keys of
 // nodes (a node is named by the indexes of the nodes, not text runs, on the way down from the root).
-const snippetSteps = () => {
+const snippetSteps = (dir) => {
   const steps = [{ snapshot: "snapshot.json", expected: "expected.tree.json" }];
-  for (let at = 1; existsSync(join(conformance, "snippets", `step-${at}.snapshot.json`)); at += 1) {
+  for (let at = 1; existsSync(join(conformance, dir, `step-${at}.snapshot.json`)); at += 1) {
     steps.push({ snapshot: `step-${at}.snapshot.json`, expected: `step-${at}.expected.tree.json` });
   }
   return steps;
 };
 
-const snippetRender = async (step) => {
-  const result = await build("snippets", JSON.parse(read("snippets", step.snapshot)));
+const snippetRender = async (dir, step) => {
+  const result = await build(dir, JSON.parse(read(dir, step.snapshot)));
   assert.ok(result.render, JSON.stringify(result.diagnostics));
-  assert.deepEqual(result.render.tree, JSON.parse(read("snippets", step.expected)), step.snapshot);
+  assert.deepEqual(result.render.tree, JSON.parse(read(dir, step.expected)), step.snapshot);
   return result.render;
 };
 
-test("snippets: every step renders its committed tree, and an update is a render", async () => {
-  const steps = snippetSteps();
-  assert.ok(steps.length >= 4);
-  let previous = await snippetRender(steps[0]);
+for (const dir of ["snippets", "forwarder"]) {
+test(`${dir}: every step renders its committed tree, and an update is a render`, async () => {
+  const steps = snippetSteps(dir);
+  assert.ok(steps.length >= 3);
+  let previous = await snippetRender(dir, steps[0]);
   for (const step of steps.slice(1)) {
-    const fresh = await snippetRender(step);
-    const updated = await update(previous, JSON.parse(read("snippets", step.snapshot)));
+    const fresh = await snippetRender(dir, step);
+    const updated = await update(previous, JSON.parse(read(dir, step.snapshot)));
     assert.ok(updated.render, JSON.stringify(updated.diagnostics));
     assert.deepEqual(updated.render.tree, fresh.tree, `an update to ${step.snapshot} is its render`);
     previous = updated.render;
   }
 });
 
-test("snippets: keys are distinct, the same, or different, as committed", async () => {
-  const steps = snippetSteps();
+test(`${dir}: keys are distinct, the same, or different, as committed`, async () => {
+  const steps = snippetSteps(dir);
   const trees = [];
-  for (const step of steps) trees.push((await snippetRender(step)).tree);
+  for (const step of steps) trees.push((await snippetRender(dir, step)).tree);
   const nodeAt = (tree, path) => {
     let node = tree.root;
     for (const index of path) {
@@ -238,7 +239,7 @@ test("snippets: keys are distinct, the same, or different, as committed", async 
     }
     return node.key;
   };
-  const cases = JSON.parse(read("snippets", "cases.json"));
+  const cases = JSON.parse(read(dir, "cases.json"));
   for (const item of cases.distinct) {
     const keys = item.paths.map((path) => nodeAt(trees[item.step], path));
     assert.equal(new Set(keys).size, keys.length, item.case);
@@ -248,11 +249,12 @@ test("snippets: keys are distinct, the same, or different, as committed", async 
   for (const item of cases.different) assert.notEqual(at(item.a), at(item.b), item.case);
 });
 
-test("snippets: an event in a snippet's body is the declaring template's, and dispatches", async () => {
-  const kept = await snippetRender(snippetSteps()[0]);
+test(`${dir}: an event in a snippet's body is the declaring template's, and dispatches`, async () => {
+  const kept = await snippetRender(dir, snippetSteps(dir)[0]);
   const all = nodes(kept.tree.root);
   const press = [...all.values()].find((node) => node.component === "row" && node.props.label === "Grace");
   const { intent, diagnostics } = await dispatch(kept, press.events.press);
   assert.equal(diagnostics, undefined);
   assert.deepEqual(intent, { command: { component: "screen", name: "select" }, arguments: [{ value: 2 }] });
 });
+}

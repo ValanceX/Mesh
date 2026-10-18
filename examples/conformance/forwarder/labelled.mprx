@@ -1,0 +1,4 @@
+<mesh-fragment>
+  <text>{label}</text>
+  {@render children()}
+</mesh-fragment>

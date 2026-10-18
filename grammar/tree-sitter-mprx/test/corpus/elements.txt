@@ -445,3 +445,18 @@ A snippet with no parameters, and a render with no arguments
           call: (command_invocation
             command: (identifier))))
       (tag_name))))
+
+
+================================================================================
+A render tag as the whole document
+================================================================================
+
+{@render children()}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (render_tag
+    keyword: (render_open)
+    call: (command_invocation
+      command: (identifier))))

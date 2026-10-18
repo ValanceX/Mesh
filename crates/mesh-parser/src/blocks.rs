@@ -491,13 +491,6 @@ pub(crate) fn scan(source: &str) -> Vec<ParseError> {
                             word_end,
                         ));
                     } else if let Some(end) = end {
-                        if depth == 0 && open.is_empty() {
-                            errors.push(error(
-                                "a render tag cannot be the document: put it inside an element",
-                                at,
-                                word_end,
-                            ));
-                        }
                         errors.extend(check_render(&source[word_end..end - 1], at, end));
                     } else {
                         errors.push(error(

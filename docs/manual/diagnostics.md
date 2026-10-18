@@ -63,7 +63,7 @@ The file doesn't match the MPRX grammar, and the problem isn't one of the more s
 | `` malformed `{#if}` `` / `` malformed `{#each}` `` / `` malformed `{:else}` `` | A block opener that is not well formed: no condition, no list, no `as` and name, an empty key. The message says which and what to write. |
 | `` `{:else if}` after `{:else}` `` | `{:else}` is the last branch of an `{#if}`. |
 | `` unknown block `{#when` `` | The blocks are `{#if}` and `{#each}`. |
-| `a block cannot be the document: put it inside an element` | A document is one element, so a block sits inside an element. Points at the opener. |
+| `a block cannot be the document: put it inside an element` | A document is one element, so an `{#if}`, `{#each}` or `{#snippet}` sits inside an element. Points at the opener. (A `{@render}` may be the document, alone: nothing may stand beside it, and then the error is `invalid syntax`.) |
 | `invalid syntax` | Anything else. Points at the smallest region the parser could isolate. |
 | `expected a single root element` | An internal safeguard. Valid or invalid input isn't expected to trigger it. |
 | `failed to parse source` | An internal safeguard: the parser couldn't produce any tree at all. |
@@ -1172,11 +1172,11 @@ Location: `program`.
 
 ### `assembly-root-fragment`
 
-The program's root renders one node, but its root template's root is a `mesh-fragment`, or a composite whose template starts with one ([Fragments](templates.md#fragments)). A fragment makes no node. Points at the root of the root template.
+The program's root renders one node, but its root template's root is a `mesh-fragment`, or a composite whose template starts with one ([Fragments](templates.md#fragments)), among them a template that is only a `{@render}` ([a forwarder](templates.md#snippets)). A fragment makes no node. Points at the root of the root template.
 
 Location: `source`, the root template's root.
 
-**Fix:** put an element around it.
+**Fix:** put an element around it, or give the root a template that starts with an element.
 
 ## Runtime errors
 

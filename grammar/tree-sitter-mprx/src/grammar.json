@@ -3,8 +3,22 @@
   "name": "mprx",
   "rules": {
     "source_file": {
-      "type": "SYMBOL",
-      "name": "element"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "element"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_root_render_tag"
+          },
+          "named": true,
+          "value": "render_tag"
+        }
+      ]
     },
     "element": {
       "type": "CHOICE",
@@ -407,6 +421,31 @@
       ]
     },
     "render_tag": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "keyword",
+          "content": {
+            "type": "SYMBOL",
+            "name": "render_open"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "call",
+          "content": {
+            "type": "SYMBOL",
+            "name": "command_invocation"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "}"
+        }
+      ]
+    },
+    "_root_render_tag": {
       "type": "SEQ",
       "members": [
         {

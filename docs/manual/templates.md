@@ -469,6 +469,7 @@ A **snippet** is a piece of template with parameters, which a component passes t
 - **Update.** A node that renders a snippet, like one that places a slot, is never kept on its own memo: what it renders depends on the snippet, which its memo doesn't record. The nodes the snippet's body made are kept as any node is, by the values they read.
 - **Limit.** Snippets render at most 64 levels deep, one inside another (`runtime-snippet-depth`), and the 512 levels of all nesting apply (`runtime-nesting-too-deep`). Neither is configurable by the host.
 - Slots (`mesh-slot`, `mesh-fill`) keep working. A component that declares `children` is given its content as a snippet, any other as before.
+- **A forwarder.** A template may be nothing but `{@render children()}` (or any `{@render name(args)}`): the document is then read as `<mesh-fragment>{@render children()}</mesh-fragment>`, so the composite makes no node of its own and places what its caller wrote, in place, as a [fragment](#fragments) does. A composite can also be one by being `<other>{@render children()}</other>` where `other` is a forwarder. Nothing else may stand beside the tag in that document, it is a `template-v2`, and a program's root cannot be one (`assembly-root-fragment`). Identity: the forwarder adds the fragment step (`0x07`) and then the render step (`0x08`) (`examples/conformance/forwarder`).
 
 ### Fragments
 
@@ -484,7 +485,7 @@ MESH makes a node only where a template wrote an element. `mesh-fragment` is how
 
 - **Where it is placed.** A fragment is built in (a model need not declare it), has no props and no events. It may be a composite template's root, a branch or body of a [block](#blocks), or simply a child among others, where its content is placed in the node around it. A block writes one for you where its branch or body is not exactly one element.
 - **Never a node.** The render tree has its content, as children of the nearest node above. Text it places that is next to other text is one run (a render tree's runs are maximal).
-- **Not the program's root.** The root renders one node: a root template that starts with a fragment, or with a composite that does, is `assembly-root-fragment`.
+- **Not the program's root.** The root renders one node: a root template that starts with a fragment, or with a composite that does (a template that is only a `{@render}` is one), is `assembly-root-fragment`.
 - **Identity.** A fragment adds a step (`0x07`, [runtime](runtime.md)) so its content's keys are its own; a repeat inside a fragment that is a repeat's item is made again on each update (it is not remembered per item).
 - **Blocks and fragments.** A block stands for several siblings, so it may be a fragment's child but not a template's root.
 
@@ -538,7 +539,7 @@ Conditional and repeated structure are syntax, not elements ([spec §3.1](../MPR
 - **`{#if condition}`** opens a conditional, zero or more **`{:else if condition}`** follow, then an optional **`{:else}`**, and **`{/if}`** closes it. Conditions are boolean. The first condition that holds chooses its branch; with none, the `{:else}` branch; with no `{:else}`, nothing is rendered.
 - **`{#each items as item (key)}`** opens a repeat and **`{/each}`** closes it. `item` is the name bound to one element, readable in the key and in the body, not in `items`. The key identifies an item across updates, is a string or a number, and is **mandatory** (`missing-repeat-key`).
 - **A branch or body is one element.** If it is exactly one element it is that element; anything else (text, several nodes, none, a lone block or slot) is wrapped in a `mesh-fragment` automatically, so `{#if ok}Saved {count} item(s){/if}` needs no fragment written.
-- **A block is a child of an element.** It cannot be the document, because a document is one element.
+- **A block is a child of an element.** It cannot be the document, because a document is one element. The one exception is `{@render name(args)}`: see [Snippets](#snippets), a template that is only a render tag.
 - **Text cannot contain `{#`, `{:` or `{/`.** To show one, write a string expression: `{"{#if}"}`.
 - **Nesting.** A block counts as three levels toward the nesting limit.
 - **The elements they replace are errors.** `mesh-if`, `mesh-each`, `mesh-switch`, `mesh-case` and `mesh-default` as elements are `retired-element`, and the message names the block to write.

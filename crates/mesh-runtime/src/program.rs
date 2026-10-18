@@ -858,7 +858,7 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
             if at.component == FRAGMENT_COMPONENT {
                 diagnostics.push(RuntimeDiagnostic::new(
                     RuntimeCode::ROOT_FRAGMENT,
-                    format!("the root `{root}` renders one root node, but its template starts with a `{FRAGMENT_COMPONENT}`, which makes none: put an element around it"),
+                    format!("the root `{root}` renders one root node, but its template starts with a `{FRAGMENT_COMPONENT}` (or a composite that is one, as a template that is only a `{{@render}}` is), which makes none: put an element around it"),
                     source(template, template.root.span),
                 ));
                 break;

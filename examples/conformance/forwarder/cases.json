@@ -1,0 +1,116 @@
+{
+  "distinct": [
+    {
+      "case": "every forwarded node has its own key: through one forwarder, through a forwarder of a forwarder, beside a fragment composite, and in each item of a repeat",
+      "step": 0,
+      "paths": [
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          5
+        ],
+        [
+          6
+        ],
+        [
+          7
+        ],
+        [
+          8
+        ]
+      ]
+    }
+  ],
+  "same": [
+    {
+      "case": "a row keeps its key when the list is reordered: it is keyed by its item through the forwarder",
+      "a": {
+        "step": 0,
+        "path": [
+          7
+        ]
+      },
+      "b": {
+        "step": 1,
+        "path": [
+          6
+        ]
+      }
+    },
+    {
+      "case": "the other row, likewise",
+      "a": {
+        "step": 0,
+        "path": [
+          6
+        ]
+      },
+      "b": {
+        "step": 1,
+        "path": [
+          7
+        ]
+      }
+    },
+    {
+      "case": "the branch's node is the same node when the branch comes back",
+      "a": {
+        "step": 0,
+        "path": [
+          8
+        ]
+      },
+      "b": {
+        "step": 2,
+        "path": [
+          9
+        ]
+      }
+    },
+    {
+      "case": "a forwarded node whose text changed is the same node",
+      "a": {
+        "step": 0,
+        "path": [
+          0
+        ]
+      },
+      "b": {
+        "step": 1,
+        "path": [
+          0
+        ]
+      }
+    }
+  ],
+  "different": [
+    {
+      "case": "the other branch of a conditional, forwarding through another composite, is another node",
+      "a": {
+        "step": 0,
+        "path": [
+          8
+        ]
+      },
+      "b": {
+        "step": 1,
+        "path": [
+          8
+        ]
+      }
+    }
+  ]
+}
