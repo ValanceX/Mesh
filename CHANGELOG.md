@@ -4,7 +4,9 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
-Defects and limits (direction work package 0). In the free window: each break names its replacement in a diagnostic.
+## [0.14.0] - 2026-10-18
+
+Prepared, not yet published. The first new types and the first new template construct since 0.10: enum types, presence tests and defaults (`template-v2` for the two expressions), snippets, and the limits and fixes of direction work package 0. In the free window: each break names its replacement in a diagnostic. A program, a manifest and a template that use none of the new constructs compile and render as they did in 0.13.0, with the same fingerprint, tree and keys (tested against the published 0.13.0).
 
 ### Changed
 
@@ -21,7 +23,7 @@ Defects and limits (direction work package 0). In the free window: each break na
 - **The checker is linear in siblings and attributes.** Every position lookup scanned its line, so a source on one line (generated or minified UI) cost the square of its size: 8,000 siblings took 4.9 s and 10,000 attributes 15 s in WebAssembly; they now take about 0.2 s. `SourceMap` answers by search.
 - Conformance READMEs no longer say MPRX cannot express conditionals or repeats.
 
-## [Unreleased] WP2 step 1: enums, presence, defaults
+### WP2 step 1: enums, presence, defaults
 
 The language's first new types (direction Bet 4). A compatible addition: a manifest and a program that use none of it keep their meaning, their fingerprints and their render trees byte for byte. An older MESH reading a manifest that uses `enum` reports `manifest-unknown-kind`.
 
