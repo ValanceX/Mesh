@@ -1,4 +1,4 @@
-//! The mistakes in blocks (`{#if}`, `{:else if}`, `{:else}`, `{/if}`, `{#each}`, `{/each}`), found by a
+//! The mistakes in blocks (`{#if}`, `{:else if}`, `{:else}`, `{/if}`, `{#each}`, `{/each}`, `{#snippet}`, `{/snippet}`, `{@render}`), found by a
 //! scan of the source text.
 //!
 //! Tree-sitter's recovery tree says only that something near a block is wrong, and where it puts the
@@ -18,6 +18,7 @@ use crate::ParseError;
 enum Kind {
     If,
     Each,
+    Snippet,
 }
 
 impl Kind {
@@ -25,6 +26,7 @@ impl Kind {
         match self {
             Kind::If => "{#if}",
             Kind::Each => "{#each}",
+            Kind::Snippet => "{#snippet}",
         }
     }
 
@@ -32,6 +34,7 @@ impl Kind {
         match self {
             Kind::If => "{/if}",
             Kind::Each => "{/each}",
+            Kind::Snippet => "{/snippet}",
         }
     }
 }
@@ -198,6 +201,55 @@ fn check_each(inner: &str, start: usize, end: usize) -> Option<ParseError> {
     None
 }
 
+/// Checks the text after `{#snippet`: `name(parameter, …)`.
+fn check_snippet(inner: &str, start: usize, end: usize) -> Option<ParseError> {
+    let malformed = |why: &str| {
+        Some(error(
+            format!("malformed `{{#snippet}}`: {why}; write `{{#snippet name(parameters)}}`"),
+            start,
+            end,
+        ))
+    };
+    let inner = inner.trim();
+    let Some(open) = inner.find('(') else {
+        return malformed("it has no parameter list");
+    };
+    if !is_name(inner[..open].trim()) {
+        return malformed("it has no name");
+    }
+    let Some(list) = inner[open + 1..].strip_suffix(')') else {
+        return malformed("the parameter list's `(` is never closed");
+    };
+    if !list.trim().is_empty() && !list.split(',').all(|parameter| is_name(parameter.trim())) {
+        return malformed("each parameter is a name");
+    }
+
+    None
+}
+
+/// Checks the text after `{@render`: `name(argument, …)`.
+fn check_render(inner: &str, start: usize, end: usize) -> Option<ParseError> {
+    let malformed = |why: &str| {
+        Some(error(
+            format!("malformed `{{@render}}`: {why}; write `{{@render name(arguments)}}`"),
+            start,
+            end,
+        ))
+    };
+    let inner = inner.trim();
+    let Some(open) = inner.find('(') else {
+        return malformed("it has no argument list");
+    };
+    if !is_name(inner[..open].trim()) {
+        return malformed("it has no snippet name");
+    }
+    if !inner.ends_with(')') {
+        return malformed("the argument list's `(` is never closed");
+    }
+
+    None
+}
+
 /// Every block mistake in `source`, in source order. Empty when the scan finds none.
 pub(crate) fn scan(source: &str) -> Vec<ParseError> {
     let bytes = source.as_bytes();
@@ -251,11 +303,12 @@ pub(crate) fn scan(source: &str) -> Vec<ParseError> {
                     let kind = match word {
                         "if" => Some(Kind::If),
                         "each" => Some(Kind::Each),
+                        "snippet" => Some(Kind::Snippet),
                         _ => None,
                     };
                     let Some(kind) = kind else {
                         errors.push(error(
-                            format!("unknown block `{{#{word}`: the blocks are `{{#if}}` and `{{#each}}`"),
+                            format!("unknown block `{{#{word}`: the blocks are `{{#if}}`, `{{#each}}` and `{{#snippet}}`"),
                             at,
                             word_end,
                         ));
@@ -294,6 +347,7 @@ pub(crate) fn scan(source: &str) -> Vec<ParseError> {
                             }
                         }
                         Kind::Each => errors.extend(check_each(inner, at, end)),
+                        Kind::Snippet => errors.extend(check_snippet(inner, at, end)),
                     }
                     open.push(Open {
                         kind,
@@ -385,12 +439,13 @@ pub(crate) fn scan(source: &str) -> Vec<ParseError> {
                     let kind = match word {
                         "if" => Some(Kind::If),
                         "each" => Some(Kind::Each),
+                        "snippet" => Some(Kind::Snippet),
                         _ => None,
                     };
 
                     match (kind, open.last()) {
                         (None, _) => errors.push(error(
-                            format!("unknown closer `{{/{word}}}`: the closers are `{{/if}}` and `{{/each}}`"),
+                            format!("unknown closer `{{/{word}}}`: the closers are `{{/if}}`, `{{/each}}` and `{{/snippet}}`"),
                             span.start_byte,
                             span.end_byte,
                         )),
@@ -420,6 +475,38 @@ pub(crate) fn scan(source: &str) -> Vec<ParseError> {
                         }
                     }
                     at = end;
+                }
+                Some(b'@') => {
+                    let end = braced(bytes, at);
+                    let word_end = source[at + 2..]
+                        .find(|c: char| !c.is_ascii_alphabetic())
+                        .map_or(bytes.len(), |n| at + 2 + n);
+                    let word = &source[at + 2..word_end];
+                    let stop = end.unwrap_or(bytes.len());
+
+                    if word != "render" {
+                        errors.push(error(
+                            format!("unknown tag `{{@{word}`: the only tag is `{{@render name(arguments)}}`"),
+                            at,
+                            word_end,
+                        ));
+                    } else if let Some(end) = end {
+                        if depth == 0 && open.is_empty() {
+                            errors.push(error(
+                                "a render tag cannot be the document: put it inside an element",
+                                at,
+                                word_end,
+                            ));
+                        }
+                        errors.extend(check_render(&source[word_end..end - 1], at, end));
+                    } else {
+                        errors.push(error(
+                            "`{@render` is never finished: expected `}`",
+                            at,
+                            word_end,
+                        ));
+                    }
+                    at = stop;
                 }
                 _ => at = braced(bytes, at).unwrap_or(bytes.len()),
             },

@@ -167,6 +167,8 @@ pub enum Expectation {
     Argument { command: String, parameter: String },
     /// A field's value in an object literal.
     Field { field: String },
+    /// A snippet's argument in a render.
+    SnippetArgument { snippet: String, index: usize },
     /// An element of an array literal where a list is expected.
     Element,
     /// PROVISIONAL (§9.10 tracer): a repeat's declared key, which must be a
@@ -208,6 +210,8 @@ pub enum Combination {
     Equality(BinaryOperator),
     /// The value and the default of `x ?? y`.
     Default,
+    /// What two renders of a local snippet give one of its parameters.
+    SnippetArgument,
 }
 
 /// A name in the template, and the manifest declaration it refers to.
@@ -386,6 +390,26 @@ pub enum Fact {
     RedundantDefault { ty: Ty, span: Span },
     /// `has` called with `found` arguments instead of one. Span: the call.
     PresenceArity { found: usize, span: Span },
+    /// `{@render name(…)}` where no snippet is called `name`: not declared among the children it is in
+    /// or around, and not a snippet-typed name of the template's scope. Span: the name.
+    UnknownSnippet {
+        name: String,
+        span: Span,
+        candidates: Vec<String>,
+    },
+    /// A render with `found` arguments, or a snippet written with `found` parameters, for a snippet
+    /// of `expected`. Span: the render, or the snippet's name.
+    SnippetArity {
+        name: String,
+        expected: usize,
+        found: usize,
+        span: Span,
+    },
+    /// Two snippets with one name among the same children. Span: the second's name.
+    DuplicateSnippet { name: String, span: Span },
+    /// `children={…}` written for a component, together with content between its tags. Span: the
+    /// attribute.
+    ChildrenConflict { component: String, span: Span },
 }
 
 impl Fact {
@@ -415,7 +439,11 @@ impl Fact {
             | Fact::UnknownVariant { span, .. }
             | Fact::RedundantPresenceTest { span, .. }
             | Fact::RedundantDefault { span, .. }
-            | Fact::PresenceArity { span, .. } => *span,
+            | Fact::PresenceArity { span, .. }
+            | Fact::UnknownSnippet { span, .. }
+            | Fact::SnippetArity { span, .. }
+            | Fact::DuplicateSnippet { span, .. }
+            | Fact::ChildrenConflict { span, .. } => *span,
         }
     }
 }

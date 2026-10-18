@@ -75,6 +75,8 @@ pub fn is_assignable(manifest: &Manifest, actual: &Ty, expected: &Ty) -> bool {
         (Ty::Optional(actual), Ty::Optional(expected)) => is_assignable(manifest, actual, expected),
         (_, Ty::Optional(expected)) => is_assignable(manifest, &actual, expected),
         (Ty::Optional(_), _) => false,
+        // A snippet is second-class: it is not an `any`, and no `any` is a snippet.
+        (Ty::Snippet(_), Ty::Any) | (Ty::Any, Ty::Snippet(_)) => false,
         // 3, 4. `any` is unchecked against the value's type, either way.
         (_, Ty::Any) | (Ty::Any, _) => true,
         // 5. `nothing` (the elements of `[]`) fits everywhere.
@@ -89,6 +91,15 @@ pub fn is_assignable(manifest: &Manifest, actual: &Ty, expected: &Ty) -> bool {
         //     which the checker decides, not this relation.
         (Ty::Enum(_), Ty::String) => true,
         (Ty::Enum(actual), Ty::Enum(expected)) => actual.iter().all(|v| expected.contains(v)),
+        // 6c. Snippets compare their parameters contravariantly, with the same arity: what the
+        //     expected snippet will be given must be accepted by the actual one.
+        (Ty::Snippet(actual), Ty::Snippet(expected)) => {
+            actual.len() == expected.len()
+                && expected
+                    .iter()
+                    .zip(actual)
+                    .all(|(given, accepted)| is_assignable(manifest, given, accepted))
+        }
         // 7. Lists are covariant: MPRX values are never mutated.
         (Ty::List(actual), Ty::List(expected)) => is_assignable(manifest, actual, expected),
         // 8. Records compare declarations, requiredness included, and are
@@ -130,6 +141,8 @@ pub fn join(manifest: &Manifest, a: &Ty, b: &Ty) -> Option<Ty> {
         // 3. `nothing` adds nothing.
         (Ty::Nothing, _) => Some(b.clone()),
         (_, Ty::Nothing) => Some(a.clone()),
+        // A snippet has a common type with nothing but itself.
+        (Ty::Snippet(_), Ty::Any) | (Ty::Any, Ty::Snippet(_)) => None,
         // 4. `any` absorbs every present type.
         (Ty::Any, _) | (_, Ty::Any) => Some(Ty::Any),
         // 5. Structurally identical types.

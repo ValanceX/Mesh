@@ -1,0 +1,4 @@
+<item label={title}>
+  {@render children()}
+  {@render footer()}
+</item>

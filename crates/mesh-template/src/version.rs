@@ -29,6 +29,15 @@ pub(crate) fn needed(element: &Element) -> u64 {
 }
 
 fn in_element(element: &Element, path: &str, found: &mut Vec<Construct>) {
+    // Snippets are elements the runtime gives meaning to, as conditionals are: only version 2 has them.
+    for (component, name) in [("mesh-snippet", "snippet"), ("mesh-render", "render")] {
+        if element.component == component {
+            found.push(Construct {
+                path: path.to_string(),
+                name,
+            });
+        }
+    }
     for (index, prop) in element.props.iter().enumerate() {
         in_expression(&prop.value, &format!("{path}/props/{index}/value"), found);
     }

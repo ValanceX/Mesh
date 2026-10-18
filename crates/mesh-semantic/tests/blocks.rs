@@ -156,3 +156,69 @@ fn a_reserved_element_written_as_an_element_is_reported() {
         );
     }
 }
+
+#[test]
+fn a_snippet_is_the_declaration_with_its_name_and_parameters_and_its_body_as_written() {
+    let (root, diagnostics) = lowered("<a>{#snippet row(p, q)}<b />text{/snippet}</a>");
+    let snippet = only(&root);
+
+    assert!(diagnostics.is_empty());
+    assert_eq!(
+        (snippet.name.as_str(), snippet.construct),
+        ("mesh-snippet", Some(Construct::Snippet))
+    );
+    assert_eq!(snippet.attributes[0].name, "name");
+    assert!(matches!(
+        &snippet.attributes[0].value,
+        mesh_semantic::AttributeValue::String { value, .. } if value == "row"
+    ));
+    let mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Array {
+        elements,
+        ..
+    }) = &snippet.attributes[1].value
+    else {
+        panic!("the parameters are an array")
+    };
+    assert_eq!(elements.len(), 2);
+    assert_eq!(
+        snippet.children.len(),
+        2,
+        "the body is not wrapped in a fragment"
+    );
+}
+
+#[test]
+fn a_render_tag_is_the_render_with_its_name_and_arguments() {
+    let (root, diagnostics) = lowered("<a>{@render row(x, 1)}</a>");
+    let render = only(&root);
+
+    assert!(diagnostics.is_empty());
+    assert_eq!(
+        (render.name.as_str(), render.construct),
+        ("mesh-render", Some(Construct::Render))
+    );
+    let mesh_semantic::AttributeValue::Expression(mesh_semantic::Expression::Array {
+        elements,
+        ..
+    }) = &render.attributes[1].value
+    else {
+        panic!("the arguments are an array")
+    };
+    assert_eq!(elements.len(), 2);
+    assert!(render.children.is_empty());
+}
+
+#[test]
+fn a_branch_that_is_one_render_tag_is_wrapped_like_any_block() {
+    let (root, _) = lowered("<a>{#if x}{@render row()}{/if}</a>");
+    let conditional = only(&root);
+
+    assert_eq!(only(conditional).construct, Some(Construct::Fragment));
+}
+
+#[test]
+fn the_reserved_elements_are_blocks_now() {
+    let (_, diagnostics) = lowered("<a><mesh-snippet /><mesh-render /></a>");
+
+    assert_eq!(diagnostics, ["retired-element", "retired-element"]);
+}

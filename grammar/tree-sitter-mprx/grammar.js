@@ -71,6 +71,8 @@ module.exports = grammar({
       $.expression_block,
       $.if_block,
       $.each_block,
+      $.snippet_block,
+      $.render_tag,
       alias($._nested_element, $.element),
     ),
 
@@ -107,6 +109,33 @@ module.exports = grammar({
       repeat($.child),
       $.each_close,
     ),
+
+    // `{#snippet name(a, b)} … {/snippet}` declares a snippet; `{@render name(args)}` renders one.
+    snippet_block: $ => seq(
+      field('keyword', $.snippet_open),
+      field('name', $.identifier),
+      '(',
+      optional(seq(
+        field('parameter', $.identifier),
+        repeat(seq(',', field('parameter', $.identifier))),
+      )),
+      ')',
+      '}',
+      repeat($.child),
+      $.snippet_close,
+    ),
+
+    render_tag: $ => seq(
+      field('keyword', $.render_open),
+      field('call', $.command_invocation),
+      '}',
+    ),
+
+    snippet_open: $ => token(seq('{#', 'snippet')),
+
+    snippet_close: $ => token(seq('{/snippet', /\s*/, '}')),
+
+    render_open: $ => token(seq('{@', 'render')),
 
     if_open: $ => token(seq('{#', 'if')),
 

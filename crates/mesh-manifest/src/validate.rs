@@ -77,6 +77,9 @@ struct PendingDefault {
 #[derive(Default)]
 struct Validator {
     defaults: Vec<PendingDefault>,
+    /// Whether the next type read may be a `snippet` (a component's prop or scope name; an
+    /// `optional` wrapping it passes this on). Taken at once by the type read.
+    snippet_allowed: bool,
     diagnostics: Vec<Diagnostic>,
     /// Every named type declared, first occurrence only, in source order,
     /// with its key's span. Declared means a reference to it isn't
@@ -252,6 +255,23 @@ impl Validator {
                 let key = DeclarationKey::Prop(name.to_string(), member.key.clone());
                 self.declare(key, member.key_span);
                 let field = self.field(&member.value, &format!("prop {:?}", member.key), true);
+                // `children` is the content a caller writes inside the component: a snippet with no
+                // parameters.
+                if member.key == "children" {
+                    if let Some(field) = &field {
+                        let inner = match &field.ty {
+                            Type::Optional(inner) => inner.as_ref(),
+                            other => other,
+                        };
+                        if !matches!(inner, Type::Snippet(params) if params.is_empty()) {
+                            self.error(
+                                DiagnosticCode::MANIFEST_CHILDREN_NOT_SNIPPET,
+                                member.key_span,
+                                "the prop `children` is the content written inside the component, so its type must be a snippet with no parameters: { \"kind\": \"snippet\" }".to_string(),
+                            );
+                        }
+                    }
+                }
                 insert(&mut props, &member.key, field);
             }
         }
@@ -281,6 +301,7 @@ impl Validator {
             for member in self.names(json, "scope", "scope name", &owner, NameRule::Identifier) {
                 let key = DeclarationKey::Scope(name.to_string(), member.key.clone());
                 self.declare(key, member.key_span);
+                self.snippet_allowed = true;
                 let ty = self.ty(&member.value);
                 insert(&mut scope, &member.key, ty);
             }
@@ -369,7 +390,11 @@ impl Validator {
     fn field(&mut self, json: &Json, what: &str, is_prop: bool) -> Option<Field> {
         let optional: &[&str] = if is_prop { &["default"] } else { &[] };
         let properties = self.object(json, what, &["type", "required"], optional)?;
-        let ty = properties.get("type").and_then(|json| self.ty(json));
+        let ty = properties.get("type").and_then(|json| {
+            // A prop may be a snippet; a record's field may not.
+            self.snippet_allowed = is_prop;
+            self.ty(json)
+        });
         let required = properties
             .get("required")
             .and_then(|json| match json.value {
@@ -444,6 +469,7 @@ impl Validator {
     /// A type. `in_optional` is whether an `optional` type directly wraps
     /// this one.
     fn ty_in(&mut self, json: &Json, in_optional: bool) -> Option<Type> {
+        let snippet_allowed = std::mem::take(&mut self.snippet_allowed);
         let Value::Object(members) = &json.value else {
             self.error(
                 DiagnosticCode::MANIFEST_INVALID_VALUE,
@@ -585,9 +611,42 @@ impl Validator {
                 }
                 Some(Type::Enum(values?))
             }
+            "snippet" => {
+                let properties = self.object(json, "a snippet type", &["kind"], &["params"])?;
+                if !snippet_allowed {
+                    self.error(
+                        DiagnosticCode::MANIFEST_SNIPPET_MISPLACED,
+                        kind.value.span,
+                        "a snippet type can only be the type of a component's prop or scope name: it is never stored, returned or sent, so it is not a record field, a list element, a named type, an event payload or a command parameter, and not a snippet's own parameter".to_string(),
+                    );
+                    return None;
+                }
+                let mut params = Some(Vec::new());
+                if let Some(list) = properties.get("params") {
+                    let Value::Array(items) = &list.value else {
+                        self.error(
+                            DiagnosticCode::MANIFEST_INVALID_VALUE,
+                            list.span,
+                            format!(
+                                "\"params\" must be an array of types, found {}",
+                                list.value.describe()
+                            ),
+                        );
+                        return None;
+                    };
+                    for item in items {
+                        match (self.ty(item), &mut params) {
+                            (Some(ty), Some(params)) => params.push(ty),
+                            _ => params = None,
+                        }
+                    }
+                }
+                Some(Type::Snippet(params?))
+            }
             "optional" => {
                 let properties = self.object(json, "an optional type", &["kind", "type"], &[])?;
                 let inner_json = properties.get("type")?;
+                self.snippet_allowed = snippet_allowed;
                 let inner = self.ty_in(inner_json, true)?;
                 if let Type::Optional(_) = inner {
                     self.error(
@@ -614,7 +673,7 @@ impl Validator {
                     kind.value.span,
                     format!(
                         "unknown type kind {kind_name:?}; expected string, number, boolean, \
-                         null, any, list, record, named, optional or enum"
+                         null, any, list, record, named, optional, enum or snippet"
                     ),
                 );
                 self.repeated_kinds(members);
@@ -1025,5 +1084,6 @@ fn describe(ty: &Type) -> &'static str {
         Type::List(_) => "a list",
         Type::Record(_) => "a record",
         Type::Enum(_) => "one of its strings",
+        Type::Snippet(_) => "a snippet, which has no constant",
     }
 }

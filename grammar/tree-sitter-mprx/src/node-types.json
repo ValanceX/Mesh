@@ -162,6 +162,14 @@
           "named": true
         },
         {
+          "type": "render_tag",
+          "named": true
+        },
+        {
+          "type": "snippet_block",
+          "named": true
+        },
+        {
           "type": "text",
           "named": true
         }
@@ -676,6 +684,32 @@
     }
   },
   {
+    "type": "render_tag",
+    "named": true,
+    "fields": {
+      "call": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "command_invocation",
+            "named": true
+          }
+        ]
+      },
+      "keyword": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "render_open",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "self_closing_element",
     "named": true,
     "fields": {
@@ -700,6 +734,56 @@
         },
         {
           "type": "event_binding",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "snippet_block",
+    "named": true,
+    "fields": {
+      "keyword": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "snippet_open",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "parameter": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "child",
+          "named": true
+        },
+        {
+          "type": "snippet_close",
           "named": true
         }
       ]
@@ -917,6 +1001,18 @@
   },
   {
     "type": "number_literal",
+    "named": true
+  },
+  {
+    "type": "render_open",
+    "named": true
+  },
+  {
+    "type": "snippet_close",
+    "named": true
+  },
+  {
+    "type": "snippet_open",
     "named": true
   },
   {

@@ -135,6 +135,14 @@ impl<'m> Digests<'m> {
                     string(&mut hash, value);
                 }
             }
+            // An ordered list of parameter types: `snippet<A, B>` and `snippet<B, A>` differ.
+            Type::Snippet(params) => {
+                hash.update([0x0a]);
+                count(&mut hash, params.len());
+                for param in params {
+                    hash.update(self.ty(param));
+                }
+            }
             Type::Record(fields) => {
                 hash.update([0x08]);
                 count(&mut hash, fields.len());

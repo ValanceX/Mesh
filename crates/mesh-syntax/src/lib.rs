@@ -104,8 +104,23 @@ impl DiagnosticCode {
     pub const REDUNDANT_PRESENCE_TEST: DiagnosticCode = DiagnosticCode("redundant-presence-test");
     /// `x ?? y` where `x` cannot be absent, so `y` is never used.
     pub const REDUNDANT_DEFAULT: DiagnosticCode = DiagnosticCode("redundant-default");
+    /// `{@render name(…)}` where no snippet is called `name`.
+    pub const UNKNOWN_SNIPPET: DiagnosticCode = DiagnosticCode("unknown-snippet");
+    /// A render with a different number of arguments than the snippet has parameters, or a snippet
+    /// passed as a prop written with a different number of parameters than the prop's type has.
+    pub const SNIPPET_ARITY_MISMATCH: DiagnosticCode = DiagnosticCode("snippet-arity-mismatch");
+    /// Two snippets with one name among the same children.
+    pub const DUPLICATE_SNIPPET: DiagnosticCode = DiagnosticCode("duplicate-snippet");
+    /// `children={…}` together with content between the tags of the component.
+    pub const CHILDREN_CONFLICT: DiagnosticCode = DiagnosticCode("children-conflict");
     /// A manifest `enum` with more than `mesh_manifest::MAX_ENUM_VALUES` values.
     pub const MANIFEST_ENUM_TOO_LARGE: DiagnosticCode = DiagnosticCode("manifest-enum-too-large");
+    /// A manifest `snippet` type somewhere but a component's prop or scope name.
+    pub const MANIFEST_SNIPPET_MISPLACED: DiagnosticCode =
+        DiagnosticCode("manifest-snippet-misplaced");
+    /// A manifest prop named `children` that is not a `snippet` with no parameters.
+    pub const MANIFEST_CHILDREN_NOT_SNIPPET: DiagnosticCode =
+        DiagnosticCode("manifest-children-not-snippet");
     /// A manifest `enum` that lists a value twice.
     pub const MANIFEST_DUPLICATE_VARIANT: DiagnosticCode =
         DiagnosticCode("manifest-duplicate-variant");
@@ -236,6 +251,8 @@ impl DiagnosticCode {
         DiagnosticCode::MANIFEST_NESTED_OPTIONAL,
         DiagnosticCode::MANIFEST_ENUM_TOO_LARGE,
         DiagnosticCode::MANIFEST_DUPLICATE_VARIANT,
+        DiagnosticCode::MANIFEST_SNIPPET_MISPLACED,
+        DiagnosticCode::MANIFEST_CHILDREN_NOT_SNIPPET,
         DiagnosticCode::MANIFEST_MISSING_COMPONENT,
         DiagnosticCode::UNKNOWN_COMPONENT,
         DiagnosticCode::UNKNOWN_PROP,
@@ -267,6 +284,10 @@ impl DiagnosticCode {
         DiagnosticCode::UNKNOWN_VARIANT,
         DiagnosticCode::REDUNDANT_PRESENCE_TEST,
         DiagnosticCode::REDUNDANT_DEFAULT,
+        DiagnosticCode::UNKNOWN_SNIPPET,
+        DiagnosticCode::SNIPPET_ARITY_MISMATCH,
+        DiagnosticCode::DUPLICATE_SNIPPET,
+        DiagnosticCode::CHILDREN_CONFLICT,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -578,6 +599,10 @@ pub enum Child {
 pub enum Block {
     If(IfBlock),
     Each(EachBlock),
+    /// `{#snippet name(a, b)} … {/snippet}`: declares a snippet.
+    Snippet(SnippetBlock),
+    /// `{@render name(args)}`: renders one.
+    Render(RenderTag),
 }
 
 impl Block {
@@ -586,6 +611,8 @@ impl Block {
         match self {
             Block::If(block) => block.span,
             Block::Each(block) => block.span,
+            Block::Snippet(block) => block.span,
+            Block::Render(tag) => tag.span,
         }
     }
 }
@@ -634,6 +661,40 @@ pub struct EachBlock {
     pub key: Option<Expression>,
     pub children: Vec<Child>,
     /// From `{#each` to `{/each}`.
+    pub span: Span,
+}
+
+/// `{#snippet name(a, b)} … {/snippet}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnippetBlock {
+    /// The keyword as written: `{#snippet`.
+    pub keyword_span: Span,
+    pub name: String,
+    pub name_span: Span,
+    /// The parameters, in order, each a name that the body can read.
+    pub parameters: Vec<Parameter>,
+    pub children: Vec<Child>,
+    /// From `{#snippet` to `{/snippet}`.
+    pub span: Span,
+}
+
+/// A snippet's parameter: a name, bound to the argument of each render.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Parameter {
+    pub name: String,
+    pub span: Span,
+}
+
+/// `{@render name(args)}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderTag {
+    /// The keyword as written: `{@render`.
+    pub keyword_span: Span,
+    /// The snippet's name.
+    pub name: String,
+    pub name_span: Span,
+    pub arguments: Vec<Expression>,
+    /// From `{@render` to `}`.
     pub span: Span,
 }
 
@@ -1102,6 +1163,8 @@ mod tests {
                 "manifest-nested-optional",
                 "manifest-enum-too-large",
                 "manifest-duplicate-variant",
+                "manifest-snippet-misplaced",
+                "manifest-children-not-snippet",
                 "manifest-missing-component",
                 "unknown-component",
                 "unknown-prop",
@@ -1133,6 +1196,10 @@ mod tests {
                 "unknown-variant",
                 "redundant-presence-test",
                 "redundant-default",
+                "unknown-snippet",
+                "snippet-arity-mismatch",
+                "duplicate-snippet",
+                "children-conflict",
             ]
         );
     }

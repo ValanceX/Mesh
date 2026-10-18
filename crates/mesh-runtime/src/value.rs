@@ -306,6 +306,28 @@ pub(crate) enum Value {
     String(Rc<str>),
     List(Rc<[Value]>),
     Record(Rc<BTreeMap<String, Value>>),
+    /// A piece of template and the scope it was declared in. Second-class: it is only ever bound to a
+    /// composite's scope name or a local name, and read to be rendered or passed along; it is never
+    /// in a snapshot, an event payload, a record, a list, a prop of a primitive or an output.
+    Snippet(Rc<SnippetValue>),
+}
+
+/// A snippet: which declaration it is, and the scope it reads. The declaration is found again in the
+/// template when it is rendered (by the component and the declaration's place among the template's),
+/// so a value holds no reference into the program.
+#[derive(Debug)]
+pub(crate) struct SnippetValue {
+    /// The component whose template declares it: the scope of its commands and events.
+    pub component: String,
+    /// The declaration's place among the elements of that template, in document order (for
+    /// children passed as `children`, the occurrence's).
+    pub element: usize,
+    /// The scope at the declaration, without the local snippets of the element it is declared in
+    /// (they are added again when it is entered, so a snippet can render itself and its siblings).
+    pub base: Rc<BTreeMap<String, Value>>,
+    /// How many composite occurrences were being rendered around the declaration: the ones a slot
+    /// or a forwarded event in its body belongs to.
+    pub frames: usize,
 }
 
 impl Value {
@@ -367,6 +389,8 @@ impl Value {
                         && a.iter()
                             .all(|(name, a)| b.get(name).is_some_and(|b| a.identical(b))))
             }
+            // A snippet is made afresh by each render, so it is never "as it was".
+            (Value::Snippet(a), Value::Snippet(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
     }
@@ -381,6 +405,7 @@ impl Value {
             Value::String(_) => "a string",
             Value::List(_) => "a list",
             Value::Record(_) => "a record",
+            Value::Snippet(_) => "a snippet",
         }
     }
 }

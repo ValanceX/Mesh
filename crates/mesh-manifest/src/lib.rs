@@ -63,6 +63,11 @@ pub enum Type {
     /// [`MAX_ENUM_VALUES`], in the order the manifest wrote them (the order
     /// is for messages; as a type, an enum is the set).
     Enum(Vec<String>),
+    /// `snippet<A, B>`: a piece of template with these ordered parameters, which a composite's
+    /// prop or scope name may be and nothing else (never a primitive's prop, a record field, a
+    /// list element, a named type, an event payload or a command parameter). A prop named
+    /// `children` is `snippet<>`.
+    Snippet(Vec<Type>),
 }
 
 /// A constant written in a manifest where a value of some type is needed:
@@ -229,7 +234,13 @@ pub struct Manifest {
 /// blocks: the conditional and the repeat a block lowers to, and the fragment that wraps a branch or body
 /// that is not exactly one element. A manifest need not declare them (docs/MPRX-SPEC.md, "Blocks"); one
 /// that does is used as declared.
-pub const BUILT_IN_COMPONENTS: [&str; 3] = ["mesh-if", "mesh-each", "mesh-fragment"];
+pub const BUILT_IN_COMPONENTS: [&str; 5] = [
+    "mesh-if",
+    "mesh-each",
+    "mesh-fragment",
+    "mesh-snippet",
+    "mesh-render",
+];
 
 /// The components a block can lower to, for analysis: [`BUILT_IN_COMPONENTS`] and the choice among branches
 /// (`mesh-switch`, `mesh-case`, `mesh-default`), which a template never names (it is emitted as conditionals)
@@ -273,6 +284,20 @@ fn built_in_components() -> &'static BTreeMap<String, Component> {
                 ]),
             ),
             ("mesh-fragment".to_string(), component(Vec::new())),
+            (
+                "mesh-snippet".to_string(),
+                component(vec![
+                    ("name", required(Type::String)),
+                    ("params", required(Type::Any)),
+                ]),
+            ),
+            (
+                "mesh-render".to_string(),
+                component(vec![
+                    ("name", required(Type::String)),
+                    ("arguments", required(Type::Any)),
+                ]),
+            ),
             ("mesh-switch".to_string(), component(Vec::new())),
             (
                 "mesh-case".to_string(),

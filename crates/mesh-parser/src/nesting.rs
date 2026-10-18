@@ -57,7 +57,7 @@ pub(crate) fn check(root: Node) -> Option<ParseError> {
 fn levels(node: Node) -> usize {
     match node.kind() {
         "element" | "expression" | "member_access" => 1,
-        "if_block" | "each_block" => 3,
+        "if_block" | "each_block" | "snippet_block" => 3,
         _ => 0,
     }
 }
@@ -66,7 +66,7 @@ fn levels(node: Node) -> usize {
 /// since the whole element can span many lines, and an expression as a
 /// whole.
 pub(crate) fn level_span(node: Node) -> Span {
-    if matches!(node.kind(), "if_block" | "each_block") {
+    if matches!(node.kind(), "if_block" | "each_block" | "snippet_block") {
         return node
             .child_by_field_name("keyword")
             .map_or_else(|| span_of(node), span_of);

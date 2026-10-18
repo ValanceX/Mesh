@@ -95,3 +95,130 @@ fn blocks_nest_and_hold_text_and_expressions() {
         .iter()
         .any(|child| matches!(child, Child::Block(inner) if matches!(**inner, Block::If(_)))));
 }
+
+#[test]
+fn a_snippet_has_its_name_its_parameters_and_its_body() {
+    let source = "<a>{#snippet row(p, q)}<b />text{/snippet}</a>";
+    let Block::Snippet(found) = block(source) else {
+        panic!("a snippet")
+    };
+
+    assert_eq!(found.name, "row");
+    assert_eq!(
+        found
+            .parameters
+            .iter()
+            .map(|parameter| parameter.name.as_str())
+            .collect::<Vec<_>>(),
+        ["p", "q"]
+    );
+    assert_eq!(
+        &source[found.parameters[1].span.start_byte..found.parameters[1].span.end_byte],
+        "q"
+    );
+    assert_eq!(
+        &source[found.keyword_span.start_byte..found.keyword_span.end_byte],
+        "{#snippet"
+    );
+    assert_eq!(found.children.len(), 2);
+    assert_eq!(
+        &source[found.span.start_byte..found.span.end_byte],
+        "{#snippet row(p, q)}<b />text{/snippet}"
+    );
+}
+
+#[test]
+fn a_snippet_may_have_no_parameters_and_no_body() {
+    let Block::Snippet(found) = block("<a>{#snippet empty()}{/snippet}</a>") else {
+        panic!("a snippet")
+    };
+
+    assert!(found.parameters.is_empty());
+    assert!(found.children.is_empty());
+}
+
+#[test]
+fn a_render_tag_has_the_snippet_name_and_its_arguments() {
+    let source = "<a>{@render row(item, 1 + 2)}</a>";
+    let Block::Render(found) = block(source) else {
+        panic!("a render tag")
+    };
+
+    assert_eq!(found.name, "row");
+    assert_eq!(
+        &source[found.name_span.start_byte..found.name_span.end_byte],
+        "row"
+    );
+    assert_eq!(found.arguments.len(), 2);
+    assert!(matches!(&found.arguments[0], Expression::Reference(r) if r.name == "item"));
+    assert_eq!(
+        &source[found.span.start_byte..found.span.end_byte],
+        "{@render row(item, 1 + 2)}"
+    );
+}
+
+#[test]
+fn snippets_nest_in_blocks_and_in_each_other() {
+    let source = "<a>{#snippet outer(x)}{#snippet inner(y)}{@render inner(x)}{/snippet}{@render inner(x)}{/snippet}</a>";
+    let Block::Snippet(outer) = block(source) else {
+        panic!("a snippet")
+    };
+
+    assert!(outer
+        .children
+        .iter()
+        .any(|child| matches!(child, Child::Block(inner) if matches!(**inner, Block::Snippet(_)))));
+    assert!(outer
+        .children
+        .iter()
+        .any(|child| matches!(child, Child::Block(inner) if matches!(**inner, Block::Render(_)))));
+}
+
+#[test]
+fn a_snippet_that_is_never_closed_is_reported_where_it_opens() {
+    let source = "<a>{#snippet row(p)}<b /></a>";
+    let result = parse(source);
+
+    assert!(result.ast.is_none());
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|error| error.message.contains("`{#snippet}` is never closed")),
+        "{:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn malformed_snippets_and_render_tags_say_what_to_write() {
+    for (source, expected) in [
+        (
+            "<a>{#snippet row}<b />{/snippet}</a>",
+            "write `{#snippet name(parameters)}`",
+        ),
+        ("<a>{#snippet (p)}<b />{/snippet}</a>", "it has no name"),
+        (
+            "<a>{#snippet row(1)}<b />{/snippet}</a>",
+            "each parameter is a name",
+        ),
+        ("<a>{@render row}</a>", "write `{@render name(arguments)}`"),
+        ("<a>{@show row()}</a>", "unknown tag `{@show`"),
+        (
+            "<a>{/snippet}</a>",
+            "`{/snippet}` with no open `{#snippet}`",
+        ),
+    ] {
+        let result = parse(source);
+
+        assert!(result.ast.is_none(), "{source}");
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|error| error.message.contains(expected)),
+            "{source}: {:?}",
+            result.errors
+        );
+    }
+}

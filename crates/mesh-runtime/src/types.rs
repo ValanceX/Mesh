@@ -18,6 +18,7 @@ pub(crate) fn fits(manifest: &Manifest, value: &Value, ty: &Type) -> bool {
         | (Type::Boolean, Value::Boolean(_))
         | (Type::Null, Value::Null) => true,
         (Type::Enum(values), Value::String(text)) => values.iter().any(|v| v.as_str() == &**text),
+        (Type::Snippet(_), Value::Snippet(_)) => true,
         (Type::List(element), Value::List(items)) => {
             items.iter().all(|item| fits(manifest, item, element))
         }

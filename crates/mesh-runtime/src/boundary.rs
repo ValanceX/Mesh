@@ -60,6 +60,7 @@ fn expected(ty: &Type) -> &'static str {
         Type::Boolean => "a boolean",
         Type::Null => "null",
         Type::Enum(_) => "one of its variants",
+        Type::Snippet(_) => "a snippet",
         Type::List(_) => "a list",
         Type::Record(_) => "a record",
         Type::Any | Type::Named(_) | Type::Optional(_) => "a value",
@@ -365,6 +366,13 @@ pub(crate) fn output(value: &Value) -> Result<serde_json::Value, NotOutput> {
                 .map(|(name, value)| Ok((name.clone(), output(value)?)))
                 .collect::<Result<_, NotOutput>>()?,
         ),
+        // Assembly refuses a snippet for a primitive's prop, so none reaches here.
+        Value::Snippet(_) => {
+            return Err(NotOutput {
+                code: RuntimeCode::PROP_MISMATCH,
+                message: "a snippet can't leave the runtime".into(),
+            })
+        }
     })
 }
 

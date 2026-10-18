@@ -1,0 +1,248 @@
+{
+  "$schema": "../../../schemas/manifest-v1.schema.json",
+  "version": 1,
+  "types": {
+    "Person": {
+      "kind": "record",
+      "fields": {
+        "id": {
+          "type": {
+            "kind": "number"
+          },
+          "required": true
+        },
+        "name": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      }
+    }
+  },
+  "components": {
+    "page": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "text": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "list": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "row": {
+      "props": {
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      },
+      "events": {
+        "press": {}
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "item": {
+      "props": {
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "data-list": {
+      "props": {
+        "items": {
+          "type": {
+            "kind": "list",
+            "element": {
+              "kind": "named",
+              "name": "Person"
+            }
+          },
+          "required": true
+        },
+        "row": {
+          "type": {
+            "kind": "snippet",
+            "params": [
+              {
+                "kind": "named",
+                "name": "Person"
+              }
+            ]
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "items": {
+          "kind": "list",
+          "element": {
+            "kind": "named",
+            "name": "Person"
+          }
+        },
+        "row": {
+          "kind": "snippet",
+          "params": [
+            {
+              "kind": "named",
+              "name": "Person"
+            }
+          ]
+        }
+      }
+    },
+    "card": {
+      "props": {
+        "title": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "children": {
+          "type": {
+            "kind": "snippet",
+            "params": []
+          },
+          "required": true
+        },
+        "footer": {
+          "type": {
+            "kind": "optional",
+            "type": {
+              "kind": "snippet",
+              "params": []
+            }
+          },
+          "required": false
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "title": {
+          "kind": "string"
+        },
+        "children": {
+          "kind": "snippet",
+          "params": []
+        },
+        "footer": {
+          "kind": "optional",
+          "type": {
+            "kind": "snippet",
+            "params": []
+          }
+        }
+      }
+    },
+    "screen": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "select": {
+          "parameters": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "number"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "people": {
+          "kind": "list",
+          "element": {
+            "kind": "named",
+            "name": "Person"
+          }
+        },
+        "tree": {
+          "kind": "any"
+        },
+        "title": {
+          "kind": "string"
+        },
+        "subtitle": {
+          "kind": "string"
+        }
+      }
+    },
+    "box": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "shell": {
+      "props": {
+        "items": {
+          "type": {
+            "kind": "list",
+            "element": {
+              "kind": "named",
+              "name": "Person"
+            }
+          },
+          "required": true
+        },
+        "row": {
+          "type": {
+            "kind": "snippet",
+            "params": [
+              {
+                "kind": "named",
+                "name": "Person"
+              }
+            ]
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "items": {
+          "kind": "list",
+          "element": {
+            "kind": "named",
+            "name": "Person"
+          }
+        },
+        "row": {
+          "kind": "snippet",
+          "params": [
+            {
+              "kind": "named",
+              "name": "Person"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

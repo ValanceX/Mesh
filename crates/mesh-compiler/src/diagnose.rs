@@ -190,6 +190,9 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
                 Combination::Elements => format!(
                     "this element doesn't fit with the ones before it: {left} and {right} have no common type"
                 ),
+                Combination::SnippetArgument => format!(
+                    "the renders of this snippet give this parameter {left} at one and {right} at another, which have no common type"
+                ),
                 Combination::Default => format!(
                     "`??` falls back from {left} to {right}, which have no common type"
                 ),
@@ -252,9 +255,45 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
             format!("`has` takes one argument, found {found}"),
             Vec::new(),
         ),
+        Fact::UnknownSnippet {
+            name,
+            span,
+            candidates,
+        } => (
+            DiagnosticCode::UNKNOWN_SNIPPET,
+            format!(
+                "unknown snippet {name:?}: it is neither declared among the children it is in or around, nor a snippet of this component"
+            ),
+            suggest(name, candidates, *span, ""),
+        ),
+        Fact::SnippetArity {
+            name,
+            expected,
+            found,
+            ..
+        } => (
+            DiagnosticCode::SNIPPET_ARITY_MISMATCH,
+            format!(
+                "the snippet {name:?} takes {expected} {}, found {found}",
+                if *expected == 1 { "parameter" } else { "parameters" }
+            ),
+            Vec::new(),
+        ),
+        Fact::DuplicateSnippet { name, .. } => (
+            DiagnosticCode::DUPLICATE_SNIPPET,
+            format!("a second snippet named {name:?} among the same children"),
+            Vec::new(),
+        ),
+        Fact::ChildrenConflict { component, .. } => (
+            DiagnosticCode::CHILDREN_CONFLICT,
+            format!(
+                "{component:?} gets its `children` twice: as an attribute and as the content between its tags; write one"
+            ),
+            Vec::new(),
+        ),
         Fact::ContentNotText { ty, .. } => (
             DiagnosticCode::CONTENT_NOT_TEXT,
-            format!("a value of type {ty} can't be shown as text: interpolate one of its fields, or a string, number, boolean or null"),
+            format!("a value of type {ty} can't be shown as text: interpolate one of its fields, or a string, number, boolean or null (a snippet is rendered with `{{@render}}`)"),
             Vec::new(),
         ),
     };
@@ -298,6 +337,9 @@ fn expecting(expectation: &Expectation) -> String {
             format!("the argument {parameter:?} of command {command:?}")
         }
         Expectation::Field { field } => format!("the field {field:?}"),
+        Expectation::SnippetArgument { snippet, index } => {
+            format!("argument {} of the snippet {snippet:?}", index + 1)
+        }
         Expectation::Element => "the list element".to_string(),
         Expectation::RepeatKey => "the key of `{#each}`".to_string(),
         Expectation::Block(BlockPart::IfCondition) => "the condition of `{#if}`".to_string(),

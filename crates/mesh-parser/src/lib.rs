@@ -8,8 +8,8 @@ use mesh_syntax::{
     ArrayExpression, Attribute, AttributeValue, BinaryExpression, BinaryOperator, Block,
     BooleanLiteral, Child, CommandInvocation, ConditionalExpression, DiagnosticCode, EachBlock,
     Element, ElseBranch, EventBinding, EventValue, Expression, IfBlock, IfBranch, Literal,
-    MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember, Reference,
-    Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
+    MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember, Parameter,
+    Reference, RenderTag, SnippetBlock, Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
 };
 use tree_sitter::Node;
 
@@ -203,6 +203,10 @@ fn lower_child(node: Node, source: &str) -> Child {
         ))),
         "if_block" => Child::Block(Box::new(Block::If(lower_if_block(inner, source)))),
         "each_block" => Child::Block(Box::new(Block::Each(lower_each_block(inner, source)))),
+        "snippet_block" => {
+            Child::Block(Box::new(Block::Snippet(lower_snippet_block(inner, source))))
+        }
+        "render_tag" => Child::Block(Box::new(Block::Render(lower_render_tag(inner, source)))),
         other => {
             unreachable!("unexpected child node kind {other:?} inside a successfully-parsed tree")
         }
@@ -332,6 +336,64 @@ fn lower_each_block(node: Node, source: &str) -> EachBlock {
         key,
         children: lower_children(node, source),
         span: span_of(node),
+    }
+}
+
+fn lower_snippet_block(node: Node, source: &str) -> SnippetBlock {
+    let keyword = node
+        .child_by_field_name("keyword")
+        .map(span_of)
+        .unwrap_or(Span {
+            start_byte: node.start_byte(),
+            end_byte: node.start_byte(),
+        });
+    let (name, name_span) = field_text(node, "name", source);
+    let mut cursor = node.walk();
+    let parameters = node
+        .children_by_field_name("parameter", &mut cursor)
+        .map(|parameter| Parameter {
+            name: text_of(parameter, source),
+            span: span_of(parameter),
+        })
+        .collect();
+
+    SnippetBlock {
+        keyword_span: keyword,
+        name,
+        name_span,
+        parameters,
+        children: lower_children(node, source),
+        span: span_of(node),
+    }
+}
+
+fn lower_render_tag(node: Node, source: &str) -> RenderTag {
+    let keyword = node
+        .child_by_field_name("keyword")
+        .map(span_of)
+        .unwrap_or(Span {
+            start_byte: node.start_byte(),
+            end_byte: node.start_byte(),
+        });
+    let call = node
+        .child_by_field_name("call")
+        .map(|call| lower_command_invocation(call, source));
+
+    match call {
+        Some(call) => RenderTag {
+            keyword_span: keyword,
+            name: call.command,
+            name_span: call.command_span,
+            arguments: call.arguments,
+            span: span_of(node),
+        },
+        None => RenderTag {
+            keyword_span: keyword,
+            name: String::new(),
+            name_span: keyword,
+            arguments: Vec::new(),
+            span: span_of(node),
+        },
     }
 }
 

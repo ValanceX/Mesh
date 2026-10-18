@@ -191,7 +191,7 @@ fn walk_children<'v>(
             // A repeat's sites are per item, and an item's key needs values:
             // the walk has none. `dispatch_from` takes a render's record for
             // a program that has one.
-            RenderChild::Repeat(_) | RenderChild::Run(_) => {}
+            RenderChild::Repeat(_) | RenderChild::Run(_) | RenderChild::Render(_) => {}
         }
     }
 }
@@ -258,7 +258,7 @@ pub fn dispatch_from(
     // are is the snapshot's to say (spec §9.10.7): its handlers are the
     // render's, with the scope each had. Without one, they are a function of
     // the program, found without values.
-    let repeats = uses_repeat(&valid.templates);
+    let repeats = uses_repeat(&valid.templates) || program::uses_snippets(&valid.templates);
     let recorded;
     let sites;
     let site = if repeats {

@@ -47,6 +47,13 @@ pub enum Construct {
     Each,
     /// The `mesh-fragment` that wraps a branch or body that is not exactly one element.
     Fragment,
+    /// `{#snippet name(params)} … {/snippet}`: the declaration `mesh-snippet`. Its `name` is a
+    /// string attribute, its `params` an array of string literals, and its children the body, as
+    /// written.
+    Snippet,
+    /// `{@render name(args)}`: `mesh-render`, whose `name` is a string attribute and whose
+    /// `arguments` is an array of the argument expressions.
+    Render,
 }
 
 /// The Semantic IR form of an [`mesh_syntax::Attribute`].
@@ -517,6 +524,8 @@ pub fn retired_block(tag: &str) -> Option<&'static str> {
         "mesh-switch" => Some("a chain of branches: `{#if a} … {:else if b} … {:else} … {/if}`"),
         "mesh-case" => Some("a branch: `{#if a} … {:else if b} … {/if}`"),
         "mesh-default" => Some("the last branch: `{:else} …` inside `{#if} … {/if}`"),
+        "mesh-snippet" => Some("a snippet: `{#snippet name(parameters)} … {/snippet}`"),
+        "mesh-render" => Some("a render tag: `{@render name(arguments)}`"),
         _ => None,
     }
 }
@@ -527,6 +536,8 @@ const CASE: &str = "mesh-case";
 const DEFAULT: &str = "mesh-default";
 const REPEAT: &str = "mesh-each";
 const FRAGMENT: &str = "mesh-fragment";
+const SNIPPET: &str = "mesh-snippet";
+const RENDER: &str = "mesh-render";
 
 fn construct_element(
     name: &str,
@@ -676,6 +687,95 @@ fn lower_block(block: &mesh_syntax::Block) -> (Element, Vec<mesh_syntax::Diagnos
                     Vec::new(),
                     cases,
                     block.span,
+                ),
+                diagnostics,
+            )
+        }
+        mesh_syntax::Block::Snippet(block) => {
+            let attributes = vec![
+                Attribute {
+                    name: "name".to_string(),
+                    name_span: block.keyword_span,
+                    span: block.name_span,
+                    value: AttributeValue::String {
+                        value: block.name.clone(),
+                        span: block.name_span,
+                    },
+                },
+                Attribute {
+                    name: "params".to_string(),
+                    name_span: block.keyword_span,
+                    span: block.name_span,
+                    value: AttributeValue::Expression(Expression::Array {
+                        elements: block
+                            .parameters
+                            .iter()
+                            .map(|parameter| Expression::Literal {
+                                value: Literal::String(parameter.name.clone()),
+                                span: parameter.span,
+                            })
+                            .collect(),
+                        span: block.name_span,
+                    }),
+                },
+            ];
+            let mut children = Vec::new();
+            for (child, found) in block.children.iter().map(lower_child) {
+                diagnostics.extend(found);
+                if let Some(child) = child {
+                    if let Child::Expression(expression) = &child {
+                        out_of_range_literals(expression, &mut diagnostics);
+                    }
+                    children.push(child);
+                }
+            }
+
+            (
+                construct_element(
+                    SNIPPET,
+                    Construct::Snippet,
+                    block.keyword_span,
+                    attributes,
+                    children,
+                    block.span,
+                ),
+                diagnostics,
+            )
+        }
+        mesh_syntax::Block::Render(tag) => {
+            let arguments: Vec<Expression> = tag.arguments.iter().map(lower_expression).collect();
+            for argument in &arguments {
+                out_of_range_literals(argument, &mut diagnostics);
+            }
+            let attributes = vec![
+                Attribute {
+                    name: "name".to_string(),
+                    name_span: tag.keyword_span,
+                    span: tag.name_span,
+                    value: AttributeValue::String {
+                        value: tag.name.clone(),
+                        span: tag.name_span,
+                    },
+                },
+                Attribute {
+                    name: "arguments".to_string(),
+                    name_span: tag.keyword_span,
+                    span: tag.span,
+                    value: AttributeValue::Expression(Expression::Array {
+                        elements: arguments,
+                        span: tag.span,
+                    }),
+                },
+            ];
+
+            (
+                construct_element(
+                    RENDER,
+                    Construct::Render,
+                    tag.keyword_span,
+                    attributes,
+                    Vec::new(),
+                    tag.span,
                 ),
                 diagnostics,
             )

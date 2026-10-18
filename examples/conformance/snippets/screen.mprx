@@ -1,0 +1,26 @@
+<page>
+  <data-list items={people}>
+    {#snippet row(p)}<row label={p.name} on.press={select(p.id)} />{/snippet}
+  </data-list>
+  <shell items={people}>
+    {#snippet row(p)}<row label={p.name} on.press={select(p.id)} />{/snippet}
+  </shell>
+  <card title={title}>
+    <text>{title}</text>
+    {#snippet footer()}<text>footer</text>{/snippet}
+  </card>
+  <card title="Fixed"><text>{subtitle}</text></card>
+  {#snippet label(text)}<item label={text} />{/snippet}
+  {@render label("first")}
+  {@render label("second")}
+  {#snippet branch(node)}
+    <item label={node.name}>
+      {#each node.children as child (child.id)}{@render branch(child)}{/each}
+    </item>
+  {/snippet}
+  {@render branch(tree)}
+  {#each people as person (person.id)}
+    {#snippet greeting()}<text>{person.name}</text>{/snippet}
+    {@render greeting()}
+  {/each}
+</page>
