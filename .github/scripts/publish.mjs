@@ -1,4 +1,4 @@
-// Publishes the eight packed npm packages of a MESH release (outline v0.4
+// Publishes the nine packed npm packages of a MESH release (outline v0.4
 // D10, and v0.5), from the tarballs the release workflow built on its runners.
 //
 //   node .github/scripts/publish.mjs <tarball-dir> [--publish]
@@ -57,6 +57,8 @@ const PACKAGES = [
   "mesh-lsp",
   "mesh-compiler",
   "mesh-runtime",
+  // The conformance vectors, as data: the renderers' test dependency (`@valancex/mesh-conformance`).
+  "mesh-conformance",
 ];
 
 const tarballs = PACKAGES.map((name) => {
