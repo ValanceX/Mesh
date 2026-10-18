@@ -6,6 +6,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 Defects and limits (direction work package 0). In the free window: each break names its replacement in a diagnostic.
 
+### Changed
+
+- **The compiler's WebAssembly is optimized after linking** with binaryen's `wasm-opt -Oz` with inlining off (`@valancex/mesh-compiler`'s `build:wasm`; `binaryen` 132.0.0 is a development dependency, and `MESH_NO_WASM_OPT=1` skips it): 989,551 bytes become 735,048, and the gzipped 320,778 become 301,420 (the size budget stays 330,000). Every test passes on the optimized module, and the replay hashes are unchanged. With inlining on, the file is smaller still and its gzip is larger, which is why it is off.
+
 ### Added
 
 - **`runtime-nesting-too-deep`.** A render nests at most 512 levels (an element, a composite's expansion, a fragment, a slot or a repeated item is one each). About 680 nested composites used to crash the WebAssembly runtime with `MeshInternalError`; now it is a diagnostic and nothing is rendered. Not host-configurable.

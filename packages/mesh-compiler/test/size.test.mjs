@@ -5,6 +5,8 @@
 // more (321,522). The module has no dominant part to trim: the largest
 // function is the parser's, at 18 KB raw of 987 KB, and the profile already
 // uses opt-level z, lto and strip. The next raise needs a reason of the same kind.
+// The build then runs binaryen's wasm-opt (-Oz, inlining off; scripts/build-wasm.mjs): the same
+// module went from 989,551 bytes (320,778 gzipped) to 735,048 (301,420), with the budget unchanged.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
