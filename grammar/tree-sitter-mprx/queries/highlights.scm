@@ -74,5 +74,5 @@
 
 (unary_expression operator: ["!" "-"] @operator)
 (binary_expression
-  operator: ["*" "/" "%" "+" "-" "<" "<=" ">" ">=" "==" "!=" "&&" "||"] @operator)
+  operator: ["*" "/" "%" "+" "-" "<" "<=" ">" ">=" "==" "!=" "&&" "||" "??"] @operator)
 (conditional_expression ["?" ":"] @operator)

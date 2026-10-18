@@ -97,6 +97,18 @@ impl DiagnosticCode {
     pub const TOO_MANY_ELEMENTS: DiagnosticCode = DiagnosticCode("too-many-elements");
     /// More than `mesh_parser::MAX_ATTRIBUTES` attributes on one element.
     pub const TOO_MANY_ATTRIBUTES: DiagnosticCode = DiagnosticCode("too-many-attributes");
+    /// A string literal that is not one of the values of the `enum` type
+    /// expected where it is written.
+    pub const UNKNOWN_VARIANT: DiagnosticCode = DiagnosticCode("unknown-variant");
+    /// `has(x)` where `x` cannot be absent, so the test is always true.
+    pub const REDUNDANT_PRESENCE_TEST: DiagnosticCode = DiagnosticCode("redundant-presence-test");
+    /// `x ?? y` where `x` cannot be absent, so `y` is never used.
+    pub const REDUNDANT_DEFAULT: DiagnosticCode = DiagnosticCode("redundant-default");
+    /// A manifest `enum` with more than `mesh_manifest::MAX_ENUM_VALUES` values.
+    pub const MANIFEST_ENUM_TOO_LARGE: DiagnosticCode = DiagnosticCode("manifest-enum-too-large");
+    /// A manifest `enum` that lists a value twice.
+    pub const MANIFEST_DUPLICATE_VARIANT: DiagnosticCode =
+        DiagnosticCode("manifest-duplicate-variant");
     /// A component manifest that isn't valid JSON.
     pub const MANIFEST_SYNTAX_ERROR: DiagnosticCode = DiagnosticCode("manifest-syntax-error");
     /// A component manifest whose arrays and objects nest more than
@@ -222,6 +234,8 @@ impl DiagnosticCode {
         DiagnosticCode::MANIFEST_UNKNOWN_TYPE,
         DiagnosticCode::MANIFEST_RECURSIVE_TYPE,
         DiagnosticCode::MANIFEST_NESTED_OPTIONAL,
+        DiagnosticCode::MANIFEST_ENUM_TOO_LARGE,
+        DiagnosticCode::MANIFEST_DUPLICATE_VARIANT,
         DiagnosticCode::MANIFEST_MISSING_COMPONENT,
         DiagnosticCode::UNKNOWN_COMPONENT,
         DiagnosticCode::UNKNOWN_PROP,
@@ -250,6 +264,9 @@ impl DiagnosticCode {
         DiagnosticCode::INPUT_TOO_LARGE,
         DiagnosticCode::TOO_MANY_ELEMENTS,
         DiagnosticCode::TOO_MANY_ATTRIBUTES,
+        DiagnosticCode::UNKNOWN_VARIANT,
+        DiagnosticCode::REDUNDANT_PRESENCE_TEST,
+        DiagnosticCode::REDUNDANT_DEFAULT,
     ];
 
     /// The code as a string, e.g. `"mismatched-closing-tag"`.
@@ -437,6 +454,8 @@ pub enum BinaryOperator {
     Ne,
     And,
     Or,
+    /// `x ?? y`: the value of `x` if it is present, otherwise `y`.
+    Coalesce,
 }
 
 /// A binary expression: an infix operator applied to a left and right
@@ -1081,6 +1100,8 @@ mod tests {
                 "manifest-unknown-type",
                 "manifest-recursive-type",
                 "manifest-nested-optional",
+                "manifest-enum-too-large",
+                "manifest-duplicate-variant",
                 "manifest-missing-component",
                 "unknown-component",
                 "unknown-prop",
@@ -1109,6 +1130,9 @@ mod tests {
                 "input-too-large",
                 "too-many-elements",
                 "too-many-attributes",
+                "unknown-variant",
+                "redundant-presence-test",
+                "redundant-default",
             ]
         );
     }

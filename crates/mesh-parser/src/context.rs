@@ -122,7 +122,7 @@ pub fn context_at(source: &str, offset: usize) -> Option<Completion> {
         // K7: a block's condition or list starts right after its opener.
         "if_open" | "each_open" | "else_if_open" => Some(Context::Value),
         "(" | "," | "[" | "?" | ":" | "!" | "-" | "+" | "*" | "/" | "%" | "<=" | ">=" | "=="
-        | "!=" | "&&" | "||" | ">" => value_after(p),
+        | "!=" | "&&" | "||" | "??" | ">" => value_after(p),
         _ => None,
     };
     // K4, where nothing above matched.

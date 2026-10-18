@@ -9,13 +9,14 @@
 
 const PREC = {
   CONDITIONAL: 1,
-  LOGICAL_OR: 2,
-  LOGICAL_AND: 3,
-  EQUALITY: 4,
-  RELATIONAL: 5,
-  ADDITIVE: 6,
-  MULTIPLICATIVE: 7,
-  UNARY: 8,
+  COALESCE: 2,
+  LOGICAL_OR: 3,
+  LOGICAL_AND: 4,
+  EQUALITY: 5,
+  RELATIONAL: 6,
+  ADDITIVE: 7,
+  MULTIPLICATIVE: 8,
+  UNARY: 9,
 };
 
 // `selfClosingElement` / `containerElement` are plain JS helper functions
@@ -230,6 +231,11 @@ module.exports = grammar({
       prec.left(PREC.LOGICAL_OR, seq(
         field('left', $.expression),
         field('operator', '||'),
+        field('right', $.expression),
+      )),
+      prec.left(PREC.COALESCE, seq(
+        field('left', $.expression),
+        field('operator', '??'),
         field('right', $.expression),
       )),
     ),

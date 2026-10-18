@@ -55,7 +55,10 @@ fn elements_are_counted_to_the_limit() {
     let at = siblings(MAX_ELEMENTS);
     assert!(codes(&at).is_empty(), "{:?}", codes(&at));
     let past = siblings(MAX_ELEMENTS + 1);
-    assert!(past.len() <= MAX_SOURCE_BYTES, "the count, not the size, is refused");
+    assert!(
+        past.len() <= MAX_SOURCE_BYTES,
+        "the count, not the size, is refused"
+    );
     let parsed = mesh_parser::parse(&past);
     assert_eq!(codes(&past), ["too-many-elements"]);
     assert_eq!(parsed.ast, None);
@@ -74,7 +77,11 @@ fn attributes_are_counted_per_element_to_the_limit() {
     let span = parsed.errors[0].span;
     assert_eq!(&past[span.start_byte..span.end_byte], "p64=\"x\"");
     // Each element has its own count.
-    let two = format!("<a>{}{}</a>", attributes(MAX_ATTRIBUTES), attributes(MAX_ATTRIBUTES));
+    let two = format!(
+        "<a>{}{}</a>",
+        attributes(MAX_ATTRIBUTES),
+        attributes(MAX_ATTRIBUTES)
+    );
     assert!(codes(&two).is_empty());
 }
 
@@ -87,7 +94,9 @@ fn event_bindings_count_as_attributes() {
 
 #[test]
 fn an_open_tag_with_content_counts_its_attributes_too() {
-    let list: Vec<String> = (0..=MAX_ATTRIBUTES).map(|i| format!("p{i}=\"x\"")).collect();
+    let list: Vec<String> = (0..=MAX_ATTRIBUTES)
+        .map(|i| format!("p{i}=\"x\""))
+        .collect();
     let source = format!("<card {}>x</card>", list.join(" "));
     assert_eq!(codes(&source), ["too-many-attributes"]);
 }

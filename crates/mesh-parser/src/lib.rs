@@ -530,6 +530,7 @@ fn lower_binary_operator(text: &str) -> BinaryOperator {
         "!=" => BinaryOperator::Ne,
         "&&" => BinaryOperator::And,
         "||" => BinaryOperator::Or,
+        "??" => BinaryOperator::Coalesce,
         other => unreachable!(
             "unexpected binary operator token {other:?} inside a successfully-parsed tree"
         ),
