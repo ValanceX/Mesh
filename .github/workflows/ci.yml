@@ -109,6 +109,10 @@ jobs:
           npm run build
           npm run typecheck
           npm test -w @valancex/mesh-lsp
+      # The conformance vectors' package holds exactly examples/conformance/ (data only).
+      - name: Conformance package
+        working-directory: packages/mesh-conformance
+        run: npm test
 
   # The compiler and the runtime in WebAssembly, and
   # @valancex/mesh-compiler and @valancex/mesh-runtime around them, on each

@@ -1,0 +1,35 @@
+{
+  "name": "@valancex/mesh-conformance",
+  "version": "0.13.0",
+  "description": "MESH's conformance vectors, as data: real programs with their expected render trees, event resolution, and node-identity cases. A renderer checks itself against them; it never copies them.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Jack Miller <jackmiller0899@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ValanceX/Mesh.git",
+    "directory": "packages/mesh-conformance"
+  },
+  "keywords": [
+    "mesh",
+    "mprx",
+    "valancex",
+    "conformance",
+    "test-vectors"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    "./*": "./conformance/*"
+  },
+  "files": [
+    "conformance/"
+  ],
+  "scripts": {
+    "prepack": "node scripts/prepack.mjs",
+    "test": "node --test --test-concurrency=1 \"test/*.test.mjs\""
+  }
+}
