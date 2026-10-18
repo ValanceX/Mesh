@@ -1,0 +1,10 @@
+<page title="x">
+  {#if has(maybeFooter)}{@render maybeFooter()}{/if}
+  {#if has(maybeRow) && count > 0}
+    {#each users as u (u.name)}{@render maybeRow(u)}{/each}
+  {:else}
+    <text>none</text>
+  {/if}
+  {#if has(maybeFooter)}{#if flag}<text>{count}</text>{@render maybeFooter()}{/if}{/if}
+  <panel title="t">{#if has(maybeFooter)}{@render maybeFooter()}{/if}</panel>
+</page>

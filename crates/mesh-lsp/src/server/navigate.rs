@@ -190,9 +190,17 @@ fn declaration(target: &Target, model: Model<'_>) -> Option<(String, Option<Stri
         }
         Target::Scope(name) => {
             let ty = Ty::from(components.get(model.component)?.scope.get(name)?);
+            let mut sentence = format!("In the scope of `{}`.", model.component);
+            match &ty {
+                Ty::Snippet(_) => sentence.push_str(&format!(" A snippet: render it with `{{@render {name}(…)}}`.")),
+                Ty::Optional(inner) if matches!(inner.as_ref(), Ty::Snippet(_)) => sentence.push_str(&format!(
+                    " An optional snippet: it may be absent, so render it inside `{{#if has({name})}}`."
+                )),
+                _ => {}
+            }
             (
                 with_definition(format!("{name}: {ty}"), &ty, manifest),
-                Some(format!("In the scope of `{}`.", model.component)),
+                Some(sentence),
             )
         }
         Target::Command(name) => {

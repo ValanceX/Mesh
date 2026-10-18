@@ -317,8 +317,11 @@ pub fn candidates(
                         || matches!(Ty::from(*ty), Ty::Optional(inner) if matches!(*inner, Ty::Snippet(_)))
                 })
                 .map(|(name, ty)| {
+                    // An optional snippet is shown as it is, and says what it needs.
                     let shown = match Ty::from(ty) {
-                        Ty::Optional(inner) => inner.to_string(),
+                        optional @ Ty::Optional(_) => {
+                            format!("{optional}, may be absent: render it inside {{#if has({name})}}")
+                        }
                         other => other.to_string(),
                     };
                     candidate(name.clone(), CandidateKind::Snippet, Some(shown), false)

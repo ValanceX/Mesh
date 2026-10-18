@@ -361,7 +361,12 @@ fn after_a_render_opener_the_snippets_in_reach_local_ones_first_then_the_scopes(
         .collect();
     assert_eq!(
         details,
-        ["greet(name)", "other()", "snippet<>", "snippet<Person>"]
+        [
+            "greet(name)",
+            "other()",
+            "snippet<>?, may be absent: render it inside {#if has(footer)}",
+            "snippet<Person>"
+        ]
     );
 }
 

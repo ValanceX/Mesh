@@ -35,6 +35,7 @@ impl<'m> Walker<'m> {
             parents: Vec::new(),
             snippets: Vec::new(),
             snippets_changed: false,
+            present: Vec::new(),
         }
     }
 
@@ -100,6 +101,10 @@ struct Walker<'m> {
     /// Whether a render site has widened a local snippet's parameter type since the last time its
     /// body was checked (the checks are repeated until none does).
     snippets_changed: bool,
+    /// The names of optional snippets known to be present here: those a `has(name)` among the
+    /// conditions of the `{#if}`s around this content, in their first branch, vouches for. A
+    /// snippet's body starts with none: it is rendered where its holder chooses.
+    present: Vec<String>,
 }
 
 /// A snippet declared among some children, and not passed to a component.
@@ -321,7 +326,35 @@ impl<'m> Walker<'m> {
     /// The content of `element`: text, interpolations and elements. A snippet declaration is not
     /// content; `finish_snippets` checks it.
     fn walk_children(&mut self, element: &Element) {
+        // The first branch of a conditional is reached only when its condition holds.
+        let vouched = if matches!(
+            element.construct,
+            Some(Construct::If | Construct::Case { .. })
+        ) {
+            element
+                .attributes
+                .iter()
+                .find(|attribute| attribute.name == "when")
+                .and_then(|attribute| match &attribute.value {
+                    AttributeValue::Expression(condition) => Some(present_names(condition)),
+                    _ => None,
+                })
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let mut first = true;
         for child in &element.children {
+            let guard = (first || element.construct != Some(Construct::If))
+                && matches!(child, Child::Element(_))
+                && !vouched.is_empty();
+            if matches!(child, Child::Element(_)) {
+                first = false;
+            }
+            let before = self.present.len();
+            if guard {
+                self.present.extend(vouched.iter().cloned());
+            }
             match child {
                 Child::Text { .. } => {}
                 Child::Expression(expression) => {
@@ -332,6 +365,7 @@ impl<'m> Walker<'m> {
                 Child::Element(child) if child.construct == Some(Construct::Snippet) => {}
                 Child::Element(child) => self.element(child),
             }
+            self.present.truncate(before);
         }
     }
 
@@ -501,7 +535,9 @@ impl<'m> Walker<'m> {
         }
         let inner = self.declare_snippets(declaration, None, false);
         self.parents.push(declaration.name.clone());
+        let outer = std::mem::take(&mut self.present);
         self.walk_children(declaration);
+        self.present = outer;
         self.parents.pop();
         self.finish_snippets(inner, None);
         for _ in params {
@@ -561,18 +597,24 @@ impl<'m> Walker<'m> {
         let scope = &self.template.component().scope;
         let snippet_named = scope.get_key_value(&name).and_then(|(key, declared)| {
             let ty = Ty::from(declared);
-            let present = match relation::expand(self.template.manifest(), &ty) {
-                Ty::Optional(inner) => relation::expand(self.template.manifest(), &inner),
-                other => other,
+            let (present, optional) = match relation::expand(self.template.manifest(), &ty) {
+                Ty::Optional(inner) => (relation::expand(self.template.manifest(), &inner), true),
+                other => (other, false),
             };
             match present {
-                Ty::Snippet(parameters) => Some((key.clone(), parameters)),
+                Ty::Snippet(parameters) => Some((key.clone(), parameters, optional)),
                 _ => None,
             }
         });
         match snippet_named {
-            Some((key, parameters)) => {
+            Some((key, parameters, optional)) => {
                 self.resolve(name_span, Target::Scope(key));
+                if optional && !self.present.contains(&name) {
+                    self.facts.push(Fact::PossiblyAbsentSnippet {
+                        name: name.clone(),
+                        span: name_span,
+                    });
+                }
                 if arguments.len() != parameters.len() {
                     self.facts.push(Fact::SnippetArity {
                         name,
@@ -1567,4 +1609,27 @@ fn last_occurrences(members: &[ObjectMember]) -> BTreeMap<&str, usize> {
         .enumerate()
         .map(|(index, member)| (member.key.as_str(), index))
         .collect()
+}
+
+/// The names `condition` vouches for: the operands of `has(name)` among its `&&`-joined conjuncts.
+fn present_names(condition: &Expression) -> Vec<String> {
+    match condition {
+        Expression::Binary {
+            operator: mesh_syntax::BinaryOperator::And,
+            left,
+            right,
+            ..
+        } => {
+            let mut names = present_names(left);
+            names.extend(present_names(right));
+            names
+        }
+        Expression::Command {
+            command, arguments, ..
+        } if command == "has" => match arguments.as_slice() {
+            [Expression::Reference { name, .. }] => vec![name.clone()],
+            _ => Vec::new(),
+        },
+        _ => Vec::new(),
+    }
 }

@@ -279,6 +279,13 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
             ),
             Vec::new(),
         ),
+        Fact::PossiblyAbsentSnippet { name, .. } => (
+            DiagnosticCode::POSSIBLY_ABSENT_SNIPPET,
+            format!(
+                "the snippet {name:?} may be absent (its type is optional), so it can't be rendered here; render it inside `{{#if has({name})}}`"
+            ),
+            Vec::new(),
+        ),
         Fact::DuplicateSnippet { name, .. } => (
             DiagnosticCode::DUPLICATE_SNIPPET,
             format!("a second snippet named {name:?} among the same children"),

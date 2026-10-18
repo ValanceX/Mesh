@@ -1,4 +1,4 @@
 <item label={title}>
   {@render children()}
-  {@render footer()}
+  {#if has(footer)}{@render footer()}{/if}
 </item>

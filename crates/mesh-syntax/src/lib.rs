@@ -111,6 +111,7 @@ impl DiagnosticCode {
     pub const SNIPPET_ARITY_MISMATCH: DiagnosticCode = DiagnosticCode("snippet-arity-mismatch");
     /// Two snippets with one name among the same children.
     pub const DUPLICATE_SNIPPET: DiagnosticCode = DiagnosticCode("duplicate-snippet");
+    pub const POSSIBLY_ABSENT_SNIPPET: DiagnosticCode = DiagnosticCode("possibly-absent-snippet");
     /// `children={…}` together with content between the tags of the component.
     pub const CHILDREN_CONFLICT: DiagnosticCode = DiagnosticCode("children-conflict");
     /// A manifest `enum` with more than `mesh_manifest::MAX_ENUM_VALUES` values.
@@ -287,6 +288,7 @@ impl DiagnosticCode {
         DiagnosticCode::UNKNOWN_SNIPPET,
         DiagnosticCode::SNIPPET_ARITY_MISMATCH,
         DiagnosticCode::DUPLICATE_SNIPPET,
+        DiagnosticCode::POSSIBLY_ABSENT_SNIPPET,
         DiagnosticCode::CHILDREN_CONFLICT,
     ];
 

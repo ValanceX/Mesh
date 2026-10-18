@@ -407,6 +407,9 @@ pub enum Fact {
     },
     /// Two snippets with one name among the same children. Span: the second's name.
     DuplicateSnippet { name: String, span: Span },
+    /// A render of a snippet that may be absent (its type is `snippet<…>?`) outside an `{#if}` whose
+    /// condition has `has(name)`. Span: the render's name.
+    PossiblyAbsentSnippet { name: String, span: Span },
     /// `children={…}` written for a component, together with content between its tags. Span: the
     /// attribute.
     ChildrenConflict { component: String, span: Span },
@@ -443,6 +446,7 @@ impl Fact {
             | Fact::UnknownSnippet { span, .. }
             | Fact::SnippetArity { span, .. }
             | Fact::DuplicateSnippet { span, .. }
+            | Fact::PossiblyAbsentSnippet { span, .. }
             | Fact::ChildrenConflict { span, .. } => *span,
         }
     }

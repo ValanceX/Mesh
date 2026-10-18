@@ -1018,6 +1018,20 @@ error[duplicate-snippet]: a second snippet named "one" among the same children
 
 **Fix:** rename one.
 
+### `possibly-absent-snippet`
+
+A snippet whose type is optional (`snippet<…>?`: a prop or scope name that the caller may leave out) is rendered where nothing says it is there. Points at the snippet's name. A render is accepted inside the first branch of an `{#if}` (or `{:else if}`) whose condition has `has(name)`, alone or `&&`-joined with other conditions, however deep within it, but not in a snippet declared there (it is rendered where its holder chooses), and not in an `{:else}`. This is the only place MPRX tracks what a condition proves.
+
+```text
+error[possibly-absent-snippet]: the snippet "maybeFooter" may be absent (its type is optional), so it can't be rendered here; render it inside `{#if has(maybeFooter)}`
+ --> fixtures/check/fail/possibly-absent-snippet.mprx:2:12
+  |
+2 |   {@render maybeFooter()}
+  |            ^^^^^^^^^^^
+```
+
+**Fix:** `{#if has(footer)}{@render footer()}{/if}`. Rendering an absent snippet draws nothing at runtime; the check is there so that is a decision and not an accident.
+
 ### `children-conflict`
 
 A component that takes `children` is given them twice: as an attribute `children={…}` and as the content between its tags. Points at the attribute.
