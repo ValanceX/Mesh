@@ -320,6 +320,12 @@ const RETIRED_CODES: [&str; 1] = ["invalid-switch"];
 /// one past, their limits.
 const LIMIT_CODES_WITHOUT_FIXTURES: [&str; 2] = ["input-too-large", "too-many-elements"];
 
+/// Codes whose input needs a snippet in the scope of the template being checked. The shared model's
+/// `template` is also the root of the programs the property test builds from every fixture, and a root
+/// cannot have a snippet in its scope (`assembly-snippet-root-scope`), so it has none; the check has its
+/// own model in `crates/mesh-compiler/tests/optional_snippets.rs`.
+const CODES_THAT_NEED_A_SNIPPET_IN_SCOPE: [&str; 1] = ["possibly-absent-snippet"];
+
 /// Codes that are warnings: their fixture is in `fixtures/check/warn/`, and
 /// the check passes.
 const WARNING_CODES: [&str; 2] = ["redundant-presence-test", "redundant-default"];
@@ -342,6 +348,7 @@ fn every_model_code_has_its_own_fail_fixture() {
         .iter()
         .filter(|code| !RETIRED_CODES.contains(&code.as_str()))
         .filter(|code| !LIMIT_CODES_WITHOUT_FIXTURES.contains(&code.as_str()))
+        .filter(|code| !CODES_THAT_NEED_A_SNIPPET_IN_SCOPE.contains(&code.as_str()))
     {
         let (dir, severity) = if WARNING_CODES.contains(&code.as_str()) {
             ("warn", "warning")
