@@ -1,0 +1,5 @@
+error[manifest-invalid-value]: an enum type needs at least one value
+ --> fixtures/manifest/fail/enum-empty.json:7:55
+  |
+7 |         "tone": { "type": { "kind": "enum", "values": [] }, "required": true }
+  |                                                       ^^

@@ -38,7 +38,7 @@
         "props": {
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/identifier" },
-          "additionalProperties": { "$ref": "#/$defs/field" }
+          "additionalProperties": { "$ref": "#/$defs/prop" }
         },
         "events": {
           "type": "object",
@@ -65,6 +65,17 @@
       "properties": {
         "type": { "$ref": "#/$defs/type" },
         "required": { "type": "boolean" }
+      },
+      "required": ["type", "required"],
+      "additionalProperties": false
+    },
+    "prop": {
+      "description": "A prop: a field that may also have a default, the value an unwritten prop binds in a composite. It must fit the prop's type (the loader checks that).",
+      "type": "object",
+      "properties": {
+        "type": { "$ref": "#/$defs/type" },
+        "required": { "type": "boolean" },
+        "default": {}
       },
       "required": ["type", "required"],
       "additionalProperties": false
@@ -121,6 +132,23 @@
             }
           },
           "required": ["fields"],
+          "additionalProperties": false
+        },
+        {
+          "description": "A string that is one of its values: 1 to 256 distinct ones (the loader checks the count and the distinctness).",
+          "properties": {
+            "kind": { "const": "enum" },
+            "values": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          },
+          "required": ["values"],
+          "additionalProperties": false
+        },
+        {
+          "description": "A piece of template with ordered parameters: only a component's prop or scope name may have this type (the loader checks the placement). A prop named `children` is a snippet with no parameters.",
+          "properties": {
+            "kind": { "const": "snippet" },
+            "params": { "type": "array", "items": { "$ref": "#/$defs/type" } }
+          },
           "additionalProperties": false
         },
         {

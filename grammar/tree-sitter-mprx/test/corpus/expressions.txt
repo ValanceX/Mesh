@@ -634,3 +634,37 @@ Nested object expression inside an array expression
                     value: (expression
                       (literal
                         (number_literal)))))))))))))
+
+================================================================================
+Coalesce binds looser than logical-or and left-associates
+================================================================================
+
+<page v={a ?? b || c ?? d} />
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (self_closing_element
+      name: (tag_name)
+      (attribute
+        name: (identifier)
+        value: (expression_block
+          expression: (expression
+            (binary_expression
+              left: (expression
+                (binary_expression
+                  left: (expression
+                    (reference
+                      (identifier)))
+                  right: (expression
+                    (binary_expression
+                      left: (expression
+                        (reference
+                          (identifier)))
+                      right: (expression
+                        (reference
+                          (identifier)))))))
+              right: (expression
+                (reference
+                  (identifier))))))))))

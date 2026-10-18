@@ -1,0 +1,4 @@
+<page title="x">
+  {#snippet s()}<text>a</text>{/snippet}
+  <text>{s}</text>
+</page>

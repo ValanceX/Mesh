@@ -120,7 +120,9 @@ fn item(index: usize, candidate: &Candidate, text: Text<'_>) -> CompletionItem {
         CandidateKind::Event => CompletionItemKind::EVENT,
         CandidateKind::ScopeName => CompletionItemKind::VARIABLE,
         CandidateKind::Member => CompletionItemKind::FIELD,
-        CandidateKind::Command => CompletionItemKind::FUNCTION,
+        CandidateKind::Command | CandidateKind::Snippet => CompletionItemKind::FUNCTION,
+        CandidateKind::Parameter => CompletionItemKind::VARIABLE,
+        CandidateKind::EnumValue => CompletionItemKind::ENUM_MEMBER,
         // `CandidateKind` is non-exhaustive; nothing else exists today.
         _ => CompletionItemKind::TEXT,
     };

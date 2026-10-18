@@ -148,7 +148,7 @@ Crate boundaries can change as we learn more.
 
 - **mesh-language**: the MPRX grammar, Tree-sitter parser, syntax nodes, AST types, source locations, expression grammar, basic semantic model, and AST traversal.
 - **mesh-compiler**: semantic analysis, type checking, component and binding resolution, template compilation, diagnostics, transformation, optimization, and code generation.
-- **mesh-template**: the template format, `template-v1`, and the model fingerprint. It has no parser, so the runtime can depend on it.
+- **mesh-template**: the template format, `template-v1` and `template-v2`, and the model fingerprint. It has no parser, so the runtime can depend on it.
 - **mesh-runtime**: MPRX's one evaluator. It validates a program, its model and the host's values, renders a tree, and dispatches an event to a command intent. It accepts templates, never source. `mesh-runtime-wasm` builds it for WebAssembly, and `@valancex/mesh-runtime` wraps that for JavaScript, encoding values and nothing more.
 - **mesh-lsp**: diagnostics and quick fixes, hover, go-to-definition, and completion. It is **a client of the compiler**, which stays the single semantic authority: its diagnostics are the compiler's own, and it has no parser or type system of its own, so the editor and the build can't disagree. Its npm package only launches it.
 
@@ -159,7 +159,7 @@ Crate boundaries can change as we learn more.
 ### Language-neutral formats
 
 The runtime's inputs and outputs are JSON documents with published schemas, so no consumer depends on Rust:
-- a **template** ([`template-v1`](../schemas/template-v1.schema.json)) is one checked component, every name resolved, no values. It's compatible with a runtime by its format version and its model fingerprint, never by the compiler's version;
+- a **template** ([`template-v1`](../schemas/template-v1.schema.json), or [`template-v2`](../schemas/template-v2.schema.json) where it uses `has` or `??`) is one checked component, every name resolved, no values. It's compatible with a runtime by its format version and its model fingerprint, never by the compiler's version;
 - a **render tree** ([`render-v1`](../schemas/render-v1.schema.json)) is what a renderer draws;
 - a **command intent** is what a host receives;
 - **runtime diagnostics** ([`runtime-diagnostics-v1`](../schemas/runtime-diagnostics-v1.schema.json)) say why a render or dispatch failed.

@@ -183,7 +183,7 @@ fn the_runtime_manuals_diagnostics_match_runtime_diagnostics_v1() {
 
 /// Every code v0.5 adds (Pass 0, Decision 27), by family.
 const CHECK_CODES: [&str; 2] = ["content-not-text", "number-literal-out-of-range"];
-const RUNTIME_CODES: [&str; 35] = [
+const RUNTIME_CODES: [&str; 36] = [
     "assembly-malformed-template",
     "assembly-unsupported-format-version",
     "assembly-fingerprint-mismatch",
@@ -215,6 +215,7 @@ const RUNTIME_CODES: [&str; 35] = [
     "runtime-absent-element-output",
     "runtime-invalid-key",
     "runtime-duplicate-key",
+    "runtime-nesting-too-deep",
     "runtime-changes-base-mismatch",
     "runtime-invalid-change",
     "runtime-changes-disagree",

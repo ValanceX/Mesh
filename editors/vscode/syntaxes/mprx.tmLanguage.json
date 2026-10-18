@@ -13,6 +13,8 @@
         { "include": "#block-else-if" },
         { "include": "#block-if" },
         { "include": "#block-each" },
+        { "include": "#block-snippet" },
+        { "include": "#render-tag" },
         { "include": "#expression-block" }
       ]
     },
@@ -39,7 +41,7 @@
     },
     "block-close": {
       "name": "meta.block.close.mprx",
-      "match": "(\\{)(/)(if|each)\\s*(\\})",
+      "match": "(\\{)(/)(if|each|snippet)\\s*(\\})",
       "captures": { "1": { "name": "punctuation.section.embedded.begin.mprx" }, "2": { "name": "punctuation.definition.block.mprx" }, "3": { "name": "keyword.control.block.mprx" }, "4": { "name": "punctuation.section.embedded.end.mprx" } }
     },
     "block-each": {
@@ -52,6 +54,24 @@
         { "match": "\\b(as)\\s+([A-Za-z_][A-Za-z0-9_]*)", "captures": { "1": { "name": "keyword.control.loop.mprx" }, "2": { "name": "variable.parameter.mprx" } } },
         { "include": "#expression" }
       ]
+    },
+    "block-snippet": {
+      "name": "meta.block.open.mprx",
+      "begin": "(\\{)(#)(snippet)\\b\\s*([A-Za-z_][A-Za-z0-9_]*)?",
+      "beginCaptures": { "1": { "name": "punctuation.section.embedded.begin.mprx" }, "2": { "name": "punctuation.definition.block.mprx" }, "3": { "name": "keyword.control.snippet.mprx" }, "4": { "name": "entity.name.function.mprx" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.end.mprx" } },
+      "patterns": [
+        { "match": "[A-Za-z_][A-Za-z0-9_]*", "name": "variable.parameter.mprx" }
+      ]
+    },
+    "render-tag": {
+      "name": "meta.block.render.mprx",
+      "begin": "(\\{)(@)(render)\\b\\s*([A-Za-z_][A-Za-z0-9_]*)?",
+      "beginCaptures": { "1": { "name": "punctuation.section.embedded.begin.mprx" }, "2": { "name": "punctuation.definition.block.mprx" }, "3": { "name": "keyword.control.snippet.mprx" }, "4": { "name": "entity.name.function.mprx" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.end.mprx" } },
+      "patterns": [{ "include": "#expression" }]
     },
     "opening-tag": {
       "name": "meta.tag.mprx",

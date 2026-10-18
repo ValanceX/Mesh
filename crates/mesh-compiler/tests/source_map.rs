@@ -221,3 +221,50 @@ fn utf16_offsets_round_trip_every_character() {
         }
     }
 }
+
+/// A lookup (an offset or a column) doesn't scan its line: a source on one line (what generated or
+/// minified UI is) takes as long per offset as a short one. The bound is far
+/// above a lookup's cost and far below a scan of 400 KB for each of 40,000
+/// offsets, which took minutes in a debug build.
+#[test]
+fn lookups_do_not_scan_the_line() {
+    let source = "<a>é😀</a>".repeat(40_000);
+    let map = SourceMap::new(&source);
+    let started = std::time::Instant::now();
+    let mut total = 0;
+    for byte in (0..source.len()).step_by(10) {
+        total += map.utf16_offset(&source, byte);
+        total += map.line_column(&source, byte, ColumnUnit::Char).column;
+        total += map.line_column(&source, byte, ColumnUnit::Utf16).column;
+    }
+    assert!(total > 0);
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(5),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+/// The columns in every unit agree with counting the characters of the line.
+#[test]
+fn columns_match_counting_the_line_in_every_unit() {
+    let source = "\u{feff}a é😀b\r\n😀😀 é\n<x>é</x>";
+    let map = SourceMap::new(source);
+    for byte in 0..=source.len() {
+        for unit in [ColumnUnit::Char, ColumnUnit::Utf8, ColumnUnit::Utf16] {
+            let found = map.line_column(source, byte, unit);
+            let floored = source.floor_char_boundary(byte);
+            let text = map.line_text(source, found.line);
+            let upto = floored.clamp(text.start, text.end);
+            let expected: usize = source[text.start..upto]
+                .chars()
+                .map(|c| match unit {
+                    ColumnUnit::Char => 1,
+                    ColumnUnit::Utf8 => c.len_utf8(),
+                    ColumnUnit::Utf16 => c.len_utf16(),
+                })
+                .sum();
+            assert_eq!(found.column, expected, "byte {byte}, {unit:?}");
+        }
+    }
+}

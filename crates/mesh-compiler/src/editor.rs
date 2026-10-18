@@ -124,6 +124,12 @@ pub enum CandidateKind {
     ScopeName,
     Member,
     Command,
+    /// A snippet that `{@render}` can name: one declared among the children around it, or a snippet of the template's scope.
+    Snippet,
+    /// A name bound around the cursor: a snippet's parameter, or the item of an `{#each}`.
+    Parameter,
+    /// A member of a closed set of strings, written inside quotes.
+    EnumValue,
 }
 
 /// A name that may be written at the cursor (outline D4), derived from a
@@ -166,7 +172,7 @@ pub fn candidates(
     analysis: Option<&Analysis>,
 ) -> Vec<Candidate> {
     use mesh_analysis::{members, read_field, Ty};
-    use mesh_parser::Context;
+    use mesh_parser::{Context, TextSite};
 
     let Some(completion) = mesh_parser::context_at(source, offset) else {
         return Vec::new();
@@ -259,19 +265,95 @@ pub fn candidates(
                 )
             })
             .collect(),
-        Context::Value => template
-            .component()
-            .scope
-            .iter()
-            .map(|(name, ty)| {
+        Context::Value => {
+            let reach = mesh_parser::reach_at(source, offset);
+            let bound = reach
+                .bindings
+                .iter()
+                .map(|name| candidate(name.clone(), CandidateKind::Parameter, None, false));
+            // What a binding names hides a scope name of the same name.
+            let scope = template
+                .component()
+                .scope
+                .iter()
+                .filter(|(name, _)| !reach.bindings.contains(name))
+                .map(|(name, ty)| {
+                    candidate(
+                        name.clone(),
+                        CandidateKind::ScopeName,
+                        Some(Ty::from(ty).to_string()),
+                        false,
+                    )
+                });
+            bound.chain(scope).collect()
+        }
+        Context::Render => {
+            let reach = mesh_parser::reach_at(source, offset);
+            // The nearest declaration of a name is the one a render means: the later of two of one name hides the earlier.
+            let mut local: Vec<&mesh_parser::LocalSnippet> = Vec::new();
+            for snippet in &reach.snippets {
+                local.retain(|earlier| earlier.name != snippet.name);
+                local.push(snippet);
+            }
+            let declared = local.iter().map(|snippet| {
                 candidate(
-                    name.clone(),
-                    CandidateKind::ScopeName,
-                    Some(Ty::from(ty).to_string()),
+                    snippet.name.clone(),
+                    CandidateKind::Snippet,
+                    Some(format!(
+                        "{}({})",
+                        snippet.name,
+                        snippet.parameters.join(", ")
+                    )),
                     false,
                 )
-            })
-            .collect(),
+            });
+            let scope = template
+                .component()
+                .scope
+                .iter()
+                .filter(|(name, _)| !local.iter().any(|snippet| &snippet.name == *name))
+                .filter(|(_, ty)| {
+                    matches!(Ty::from(*ty), Ty::Snippet(_))
+                        || matches!(Ty::from(*ty), Ty::Optional(inner) if matches!(*inner, Ty::Snippet(_)))
+                })
+                .map(|(name, ty)| {
+                    // An optional snippet is shown as it is, and says what it needs.
+                    let shown = match Ty::from(ty) {
+                        optional @ Ty::Optional(_) => {
+                            format!("{optional}, may be absent: render it inside {{#if has({name})}}")
+                        }
+                        other => other.to_string(),
+                    };
+                    candidate(name.clone(), CandidateKind::Snippet, Some(shown), false)
+                });
+            declared.chain(scope).collect()
+        }
+        Context::Text(site) => {
+            let ty = match site {
+                TextSite::Prop { tag, prop } => manifest
+                    .components()
+                    .get(&tag)
+                    .filter(|_| mesh_semantic::retired_block(&tag).is_none())
+                    .and_then(|component| component.props.get(&prop))
+                    .map(|field| Ty::from(&field.ty)),
+                TextSite::Compared { other, other_span } => match analysis {
+                    Some(analysis) => analysis.type_at(other_span).cloned(),
+                    None => {
+                        let other = mesh_semantic::lower_expression(&other);
+                        mesh_analysis::analyze_expression(&other, template)
+                            .type_at(other_span)
+                            .cloned()
+                    }
+                },
+            };
+            let Some(ty) = ty else {
+                return Vec::new();
+            };
+            enum_values(manifest, &ty, 0)
+                .into_iter()
+                .map(|value| candidate(value, CandidateKind::EnumValue, None, false))
+                .collect()
+        }
         Context::Member {
             object,
             object_span,
@@ -304,4 +386,104 @@ pub fn candidates(
     let mut seen = std::collections::BTreeSet::new();
     out.retain(|candidate| seen.insert((candidate.label.clone(), candidate.kind)));
     out
+}
+
+/// The members of the closed set `ty` is, or is optionally, or names; none if it is not one.
+fn enum_values(
+    manifest: &mesh_manifest::Manifest,
+    ty: &mesh_analysis::Ty,
+    depth: usize,
+) -> Vec<String> {
+    use mesh_analysis::Ty;
+
+    match ty {
+        Ty::Enum(values) => values.clone(),
+        Ty::Optional(inner) if depth < 8 => enum_values(manifest, inner, depth + 1),
+        Ty::Named(name) if depth < 8 => manifest
+            .types()
+            .get(name)
+            .map(|named| enum_values(manifest, &Ty::from(named), depth + 1))
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    }
+}
+
+/// What a render tag's call looks like at the cursor: the snippet's signature, and which parameter
+/// the argument being written is for.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Signature {
+    /// `name(a: T, b: U)` for a snippet declared in the template (with the types the checker found for its
+    /// parameters), `name(T, U)` for a snippet of the component's scope (the manifest names no parameters).
+    pub label: String,
+    /// The label of each parameter, as it appears in `label`.
+    pub parameters: Vec<String>,
+    /// The index of the parameter the cursor's argument is for; at or past `parameters.len()` when there
+    /// are more arguments than parameters.
+    pub active: usize,
+    /// A sentence on the snippet, if it has something to say (an optional one may be absent).
+    pub documentation: Option<String>,
+}
+
+/// The signature of the snippet whose `{@render name(` call contains byte `offset` of `source`, checked as
+/// the template of `template`. `analysis` is the canonical compile's analysis of the same `source`, if
+/// it has one; it gives the types of a declared snippet's parameters.
+pub fn signature(
+    source: &str,
+    offset: usize,
+    template: Template<'_>,
+    analysis: Option<&Analysis>,
+) -> Option<Signature> {
+    use mesh_analysis::Ty;
+
+    let call = mesh_parser::render_call_at(source, offset)?;
+    let reach = mesh_parser::reach_at(source, call.name_span.start_byte);
+    // The nearest declaration of the name is the one a render means.
+    if let Some(local) = reach
+        .snippets
+        .iter()
+        .rev()
+        .find(|local| local.name == call.name)
+    {
+        let parameters: Vec<String> = local
+            .parameters
+            .iter()
+            .zip(&local.parameter_spans)
+            .map(
+                |(name, span)| match analysis.and_then(|analysis| analysis.type_at(*span)) {
+                    Some(ty) => format!("{name}: {ty}"),
+                    None => name.clone(),
+                },
+            )
+            .collect();
+
+        return Some(Signature {
+            label: format!("{}({})", call.name, parameters.join(", ")),
+            parameters,
+            active: call.active,
+            documentation: None,
+        });
+    }
+    let declared = template.component().scope.get(&call.name)?;
+    let (types, optional) = match Ty::from(declared) {
+        Ty::Snippet(types) => (types, false),
+        Ty::Optional(inner) => match *inner {
+            Ty::Snippet(types) => (types, true),
+            _ => return None,
+        },
+        _ => return None,
+    };
+    let parameters: Vec<String> = types.iter().map(ToString::to_string).collect();
+
+    Some(Signature {
+        label: format!("{}({})", call.name, parameters.join(", ")),
+        parameters,
+        active: call.active,
+        documentation: optional.then(|| {
+            format!(
+                "May be absent: render it inside `{{#if has({})}}`.",
+                call.name
+            )
+        }),
+    })
 }

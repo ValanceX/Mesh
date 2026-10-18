@@ -1,4 +1,4 @@
-//! Reading and writing `template-v1` (docs/manual/templates.md, "The
+//! Reading and writing `template-v1` and `template-v2` (docs/manual/templates.md, "The
 //! format"): what reads, what is refused and why, and that what is
 //! written reads back as the same template and matches the schema.
 
@@ -150,7 +150,7 @@ fn unknown_properties_are_ignored() {
 
 #[test]
 fn another_version_is_unsupported_not_malformed() {
-    for version in [0, 2, 17] {
+    for version in [0, 3, 17] {
         let mut document = example();
         document["version"] = json!(version);
         assert_eq!(
@@ -294,5 +294,103 @@ fn a_record_field_name_is_any_string() {
         malformed(&member).len(),
         1,
         "a member access's field is an identifier"
+    );
+}
+
+/// A template nested past `MAX_JSON_DEPTH` is refused as malformed, in
+/// bounded time and stack, not crashed on, and one nested far deeper than
+/// serde_json's own limit of 128 levels (about 42 elements) reads.
+#[test]
+fn json_depth_is_limited_by_the_format_not_the_parser() {
+    let deep = |levels: usize| {
+        let mut document = example();
+        document["root"]["children"] = Value::Null;
+        let text = document.to_string().replace(
+            "\"children\":null",
+            &format!("\"children\":{}{}", "[".repeat(levels), "]".repeat(levels)),
+        );
+        text
+    };
+    let refused = malformed_text(&deep(100_000));
+    assert_eq!(refused.len(), 1);
+    assert!(refused[0].contains("levels of JSON deep"), "{}", refused[0]);
+    // Past serde_json's limit, within ours: refused for what it is (a
+    // children list of lists), not for its depth.
+    let inside = malformed_text(&deep(500));
+    assert!(!inside[0].contains("levels of JSON deep"), "{}", inside[0]);
+    // Brackets inside strings don't count.
+    let mut document = example();
+    document["compiler"] = json!("[".repeat(5_000));
+    assert!(from_json(&document.to_string()).is_ok());
+}
+
+fn validator_v2() -> jsonschema::Validator {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schemas/template-v2.schema.json");
+    let schema: Value = serde_json::from_str(&fs::read_to_string(path).expect("the schema reads"))
+        .expect("the schema is JSON");
+    jsonschema::draft202012::new(&schema).expect("the schema is valid")
+}
+
+/// The example with `has(user)` as a prop's value, and `a ?? b` as another's.
+fn with_v2_constructs() -> Value {
+    let s = span();
+    let scope = json!({ "kind": "scope", "name": "user", "span": s });
+    let mut document = example();
+    document["root"]["props"][0]["value"] = json!({ "kind": "has", "operand": scope, "span": s });
+    document["root"]["props"][1]["value"] = json!({ "kind": "binary", "operator": "coalesce", "span": s,
+        "left": scope, "right": { "kind": "literal", "value": "x", "span": s } });
+    document
+}
+
+#[test]
+fn has_and_coalesce_are_template_v2() {
+    let mut document = with_v2_constructs();
+    document["version"] = json!(2);
+    let template = from_json(&document.to_string()).expect("version 2 reads them");
+    let written: Value = serde_json::from_str(&to_json(&template)).unwrap();
+    assert_eq!(
+        written["version"], 2,
+        "a template that uses them is written as version 2"
+    );
+    assert_eq!(written, document);
+    assert!(validator_v2().is_valid(&written));
+    assert!(
+        !validator().is_valid(&written),
+        "version 1 has neither the kind nor the operator"
+    );
+}
+
+#[test]
+fn a_template_that_uses_nothing_of_version_2_is_written_as_version_1() {
+    let template = from_json(EXAMPLE).expect("the example reads");
+    let written: Value = serde_json::from_str(&to_json(&template)).unwrap();
+    assert_eq!(written["version"], 1);
+    assert_eq!(written, example(), "byte for byte as before");
+}
+
+#[test]
+fn version_2_reads_a_template_that_uses_nothing_of_it() {
+    let mut document = example();
+    document["version"] = json!(2);
+    let template = from_json(&document.to_string()).expect("version 2 is a superset");
+    assert_eq!(
+        serde_json::from_str::<Value>(&to_json(&template)).unwrap()["version"],
+        1,
+        "and is written as version 1"
+    );
+}
+
+#[test]
+fn a_version_1_document_with_a_version_2_construct_is_malformed() {
+    let document = with_v2_constructs();
+    let problems = malformed(&document);
+    assert_eq!(problems.len(), 2, "{problems:?}");
+    assert!(
+        problems[0].contains("`has` is a template-v2"),
+        "{problems:?}"
+    );
+    assert!(
+        problems[1].contains("`coalesce` is a template-v2"),
+        "{problems:?}"
     );
 }

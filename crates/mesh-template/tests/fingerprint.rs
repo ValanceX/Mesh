@@ -225,3 +225,77 @@ fn named_types_are_digested_once_each() {
         start.elapsed()
     );
 }
+
+fn with_prop(ty: Value, default: Option<Value>) -> Value {
+    let mut prop = json!({ "type": ty, "required": false });
+    if let Some(default) = default {
+        prop["default"] = default;
+    }
+    json!({ "version": 1, "types": {}, "components": {
+        "c": { "props": { "p": prop }, "events": {}, "commands": {}, "scope": {} }
+    } })
+}
+
+#[test]
+fn an_enum_is_a_set_so_its_order_does_not_count() {
+    let a = json!({ "kind": "enum", "values": ["a", "b", "c"] });
+    let b = json!({ "kind": "enum", "values": ["c", "a", "b"] });
+    let other = json!({ "kind": "enum", "values": ["a", "b"] });
+    assert_eq!(
+        of_value(&with_prop(a.clone(), None)),
+        of_value(&with_prop(b, None))
+    );
+    assert_ne!(
+        of_value(&with_prop(a, None)),
+        of_value(&with_prop(other, None))
+    );
+    assert_ne!(
+        of_value(&with_prop(json!({ "kind": "enum", "values": ["a"] }), None)),
+        of_value(&with_prop(json!({ "kind": "string" }), None))
+    );
+}
+
+#[test]
+fn a_default_changes_the_fingerprint_and_only_a_default_does() {
+    let ty = json!({ "kind": "string" });
+    let none = of_value(&with_prop(ty.clone(), None));
+    let a = of_value(&with_prop(ty.clone(), Some(json!("a"))));
+    let b = of_value(&with_prop(ty.clone(), Some(json!("b"))));
+    assert_ne!(none, a);
+    assert_ne!(a, b);
+    assert_eq!(a, of_value(&with_prop(ty, Some(json!("a")))));
+    // -0 and 0 are the same default.
+    let number = json!({ "kind": "number" });
+    assert_eq!(
+        of_value(&with_prop(number.clone(), Some(json!(0)))),
+        of_value(&with_prop(number, Some(json!(-0.0))))
+    );
+}
+
+fn with_scope(ty: Value) -> Value {
+    json!({ "version": 1, "types": {}, "components": {
+        "c": { "props": {}, "events": {}, "commands": {}, "scope": { "x": ty } }
+    } })
+}
+
+#[test]
+fn a_snippet_is_its_ordered_parameters() {
+    let snippet = |params: Value| json!({ "kind": "snippet", "params": params });
+    let (s, n) = (json!({ "kind": "string" }), json!({ "kind": "number" }));
+    let sn = of_value(&with_scope(snippet(json!([s, n]))));
+    assert_eq!(sn, of_value(&with_scope(snippet(json!([s, n])))));
+    assert_ne!(
+        sn,
+        of_value(&with_scope(snippet(json!([n, s])))),
+        "order counts"
+    );
+    assert_ne!(
+        sn,
+        of_value(&with_scope(snippet(json!([s])))),
+        "arity counts"
+    );
+    assert_ne!(
+        of_value(&with_scope(snippet(json!([])))),
+        of_value(&with_scope(snippet(json!([s])))),
+    );
+}

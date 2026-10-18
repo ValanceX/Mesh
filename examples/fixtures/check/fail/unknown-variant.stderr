@@ -1,0 +1,6 @@
+error[unknown-variant]: "dagner" is not one of "info", "warning", "danger"
+ --> fixtures/check/fail/unknown-variant.mprx:1:13
+  |
+1 | <badge tone="dagner"></badge>
+  |             ^^^^^^^^
+  = help: did you mean "danger"?

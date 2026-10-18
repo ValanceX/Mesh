@@ -43,7 +43,11 @@ fn runs() -> Vec<(String, &'static str, String)> {
         };
         runs.push((file, "components.json", component));
     }
-    for dir in ["fixtures/check/pass", "fixtures/check/fail"] {
+    for dir in [
+        "fixtures/check/pass",
+        "fixtures/check/warn",
+        "fixtures/check/fail",
+    ] {
         for file in sources(dir) {
             runs.push((
                 file,

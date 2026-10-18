@@ -1,0 +1,6 @@
+error[too-many-attributes]: this is attribute 65 on one element, past the 64 MESH reads; pass a record in one prop instead
+  --> fixtures/check/fail/too-many-attributes.mprx:66:3
+   |
+66 |   p64="x"
+   |   ^^^^^^^
+

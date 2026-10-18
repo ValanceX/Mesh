@@ -7,8 +7,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Every package, by name, sorted.
-const PACKAGES: [&str; 8] = [
+const PACKAGES: [&str; 9] = [
     "@valancex/mesh-compiler",
+    "@valancex/mesh-conformance",
     "@valancex/mesh-lsp",
     "@valancex/mesh-lsp-darwin-arm64",
     "@valancex/mesh-lsp-darwin-x64",

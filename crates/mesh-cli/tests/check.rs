@@ -103,8 +103,10 @@ fn check_rejects_a_deeply_nested_syntax_error_without_crashing() {
     // D17: v0.1 rejected this with exit 1. Locating the error must not
     // overflow the main thread's stack, which a crash (SIGABRT) would show
     // as a signal instead of an exit code. Each `<p>` is on its own line
-    // so the rendered snippet stays one short line.
-    let depth = 20_000;
+    // so the rendered snippet stays one short line. 7,000 levels is as
+    // deep as fits in the 64 KB source limit (G5); 20,000 gave
+    // `input-too-large` instead and no longer reached the code under test.
+    let depth = 7_000;
     let file = temp_mprx(&format!(
         "{}{{a +}}\n{}",
         "<p>\n".repeat(depth),

@@ -8,18 +8,23 @@ use mesh_syntax::{
     ArrayExpression, Attribute, AttributeValue, BinaryExpression, BinaryOperator, Block,
     BooleanLiteral, Child, CommandInvocation, ConditionalExpression, DiagnosticCode, EachBlock,
     Element, ElseBranch, EventBinding, EventValue, Expression, IfBlock, IfBranch, Literal,
-    MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember, Reference,
-    Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
+    MemberAccess, NullLiteral, NumberLiteral, ObjectExpression, ObjectKey, ObjectMember, Parameter,
+    Reference, RenderTag, SnippetBlock, Span, StringLiteral, Text, UnaryExpression, UnaryOperator,
 };
 use tree_sitter::Node;
 
 mod blocks;
 mod context;
+mod limits;
 mod nesting;
 mod recover;
 mod syntax_errors;
 
-pub use context::{context_at, Completion, Context};
+pub use context::{
+    context_at, reach_at, render_call_at, Completion, Context, LocalSnippet, Reach, RenderCall,
+    TextSite,
+};
+pub use limits::{MAX_ATTRIBUTES, MAX_ELEMENTS, MAX_SOURCE_BYTES};
 pub use nesting::MAX_NESTING_DEPTH;
 pub use recover::{recover, Recovered, RecoveredExpression};
 
@@ -53,8 +58,17 @@ pub struct ParseResult {
 /// exactly one root element. Syntax errors are located: `errors` holds
 /// one [`ParseError`] per error region, in source order, each with the
 /// narrowest useful span. A file too deeply nested gets one
-/// `nesting-too-deep` error, at the first place it goes too deep.
+/// `nesting-too-deep` error, at the first place it goes too deep. One past
+/// the size, element or attribute limits ([`MAX_SOURCE_BYTES`],
+/// [`MAX_ELEMENTS`], [`MAX_ATTRIBUTES`]) gets one error likewise.
 pub fn parse(source: &str) -> ParseResult {
+    if let Some(error) = limits::check_size(source) {
+        return ParseResult {
+            ast: None,
+            errors: vec![error],
+        };
+    }
+
     let mut parser = tree_sitter::Parser::new();
     parser
         .set_language(&tree_sitter_mprx::language())
@@ -88,7 +102,7 @@ pub fn parse(source: &str) -> ParseResult {
         };
     }
 
-    if let Some(error) = nesting::check(root) {
+    if let Some(error) = nesting::check(root).or_else(|| limits::check_tree(root)) {
         return ParseResult {
             ast: None,
             errors: vec![error],
@@ -100,6 +114,31 @@ pub fn parse(source: &str) -> ParseResult {
         return ParseResult {
             ast: None,
             errors: block_errors,
+        };
+    }
+
+    // A render tag that is the whole document (decision U13) is a composite that only forwards a snippet. It is read as the fragment around the tag
+    // that the author would write to say the same: the template's root is `<mesh-fragment>{@render …}</mesh-fragment>`.
+    if let Some(tag) = root
+        .named_child(0)
+        .filter(|node| node.kind() == "render_tag")
+    {
+        let span = span_of(tag);
+        let keyword = tag.child_by_field_name("keyword").map_or(span, span_of);
+
+        return ParseResult {
+            ast: Some(Element {
+                name: "mesh-fragment".to_string(),
+                name_span: keyword,
+                closing_name: None,
+                attributes: Vec::new(),
+                event_bindings: Vec::new(),
+                children: vec![Child::Block(Box::new(Block::Render(lower_render_tag(
+                    tag, source,
+                ))))],
+                span,
+            }),
+            errors: vec![],
         };
     }
 
@@ -192,6 +231,10 @@ fn lower_child(node: Node, source: &str) -> Child {
         ))),
         "if_block" => Child::Block(Box::new(Block::If(lower_if_block(inner, source)))),
         "each_block" => Child::Block(Box::new(Block::Each(lower_each_block(inner, source)))),
+        "snippet_block" => {
+            Child::Block(Box::new(Block::Snippet(lower_snippet_block(inner, source))))
+        }
+        "render_tag" => Child::Block(Box::new(Block::Render(lower_render_tag(inner, source)))),
         other => {
             unreachable!("unexpected child node kind {other:?} inside a successfully-parsed tree")
         }
@@ -321,6 +364,64 @@ fn lower_each_block(node: Node, source: &str) -> EachBlock {
         key,
         children: lower_children(node, source),
         span: span_of(node),
+    }
+}
+
+fn lower_snippet_block(node: Node, source: &str) -> SnippetBlock {
+    let keyword = node
+        .child_by_field_name("keyword")
+        .map(span_of)
+        .unwrap_or(Span {
+            start_byte: node.start_byte(),
+            end_byte: node.start_byte(),
+        });
+    let (name, name_span) = field_text(node, "name", source);
+    let mut cursor = node.walk();
+    let parameters = node
+        .children_by_field_name("parameter", &mut cursor)
+        .map(|parameter| Parameter {
+            name: text_of(parameter, source),
+            span: span_of(parameter),
+        })
+        .collect();
+
+    SnippetBlock {
+        keyword_span: keyword,
+        name,
+        name_span,
+        parameters,
+        children: lower_children(node, source),
+        span: span_of(node),
+    }
+}
+
+fn lower_render_tag(node: Node, source: &str) -> RenderTag {
+    let keyword = node
+        .child_by_field_name("keyword")
+        .map(span_of)
+        .unwrap_or(Span {
+            start_byte: node.start_byte(),
+            end_byte: node.start_byte(),
+        });
+    let call = node
+        .child_by_field_name("call")
+        .map(|call| lower_command_invocation(call, source));
+
+    match call {
+        Some(call) => RenderTag {
+            keyword_span: keyword,
+            name: call.command,
+            name_span: call.command_span,
+            arguments: call.arguments,
+            span: span_of(node),
+        },
+        None => RenderTag {
+            keyword_span: keyword,
+            name: String::new(),
+            name_span: keyword,
+            arguments: Vec::new(),
+            span: span_of(node),
+        },
     }
 }
 
@@ -519,6 +620,7 @@ fn lower_binary_operator(text: &str) -> BinaryOperator {
         "!=" => BinaryOperator::Ne,
         "&&" => BinaryOperator::And,
         "||" => BinaryOperator::Or,
+        "??" => BinaryOperator::Coalesce,
         other => unreachable!(
             "unexpected binary operator token {other:?} inside a successfully-parsed tree"
         ),

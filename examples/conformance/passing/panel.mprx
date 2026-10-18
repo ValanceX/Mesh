@@ -1,0 +1,5 @@
+<box>
+  <item label={title} />
+  {#if has(header)}{@render header()}{/if}
+  {#if has(children)}{@render children()}{/if}
+</box>

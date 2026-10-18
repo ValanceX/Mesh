@@ -1,0 +1,5 @@
+error[type-mismatch]: an operand of `??` needs string, found string?, which may be absent
+ --> fixtures/check/fail/coalesce-default-may-be-absent.mprx:1:21
+  |
+1 | <text>{maybeName ?? maybeName}</text>
+  |                     ^^^^^^^^^

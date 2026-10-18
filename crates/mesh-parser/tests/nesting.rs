@@ -129,14 +129,16 @@ fn only_the_first_place_too_deep_is_reported() {
 
 /// Far past the limit, a valid file is rejected without the recursion
 /// that would overflow the stack (this runs on a test thread, with a
-/// smaller stack than a program's main thread).
+/// smaller stack than a program's main thread). The sizes are as large as
+/// fit in the source limit (64 KB, G5); a larger source never reaches the
+/// nesting check and is `input-too-large`.
 #[test]
 fn rejects_very_deep_files_without_overflowing_the_stack() {
     let sources = [
-        elements(100_000),
-        format!("<a x={{{}y}} />", "!".repeat(100_000)),
-        format!("<a x={{y{}}} />", ".a".repeat(100_000)),
-        format!("<a x={{y{}}} />", " + y".repeat(100_000)),
+        elements(9_000),
+        format!("<a x={{{}y}} />", "!".repeat(60_000)),
+        format!("<a x={{y{}}} />", ".a".repeat(30_000)),
+        format!("<a x={{y{}}} />", " + y".repeat(15_000)),
     ];
     for source in &sources {
         let found = errors(source);

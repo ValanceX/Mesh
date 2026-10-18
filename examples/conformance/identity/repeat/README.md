@@ -2,7 +2,7 @@
 
 Contract vectors for **repeated** structure: what makes an item in one render the same node as an item in the next. They extend [`../`](../README.md), whose definitions of `previous`, `next`, `earlier`, `identities` and `expect` (kept, created, removed, moved, handlers, positional) they use unchanged.
 
-Like those, they are **render-v1 and nothing else**. They contain no MPRX, and nothing in them depends on how a repeat is spelled: the provisional `<mesh-each>` of the runtime manual does not appear. Every tree validates against [`render-v1.schema.json`](../../../../schemas/render-v1.schema.json).
+Like those, they are **render-v1 and nothing else**. They contain no MPRX, and nothing in them depends on how a repeat is spelled: the `{#each}` block of MPRX (and the retired `<mesh-each>` it lowers to) does not appear. Every tree validates against [`render-v1.schema.json`](../../../../schemas/render-v1.schema.json).
 
 ## What is new
 
@@ -10,7 +10,7 @@ Like those, they are **render-v1 and nothing else**. They contain no MPRX, and n
 - **Identity names** are `page/<site>/item[<key>]`, a string key **quoted** (`item["1"]`) and a number **bare** (`item[1]`), and `0` and `-0` both written `0`. The notation is for these files only; it is not an encoding.
 - The tokens in `key` and handler positions are illustrative, as in `../`; they are derived from the identity, so equal identities have equal tokens throughout the file.
 
-`crates/mesh-compiler/tests/identity_vectors.rs` checks the vectors against their own definitions: each identity is its site and declared key, the declared keys of a site are pairwise unequal under §9.10.3, the rendered order is the keys' order, and every expectation follows from the identities. `crates/mesh-runtime/tests/repeat.rs` renders the declared keys through the runtime's provisional repeat and checks that it classifies and refuses as the vectors say.
+`crates/mesh-compiler/tests/identity_vectors.rs` checks the vectors against their own definitions: each identity is its site and declared key, the declared keys of a site are pairwise unequal under §9.10.3, the rendered order is the keys' order, and every expectation follows from the identities. `crates/mesh-runtime/tests/repeat.rs` renders the declared keys through the runtime's repeat and checks that it classifies and refuses as the vectors say.
 
 ## The vectors
 

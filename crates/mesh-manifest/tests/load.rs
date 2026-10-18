@@ -678,7 +678,7 @@ fn does_not_look_inside_a_rejected_value() {
         (
             component(
                 &format!(
-                    r#"{{ "p": {{ "type": {{ "kind": "any" }}, "required": true, "default": {void} }} }}"#
+                    r#"{{ "p": {{ "type": {{ "kind": "any" }}, "required": true, "extra": {void} }} }}"#
                 ),
                 "{}",
                 "{}",
@@ -896,4 +896,211 @@ fn diagnostic_spans_cover_exactly_the_offending_token() {
             (DiagnosticCode::MANIFEST_UNKNOWN_PROPERTY, "\"extra\""),
         ]
     );
+}
+
+fn prop(ty: &str, extra: &str) -> String {
+    component(
+        &format!(r#"{{ "p": {{ "type": {ty}, "required": false{extra} }} }}"#),
+        "{}",
+        "{}",
+        "{}",
+    )
+}
+
+#[test]
+fn reads_an_enum_as_a_set_of_strings() {
+    let manifest = load(&scope_type(r#"{ "kind": "enum", "values": ["b", "a"] }"#)).unwrap();
+    let (_, component) = manifest.component("c").unwrap();
+    assert_eq!(
+        component.scope["x"],
+        Type::Enum(vec!["b".to_string(), "a".to_string()])
+    );
+}
+
+#[test]
+fn rejects_an_enum_that_is_empty_has_a_non_string_or_is_too_large_or_repeats() {
+    for values in ["[]", "[1]", r#"["a", null]"#, r#""a""#] {
+        let source = scope_type(&format!(r#"{{ "kind": "enum", "values": {values} }}"#));
+        let found = errors(&source);
+        assert_eq!(found.len(), 1, "{values}: {found:?}");
+        assert_eq!(
+            found[0].0,
+            DiagnosticCode::MANIFEST_INVALID_VALUE,
+            "{values}"
+        );
+    }
+    let exact: Vec<String> = (0..256).map(|i| format!("\"v{i}\"")).collect();
+    load(&scope_type(&format!(
+        r#"{{ "kind": "enum", "values": [{}] }}"#,
+        exact.join(",")
+    )))
+    .expect("256 values are the limit");
+    let over: Vec<String> = (0..257).map(|i| format!("\"v{i}\"")).collect();
+    let source = scope_type(&format!(
+        r#"{{ "kind": "enum", "values": [{}] }}"#,
+        over.join(",")
+    ));
+    assert_eq!(
+        errors(&source)[0].0,
+        DiagnosticCode::MANIFEST_ENUM_TOO_LARGE
+    );
+    let source = scope_type(r#"{ "kind": "enum", "values": ["a", "b", "a"] }"#);
+    assert_eq!(
+        errors(&source),
+        [(DiagnosticCode::MANIFEST_DUPLICATE_VARIANT, r#""a""#)]
+    );
+}
+
+#[test]
+fn a_default_is_a_prop_value_of_the_props_type() {
+    let tone = r#"{ "kind": "enum", "values": ["info", "danger"] }"#;
+    let manifest = load(&prop(tone, r#", "default": "info""#)).expect("a variant is a default");
+    let (_, component) = manifest.component("c").unwrap();
+    assert_eq!(
+        component.props["p"].default,
+        Some(mesh_manifest::Constant::String("info".to_string()))
+    );
+    load(&prop(
+        r#"{ "kind": "optional", "type": { "kind": "number" } }"#,
+        r#", "default": 3"#,
+    ))
+    .expect("an optional prop's default fits what is inside");
+    load(&prop(
+        r#"{ "kind": "list", "element": { "kind": "string" } }"#,
+        r#", "default": ["a"]"#,
+    ))
+    .expect("a list default");
+    for (ty, default) in [
+        (tone, r#""loud""#),
+        (tone, "1"),
+        (r#"{ "kind": "number" }"#, r#""1""#),
+        (r#"{ "kind": "null" }"#, "0"),
+        (
+            r#"{ "kind": "list", "element": { "kind": "number" } }"#,
+            r#"[1, "a"]"#,
+        ),
+        (
+            r#"{ "kind": "record", "fields": { "a": { "type": { "kind": "number" }, "required": true } } }"#,
+            r#"{ "b": 1 }"#,
+        ),
+    ] {
+        let source = prop(ty, &format!(r#", "default": {default}"#));
+        let found = errors(&source);
+        assert_eq!(found.len(), 1, "{ty} {default}: {found:?}");
+        assert_eq!(
+            found[0].0,
+            DiagnosticCode::MANIFEST_INVALID_VALUE,
+            "{ty} {default}"
+        );
+    }
+}
+
+#[test]
+fn a_default_is_for_props_only() {
+    let source = scope_type(
+        r#"{ "kind": "record", "fields": { "a": { "type": { "kind": "string" }, "required": false, "default": "x" } } }"#,
+    );
+    assert_eq!(
+        errors(&source)[0].0,
+        DiagnosticCode::MANIFEST_UNKNOWN_PROPERTY
+    );
+}
+
+#[test]
+fn a_snippet_is_a_components_prop_or_scope_name_and_nothing_else() {
+    let snippet = r#"{ "kind": "snippet", "params": [{ "kind": "string" }] }"#;
+    // A prop, an optional prop, and a scope name.
+    let loaded = load(&component(
+        &format!(
+            r#"{{ "body": {{ "type": {snippet}, "required": true }},
+                  "footer": {{ "type": {{ "kind": "optional", "type": {snippet} }}, "required": false }} }}"#
+        ),
+        "{}",
+        "{}",
+        &format!(r#"{{ "body": {snippet} }}"#),
+    ))
+    .expect("a snippet may be a prop and a scope name");
+    let (_, declared) = loaded.component("c").unwrap();
+    assert_eq!(declared.props["body"].ty, Type::Snippet(vec![Type::String]));
+
+    // Everywhere else it is refused, once, at the snippet.
+    for (place, source) in [
+        (
+            "a record field",
+            scope_type(&format!(
+                r#"{{ "kind": "record", "fields": {{ "f": {{ "type": {snippet}, "required": true }} }} }}"#
+            )),
+        ),
+        (
+            "a list element",
+            scope_type(&format!(r#"{{ "kind": "list", "element": {snippet} }}"#)),
+        ),
+        (
+            "an event payload",
+            component(
+                "{}",
+                &format!(r#"{{ "e": {{ "payload": {snippet} }} }}"#),
+                "{}",
+                "{}",
+            ),
+        ),
+        (
+            "a command parameter",
+            component(
+                "{}",
+                "{}",
+                &format!(
+                    r#"{{ "go": {{ "parameters": [{{ "name": "p", "type": {snippet} }}] }} }}"#
+                ),
+                "{}",
+            ),
+        ),
+        (
+            "a snippet's own parameter",
+            scope_type(r#"{ "kind": "snippet", "params": [{ "kind": "snippet", "params": [] }] }"#),
+        ),
+        (
+            "a named type",
+            manifest(
+                &format!(r#"{{ "T": {snippet} }}"#),
+                r#"{ "c": { "props": {}, "events": {}, "commands": {}, "scope": {} } }"#,
+            ),
+        ),
+    ] {
+        let found = errors(&source);
+        assert_eq!(found.len(), 1, "{place}: {found:?}");
+        assert_eq!(
+            found[0].0,
+            DiagnosticCode::MANIFEST_SNIPPET_MISPLACED,
+            "{place}"
+        );
+    }
+}
+
+#[test]
+fn the_prop_children_is_a_snippet_with_no_parameters() {
+    let props = |ty: &str| format!(r#"{{ "children": {{ "type": {ty}, "required": true }} }}"#);
+    load(&component(
+        &props(r#"{ "kind": "snippet", "params": [] }"#),
+        "{}",
+        "{}",
+        "{}",
+    ))
+    .expect("children is a snippet");
+    load(&component(
+        &props(r#"{ "kind": "snippet" }"#),
+        "{}",
+        "{}",
+        "{}",
+    ))
+    .expect("params may be left out");
+    for ty in [
+        r#"{ "kind": "string" }"#,
+        r#"{ "kind": "snippet", "params": [{ "kind": "string" }] }"#,
+    ] {
+        let source = component(&props(ty), "{}", "{}", "{}");
+        let found = errors(&source);
+        assert_eq!(found.len(), 1, "{ty}");
+        assert_eq!(found[0].0, DiagnosticCode::MANIFEST_CHILDREN_NOT_SNIPPET);
+    }
 }

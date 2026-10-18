@@ -1,0 +1,5 @@
+error[type-mismatch]: an operand of `+` needs number, found User
+ --> fixtures/check/fail/snippet-body-type-mismatch.mprx:2:52
+  |
+2 |   <data-list items={users}>{#snippet row(u)}<text>{u + 1}</text>{/snippet}</data-list>
+  |                                                    ^

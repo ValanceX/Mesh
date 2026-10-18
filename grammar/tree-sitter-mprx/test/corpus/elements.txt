@@ -385,3 +385,78 @@ A repeat block without a key still parses (the compiler asks for the key)
                 name: (tag_name))))
           (each_close)))
       (tag_name))))
+
+================================================================================
+A snippet declaration and a render tag
+================================================================================
+
+<list>{#snippet row(p, q)}<item />{/snippet}{@render row(a, 1)}</list>
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (container_element
+      name: (tag_name)
+      (child
+        (snippet_block
+          keyword: (snippet_open)
+          name: (identifier)
+          parameter: (identifier)
+          parameter: (identifier)
+          (child
+            (element
+              (self_closing_element
+                name: (tag_name))))
+          (snippet_close)))
+      (child
+        (render_tag
+          keyword: (render_open)
+          call: (command_invocation
+            command: (identifier)
+            (expression
+              (reference
+                (identifier)))
+            (expression
+              (literal
+                (number_literal))))))
+      (tag_name))))
+
+================================================================================
+A snippet with no parameters, and a render with no arguments
+================================================================================
+
+<list>{#snippet empty()}{/snippet}{@render empty()}</list>
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    (container_element
+      name: (tag_name)
+      (child
+        (snippet_block
+          keyword: (snippet_open)
+          name: (identifier)
+          (snippet_close)))
+      (child
+        (render_tag
+          keyword: (render_open)
+          call: (command_invocation
+            command: (identifier))))
+      (tag_name))))
+
+
+================================================================================
+A render tag as the whole document
+================================================================================
+
+{@render children()}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (render_tag
+    keyword: (render_open)
+    call: (command_invocation
+      command: (identifier))))

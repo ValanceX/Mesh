@@ -1,0 +1,5 @@
+error[duplicate-snippet]: a second snippet named "one" among the same children
+ --> fixtures/check/fail/duplicate-snippet.mprx:3:13
+  |
+3 |   {#snippet one()}<text>b</text>{/snippet}
+  |             ^^^

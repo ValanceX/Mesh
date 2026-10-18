@@ -53,6 +53,10 @@ impl RuntimeCode {
     pub const DUPLICATE_TEMPLATE: RuntimeCode =
         RuntimeCode("assembly-duplicate-template", Form::Source);
     pub const MISSING_ROOT: RuntimeCode = RuntimeCode("assembly-missing-root", Form::Program);
+    pub const SNIPPET_TO_PRIMITIVE: RuntimeCode =
+        RuntimeCode("assembly-snippet-to-primitive", Form::Source);
+    pub const SNIPPET_IN_ROOT_SCOPE: RuntimeCode =
+        RuntimeCode("assembly-snippet-root-scope", Form::Program);
     pub const UNBOUND_SCOPE_NAME: RuntimeCode =
         RuntimeCode("assembly-unbound-scope-name", Form::Source);
     pub const UNSOUND_BINDING: RuntimeCode = RuntimeCode("assembly-unsound-binding", Form::Source);
@@ -98,6 +102,9 @@ impl RuntimeCode {
     // Repeated structure (PROVISIONAL, §9.10 tracer).
     pub const INVALID_KEY: RuntimeCode = RuntimeCode("runtime-invalid-key", Form::Source);
     pub const DUPLICATE_KEY: RuntimeCode = RuntimeCode("runtime-duplicate-key", Form::Source);
+    // Limits.
+    pub const NESTING_TOO_DEEP: RuntimeCode = RuntimeCode("runtime-nesting-too-deep", Form::Source);
+    pub const SNIPPET_DEPTH: RuntimeCode = RuntimeCode("runtime-snippet-depth", Form::Source);
     // Internal.
     pub const KEY_COLLISION: RuntimeCode = RuntimeCode("runtime-key-collision", Form::Source);
 
@@ -108,6 +115,8 @@ impl RuntimeCode {
         RuntimeCode::FINGERPRINT_MISMATCH,
         RuntimeCode::DUPLICATE_TEMPLATE,
         RuntimeCode::MISSING_ROOT,
+        RuntimeCode::SNIPPET_TO_PRIMITIVE,
+        RuntimeCode::SNIPPET_IN_ROOT_SCOPE,
         RuntimeCode::UNBOUND_SCOPE_NAME,
         RuntimeCode::UNSOUND_BINDING,
         RuntimeCode::CYCLE,
@@ -138,6 +147,8 @@ impl RuntimeCode {
         RuntimeCode::ABSENT_ELEMENT_OUTPUT,
         RuntimeCode::INVALID_KEY,
         RuntimeCode::DUPLICATE_KEY,
+        RuntimeCode::NESTING_TOO_DEEP,
+        RuntimeCode::SNIPPET_DEPTH,
         RuntimeCode::KEY_COLLISION,
     ];
 

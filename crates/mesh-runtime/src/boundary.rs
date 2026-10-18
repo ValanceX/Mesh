@@ -43,12 +43,24 @@ fn host_kind(value: &HostValue) -> &'static str {
     }
 }
 
+/// The variants of an enum for a message, cut after eight.
+fn variants(values: &[String]) -> String {
+    let shown: Vec<String> = values.iter().take(8).map(|v| format!("{v:?}")).collect();
+    if values.len() > 8 {
+        format!("{}, … ({} values)", shown.join(", "), values.len())
+    } else {
+        shown.join(", ")
+    }
+}
+
 fn expected(ty: &Type) -> &'static str {
     match ty {
         Type::String => "a string",
         Type::Number => "a number",
         Type::Boolean => "a boolean",
         Type::Null => "null",
+        Type::Enum(_) => "one of its variants",
+        Type::Snippet(_) => "a snippet",
         Type::List(_) => "a list",
         Type::Record(_) => "a record",
         Type::Any | Type::Named(_) | Type::Optional(_) => "a value",
@@ -102,6 +114,22 @@ impl<'m> Inputs<'m> {
         match (ty, host) {
             (Type::Any, _) => self.any(host, path),
             (Type::String, HostValue::String(text)) => Value::String(Rc::from(text.as_str())),
+            (Type::Enum(values), HostValue::String(text)) => {
+                if values.iter().any(|v| v == text) {
+                    Value::String(Rc::from(text.as_str()))
+                } else {
+                    let what = display(path);
+                    self.report(
+                        RuntimeCode::VALUE_MISMATCH,
+                        path,
+                        format!(
+                            "`{what}` is {text:?}, which isn't one of {}",
+                            variants(values)
+                        ),
+                    );
+                    Value::Absent
+                }
+            }
             (Type::Number, HostValue::Number(number)) => Value::Number(*number),
             (Type::Boolean, HostValue::Boolean(value)) => Value::Boolean(*value),
             (Type::Null, HostValue::Null) => Value::Null,
@@ -338,6 +366,13 @@ pub(crate) fn output(value: &Value) -> Result<serde_json::Value, NotOutput> {
                 .map(|(name, value)| Ok((name.clone(), output(value)?)))
                 .collect::<Result<_, NotOutput>>()?,
         ),
+        // Assembly refuses a snippet for a primitive's prop, so none reaches here.
+        Value::Snippet(_) => {
+            return Err(NotOutput {
+                code: RuntimeCode::PROP_MISMATCH,
+                message: "a snippet can't leave the runtime".into(),
+            })
+        }
     })
 }
 

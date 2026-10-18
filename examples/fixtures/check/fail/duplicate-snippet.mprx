@@ -1,0 +1,5 @@
+<page title="x">
+  {#snippet one()}<text>a</text>{/snippet}
+  {#snippet one()}<text>b</text>{/snippet}
+  {@render one()}
+</page>

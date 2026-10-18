@@ -22,7 +22,10 @@
 //! nothing was reported.
 
 use crate::json::{Json, Member, Value};
-use crate::{Command, Component, DeclarationKey, Event, Field, Manifest, Parameter, Type, VERSION};
+use crate::{
+    Command, Component, Constant, DeclarationKey, Event, Field, Manifest, Parameter, Type,
+    MAX_ENUM_VALUES, VERSION,
+};
 use mesh_syntax::{Diagnostic, DiagnosticCode, Severity, Span};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -61,8 +64,22 @@ struct NamedRef {
     wrapped_in_optional: bool,
 }
 
+/// A prop's `default`, checked against the prop's type once every named
+/// type is known.
+struct PendingDefault {
+    prop: String,
+    /// The `"default"` value's span.
+    span: Span,
+    value: Constant,
+    ty: Type,
+}
+
 #[derive(Default)]
 struct Validator {
+    defaults: Vec<PendingDefault>,
+    /// Whether the next type read may be a `snippet` (a component's prop or scope name; an
+    /// `optional` wrapping it passes this on). Taken at once by the type read.
+    snippet_allowed: bool,
     diagnostics: Vec<Diagnostic>,
     /// Every named type declared, first occurrence only, in source order,
     /// with its key's span. Declared means a reference to it isn't
@@ -212,6 +229,7 @@ impl Validator {
         }
 
         self.check_named_types();
+        self.check_defaults();
 
         let components_span = members
             .iter()
@@ -236,7 +254,24 @@ impl Validator {
             for member in self.names(json, "props", "prop", &owner, NameRule::Identifier) {
                 let key = DeclarationKey::Prop(name.to_string(), member.key.clone());
                 self.declare(key, member.key_span);
-                let field = self.field(&member.value, &format!("prop {:?}", member.key));
+                let field = self.field(&member.value, &format!("prop {:?}", member.key), true);
+                // `children` is the content a caller writes inside the component: a snippet with no
+                // parameters.
+                if member.key == "children" {
+                    if let Some(field) = &field {
+                        let inner = match &field.ty {
+                            Type::Optional(inner) => inner.as_ref(),
+                            other => other,
+                        };
+                        if !matches!(inner, Type::Snippet(params) if params.is_empty()) {
+                            self.error(
+                                DiagnosticCode::MANIFEST_CHILDREN_NOT_SNIPPET,
+                                member.key_span,
+                                "the prop `children` is the content written inside the component, so its type must be a snippet with no parameters: { \"kind\": \"snippet\" }".to_string(),
+                            );
+                        }
+                    }
+                }
                 insert(&mut props, &member.key, field);
             }
         }
@@ -266,6 +301,7 @@ impl Validator {
             for member in self.names(json, "scope", "scope name", &owner, NameRule::Identifier) {
                 let key = DeclarationKey::Scope(name.to_string(), member.key.clone());
                 self.declare(key, member.key_span);
+                self.snippet_allowed = true;
                 let ty = self.ty(&member.value);
                 insert(&mut scope, &member.key, ty);
             }
@@ -349,10 +385,16 @@ impl Validator {
         })
     }
 
-    /// A prop or record field declaration: `{ "type": ..., "required": ... }`.
-    fn field(&mut self, json: &Json, what: &str) -> Option<Field> {
-        let properties = self.object(json, what, &["type", "required"], &[])?;
-        let ty = properties.get("type").and_then(|json| self.ty(json));
+    /// A prop or record field declaration: `{ "type": ..., "required": ... }`,
+    /// and, for a prop (`is_prop`), an optional `"default"`.
+    fn field(&mut self, json: &Json, what: &str, is_prop: bool) -> Option<Field> {
+        let optional: &[&str] = if is_prop { &["default"] } else { &[] };
+        let properties = self.object(json, what, &["type", "required"], optional)?;
+        let ty = properties.get("type").and_then(|json| {
+            // A prop may be a snippet; a record's field may not.
+            self.snippet_allowed = is_prop;
+            self.ty(json)
+        });
         let required = properties
             .get("required")
             .and_then(|json| match json.value {
@@ -369,9 +411,26 @@ impl Validator {
                     None
                 }
             });
+        let default = properties
+            .get("default")
+            .map(|json| (json.span, constant(json)));
+        let ty = ty?;
+        let default = match default {
+            Some((span, value)) => {
+                self.defaults.push(PendingDefault {
+                    prop: what.to_string(),
+                    span,
+                    value: value.clone(),
+                    ty: ty.clone(),
+                });
+                Some(value)
+            }
+            None => None,
+        };
         Some(Field {
-            ty: ty?,
+            ty,
             required: required?,
+            default,
         })
     }
 
@@ -410,6 +469,7 @@ impl Validator {
     /// A type. `in_optional` is whether an `optional` type directly wraps
     /// this one.
     fn ty_in(&mut self, json: &Json, in_optional: bool) -> Option<Type> {
+        let snippet_allowed = std::mem::take(&mut self.snippet_allowed);
         let Value::Object(members) = &json.value else {
             self.error(
                 DiagnosticCode::MANIFEST_INVALID_VALUE,
@@ -472,7 +532,8 @@ impl Validator {
                     "a record type",
                     NameRule::Identifier,
                 ) {
-                    let field = self.field(&member.value, &format!("field {:?}", member.key));
+                    let field =
+                        self.field(&member.value, &format!("field {:?}", member.key), false);
                     insert(&mut fields, &member.key, field);
                 }
                 Some(Type::Record(fields?))
@@ -489,9 +550,103 @@ impl Validator {
                 });
                 Some(Type::Named(name))
             }
+            "enum" => {
+                let properties = self.object(json, "an enum type", &["kind", "values"], &[])?;
+                let values_json = properties.get("values")?;
+                let Value::Array(items) = &values_json.value else {
+                    self.error(
+                        DiagnosticCode::MANIFEST_INVALID_VALUE,
+                        values_json.span,
+                        format!(
+                            "\"values\" must be an array of strings, found {}",
+                            values_json.value.describe()
+                        ),
+                    );
+                    return None;
+                };
+                if items.is_empty() {
+                    self.error(
+                        DiagnosticCode::MANIFEST_INVALID_VALUE,
+                        values_json.span,
+                        "an enum type needs at least one value".to_string(),
+                    );
+                    return None;
+                }
+                let mut values = Some(Vec::new());
+                let mut seen = HashSet::new();
+                for item in items {
+                    let Value::String(text) = &item.value else {
+                        self.error(
+                            DiagnosticCode::MANIFEST_INVALID_VALUE,
+                            item.span,
+                            format!(
+                                "an enum value must be a string, found {}",
+                                item.value.describe()
+                            ),
+                        );
+                        values = None;
+                        continue;
+                    };
+                    if !seen.insert(text.as_str()) {
+                        self.error(
+                            DiagnosticCode::MANIFEST_DUPLICATE_VARIANT,
+                            item.span,
+                            format!("the enum lists the value {text:?} twice"),
+                        );
+                        values = None;
+                    } else if let Some(values) = &mut values {
+                        values.push(text.clone());
+                    }
+                }
+                if items.len() > MAX_ENUM_VALUES {
+                    self.error(
+                        DiagnosticCode::MANIFEST_ENUM_TOO_LARGE,
+                        values_json.span,
+                        format!(
+                            "an enum has {} values, more than the {MAX_ENUM_VALUES} MESH supports; keep a larger set as `string` and validate it in the application",
+                            items.len()
+                        ),
+                    );
+                    return None;
+                }
+                Some(Type::Enum(values?))
+            }
+            "snippet" => {
+                let properties = self.object(json, "a snippet type", &["kind"], &["params"])?;
+                if !snippet_allowed {
+                    self.error(
+                        DiagnosticCode::MANIFEST_SNIPPET_MISPLACED,
+                        kind.value.span,
+                        "a snippet type can only be the type of a component's prop or scope name: it is never stored, returned or sent, so it is not a record field, a list element, a named type, an event payload or a command parameter, and not a snippet's own parameter".to_string(),
+                    );
+                    return None;
+                }
+                let mut params = Some(Vec::new());
+                if let Some(list) = properties.get("params") {
+                    let Value::Array(items) = &list.value else {
+                        self.error(
+                            DiagnosticCode::MANIFEST_INVALID_VALUE,
+                            list.span,
+                            format!(
+                                "\"params\" must be an array of types, found {}",
+                                list.value.describe()
+                            ),
+                        );
+                        return None;
+                    };
+                    for item in items {
+                        match (self.ty(item), &mut params) {
+                            (Some(ty), Some(params)) => params.push(ty),
+                            _ => params = None,
+                        }
+                    }
+                }
+                Some(Type::Snippet(params?))
+            }
             "optional" => {
                 let properties = self.object(json, "an optional type", &["kind", "type"], &[])?;
                 let inner_json = properties.get("type")?;
+                self.snippet_allowed = snippet_allowed;
                 let inner = self.ty_in(inner_json, true)?;
                 if let Type::Optional(_) = inner {
                     self.error(
@@ -518,7 +673,7 @@ impl Validator {
                     kind.value.span,
                     format!(
                         "unknown type kind {kind_name:?}; expected string, number, boolean, \
-                         null, any, list, record, named or optional"
+                         null, any, list, record, named, optional, enum or snippet"
                     ),
                 );
                 self.repeated_kinds(members);
@@ -736,6 +891,96 @@ impl Validator {
         }
     }
 
+    /// Every prop's `default` must be a value of the prop's type (an
+    /// optional prop's default is a value of the type inside the `optional`).
+    /// A type that is unknown or invalid has been reported already.
+    fn check_defaults(&mut self) {
+        for pending in std::mem::take(&mut self.defaults) {
+            let ty = match self.expand(&pending.ty) {
+                Some(Type::Optional(inner)) => Some(inner.as_ref().clone()),
+                other => other.cloned(),
+            };
+            let Some(ty) = ty else { continue };
+            if let Err(why) = self.fits(&pending.value, &ty) {
+                self.error(
+                    DiagnosticCode::MANIFEST_INVALID_VALUE,
+                    pending.span,
+                    format!(
+                        "the default of {} doesn't fit its type: {why}",
+                        pending.prop
+                    ),
+                );
+            }
+        }
+    }
+
+    /// `ty` with named references at the top followed; `None` if one is
+    /// unknown or recursive.
+    fn expand<'a>(&'a self, ty: &'a Type) -> Option<&'a Type> {
+        let mut ty = ty;
+        for _ in 0..=self.types.len() {
+            match ty {
+                Type::Named(name) => ty = self.types.get(name)?,
+                other => return Some(other),
+            }
+        }
+        None
+    }
+
+    /// Whether `value` is a value of `ty`. An unresolvable type accepts
+    /// anything: it has been reported already.
+    fn fits(&self, value: &Constant, ty: &Type) -> Result<(), String> {
+        let Some(ty) = self.expand(ty) else {
+            return Ok(());
+        };
+        let found = |value: &Constant| match value {
+            Constant::Null => "null",
+            Constant::Boolean(_) => "a boolean",
+            Constant::Number(_) => "a number",
+            Constant::String(_) => "a string",
+            Constant::List(_) => "a list",
+            Constant::Record(_) => "a record",
+        };
+        match (ty, value) {
+            (Type::Any, _)
+            | (Type::String, Constant::String(_))
+            | (Type::Number, Constant::Number(_))
+            | (Type::Boolean, Constant::Boolean(_))
+            | (Type::Null, Constant::Null) => Ok(()),
+            (Type::Optional(inner), value) => self.fits(value, inner),
+            (Type::Enum(values), Constant::String(text)) if values.contains(text) => Ok(()),
+            (Type::Enum(values), Constant::String(text)) => Err(format!(
+                "{text:?} is not one of {}",
+                values
+                    .iter()
+                    .map(|value| format!("{value:?}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
+            (Type::List(element), Constant::List(items)) => {
+                items.iter().try_for_each(|item| self.fits(item, element))
+            }
+            (Type::Record(fields), Constant::Record(record)) => {
+                if let Some(name) = record.keys().find(|name| !fields.contains_key(*name)) {
+                    return Err(format!("{name:?} is not a field of the record"));
+                }
+                for (name, field) in fields {
+                    match record.get(name) {
+                        Some(value) => self.fits(value, &field.ty)?,
+                        None if field.required
+                            && !matches!(self.expand(&field.ty), Some(Type::Optional(_))) =>
+                        {
+                            return Err(format!("the field {name:?} is missing"));
+                        }
+                        None => {}
+                    }
+                }
+                Ok(())
+            }
+            (ty, value) => Err(format!("{} where {} is needed", found(value), describe(ty))),
+        }
+    }
+
     /// Whether named type `name` is, after following named references,
     /// an optional type. An unknown or invalid definition counts as not
     /// optional: it has been reported already.
@@ -808,5 +1053,37 @@ fn insert<T>(map: &mut Option<BTreeMap<String, T>>, name: &str, value: Option<T>
             map.insert(name.to_string(), value);
         }
         _ => *map = None,
+    }
+}
+
+/// A JSON value as a [`Constant`].
+fn constant(json: &Json) -> Constant {
+    match &json.value {
+        Value::Null => Constant::Null,
+        Value::Bool(value) => Constant::Boolean(*value),
+        Value::Number(number) => Constant::Number(number.as_f64().unwrap_or(f64::MAX)),
+        Value::String(text) => Constant::String(text.clone()),
+        Value::Array(items) => Constant::List(items.iter().map(constant).collect()),
+        Value::Object(members) => Constant::Record(
+            members
+                .iter()
+                .map(|member| (member.key.clone(), constant(&member.value)))
+                .collect(),
+        ),
+    }
+}
+
+/// What a type needs, for a message.
+fn describe(ty: &Type) -> &'static str {
+    match ty {
+        Type::String => "a string",
+        Type::Number => "a number",
+        Type::Boolean => "a boolean",
+        Type::Null => "null",
+        Type::Any | Type::Named(_) | Type::Optional(_) => "a value",
+        Type::List(_) => "a list",
+        Type::Record(_) => "a record",
+        Type::Enum(_) => "one of its strings",
+        Type::Snippet(_) => "a snippet, which has no constant",
     }
 }

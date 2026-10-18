@@ -7,13 +7,14 @@ use crate::eval::Scope;
 use crate::number::number_to_text;
 use crate::patch::Patch;
 use crate::program::{
-    self, alternatives, repeat_name, Program, Step, Valid, ALTERNATIVES, COMPOSITE, CONDITIONAL,
-    CONDITIONAL_COMPONENT, FILL_COMPONENT, FRAGMENT, FRAGMENT_COMPONENT, NODE, REPEAT,
-    REPEAT_COMPONENT, SLOT, SLOT_COMPONENT, TEXT,
+    self, alternatives, local_snippets, passes, render_arguments, repeat_name, snippet_name,
+    snippet_params, Program, Step, Valid, ALTERNATIVES, COMPOSITE, CONDITIONAL,
+    CONDITIONAL_COMPONENT, FILL_COMPONENT, FRAGMENT, FRAGMENT_COMPONENT, NODE, RENDER,
+    RENDER_COMPONENT, REPEAT, REPEAT_COMPONENT, SLOT, SLOT_COMPONENT, SNIPPET_COMPONENT, TEXT,
 };
 use crate::tree::{Memo, Node, RepeatItem, RepeatMemo, Run, Tree, TreeChild};
 use crate::types::{fits, Statics};
-use crate::value::{HostKey, HostRecord, HostValue, Value};
+use crate::value::{HostKey, HostRecord, HostValue, SnippetValue, Value};
 use mesh_template as mpl;
 use mesh_template::{Child, Element, Expression};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -98,6 +99,7 @@ impl Render {
 fn to_host(value: &Value) -> HostValue {
     match value {
         Value::Absent => unreachable!("a record holds no absent field; a list's are refused"),
+        Value::Snippet(_) => unreachable!("a snapshot holds no snippet: the root scope has none"),
         Value::Null => HostValue::Null,
         Value::Boolean(value) => HostValue::Boolean(*value),
         Value::Number(number) => HostValue::Number(*number),
@@ -270,7 +272,9 @@ fn reads<'t>(expression: &'t Expression, names: &mut BTreeSet<&'t str>) {
             names.insert(name);
         }
         Expression::Member { object, .. } => reads(object, names),
-        Expression::Unary { operand, .. } => reads(operand, names),
+        Expression::Unary { operand, .. } | Expression::Has { operand, .. } => {
+            reads(operand, names)
+        }
         Expression::Binary { left, right, .. } => {
             reads(left, names);
             reads(right, names);
@@ -424,6 +428,7 @@ struct Built {
 /// content, which its own memo doesn't record, so it is rebuilt, never kept.
 fn contains_slot(element: &Element) -> bool {
     element.component == SLOT_COMPONENT
+        || element.component == RENDER_COMPONENT
         || element.children.iter().any(|child| match child {
             Child::Element { element } => contains_slot(element),
             _ => false,
@@ -531,6 +536,8 @@ pub(crate) fn tree_of<'v>(
         frames: Vec::new(),
         site: Vec::new(),
         slots: HashMap::new(),
+        snippet_depth: 0,
+        tables: HashMap::new(),
     };
     let root = &valid.templates[&valid.root];
     let old: Old<'_> = previous
@@ -578,6 +585,8 @@ pub(crate) enum RenderChild<'t> {
     /// caller's content, rendered in the caller's scope. The name is the
     /// slot's (empty for the default slot).
     Slot(&'t str),
+    /// A `{@render}`: the snippet it names, rendered here, under a step of its own.
+    Render(&'t Element),
 }
 
 pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
@@ -589,8 +598,9 @@ pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
                 if !run.is_empty() {
                     children.push(RenderChild::Run(std::mem::take(&mut run)));
                 }
-                // A fill is content for a named slot, never placed where it is written.
-                if element.component == FILL_COMPONENT {
+                // A fill is content for a named slot, and a snippet declaration is a name for a piece
+                // of template: neither is placed where it is written.
+                if element.component == FILL_COMPONENT || element.component == SNIPPET_COMPONENT {
                     continue;
                 }
                 children.push(if element.component == CONDITIONAL_COMPONENT {
@@ -599,6 +609,8 @@ pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
                     RenderChild::Repeat(element)
                 } else if element.component == SLOT_COMPONENT {
                     RenderChild::Slot(program::slot_name(element))
+                } else if element.component == RENDER_COMPONENT {
+                    RenderChild::Render(element)
                 } else {
                     RenderChild::Element(element)
                 });
@@ -615,7 +627,7 @@ pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
 /// The scope of the template of a composite occurrence (docs/manual/
 /// templates.md, "Binding a composite's scope"): each written prop,
 /// evaluated in the enclosing template and checked against its declared
-/// type; each scope name bound to its prop's value, or absent.
+/// type; each scope name bound to its prop's value, else the prop's `default`, else absent.
 pub(crate) fn bind(
     valid: &Valid,
     scope: &Scope<'_, '_>,
@@ -646,7 +658,17 @@ pub(crate) fn bind(
         .map(|name| {
             (
                 name.clone(),
-                written.get(name).cloned().unwrap_or(Value::Absent),
+                written
+                    .get(name)
+                    .cloned()
+                    .or_else(|| {
+                        composite
+                            .props
+                            .get(name)
+                            .and_then(|prop| prop.default.as_ref())
+                            .map(Value::from_constant)
+                    })
+                    .unwrap_or(Value::Absent),
             )
         })
         .collect())
@@ -665,6 +687,15 @@ pub(crate) fn statics<'m>(
     }
 }
 
+/// The deepest a render nests, counted in steps of the path to a node: an
+/// element, a composite's expansion, a fragment, a slot and a repeated item
+/// are one each. It is a resource limit of this implementation (decision
+/// U12, outline D12), not host-configurable, and a later version may change
+/// it. Beyond it a render fails closed with `runtime-nesting-too-deep`
+/// instead of exhausting the stack of the module (about 680 nested
+/// composites crashed the WebAssembly runtime before this limit).
+const MAX_RENDER_NESTING: usize = 512;
+
 struct Renderer<'v> {
     valid: &'v Valid,
     keys: HashSet<String>,
@@ -680,8 +711,49 @@ struct Renderer<'v> {
     /// Where in the node being rendered (positions, through any slots) the
     /// children being rendered are: names a repeat among them.
     site: Vec<usize>,
-    /// Whether each element's subtree places a slot.
+    /// Whether each element's subtree places a slot or renders a snippet.
     slots: HashMap<*const Element, bool>,
+    /// How many snippets are being rendered, one inside another.
+    snippet_depth: usize,
+    /// Each template's elements, for finding a snippet's declaration again from its value.
+    tables: HashMap<String, Rc<Table<'v>>>,
+}
+
+/// The deepest snippets render one inside another (decision U12): a snippet that renders itself
+/// with the same arguments never ends, and a tree's data is at most about 64 levels deep (128 levels
+/// of record and list). Not host-configurable; beyond it a render fails closed with
+/// `runtime-snippet-depth`.
+const MAX_SNIPPET_DEPTH: usize = 64;
+
+/// A template's elements in document order, and where each is.
+struct Table<'v> {
+    elements: Vec<&'v Element>,
+    index: HashMap<*const Element, usize>,
+    parents: Vec<Option<usize>>,
+}
+
+impl<'v> Table<'v> {
+    fn of(root: &'v Element) -> Table<'v> {
+        let mut table = Table {
+            elements: Vec::new(),
+            index: HashMap::new(),
+            parents: Vec::new(),
+        };
+        table.add(root, None);
+        table
+    }
+
+    fn add(&mut self, element: &'v Element, parent: Option<usize>) {
+        let at = self.elements.len();
+        self.elements.push(element);
+        self.index.insert(element, at);
+        self.parents.push(parent);
+        for child in &element.children {
+            if let Child::Element { element } = child {
+                self.add(element, Some(at));
+            }
+        }
+    }
 }
 
 impl<'v> Renderer<'v> {
@@ -691,6 +763,164 @@ impl<'v> Renderer<'v> {
             let mut names = BTreeSet::new();
             free_names(element, &mut Vec::new(), &mut names);
             Rc::new(names.into_iter().map(str::to_string).collect())
+        }))
+    }
+
+    /// The elements of the template of `component`, in document order.
+    fn table(&mut self, component: &str) -> Rc<Table<'v>> {
+        if let Some(table) = self.tables.get(component) {
+            return Rc::clone(table);
+        }
+        let valid: &'v Valid = self.valid;
+        let table = Rc::new(Table::of(&valid.templates[component].root));
+        self.tables.insert(component.to_string(), Rc::clone(&table));
+        table
+    }
+
+    /// The snippet value of the declaration (or, for loose children, the occurrence) `element`, in
+    /// the template of `component`, over the scope `base`.
+    fn snippet(
+        &mut self,
+        component: &str,
+        element: &Element,
+        base: &Rc<BTreeMap<String, Value>>,
+    ) -> Value {
+        let table = self.table(component);
+        Value::Snippet(Rc::new(SnippetValue {
+            component: component.to_string(),
+            element: table.index[&std::ptr::from_ref(element)],
+            base: Rc::clone(base),
+            frames: self.frames.len(),
+        }))
+    }
+
+    /// The scope of the template of a composite occurrence: [`bind`]'s, and the snippets the
+    /// occurrence passes, which are values over the caller's scope: each declaration among its
+    /// children that is a prop of the component, and, if the component has a `children` snippet prop
+    /// and the occurrence has content of its own, that content.
+    fn bind(
+        &mut self,
+        scope: &Scope<'_, '_>,
+        element: &'v Element,
+    ) -> Result<BTreeMap<String, Value>, RuntimeDiagnostic> {
+        let mut bound = bind(self.valid, scope, element)?;
+        let composite = self.valid.component(&element.component);
+        let mut base = None;
+        for child in &element.children {
+            let Child::Element { element: snippet } = child else {
+                continue;
+            };
+            if snippet.component != SNIPPET_COMPONENT
+                || !passes(&self.valid.manifest, element, snippet)
+            {
+                continue;
+            }
+            let name = snippet_name(snippet);
+            if composite.scope.contains_key(name) {
+                let base = base.get_or_insert_with(|| Rc::new(scope.values.clone()));
+                let value = self.snippet(scope.component, snippet, base);
+                bound.insert(name.to_string(), value);
+            }
+        }
+        let loose = element.children.iter().any(|child| match child {
+            Child::Element { element } => {
+                element.component != SNIPPET_COMPONENT && element.component != FILL_COMPONENT
+            }
+            _ => true,
+        });
+        if loose
+            && composite.scope.contains_key("children")
+            && composite.props.contains_key("children")
+        {
+            let base = base.get_or_insert_with(|| Rc::new(scope.values.clone()));
+            let value = self.snippet(scope.component, element, base);
+            bound.insert("children".to_string(), value);
+        }
+        Ok(bound)
+    }
+
+    /// Renders the snippet the render site `site` names, here: its body, in the scope it was declared
+    /// in plus its parameters bound to the arguments, under a step of the site's own. The body's
+    /// declaring template is the scope for its commands, events and slot, so the occurrences around it
+    /// are the ones that were around its declaration.
+    #[allow(clippy::too_many_arguments)]
+    fn render_site(
+        &mut self,
+        scope: &Scope<'_, '_>,
+        site: &'v Element,
+        position: usize,
+        path: &mut Vec<Step>,
+        old_below: &Old<'_>,
+        previous: Option<&Rc<Node>>,
+        built: &mut Built,
+    ) -> Result<(), RuntimeDiagnostic> {
+        // A snippet that isn't there (an optional prop left out) renders nothing.
+        let Some(Value::Snippet(snippet)) = scope.values.get(snippet_name(site)) else {
+            return Ok(());
+        };
+        let snippet = Rc::clone(snippet);
+        let arguments = render_arguments(site)
+            .iter()
+            .map(|argument| scope.eval(argument))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.within_limit(scope, path, site.span)?;
+        if self.snippet_depth >= MAX_SNIPPET_DEPTH {
+            return Err(scope.error(
+                RuntimeCode::SNIPPET_DEPTH,
+                format!(
+                    "snippets are rendered more than {MAX_SNIPPET_DEPTH} levels deep, one inside another, \
+                     the deepest MESH renders: a snippet that renders itself needs an argument that ends it"
+                ),
+                site.span,
+            ));
+        }
+        let table = self.table(&snippet.component);
+        let body = table.elements[snippet.element];
+        let mut values = (*snippet.base).clone();
+        // The snippets declared beside it are names in its body again (it can render itself and them).
+        if body.component == SNIPPET_COMPONENT {
+            if let Some(parent) = table.parents[snippet.element] {
+                for local in local_snippets(&self.valid.manifest, table.elements[parent]) {
+                    let value = self.snippet_over(&snippet, &table, local);
+                    values.insert(snippet_name(local).to_string(), value);
+                }
+            }
+            for (index, name) in snippet_params(body).into_iter().enumerate() {
+                values.insert(
+                    name.to_string(),
+                    arguments.get(index).cloned().unwrap_or(Value::Absent),
+                );
+            }
+        }
+        path.push(Step {
+            position,
+            kind: RENDER,
+            component: String::new(),
+        });
+        self.site.push(position);
+        let outer = self.frames.split_off(snippet.frames.min(self.frames.len()));
+        self.snippet_depth += 1;
+        let inner = Scope {
+            component: &snippet.component,
+            values: &values,
+            payload: None,
+            statics: statics(self.valid, &snippet.component, None),
+        };
+        let listed = self.render_list(&inner, body, path, old_below, previous, built);
+        self.snippet_depth -= 1;
+        self.frames.extend(outer);
+        self.site.pop();
+        path.pop();
+        listed
+    }
+
+    /// The value of the declaration `local`, over the same scope and frames as `like`.
+    fn snippet_over(&self, like: &SnippetValue, table: &Table<'v>, local: &Element) -> Value {
+        Value::Snippet(Rc::new(SnippetValue {
+            component: like.component.clone(),
+            element: table.index[&std::ptr::from_ref(local)],
+            base: Rc::clone(&like.base),
+            frames: like.frames,
         }))
     }
 
@@ -708,6 +938,26 @@ impl<'v> Renderer<'v> {
             Some((total, hashed, prefix)) if *total == path.len() => prefix.key(&path[*hashed..]),
             _ => program::key(&self.valid.identity, path),
         }
+    }
+
+    /// Refuses to go deeper than [`MAX_RENDER_NESTING`] below `path`.
+    fn within_limit(
+        &self,
+        scope: &Scope<'_, '_>,
+        path: &[Step],
+        span: mesh_template::Span,
+    ) -> Result<(), RuntimeDiagnostic> {
+        if path.len() >= MAX_RENDER_NESTING {
+            return Err(scope.error(
+                RuntimeCode::NESTING_TOO_DEEP,
+                format!(
+                    "this is nested more than {MAX_RENDER_NESTING} levels deep, \
+                     the deepest MESH renders"
+                ),
+                span,
+            ));
+        }
+        Ok(())
     }
 
     fn key(
@@ -744,8 +994,9 @@ impl<'v> Renderer<'v> {
             payload: None,
             statics: statics(self.valid, component, None),
         };
+        self.within_limit(&scope, path, element.span)?;
         if self.valid.is_composite(&element.component) {
-            let bound = bind(self.valid, &scope, element)?;
+            let bound = self.bind(&scope, element)?;
             let template = &self.valid.templates[&element.component];
             path.push(Step {
                 position,
@@ -946,6 +1197,29 @@ impl<'v> Renderer<'v> {
         previous: Option<&Rc<Node>>,
         built: &mut Built,
     ) -> Result<(), RuntimeDiagnostic> {
+        // The snippets declared among `source`'s children are names for all of them. They are values
+        // over this scope as it is, so each is made again wherever it is entered, never stored in the
+        // scope it reads (a snippet that could see itself there would be a cycle).
+        let locals = local_snippets(&self.valid.manifest, source);
+        let augmented;
+        let mut scope = scope;
+        let own;
+        if !locals.is_empty() {
+            let base = Rc::new(scope.values.clone());
+            let mut values = (*base).clone();
+            for local in &locals {
+                let value = self.snippet(scope.component, local, &base);
+                values.insert(snippet_name(local).to_string(), value);
+            }
+            augmented = values;
+            own = Scope {
+                component: scope.component,
+                values: &augmented,
+                payload: scope.payload,
+                statics: statics(self.valid, scope.component, None),
+            };
+            scope = &own;
+        }
         for (position, child) in render_children(source).into_iter().enumerate() {
             match child {
                 RenderChild::Run(parts) => {
@@ -1023,6 +1297,9 @@ impl<'v> Renderer<'v> {
                 RenderChild::Slot(name) => {
                     self.slot(position, name, path, old_below, previous, built)?;
                 }
+                RenderChild::Render(site) => {
+                    self.render_site(scope, site, position, path, old_below, previous, built)?;
+                }
             }
         }
         Ok(())
@@ -1041,6 +1318,7 @@ impl<'v> Renderer<'v> {
         previous: Option<&Rc<Node>>,
         built: &mut Built,
     ) -> Result<(), RuntimeDiagnostic> {
+        self.within_limit(scope, path, element.span)?;
         if !program::is_inline(self.valid, element) {
             built.children.push(TreeChild::Node(self.occurrence(
                 scope.component,
@@ -1066,7 +1344,7 @@ impl<'v> Renderer<'v> {
             path.pop();
             listed
         } else {
-            let bound = bind(self.valid, scope, element);
+            let bound = self.bind(scope, element);
             match bound {
                 Err(diagnostic) => Err(diagnostic),
                 Ok(bound) => {
@@ -1397,7 +1675,11 @@ fn text_of(value: &Value) -> Option<String> {
         Value::Boolean(value) => Some(value.to_string()),
         Value::String(text) => Some(text.to_string()),
         Value::Number(number) if number.is_finite() => Some(number_to_text(*number)),
-        Value::Absent | Value::Number(_) | Value::List(_) | Value::Record(_) => None,
+        Value::Absent
+        | Value::Number(_)
+        | Value::List(_)
+        | Value::Record(_)
+        | Value::Snippet(_) => None,
     }
 }
 

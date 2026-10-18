@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "types": {},
+  "components": {
+    "page": {
+      "props": {
+        "options": {
+          "type": { "kind": "record", "fields": { "body": { "type": { "kind": "snippet", "params": [] }, "required": true } } },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "template": { "props": {}, "events": {}, "commands": {}, "scope": {} }
+  }
+}

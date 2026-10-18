@@ -274,8 +274,22 @@ impl Emitter<'_> {
             Expression::EventValue { span, .. } => t::Expression::Event {
                 span: self.span(*span),
             },
-            Expression::Command { .. } => {
-                unreachable!("a clean check guarantees a command appears only as a handler")
+            Expression::Command {
+                command,
+                arguments,
+                span,
+                ..
+            } => {
+                // A clean check leaves only `has(x)` here: any other command
+                // is a handler, which the element's events take apart.
+                assert!(
+                    command == "has" && arguments.len() == 1,
+                    "a clean check guarantees a command appears only as a handler or as `has`"
+                );
+                t::Expression::Has {
+                    operand: boxed(&arguments[0]),
+                    span: self.span(*span),
+                }
             }
         }
     }
@@ -296,5 +310,6 @@ fn binary(operator: BinaryOperator) -> t::BinaryOperator {
         BinaryOperator::Ge => t::BinaryOperator::GreaterEqual,
         BinaryOperator::And => t::BinaryOperator::And,
         BinaryOperator::Or => t::BinaryOperator::Or,
+        BinaryOperator::Coalesce => t::BinaryOperator::Coalesce,
     }
 }

@@ -1,0 +1,5 @@
+error[manifest-children-not-snippet]: the prop `children` is the content written inside the component, so its type must be a snippet with no parameters: { "kind": "snippet" }
+ --> fixtures/manifest/fail/children-not-snippet.json:7:9
+  |
+7 |         "children": { "type": { "kind": "string" }, "required": true }
+  |         ^^^^^^^^^^

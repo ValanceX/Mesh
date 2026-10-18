@@ -1,0 +1,36 @@
+{
+  "title": "People",
+  "people": [
+    {
+      "id": 2,
+      "name": "Grace"
+    },
+    {
+      "id": 1,
+      "name": "Ada"
+    }
+  ],
+  "tree": {
+    "id": 0,
+    "name": "root",
+    "children": [
+      {
+        "id": 1,
+        "name": "a",
+        "children": [
+          {
+            "id": 3,
+            "name": "a1",
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "name": "b",
+        "children": []
+      }
+    ]
+  },
+  "subtitle": "sub 0"
+}

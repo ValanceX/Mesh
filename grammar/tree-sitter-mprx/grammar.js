@@ -9,13 +9,14 @@
 
 const PREC = {
   CONDITIONAL: 1,
-  LOGICAL_OR: 2,
-  LOGICAL_AND: 3,
-  EQUALITY: 4,
-  RELATIONAL: 5,
-  ADDITIVE: 6,
-  MULTIPLICATIVE: 7,
-  UNARY: 8,
+  COALESCE: 2,
+  LOGICAL_OR: 3,
+  LOGICAL_AND: 4,
+  EQUALITY: 5,
+  RELATIONAL: 6,
+  ADDITIVE: 7,
+  MULTIPLICATIVE: 8,
+  UNARY: 9,
 };
 
 // `selfClosingElement` / `containerElement` are plain JS helper functions
@@ -30,6 +31,12 @@ const PREC = {
 // in sync in one edit going forward (see the comment above
 // `_nested_self_closing_element` for why the two call sites need to exist
 // as separate symbols in the first place).
+const renderTag = $ => seq(
+  field('keyword', $.render_open),
+  field('call', $.command_invocation),
+  '}',
+);
+
 const selfClosingElement = $ => seq(
   '<',
   field('name', $.tag_name),
@@ -54,7 +61,8 @@ module.exports = grammar({
   extras: $ => [/\s/],
 
   rules: {
-    source_file: $ => $.element,
+    // A render tag may be the whole document: a composite that only forwards a snippet (decision U13). The parser reads it as a fragment around the tag.
+    source_file: $ => choice($.element, alias($._root_render_tag, $.render_tag)),
 
     element: $ => choice(
       $.self_closing_element,
@@ -70,6 +78,8 @@ module.exports = grammar({
       $.expression_block,
       $.if_block,
       $.each_block,
+      $.snippet_block,
+      $.render_tag,
       alias($._nested_element, $.element),
     ),
 
@@ -106,6 +116,33 @@ module.exports = grammar({
       repeat($.child),
       $.each_close,
     ),
+
+    // `{#snippet name(a, b)} … {/snippet}` declares a snippet; `{@render name(args)}` renders one.
+    snippet_block: $ => seq(
+      field('keyword', $.snippet_open),
+      field('name', $.identifier),
+      '(',
+      optional(seq(
+        field('parameter', $.identifier),
+        repeat(seq(',', field('parameter', $.identifier))),
+      )),
+      ')',
+      '}',
+      repeat($.child),
+      $.snippet_close,
+    ),
+
+    render_tag: renderTag,
+
+    // The document's own copy, for the reason `_nested_element` is a copy of `element` (see there): reached from `source_file` the tag is followed by the end of
+    // input, from `child` by more content, and shared states would offer `text` after the document's last tag.
+    _root_render_tag: renderTag,
+
+    snippet_open: $ => token(seq('{#', 'snippet')),
+
+    snippet_close: $ => token(seq('{/snippet', /\s*/, '}')),
+
+    render_open: $ => token(seq('{@', 'render')),
 
     if_open: $ => token(seq('{#', 'if')),
 
@@ -230,6 +267,11 @@ module.exports = grammar({
       prec.left(PREC.LOGICAL_OR, seq(
         field('left', $.expression),
         field('operator', '||'),
+        field('right', $.expression),
+      )),
+      prec.left(PREC.COALESCE, seq(
+        field('left', $.expression),
+        field('operator', '??'),
         field('right', $.expression),
       )),
     ),

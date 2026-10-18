@@ -3,7 +3,7 @@
 //! the text with `|` at the cursor. Each expectation is the context and
 //! the text it would replace.
 
-use mesh_parser::{context_at, Context};
+use mesh_parser::{context_at, reach_at, Context, TextSite};
 
 /// The context at the `|` in `marked`, as `"Kind(detail) replacing 'text'"`.
 fn context(marked: &str) -> Option<String> {
@@ -16,6 +16,12 @@ fn context(marked: &str) -> Option<String> {
         Context::EventName { tag } => format!("EventName({tag})"),
         Context::Handler => "Handler".to_string(),
         Context::Value => "Value".to_string(),
+        Context::Render => "Render".to_string(),
+        Context::Text(TextSite::Prop { tag, prop }) => format!("Text({tag}.{prop})"),
+        Context::Text(TextSite::Compared { other_span, .. }) => format!(
+            "Text(compared with {})",
+            &source[other_span.start_byte..other_span.end_byte]
+        ),
         Context::Member { object_span, .. } => format!(
             "Member({})",
             &source[object_span.start_byte..object_span.end_byte]
@@ -168,7 +174,11 @@ fn k4_in_an_opening_tag() {
 #[test]
 fn k4_not_in_a_value_text_or_after_the_tag() {
     assert_context(&in_page("<avatar src=|"), None); // S9
-    assert_context(&in_page("<avatar alt=\"x|\" />"), None);
+                                                     // A string that is a prop's value is a place for the members of a closed set (the manifest decides whether there are any).
+    assert_context(
+        &in_page("<avatar alt=\"x|\" />"),
+        Some("Text(avatar.alt) replacing 'x'"),
+    );
     assert_context(&in_page("<text>hel|lo</text>"), None);
     assert_context(&in_page("<text> |</text>"), None);
     assert_context(&in_page("<avatar /> |"), None);
@@ -260,4 +270,77 @@ fn every_offset_of_every_fixture_classifies_without_panicking() {
             }
         }
     }
+}
+
+// Snippets and closed sets (Bet 5, Bet 4).
+
+#[test]
+fn k8_after_a_render_opener() {
+    assert_context(&in_page("{@render |}"), Some("Render replacing ''"));
+    assert_context(&in_page("{@render ro|}"), Some("Render replacing 'ro'"));
+    assert_context(&in_page("{@render row(|)}"), Some("Value replacing ''"));
+}
+
+#[test]
+fn k9_inside_the_quotes_of_a_prop_value_or_a_comparison() {
+    assert_context(
+        &in_page("<badge tone=\"|\" />"),
+        Some("Text(badge.tone) replacing ''"),
+    );
+    assert_context(
+        &in_page("<badge tone=\"da|n\" />"),
+        Some("Text(badge.tone) replacing 'dan'"),
+    );
+    assert_context(
+        &in_page("<badge tone={\"|\"} />"),
+        Some("Text(badge.tone) replacing ''"),
+    );
+    assert_context(
+        &in_page("<text>{tone == \"|\" ? a : b}</text>"),
+        Some("Text(compared with tone) replacing ''"),
+    );
+    assert_context(
+        &in_page("<text>{\"x|\" != user.kind ? a : b}</text>"),
+        Some("Text(compared with user.kind) replacing 'x'"),
+    );
+    // Not a prop value or a comparison: no context.
+    assert_context(&in_page("<text>{\"x|\"}</text>"), None);
+    assert_context(&in_page("<text>{a + \"x|\"}</text>"), None);
+}
+
+fn reach(marked: &str) -> (Vec<String>, Vec<String>) {
+    let offset = marked.find('|').expect("a cursor");
+    let source = marked.replacen('|', "", 1);
+    let reach = reach_at(&source, offset);
+
+    (
+        reach
+            .snippets
+            .iter()
+            .map(|snippet| format!("{}({})", snippet.name, snippet.parameters.join(", ")))
+            .collect(),
+        reach.bindings,
+    )
+}
+
+#[test]
+fn reach_is_the_snippets_among_the_children_around_and_the_names_bound_around() {
+    let (snippets, bound) =
+        reach("<a>{#snippet s(x, y)}<b>{|}</b>{/snippet}{#snippet t()}<b />{/snippet}</a>");
+    assert_eq!(snippets, ["s(x, y)", "t()"]);
+    assert_eq!(bound, ["x", "y"]);
+
+    // The header's parameters are not bound in the header, nor are they in the siblings after.
+    let (_, bound) = reach("<a>{#snippet s(x)}<b />{/snippet}<b>{|}</b></a>");
+    assert!(bound.is_empty(), "{bound:?}");
+
+    // An item is bound in the key and the body, not in the list, innermost first.
+    let (_, bound) = reach("<a>{#each xs as x (x.id)}{#each x.ys as y (|)}<b />{/each}{/each}</a>");
+    assert_eq!(bound, ["y", "x"]);
+    let (_, bound) = reach("<a>{#each |xs as x (x.id)}<b />{/each}</a>");
+    assert!(bound.is_empty(), "{bound:?}");
+
+    // A snippet declared inside an element is not in reach beside it.
+    let (snippets, _) = reach("<a><b>{#snippet inner()}<c />{/snippet}</b>{@render |}</a>");
+    assert!(snippets.is_empty(), "{snippets:?}");
 }

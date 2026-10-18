@@ -1,0 +1,204 @@
+{
+  "distinct": [
+    {
+      "case": "a local snippet passed to three composites, one of them twice, and one passed through another composite: every node has its own key",
+      "step": 0,
+      "paths": [
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          5
+        ],
+        [
+          6
+        ],
+        [
+          7
+        ],
+        [
+          8
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          3,
+          0,
+          0
+        ],
+        [
+          3,
+          0,
+          1
+        ],
+        [
+          4,
+          0
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          5,
+          0
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          6,
+          0
+        ],
+        [
+          7,
+          0
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ]
+      ]
+    }
+  ],
+  "same": [
+    {
+      "case": "a row made by a passed local snippet keeps its key when its item moves",
+      "a": {
+        "step": 0,
+        "path": [
+          0,
+          0
+        ]
+      },
+      "b": {
+        "step": 1,
+        "path": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "the other row, likewise",
+      "a": {
+        "step": 0,
+        "path": [
+          0,
+          1
+        ]
+      },
+      "b": {
+        "step": 1,
+        "path": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "a local snippet that reads its repeat's item, passed as an optional prop: its node follows the item",
+      "a": {
+        "step": 0,
+        "path": [
+          4,
+          1
+        ]
+      },
+      "b": {
+        "step": 1,
+        "path": [
+          5,
+          1
+        ]
+      }
+    },
+    {
+      "case": "a passed snippet whose text changed is the same node",
+      "a": {
+        "step": 0,
+        "path": [
+          7,
+          1
+        ]
+      },
+      "b": {
+        "step": 1,
+        "path": [
+          8,
+          1
+        ]
+      }
+    }
+  ],
+  "different": [
+    {
+      "case": "the same local snippet passed to two composites at two positions makes two nodes",
+      "a": {
+        "step": 0,
+        "path": [
+          0,
+          0
+        ]
+      },
+      "b": {
+        "step": 0,
+        "path": [
+          2,
+          0
+        ]
+      }
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-//! The MESH template format, `template-v1` (docs/manual/templates.md).
+//! The MESH template format, `template-v1` and `template-v2` (docs/manual/templates.md).
 //!
 //! A **template** is one component's MPRX, checked clean against a
 //! component model and compiled: every name resolved to the declaration
@@ -23,18 +23,24 @@
 mod fingerprint;
 mod read;
 mod types;
+mod version;
 mod write;
 
 pub use fingerprint::{fingerprint, Fingerprint, ParseFingerprintError};
-pub use read::{from_json, Problem, Refusal};
+pub use read::{from_json, value_from_json, Problem, Refusal, MAX_JSON_DEPTH};
 pub use types::{
     BinaryOperator, Child, Element, EventBinding, Expression, Field, Literal, Offset, Prop, Span,
     Template, UnaryOperator,
 };
 pub use write::to_json;
 
-/// The template format version this crate reads and writes.
-pub const VERSION: u64 = 1;
+/// The newest template format version this crate reads and writes: 2, a superset of 1.
+/// [`to_json`] writes version 2 only for a template that uses a construct of it (`has`, `??`),
+/// and version 1 otherwise; [`from_json`] reads both.
+pub const VERSION: u64 = 2;
+
+/// The oldest template format version this crate reads and writes.
+pub const FIRST_VERSION: u64 = 1;
 
 /// The value of every template's `format` property.
 pub const FORMAT: &str = "mesh-template";

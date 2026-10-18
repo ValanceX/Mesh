@@ -13,7 +13,7 @@ What each public surface of MESH promises. The tiers have one meaning each, ever
 
 | Surface | Tier |
 |---|---|
-| MPRX language, manifest, `template-v1`, `render-v1`, `runtime-diagnostics-v1`, the CLI and its JSON output | Stable |
+| MPRX language, manifest, `template-v1`, `template-v2`, `render-v1`, `runtime-diagnostics-v1`, the CLI and its JSON output | Stable |
 | `check`, `compile`, `checkProgram`, `compileProgram`, `init`, `version` of `@valancex/mesh-compiler`; `render`, `dispatch`, `declaredEvents`, `init`, `version`, `Render.tree`; `mesh_runtime::{render, dispatch, resolve}`. `render()` keeps nothing in the module, as in 0.9.0, and that is part of the contract | Stable |
 | `update`, `render-patch-v1`, `render.release()`, `mesh_runtime::update`, `update_with` | Stable |
 | `updateChanges`, `diff`, `render.version`, `[Symbol.dispose]`; `mesh_runtime::{update_changes, Changes, Change}`; the changes document; the diagnostics `runtime-changes-base-mismatch`, `runtime-invalid-change`, `runtime-changes-disagree` | Stable |
@@ -28,7 +28,7 @@ What each public surface of MESH promises. The tiers have one meaning each, ever
 
 ## What a host can rely on
 
-- A document format with a `-v1` name (`render-v1`, `render-patch-v1`, `template-v1`, `runtime-diagnostics-v1`, `diagnostics-v1`) may gain **optional properties** in any release without changing its version; its schema says so, and a consumer ignores properties it doesn't know (so it must not validate strictly against a copy of the schema from an older release). Removing or changing a property, or a new required one, is a new version.
+- A document format with a `-v1` name (`render-v1`, `render-patch-v1`, `template-v1`, `runtime-diagnostics-v1`, `diagnostics-v1`) may gain **optional properties** in any release without changing its version (a new expression kind, a new value of an enumerated property, or a new required property is a new version: `template-v2` is how `has` and `??` were added, and the compiler writes it only for a template that needs it); its schema says so, and a consumer ignores properties it doesn't know (so it must not validate strictly against a copy of the schema from an older release). Removing or changing a property, or a new required one, is a new version.
 - A diagnostic or error **code** keeps its meaning; match on it, never on a message. Messages, locations' wording and the order of unrelated diagnostics may improve in any release.
 - Documentation examples are for the version of the page.
 - A removed Stable API is deprecated first, in a release that names the replacement and how to migrate, and is removed no sooner than the next release that is allowed to break. The first release in which this applies to the Unreleased rows above is the one that includes them.

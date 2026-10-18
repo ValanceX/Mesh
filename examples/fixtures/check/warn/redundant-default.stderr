@@ -1,0 +1,5 @@
+warning[redundant-default]: the left side is string, which is never absent, so the default is never used
+ --> fixtures/check/warn/redundant-default.mprx:1:8
+  |
+1 | <text>{name ?? "anonymous"}</text>
+  |        ^^^^^^^^^^^^^^^^^^^

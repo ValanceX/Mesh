@@ -38,6 +38,18 @@
 (each_block "}" @punctuation.special)
 (each_close) @keyword.repeat
 
+; Snippets: a declaration with its parameters, and a render tag.
+
+(snippet_open) @keyword.function
+(snippet_block name: (identifier) @function)
+(snippet_block parameter: (identifier) @variable.parameter)
+(snippet_block ["(" ")"] @punctuation.bracket)
+(snippet_block "," @punctuation.delimiter)
+(snippet_block "}" @punctuation.special)
+(snippet_close) @keyword.function
+(render_open) @keyword.function
+(render_tag "}" @punctuation.special)
+
 ; Expressions
 
 (expression_block ["{" "}"] @punctuation.special)
@@ -74,5 +86,5 @@
 
 (unary_expression operator: ["!" "-"] @operator)
 (binary_expression
-  operator: ["*" "/" "%" "+" "-" "<" "<=" ">" ">=" "==" "!=" "&&" "||"] @operator)
+  operator: ["*" "/" "%" "+" "-" "<" "<=" ">" ">=" "==" "!=" "&&" "||" "??"] @operator)
 (conditional_expression ["?" ":"] @operator)

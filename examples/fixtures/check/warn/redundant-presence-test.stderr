@@ -1,0 +1,5 @@
+warning[redundant-presence-test]: this value is string, which is never absent, so `has` is always true
+ --> fixtures/check/warn/redundant-presence-test.mprx:1:8
+  |
+1 | <text>{has(name)}</text>
+  |        ^^^^^^^^^

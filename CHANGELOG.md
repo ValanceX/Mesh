@@ -4,6 +4,55 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-18
+
+Prepared, not yet published. The first new types and the first new template construct since 0.10: enum types, presence tests and defaults (`template-v2` for the two expressions), snippets, and the limits and fixes of direction work package 0. In the free window: each break names its replacement in a diagnostic. A program, a manifest and a template that use none of the new constructs compile and render as they did in 0.13.0, with the same fingerprint, tree and keys (tested against the published 0.13.0).
+
+### Changed
+
+- **The compiler's WebAssembly is optimized after linking** with binaryen's `wasm-opt -Oz` with inlining off (`@valancex/mesh-compiler`'s `build:wasm`; `binaryen` 132.0.0 is a development dependency, and `MESH_NO_WASM_OPT=1` skips it): 989,551 bytes become 735,048, and the gzipped 320,778 become 301,420 (the size budget stays 330,000). Every test passes on the optimized module, and the replay hashes are unchanged. With inlining on, the file is smaller still and its gzip is larger, which is why it is off.
+
+### Added
+
+- **`runtime-nesting-too-deep`.** A render nests at most 512 levels (an element, a composite's expansion, a fragment, a slot or a repeated item is one each). About 680 nested composites used to crash the WebAssembly runtime with `MeshInternalError`; now it is a diagnostic and nothing is rendered. Not host-configurable.
+- **`input-too-large`, `too-many-elements`, `too-many-attributes`.** A source over 64 KB, more than 5,000 elements, or more than 64 attributes (event bindings count) on one element is one error at the first place past the limit, before anything else is checked. **Sources over 64 KB that used to check now fail**; split them into components.
+
+### Fixed
+
+- **A compiled `template-v1` is read at the documented depth.** `serde_json`'s own limit of 128 JSON levels refused a template at about 42 nested elements (an element is three levels), though 128 are documented. The reader now bounds the depth itself at 1,024 JSON levels and refuses deeper with `assembly-malformed-template`.
+- **The checker is linear in siblings and attributes.** Every position lookup scanned its line, so a source on one line (generated or minified UI) cost the square of its size: 8,000 siblings took 4.9 s and 10,000 attributes 15 s in WebAssembly; they now take about 0.2 s. `SourceMap` answers by search.
+- Conformance READMEs no longer say MPRX cannot express conditionals or repeats.
+
+### WP2 step 1: enums, presence, defaults
+
+The language's first new types (direction Bet 4). A compatible addition: a manifest and a program that use none of it keep their meaning, their fingerprints and their render trees byte for byte. An older MESH reading a manifest that uses `enum` reports `manifest-unknown-kind`.
+
+### Added
+
+- **`enum` types.** `{ "kind": "enum", "values": ["info", "warning", "danger"] }`: a string that is one of 1 to 256 distinct values. An enum fits `string`; an enum fits another that has all its values; the common type of two enums is the union, and of an enum and `string` is `string`. `string` does not fit an enum, except as a **string literal** at an attribute value, an operand of `==`/`!=`, a `?:` branch, an array element or the right of `??`. New codes `manifest-enum-too-large`, `manifest-duplicate-variant`, `unknown-variant` (with a did-you-mean help line).
+- **`has(x)` and `x ?? y`.** `has(x)` is `true` unless `x` is absent; `x ?? y` is `x` when present, else `y` (lazy, between `?:` and `||`). `has` is not reserved. New warnings `redundant-presence-test` and `redundant-default`. The expression `has` and the binary operator `coalesce` are **`template-v2`** (see Changed). 
+- **`default` on props.** A prop may declare `"default": <value>`; a composite occurrence that leaves the prop out binds the default instead of absence (primitives ignore it). Binding soundness (rule 4b) is checked with the prop's own type. The model fingerprint includes a default, and is unchanged for a prop without one.
+- The runtime checks an enum where host values enter (snapshot fields, event payloads, values read through `any`, props, command arguments) with the existing `runtime-value-mismatch`, `runtime-prop-mismatch` and `runtime-argument-mismatch`. `render-v1` and the patch format are unchanged.
+- Conformance vectors `examples/conformance/enums/`, with their own manifest.
+
+### Added (snippets, Bet 5)
+
+- **Snippets.** `{#snippet name(params)} … {/snippet}` declares a piece of template with parameters, and `{@render name(args)}` renders one, wherever an element may be. A snippet declared as a direct child of a component's occurrence is passed as the prop of that name; content between the tags of a component that declares a `children` snippet prop is passed as `children`; any other is a local name for the children around it, so a snippet can render itself. A snippet reads the scope of the template that declares it. Slots (`mesh-slot`, `mesh-fill`) keep working.
+- **The `snippet` type kind**, `{ "kind": "snippet", "params": [...] }` (`snippet<A, B>`): a composite's prop or scope name only (`manifest-snippet-misplaced`), parameters compared contravariantly with exact arity, never an `any`. `children` is reserved: a `snippet` with no parameters (`manifest-children-not-snippet`). The fingerprint hashes a snippet as its ordered parameters.
+- **Codes:** `unknown-snippet`, `snippet-arity-mismatch`, `duplicate-snippet`, `children-conflict`, `manifest-snippet-misplaced`, `manifest-children-not-snippet`, `assembly-snippet-to-primitive`, `assembly-snippet-root-scope` and `runtime-snippet-depth`.
+- **Identity:** a render site adds the step `0x08`; a subtree that renders a snippet is never kept on its own memo (as with a slot), and the vectors in `examples/conformance/snippets` fail without that rule. Snippets render at most 64 levels deep. `render-v1` and the patch format are unchanged; a template that has a snippet is `template-v2`.
+- **A forwarder (U13).** A template may be only `{@render children()}`: the document is read as `<mesh-fragment>{@render …}</mesh-fragment>`, so a composite can forward what its caller wrote without a node of its own. The grammar's `source_file` is an element or a render tag; the output is `template-v2`; a program's root cannot be one (`assembly-root-fragment`, whose message now says so). Vectors: `examples/conformance/forwarder`.
+- **The language server** hovers a snippet's name, and completes snippet names after `{@render `, a snippet's parameters and an `{#each}` item where a value starts, and the members of a closed set inside the quotes of a prop's value or beside `==` and `!=` (the new candidate kinds `Snippet`, `Parameter` and `EnumValue`).
+- **Go to definition** from a snippet's name to its declaration, and **signature help** in a render's arguments (`textDocument/signatureHelp`, triggers `(` and `,`).
+- **Optional snippets (U19).** A render of a snippet whose type is optional is `possibly-absent-snippet` unless it is in the first branch of an `{#if}` that has `has(name)` (`&&` allowed); the completion, hover and signature help of an optional snippet say so. A MESH from before 0.14 reads such a manifest as `manifest-unknown-kind` (tested against 0.13.0).
+- **Passing a local snippet along** as a prop value is specified and has vectors (`examples/conformance/passing`).
+- **Not yet:** contract inference for snippet props (declare them in the manifest), and signature help for commands.
+
+### Changed
+
+- **`template-v2`.** The stability policy lets a `-v1` format gain only optional properties, so the expression `has` and the operator `coalesce` are a new version, not an addition to `template-v1`. `template-v2` is a superset (`schemas/template-v2.schema.json`); the compiler writes it **only** for a template that uses `has` or `??`, and every other template is written as version 1, byte for byte as before. The runtime and `mesh-template` read both; a version 1 document that holds a version 2 construct is `assembly-malformed-template`; a runtime from before this reads only version 1 and refuses version 2 with `assembly-unsupported-format-version`. `schemas/template-v1.schema.json` no longer has `has` or `coalesce` (they were never released).
+- `possibly-absent-access` no longer says MPRX has no presence test.
+
 ## [0.13.0] - 2026-10-17
 
 A change to how MPRX reads text: a space written between two interpolations is content. Nothing else in the language, the compiler, the runtime or any document format changes. See the [v0.13 release notes](./docs/releases/v0.13.md).

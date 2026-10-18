@@ -65,7 +65,8 @@ pub(crate) fn validate(
             Err(Refusal::UnsupportedVersion(version)) => diagnostics.push(RuntimeDiagnostic::new(
                 RuntimeCode::UNSUPPORTED_FORMAT_VERSION,
                 format!(
-                    "the template is format version {version}; this runtime reads version {}",
+                    "the template is format version {version}; this runtime reads versions {} to {}",
+                    mesh_template::FIRST_VERSION,
                     mesh_template::VERSION
                 ),
                 Location::Template { index, component },
@@ -145,7 +146,7 @@ pub(crate) fn validate(
 
 /// A malformed template's `component`, if it has a string one.
 fn readable_component(text: &str) -> Option<String> {
-    let value: serde_json::Value = serde_json::from_str(text).ok()?;
+    let value = mesh_template::value_from_json(text).ok()?;
     value.get("component")?.as_str().map(str::to_string)
 }
 
@@ -161,6 +162,8 @@ fn undeclared(manifest: &Manifest, template: &Template) -> Vec<String> {
         REPEAT_COMPONENT,
         SLOT_COMPONENT,
         FILL_COMPONENT,
+        SNIPPET_COMPONENT,
+        RENDER_COMPONENT,
     ] {
         if template.root.component == reserved {
             problems.push(format!(
@@ -217,6 +220,14 @@ fn walk_names(
     }
     if element.component == FILL_COMPONENT {
         fill_problems(element, problems);
+    }
+    if element.component == SNIPPET_COMPONENT {
+        snippet_problems(element, problems);
+    }
+    if element.component == RENDER_COMPONENT {
+        let name = snippet_name(element);
+        let visible = loops.iter().any(|bound| bound == name) || own.scope.contains_key(name);
+        render_problems(element, visible, problems);
     }
     if element.component == FRAGMENT_COMPONENT {
         if !element.props.is_empty() {
@@ -301,12 +312,37 @@ fn walk_names(
             scope_names(own, loops, argument, problems);
         }
     }
+    // The names the children can read besides the scope: a snippet's parameters, and the snippets
+    // declared among the children (each visible to all of them, itself and its siblings included, so
+    // a snippet can render itself).
+    let mut introduced = 0;
+    if element.component == SNIPPET_COMPONENT {
+        for name in snippet_params(element) {
+            loops.push(name.to_string());
+            introduced += 1;
+        }
+    }
+    let locals = local_snippets(manifest, element);
+    let mut declared = BTreeSet::new();
+    for local in &locals {
+        if !declared.insert(snippet_name(local)) {
+            problems.push(format!(
+                "a second snippet named `{}` among the same children",
+                snippet_name(local)
+            ));
+        }
+        loops.push(snippet_name(local).to_string());
+        introduced += 1;
+    }
     for child in &element.children {
         match child {
             Child::Text { .. } => {}
             Child::Expression { expression } => scope_names(own, loops, expression, problems),
             Child::Element { element } => walk_names(manifest, own, element, loops, problems),
         }
+    }
+    for _ in 0..introduced {
+        loops.pop();
     }
     if bound {
         loops.pop();
@@ -470,7 +506,7 @@ pub(crate) fn visit(expression: &Expression, f: &mut impl FnMut(&Expression)) {
     match expression {
         Expression::Literal { .. } | Expression::Scope { .. } | Expression::Event { .. } => {}
         Expression::Member { object, .. } => visit(object, f),
-        Expression::Unary { operand, .. } => visit(operand, f),
+        Expression::Unary { operand, .. } | Expression::Has { operand, .. } => visit(operand, f),
         Expression::Binary { left, right, .. } => {
             visit(left, f);
             visit(right, f);
@@ -649,7 +685,9 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
                         source(template, element.span),
                     )),
                     Some(prop) => {
-                        let bound = if prop.required || matches!(manifest.expand(&prop.ty), Type::Optional(_)) {
+                        let bound = if prop.required
+                            || prop.default.is_some()
+                            || matches!(manifest.expand(&prop.ty), Type::Optional(_)) {
                             prop.ty.clone()
                         } else {
                             Type::Optional(Box::new(prop.ty.clone()))
@@ -664,7 +702,7 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
                                 RuntimeCode::UNSOUND_BINDING,
                                 format!(
                                     "`{name}`'s prop `{scope_name}` can't bind its scope name `{scope_name}`: {}",
-                                    if prop.required { "its type isn't assignable" } else { "it's optional, and an unwritten prop binds absence" }
+                                    if prop.required || prop.default.is_some() { "its type isn't assignable" } else { "it's optional, and an unwritten prop binds absence" }
                                 ),
                                 source(template, element.span),
                             ));
@@ -698,9 +736,12 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
             // Rule 7: children only where the composite's template has a slot
             // for them: loose ones (and text) go to the default slot, and each
             // `mesh-fill` to the slot of its name, once.
+            // Snippet declarations are not children: they are passed as props, or are names.
             let has_children = element.children.iter().any(|child| match child {
                 Child::Text { value, .. } => !value.trim().is_empty(),
-                Child::Element { element } => element.component != FILL_COMPONENT,
+                Child::Element { element } => {
+                    element.component != FILL_COMPONENT && element.component != SNIPPET_COMPONENT
+                }
                 Child::Expression { .. } => true,
             });
             let mut inside = Vec::new();
@@ -710,7 +751,9 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
                 .filter(|inner| inner.component == SLOT_COMPONENT)
                 .map(|inner| slot_name(inner))
                 .collect();
-            if has_children && !slots.contains("") {
+            // A composite that takes `children` as a snippet prop is given its content that way.
+            let takes_children = composite.props.contains_key("children");
+            if has_children && !slots.contains("") && !takes_children {
                 diagnostics.push(RuntimeDiagnostic::new(
                     RuntimeCode::COMPOSITE_CHILDREN,
                     format!(
@@ -749,6 +792,65 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
             }
         }
     }
+    // A snippet is for composites: a primitive's props go to the renderer, and a snippet can't. An
+    // occurrence of a primitive may not write a prop whose type is a snippet, pass a snippet as a prop,
+    // or give content to a `children` snippet prop.
+    for (_, template) in read {
+        let mut all = Vec::new();
+        elements(&template.root, &mut all);
+        for element in all {
+            let name = element.component.as_str();
+            if first.contains_key(name) || name.starts_with("mesh-") {
+                continue;
+            }
+            let Some((_, declared)) = manifest.component(name) else {
+                continue;
+            };
+            let is_snippet = |prop: &str| {
+                declared.props.get(prop).is_some_and(|field| {
+                    matches!(
+                        &field.ty,
+                        Type::Snippet(_)
+                    ) || matches!(&field.ty, Type::Optional(inner) if matches!(inner.as_ref(), Type::Snippet(_)))
+                })
+            };
+            let written = element.props.iter().any(|prop| is_snippet(&prop.prop));
+            let passed = element.children.iter().any(|child| match child {
+                Child::Element { element } => {
+                    element.component == SNIPPET_COMPONENT && is_snippet(snippet_name(element))
+                }
+                _ => false,
+            });
+            let content = is_snippet("children")
+                && element.children.iter().any(|child| match child {
+                    Child::Element { element } => {
+                        element.component != SNIPPET_COMPONENT
+                            && element.component != FILL_COMPONENT
+                    }
+                    _ => true,
+                });
+            if written || passed || content {
+                diagnostics.push(RuntimeDiagnostic::new(
+                    RuntimeCode::SNIPPET_TO_PRIMITIVE,
+                    format!("`{name}` has no template in the program, so it's a primitive, and a primitive's props go to the renderer: a snippet can't be given to it"),
+                    source(template, element.span),
+                ));
+            }
+        }
+    }
+    // The root scope comes from the host's snapshot, which holds no snippet.
+    if let Some(root_component) = components.get(root) {
+        if root_component.scope.values().any(|ty| {
+            matches!(ty, Type::Snippet(_))
+                || matches!(ty, Type::Optional(inner) if matches!(inner.as_ref(), Type::Snippet(_)))
+        }) {
+            diagnostics.push(RuntimeDiagnostic::new(
+                RuntimeCode::SNIPPET_IN_ROOT_SCOPE,
+                format!("the root `{root}` has a snippet in its scope, but its scope comes from the host's snapshot, which holds none"),
+                Location::Program,
+            ));
+        }
+    }
     // The program renders one root node: its root template's root is not a fragment, nor a composite that expands to one.
     if let Some((_, template)) = read.iter().find(|(_, template)| template.component == root) {
         let mut at = &template.root;
@@ -756,7 +858,7 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
             if at.component == FRAGMENT_COMPONENT {
                 diagnostics.push(RuntimeDiagnostic::new(
                     RuntimeCode::ROOT_FRAGMENT,
-                    format!("the root `{root}` renders one root node, but its template starts with a `{FRAGMENT_COMPONENT}`, which makes none: put an element around it"),
+                    format!("the root `{root}` renders one root node, but its template starts with a `{FRAGMENT_COMPONENT}` (or a composite that is one, as a template that is only a `{{@render}}` is), which makes none: put an element around it"),
                     source(template, template.root.span),
                 ));
                 break;
@@ -829,7 +931,7 @@ fn identity(program: &Program<'_>) -> [u8; 32] {
         .templates
         .iter()
         .map(|text| {
-            let value: serde_json::Value = serde_json::from_str(text).expect("validated");
+            let value = mesh_template::value_from_json(text).expect("validated");
             let component = value["component"].as_str().expect("validated").to_string();
             (component, canonical_digest(&value))
         })
@@ -1003,6 +1105,142 @@ pub(crate) const SLOT_COMPONENT: &str = "mesh-slot";
 /// `<mesh-slot name="header" />` in the composite's template.
 pub(crate) const FILL_COMPONENT: &str = "mesh-fill";
 
+/// A render site (`{@render name(args)}`): one step for the site, then the snippet body's own steps
+/// (their positions are within the body, as a slot's are within the caller's content), so the same
+/// snippet rendered at two sites, or twice under one parent, or in two repeat items, never shares a
+/// key. The step carries the site's position in the *rendering* template; the declaring template
+/// contributes only the positions inside the body. `0x07` is the fragment's.
+pub(crate) const RENDER: u8 = 0x08;
+
+/// A snippet declaration (`{#snippet name(params)}`): never a node, and never placed where it is
+/// written. Its `name` is a string literal, its `params` a list of string literals, and its children
+/// are the body. A direct child of an occurrence whose component declares a prop of that name is
+/// passed as that prop; any other is a local name, readable in the children of the element it is in.
+pub(crate) const SNIPPET_COMPONENT: &str = "mesh-snippet";
+
+/// A render site's element: `name`, a string literal, and `arguments`, a list of expressions that are
+/// evaluated one by one (an absent argument is an argument), and no children.
+pub(crate) const RENDER_COMPONENT: &str = "mesh-render";
+
+/// The name a snippet declaration or a render site gives: its `name`.
+pub(crate) fn snippet_name(element: &Element) -> &str {
+    literal(element, "name").unwrap_or("")
+}
+
+/// A snippet's parameter names, in order.
+pub(crate) fn snippet_params(snippet: &Element) -> Vec<&str> {
+    snippet
+        .props
+        .iter()
+        .find(|prop| prop.prop == "params")
+        .map(|prop| match &prop.value {
+            Expression::List { elements, .. } => elements
+                .iter()
+                .filter_map(|element| match element {
+                    Expression::Literal {
+                        value: mesh_template::Literal::String(name),
+                        ..
+                    } => Some(name.as_str()),
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        })
+        .unwrap_or_default()
+}
+
+/// A render site's argument expressions, in order.
+pub(crate) fn render_arguments(render: &Element) -> &[Expression] {
+    render
+        .props
+        .iter()
+        .find(|prop| prop.prop == "arguments")
+        .and_then(|prop| match &prop.value {
+            Expression::List { elements, .. } => Some(elements.as_slice()),
+            _ => None,
+        })
+        .unwrap_or(&[])
+}
+
+/// Whether the snippet declaration `snippet`, a direct child of `source`, is passed as a prop of
+/// `source`'s component, not a local name: `source` is an occurrence (not a construct) of a
+/// component that declares a prop of the snippet's name.
+pub(crate) fn passes(manifest: &Manifest, source: &Element, snippet: &Element) -> bool {
+    !source.component.starts_with("mesh-")
+        && manifest
+            .component(&source.component)
+            .is_some_and(|(_, component)| component.props.contains_key(snippet_name(snippet)))
+}
+
+/// The snippet declarations among `source`'s children that are local names.
+pub(crate) fn local_snippets<'e>(manifest: &Manifest, source: &'e Element) -> Vec<&'e Element> {
+    source
+        .children
+        .iter()
+        .filter_map(|child| match child {
+            Child::Element { element }
+                if element.component == SNIPPET_COMPONENT && !passes(manifest, source, element) =>
+            {
+                Some(element.as_ref())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// What a snippet declaration must be: a `name` and `params`, a list of names, with nothing else,
+/// no events, and distinct parameter names.
+fn snippet_problems(element: &Element, problems: &mut Vec<String>) {
+    if element
+        .props
+        .iter()
+        .any(|prop| !matches!(prop.prop.as_str(), "name" | "params"))
+    {
+        problems.push(format!(
+            "`{SNIPPET_COMPONENT}` has no props but `name` and `params`"
+        ));
+    }
+    if snippet_name(element).is_empty() {
+        problems.push(format!(
+            "the `name` of a `{SNIPPET_COMPONENT}` is a non-empty string literal"
+        ));
+    }
+    let params = snippet_params(element);
+    for (index, name) in params.iter().enumerate() {
+        if params[..index].contains(name) {
+            problems.push(format!("a snippet has two parameters named `{name}`"));
+        }
+    }
+    if !element.events.is_empty() {
+        problems.push(format!("`{SNIPPET_COMPONENT}` can't have events"));
+    }
+}
+
+/// What a render site must be: a `name` that is visible here, a list of `arguments`, no events and no
+/// children.
+fn render_problems(element: &Element, visible: bool, problems: &mut Vec<String>) {
+    if element
+        .props
+        .iter()
+        .any(|prop| !matches!(prop.prop.as_str(), "name" | "arguments"))
+    {
+        problems.push(format!(
+            "`{RENDER_COMPONENT}` has no props but `name` and `arguments`"
+        ));
+    }
+    if !visible {
+        problems.push(format!(
+            "no snippet `{}` to render: it is neither declared here nor a name this template has",
+            snippet_name(element)
+        ));
+    }
+    if !element.events.is_empty() || !element.children.is_empty() {
+        problems.push(format!(
+            "`{RENDER_COMPONENT}` has no events and no children"
+        ));
+    }
+}
+
 /// A fragment (PROVISIONAL): its children are placed where it is, and it is never a node. The explicit way for a composite's template, or a
 /// conditional's alternative or a repeat's item, to be text or several nodes: nothing in MESH wraps content in a node of its own. Declared in the
 /// model like `mesh-slot`, with no props, and it has no events. A step of its own (`0x07`) keeps its content's keys apart from a sibling's.
@@ -1057,6 +1295,18 @@ pub(crate) fn fill_for<'e>(occurrence: &'e Element, name: &str) -> Option<&'e El
             Some(element.as_ref())
         }
         _ => None,
+    })
+}
+
+/// Whether any template of the program declares a snippet or renders one: its handlers are per
+/// render site, with the scope each was rendered in, so (as with a repeat) they are the render's.
+pub(crate) fn uses_snippets(templates: &BTreeMap<String, Template>) -> bool {
+    templates.values().any(|template| {
+        let mut all = Vec::new();
+        elements(&template.root, &mut all);
+        all.iter().any(|element| {
+            element.component == SNIPPET_COMPONENT || element.component == RENDER_COMPONENT
+        })
     })
 }
 

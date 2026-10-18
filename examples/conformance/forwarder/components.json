@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "types": {
+    "Person": {
+      "kind": "record",
+      "fields": {
+        "id": {
+          "type": {
+            "kind": "number"
+          },
+          "required": true
+        },
+        "name": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      }
+    }
+  },
+  "components": {
+    "page": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "text": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "list": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "row": {
+      "props": {
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      },
+      "events": {
+        "press": {}
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "item": {
+      "props": {
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "pass": {
+      "props": {
+        "children": {
+          "type": {
+            "kind": "snippet",
+            "params": []
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "children": {
+          "kind": "snippet",
+          "params": []
+        }
+      }
+    },
+    "relay": {
+      "props": {
+        "children": {
+          "type": {
+            "kind": "snippet",
+            "params": []
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "children": {
+          "kind": "snippet",
+          "params": []
+        }
+      }
+    },
+    "labelled": {
+      "props": {
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "children": {
+          "type": {
+            "kind": "snippet",
+            "params": []
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "label": {
+          "kind": "string"
+        },
+        "children": {
+          "kind": "snippet",
+          "params": []
+        }
+      }
+    },
+    "screen": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "select": {
+          "parameters": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "number"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "people": {
+          "kind": "list",
+          "element": {
+            "kind": "named",
+            "name": "Person"
+          }
+        },
+        "title": {
+          "kind": "string"
+        },
+        "flag": {
+          "kind": "boolean"
+        }
+      }
+    }
+  }
+}

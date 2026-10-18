@@ -1,0 +1,11 @@
+<page>
+  <pass><text>{title}</text></pass>
+  <relay><item label={title} /></relay>
+  <pass><text>a</text><text>b</text></pass>
+  <pass>{title}</pass>
+  <labelled label="L"><text>{title}</text></labelled>
+  {#each people as person (person.id)}
+    <pass><row label={person.name} on.press={select(person.id)} /></pass>
+  {/each}
+  {#if flag}<pass><text>on</text></pass>{:else}<relay><text>off</text></relay>{/if}
+</page>

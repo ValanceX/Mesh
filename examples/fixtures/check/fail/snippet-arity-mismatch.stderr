@@ -1,0 +1,11 @@
+error[snippet-arity-mismatch]: the snippet "pair" takes 2 parameters, found 1
+ --> fixtures/check/fail/snippet-arity-mismatch.mprx:3:3
+  |
+3 |   {@render pair(name)}
+  |   ^^^^^^^^^^^^^^^^^^^^
+
+error[snippet-arity-mismatch]: the snippet "row" takes 1 parameter, found 2
+ --> fixtures/check/fail/snippet-arity-mismatch.mprx:4:38
+  |
+4 |   <data-list items={users}>{#snippet row(u, v)}<text>{u.name}</text>{/snippet}</data-list>
+  |                                      ^^^

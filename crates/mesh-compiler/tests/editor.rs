@@ -349,3 +349,61 @@ fn nothing_is_offered_without_a_type_or_a_declared_tag() {
     assert!(offered(&page("<nope |"), "users-page").is_empty());
     assert!(offered(&page("<text>hello |</text>"), "users-page").is_empty());
 }
+
+// --- Members of a closed set, written inside quotes (Bet 4) ---------------
+
+/// The candidates at the `|` in `marked`, as the `template` component of the check fixtures' manifest.
+fn offered_in_fixtures(marked: &str) -> Vec<Candidate> {
+    let manifest =
+        mesh_manifest::load(&read(&examples().join("fixtures/check/components.json"))).unwrap();
+    let template = manifest.template("template").unwrap();
+    let offset = marked.find('|').unwrap();
+    let source = marked.replacen('|', "", 1);
+    let result = compile_with(&source, &CompileOptions::with_template(template));
+    candidates(&source, offset, template, result.analysis.as_ref())
+}
+
+#[test]
+fn a_closed_sets_members_are_offered_inside_the_quotes_and_each_is_accepted() {
+    let manifest =
+        mesh_manifest::load(&read(&examples().join("fixtures/check/components.json"))).unwrap();
+    let template = manifest.template("template").unwrap();
+    // A named closed set, an enum written in the manifest, a prop through `==`, and an expression string.
+    for (marked, expected) in [
+        (
+            "<page><badge tone=\"|\" /></page>",
+            vec!["info", "warning", "danger"],
+        ),
+        (
+            "<page><badge tone=\"info\" shade=\"|\" /></page>",
+            vec!["info", "warning", "danger", "success"],
+        ),
+        (
+            "<page><badge tone={\"|\"} /></page>",
+            vec!["info", "warning", "danger"],
+        ),
+        (
+            "<page><text>{tone == \"|\" ? name : name}</text></page>",
+            vec!["info", "warning", "danger"],
+        ),
+    ] {
+        let found = offered_in_fixtures(marked);
+        assert_eq!(labels(&found), expected, "{marked}");
+        assert!(found.iter().all(|c| c.kind == CandidateKind::EnumValue));
+        for candidate in &found {
+            let source = marked.replacen('|', &candidate.label, 1);
+            let result = compile_with(&source, &CompileOptions::with_template(template));
+            assert!(
+                !result
+                    .diagnostics
+                    .iter()
+                    .any(|d| d.code.as_str() == "unknown-variant"),
+                "{} is offered but rejected in {source:?}",
+                candidate.label
+            );
+        }
+    }
+    assert!(
+        offered_in_fixtures("<page><text>{name == \"|\" ? name : name}</text></page>").is_empty()
+    );
+}

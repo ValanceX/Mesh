@@ -136,6 +136,19 @@ test("blocks: openers, branches, closers and the name a repeat binds", () => {
   assert.ok(closed);
 });
 
+test("snippets: the declaration with its name and parameters, the render tag, and the closer", () => {
+  const { tokens, closed } = tokenize("<list>{#snippet row(p)}<i>{p}</i>{/snippet}{@render row(item)}</list>");
+
+  assert.equal(scope(tokens, "snippet", 0), "keyword.control.snippet.mprx");
+  assert.equal(scope(tokens, "row", 0), "entity.name.function.mprx");
+  assert.equal(scope(tokens, "p", 0), "variable.parameter.mprx");
+  assert.equal(scope(tokens, "snippet", 1), "keyword.control.block.mprx");
+  assert.equal(scope(tokens, "render"), "keyword.control.snippet.mprx");
+  assert.equal(scope(tokens, "row", 1), "entity.name.function.mprx");
+  assert.equal(scope(tokens, "item"), "variable.other.readwrite.mprx");
+  assert.ok(closed);
+});
+
 test("an expression block is still an expression block next to a block", () => {
   const { tokens, closed } = tokenize("<p>{#if a}{b}{/if}</p>");
 

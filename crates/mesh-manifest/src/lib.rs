@@ -30,6 +30,11 @@ pub const VERSION: u64 = 1;
 /// checked.
 pub const MAX_NESTING_DEPTH: usize = 128;
 
+/// The most values an `enum` type may have. A resource limit of this
+/// implementation, not part of the format: a later version may raise it.
+/// Reported as `manifest-enum-too-large`.
+pub const MAX_ENUM_VALUES: usize = 256;
+
 /// A type a manifest can write. Named references are aliases for their
 /// definition; [`Manifest::expand`] follows them.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,7 +59,31 @@ pub enum Type {
     /// through any chain of named references. `inner` may still *contain*
     /// optional types (a list of them, a record with optional fields).
     Optional(Box<Type>),
+    /// A closed set of strings: non-empty, distinct, at most
+    /// [`MAX_ENUM_VALUES`], in the order the manifest wrote them (the order
+    /// is for messages; as a type, an enum is the set).
+    Enum(Vec<String>),
+    /// `snippet<A, B>`: a piece of template with these ordered parameters, which a composite's
+    /// prop or scope name may be and nothing else (never a primitive's prop, a record field, a
+    /// list element, a named type, an event payload or a command parameter). A prop named
+    /// `children` is `snippet<>`.
+    Snippet(Vec<Type>),
 }
+
+/// A constant written in a manifest where a value of some type is needed:
+/// a prop's `default`. The JSON values, with numbers as binary64.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Constant {
+    Null,
+    Boolean(bool),
+    Number(f64),
+    String(String),
+    List(Vec<Constant>),
+    Record(BTreeMap<String, Constant>),
+}
+
+// JSON has no NaN, so a constant equals itself.
+impl Eq for Constant {}
 
 /// A prop or record field declaration: its type, and whether it must be
 /// supplied.
@@ -63,6 +92,11 @@ pub enum Type {
 pub struct Field {
     pub ty: Type,
     pub required: bool,
+    /// A prop's `default`: bound when the occurrence expands as a
+    /// composite and the prop is not written, and ignored for a primitive.
+    /// `None` for a prop that declares none, and for a record field, which
+    /// cannot.
+    pub default: Option<Constant>,
 }
 
 /// An event a component can raise.
@@ -200,7 +234,13 @@ pub struct Manifest {
 /// blocks: the conditional and the repeat a block lowers to, and the fragment that wraps a branch or body
 /// that is not exactly one element. A manifest need not declare them (docs/MPRX-SPEC.md, "Blocks"); one
 /// that does is used as declared.
-pub const BUILT_IN_COMPONENTS: [&str; 3] = ["mesh-if", "mesh-each", "mesh-fragment"];
+pub const BUILT_IN_COMPONENTS: [&str; 5] = [
+    "mesh-if",
+    "mesh-each",
+    "mesh-fragment",
+    "mesh-snippet",
+    "mesh-render",
+];
 
 /// The components a block can lower to, for analysis: [`BUILT_IN_COMPONENTS`] and the choice among branches
 /// (`mesh-switch`, `mesh-case`, `mesh-default`), which a template never names (it is emitted as conditionals)
@@ -215,7 +255,11 @@ fn built_in_components() -> &'static BTreeMap<String, Component> {
     static BUILT_IN: OnceLock<BTreeMap<String, Component>> = OnceLock::new();
 
     BUILT_IN.get_or_init(|| {
-        let required = |ty| Field { ty, required: true };
+        let required = |ty| Field {
+            ty,
+            required: true,
+            default: None,
+        };
         let component = |props: Vec<(&str, Field)>| Component {
             props: props
                 .into_iter()
@@ -240,6 +284,20 @@ fn built_in_components() -> &'static BTreeMap<String, Component> {
                 ]),
             ),
             ("mesh-fragment".to_string(), component(Vec::new())),
+            (
+                "mesh-snippet".to_string(),
+                component(vec![
+                    ("name", required(Type::String)),
+                    ("params", required(Type::Any)),
+                ]),
+            ),
+            (
+                "mesh-render".to_string(),
+                component(vec![
+                    ("name", required(Type::String)),
+                    ("arguments", required(Type::Any)),
+                ]),
+            ),
             ("mesh-switch".to_string(), component(Vec::new())),
             (
                 "mesh-case".to_string(),

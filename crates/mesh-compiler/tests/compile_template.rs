@@ -66,15 +66,21 @@ fn corpus() -> Vec<(PathBuf, String, Model)> {
     runs
 }
 
-fn validator() -> jsonschema::Validator {
-    let schema: Value =
-        serde_json::from_str(&read(&root().join("schemas/template-v1.schema.json"))).unwrap();
-    jsonschema::draft202012::new(&schema).expect("the schema is valid")
+/// The validators of `template-v1` and `template-v2`: a template is valid against the one for
+/// the version it says.
+fn validators() -> [jsonschema::Validator; 2] {
+    ["1", "2"].map(|version| {
+        let schema: Value = serde_json::from_str(&read(
+            &root().join(format!("schemas/template-v{version}.schema.json")),
+        ))
+        .unwrap();
+        jsonschema::draft202012::new(&schema).expect("the schema is valid")
+    })
 }
 
 #[test]
 fn every_clean_source_compiles_to_a_valid_template() {
-    let validator = validator();
+    let validators = validators();
     let mut compiled = 0;
     for (path, text, model) in corpus() {
         let result = check::template(&text, &model);
@@ -98,7 +104,8 @@ fn every_clean_source_compiles_to_a_valid_template() {
         assert_eq!(template.component, model.component());
         assert_eq!(template.fingerprint, model.fingerprint());
         let written: Value = serde_json::from_str(&mesh_template::to_json(&template)).unwrap();
-        let errors: Vec<String> = validator
+        let version = written["version"].as_u64().expect("a version") as usize;
+        let errors: Vec<String> = validators[version - 1]
             .iter_errors(&written)
             .map(|e| e.to_string())
             .collect();
@@ -296,7 +303,14 @@ fn names(element: &mesh_template::Element, out: &mut Vec<String>) {
     let component = &element.component;
     // A block lowers to a construct that is built in, and resolves no component of the manifest's: only the
     // expressions inside it hold names.
-    let block = ["mesh-if", "mesh-each", "mesh-fragment"].contains(&component.as_str());
+    let block = [
+        "mesh-if",
+        "mesh-each",
+        "mesh-fragment",
+        "mesh-snippet",
+        "mesh-render",
+    ]
+    .contains(&component.as_str());
     if !block {
         out.push(format!("{:?}", Target::Component(component.clone())));
     }
@@ -340,7 +354,9 @@ fn expression_names(expression: &Expression, out: &mut Vec<String>) {
         Expression::Scope { name, .. } => out.push(format!("{:?}", Target::Scope(name.clone()))),
         Expression::Literal { .. } | Expression::Event { .. } => {}
         Expression::Member { object, .. } => expression_names(object, out),
-        Expression::Unary { operand, .. } => expression_names(operand, out),
+        Expression::Unary { operand, .. } | Expression::Has { operand, .. } => {
+            expression_names(operand, out)
+        }
         Expression::Binary { left, right, .. } => {
             expression_names(left, out);
             expression_names(right, out);
@@ -362,4 +378,40 @@ fn expression_names(expression: &Expression, out: &mut Vec<String>) {
                 .for_each(|field| expression_names(&field.value, out));
         }
     }
+}
+
+/// A template that is only `{@render children()}` (decision U13) is a `mesh-fragment` around the render, and so a `template-v2`; version 1 never carries it.
+#[test]
+fn a_template_that_is_a_render_tag_is_a_fragment_and_a_version_2_document() {
+    const MODEL: &str = r#"{ "version": 1, "types": {}, "components": { "fwd": {
+        "props": { "children": { "type": { "kind": "snippet", "params": [] }, "required": true } },
+        "events": {}, "commands": {}, "scope": { "children": { "kind": "snippet", "params": [] } } } } }"#;
+    let model = check::Model::load(MODEL, "fwd").expect("the model loads");
+    let result = check::template("{@render children()}\n", &model);
+    let template = result
+        .template
+        .unwrap_or_else(|| panic!("it compiles: {:#?}", result.diagnostics));
+    let written: Value = serde_json::from_str(&mesh_template::to_json(&template)).unwrap();
+
+    assert_eq!(written["root"]["component"], "mesh-fragment");
+    assert_eq!(
+        written["root"]["children"][0]["element"]["component"],
+        "mesh-render"
+    );
+    assert_eq!(written["version"], 2);
+
+    let [v1, v2] = validators();
+    assert!(v2.is_valid(&written));
+    assert!(!v1.is_valid(&written), "version 1 has no snippets");
+
+    let mut as_v1 = written.clone();
+    as_v1["version"] = Value::from(1);
+    assert!(
+        mesh_template::from_json(&as_v1.to_string()).is_err(),
+        "a version 1 document with a render is malformed"
+    );
+    assert_eq!(
+        mesh_template::from_json(&written.to_string()).as_ref(),
+        Ok(&template)
+    );
 }

@@ -8,7 +8,7 @@ MPRX goes through three stages: **source syntax → semantic resolution → runt
 
 ## What a template contains
 
-- **Its format version,** `1`: the version of its serialized structure, and its only compatibility version.
+- **Its format version,** `1` or `2`: the version of its serialized structure, and its only compatibility version. Version 2 is a superset of version 1 (see [template-v2](#template-v2)).
 - **Its component,** the one whose template it is.
 - **The model fingerprint** of the model it was checked against ([below](#the-model-fingerprint)).
 - **Its compiler version,** for provenance and debugging only. It never affects whether the template runs.
@@ -42,12 +42,12 @@ A reference names the scope declaration it reads. Its value is supplied only at 
 
 ## The format
 
-The format is [`schemas/template-v1.schema.json`](../../schemas/template-v1.schema.json). It is JSON, under the same promise as the diagnostics document: a later MESH may add properties without changing `version`, and removing one or changing its meaning is a new version. A reader must ignore properties it doesn't know.
+The format is [`schemas/template-v1.schema.json`](../../schemas/template-v1.schema.json), or [`schemas/template-v2.schema.json`](../../schemas/template-v2.schema.json) for a template that uses a construct only version 2 has ([below](#template-v2)). It is JSON, under the same promise as the diagnostics document: a later MESH may add properties without changing `version`, and removing one or changing its meaning is a new version. A reader must ignore properties it doesn't know.
 
 | Property | Holds |
 |---|---|
 | `format` | always `"mesh-template"`, so a stray JSON document is refused as malformed rather than as a version mismatch |
-| `version` | `1` |
+| `version` | `1`, or `2` when the template uses `has` or `??` |
 | `component` | the component whose template this is |
 | `fingerprint` | `sha256:` and 64 lowercase hexadecimal digits |
 | `compiler` | the compiler's version, such as `"0.5.0"` |
@@ -66,7 +66,8 @@ The format is [`schemas/template-v1.schema.json`](../../schemas/template-v1.sche
   | `scope` | `name` | a reference to a scope declaration of the template's component |
   | `member` | `object`, `field` | `object.field` |
   | `unary` | `operator` (`not`, `negate`), `operand` | `!x`, `-x` |
-  | `binary` | `operator`, `left`, `right` | `operator` is one of `add`, `subtract`, `multiply`, `divide`, `remainder`, `equal`, `not-equal`, `less`, `less-equal`, `greater`, `greater-equal`, `and`, `or` |
+  | `binary` | `operator`, `left`, `right` | `operator` is one of `add`, `subtract`, `multiply`, `divide`, `remainder`, `equal`, `not-equal`, `less`, `less-equal`, `greater`, `greater-equal`, `and`, `or`, `coalesce` (`x ?? y`; the right side is evaluated only when the left is absent) |
+  | `has` | `operand` | `has(x)`: `true` unless `x` is absent |
   | `conditional` | `condition`, `consequent`, `alternate` | `c ? a : b` |
   | `list` | `elements` | a list literal |
   | `record` | `fields`: `[{ "name", "value", "span" }]` | a record literal; shadowed keys (§9.4) are omitted. A field's `name` is any string, since an object key may be quoted (`{ "display-name": x }`), and names are unique |
@@ -320,13 +321,26 @@ Exactly two things decide whether a template runs under a runtime and a model:
 
 A template runs under any runtime that supports its format version, whatever compiler version produced it. Recompiling is the remedy for a changed model.
 
+### template-v2
+
+`template-v2` is a **superset** of `template-v1`, introduced because the stability policy lets a `-v1` format gain only optional properties, and a new expression kind or operator value is more than that ([stability](./stability.md)).
+
+| | Version 1 | Version 2 |
+|---|---|---|
+| Expressions | `literal`, `scope`, `member`, `unary`, `binary`, `conditional`, `list`, `record`, `event` | all of version 1, and `has` (`{ "kind": "has", "operand", "span" }`, `has(x)`) |
+| Binary operators | `add` … `or` | all of version 1, and `coalesce` (`x ?? y`; the right side is evaluated only when the left is absent) |
+
+- **The compiler writes version 2 only for a template that uses a construct of it.** A template that uses none is written as version 1, byte for byte as before: its canonical digest, its program identity, its tree and its keys do not change, and an older runtime still runs it.
+- **The runtime reads both.** A version 1 document that contains a version 2 construct is `assembly-malformed-template`, and a version 2 document that uses none is read as a template. A runtime from before version 2 refuses a version 2 template as `assembly-unsupported-format-version`: recompile with an older MESH, or update the runtime. Both the compiler and the runtime say which versions they read.
+- Version 2 is where the later constructs (snippets, the window clause) are added, with the same rule.
+
 ## The model fingerprint
 
 The fingerprint is determined by the model's **meaning**, and by nothing else.
 
 **What counts:**
 - the set of components;
-- for each component: its props (name, type, requiredness); its events (name, and payload type or none); its commands (name, and each parameter's type, in order); and its scope (name and type);
+- for each component: its props (name, type, requiredness, and `default` if it has one); its events (name, and payload type or none); its commands (name, and each parameter's type, in order); and its scope (name and type);
 - types as their full structural expansion, since named types are structural (§9.3).
 
 **What doesn't count:**
@@ -352,13 +366,15 @@ The fingerprint is determined by the model's **meaning**, and by nothing else.
 | `list<U>` | `0x06`, `D(U)` |
 | `U?` | `0x07`, `D(U)` |
 | record | `0x08`, the count of fields, then for each field: its name (a string), its requiredness (a flag, `0x01` for required), `D(its type)` |
+| `enum` | `0x09`, the count of values, then each value (a string), in code-point order: an enum is a set |
+| `snippet<A, B>` | `0x0a`, the count of parameters, then `D(each parameter)` in order |
 | a named type | nothing of its own: `D(named)` is `D(its definition)` |
 
 A digest is computed once per named type and reused, so the fingerprint costs time linear in the manifest's size, however often a named type is used, and equals what hashing the full expansion would give.
 
 **A component's digest,** `C`, is `H` of:
 1. `0x10`;
-2. the count of props, then for each prop: its name, its requiredness (a flag), `D(its type)`;
+2. the count of props, then for each prop: its name, its requiredness (a flag), `D(its type)`, then, only if it has a `default`, `0x20` and the default's bytes (null `0x00`; boolean `0x01` and a flag; number `0x02` and its binary64 value, big-endian, `-0` as `0`; string `0x03` and a string; list `0x04`, a count and each element; record `0x05`, a count, and for each field in code-point order its name and value). A prop with no default hashes exactly as before, so a manifest that uses neither enums nor defaults keeps its fingerprint;
 3. the count of events, then for each event: its name, then `0x00` if it has no payload, or `0x01` and `D(its payload)`;
 4. the count of commands, then for each command: its name, the count of its parameters, then `D(each parameter's type)`, in parameter order;
 5. the count of scope names, then for each: its name, `D(its type)`.
@@ -416,16 +432,46 @@ A composite's template reads its own scope names. Those names are bound by the c
 
 1. every scope name `s` of `C` must be bound by a prop of `C` with the same name;
 2. the binding must be sound. With the prop declared as type `P`, and `s` of type `S`:
-   - if the prop is required, `is_assignable(P, S)` must hold (§9.3);
-   - if it's optional, `is_assignable(P?, S)` must hold (or `is_assignable(P, S)`, when `P` is already optional), because an unwritten prop binds absence.
+   - if the prop declares a `default`, `is_assignable(P, S)` must hold (§9.3): an unwritten prop binds the default, which is a `P`, so this holds by construction when the scope name has the prop's own type, and rule 4b needs no `P?` for it;
+   - otherwise, if the prop is required, `is_assignable(P, S)` must hold;
+   - if it's optional and has no default, `is_assignable(P?, S)` must hold (or `is_assignable(P, S)`, when `P` is already optional), because an unwritten prop binds absence.
 
-At runtime, each written prop's value is evaluated in the enclosing template and checked against the prop's declared type (§9.7.6). An unwritten prop binds absent. A prop with no scope name of the same name is evaluated, and then not used.
+At runtime, each written prop's value is evaluated in the enclosing template and checked against the prop's declared type (§9.7.6). An unwritten prop binds its `default` if it declares one, otherwise absent. A `default` is applied only when the occurrence expands as a composite: on a primitive occurrence it is ignored, and nothing is added to the render tree for it, so a renderer sees exactly the props the template wrote. A prop with no scope name of the same name is evaluated, and then not used.
 
 Only the root template's scope comes from the snapshot. The root component's own props play no part. The root is exempt from the binding rules, unless it is also used as a composite occurrence somewhere, which is then a cycle (rule 5).
 
-**Nesting.** A composite's template may contain composite occurrences, to any depth, as long as the program has no cycle.
+**Nesting.** A composite's template may contain composite occurrences, as long as the program has no cycle, and a render may nest 512 levels (an element, a composite's expansion, a fragment, a slot or a repeated item is one each); deeper is `runtime-nesting-too-deep`. A template document may nest 1,024 levels of JSON, which holds the 128 levels of MPRX nesting (an element is three levels of JSON); deeper is `assembly-malformed-template`.
 
 **Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can raise events of its own: see [Composite events](#composite-events).
+
+### Snippets
+
+A **snippet** is a piece of template with parameters, which a component passes to another, or a template names and renders itself ([the language spec](../MPRX-SPEC.md#9-checking-against-a-component-model), §9.4). It is pure: a function of its arguments and the scope it was declared in, and it runs no code.
+
+```xml
+<!-- the template of `data-list` (props `items` and `row`, a `snippet<Person>`) -->
+<list>
+  {#each items as item (item.id)}{@render row(item)}{/each}
+</list>
+
+<!-- an occurrence of it, with the snippet declared as a child -->
+<data-list items={people}>
+  {#snippet row(p)}<row label={p.name} on.press={select(p.id)} />{/snippet}
+</data-list>
+```
+
+- **Declared** with `{#snippet name(a, b)} … {/snippet}`, and **rendered** with `{@render name(args)}`, wherever an element may be.
+- **Passed.** A snippet declared as a direct child of an occurrence whose component declares a prop of that name is passed as that prop. Content between the tags of a component that declares a `children` snippet prop is passed as `children`, with no parameters. Any other declaration is **local**: a name for all the children of the element it is in, itself and its siblings included, so a snippet can render itself. A snippet is also passed along by name: `row={row}`.
+- **Scope.** A snippet reads the scope of the template that declares it, plus its parameters. A handler in its body names that template's commands and events, and a `mesh-slot` in it places the content of the occurrence of the declaring template's component, wherever it is rendered.
+- **Where it lives.** The manifest kind `snippet` (with ordered `params`) may be a composite's prop or scope name. It is never in a primitive's prop (`assembly-snippet-to-primitive`), a record, a list, a named type, an event payload, a command parameter, or the root scope (`assembly-snippet-root-scope`), and in an expression only as a whole attribute value, or a name passed along. A prop named `children` is a `snippet` with no parameters.
+- **In the template** it is the built-in elements `mesh-snippet` (props `name`, a string, and `params`, a list of strings; its children are the body) and `mesh-render` (props `name` and `arguments`, a list of the argument expressions; no children), as blocks are `mesh-if` and `mesh-each`. A template that has either is a `template-v2`. The runtime keeps a snippet as a value (the declaration and the scope it reads), never in a snapshot, a payload or a render tree.
+- **Identity.** A `{@render}` adds a **render step** (`0x08`) to the path of every node of the body: its position among the children of the rendering template, and no component. The body's own positions follow, so the same snippet rendered twice under one parent, in every item of a repeat, or through two composites, never shares a key (`examples/conformance/snippets`). The declaring template contributes only the positions inside the body.
+- **Update.** A node that renders a snippet, like one that places a slot, is never kept on its own memo: what it renders depends on the snippet, which its memo doesn't record. The nodes the snippet's body made are kept as any node is, by the values they read.
+- **Limit.** Snippets render at most 64 levels deep, one inside another (`runtime-snippet-depth`), and the 512 levels of all nesting apply (`runtime-nesting-too-deep`). Neither is configurable by the host.
+- Slots (`mesh-slot`, `mesh-fill`) keep working. A component that declares `children` is given its content as a snippet, any other as before.
+- **Passing a local snippet along.** A local snippet's name is a value in the attributes of the element whose children declare it and of everything inside them, and as the **whole** value of an attribute (`row={fmt}`) it is passed to that occurrence, which gets the snippet itself: it still reads the scope it was declared in (the repeat's item around it, the template's names), its commands are its declaring template's, and it is rendered by whoever holds it, in the holder's position. The prop it is given to must be a `snippet`, with the parameters the render sites give: a local snippet whose parameters have no render yet takes them from the prop's type (`type-mismatch` if the count is not the prop's, and `snippet<…>` is shown with the types it has). Anywhere else a snippet's name is an error: in an expression (`snippet-in-content`, `type-mismatch`), as a primitive's prop (`type-mismatch` when the prop is not a snippet), and a name declared in the body of a sibling is not in reach (`unknown-reference`). Vectors: `examples/conformance/passing`.
+- **Optional snippets.** A snippet prop or scope name may be optional (`{ "kind": "optional", "type": { "kind": "snippet" } }`, and `required: false`): a caller may leave it out, and `children` may be one. Rendering it is `possibly-absent-snippet` unless it sits in the first branch of an `{#if}` with `has(name)` in its condition (`&&` allowed). When it is absent a render draws nothing.
+- **A forwarder.** A template may be nothing but `{@render children()}` (or any `{@render name(args)}`): the document is then read as `<mesh-fragment>{@render children()}</mesh-fragment>`, so the composite makes no node of its own and places what its caller wrote, in place, as a [fragment](#fragments) does. A composite can also be one by being `<other>{@render children()}</other>` where `other` is a forwarder. Nothing else may stand beside the tag in that document, it is a `template-v2`, and a program's root cannot be one (`assembly-root-fragment`). Identity: the forwarder adds the fragment step (`0x07`) and then the render step (`0x08`) (`examples/conformance/forwarder`).
 
 ### Fragments
 
@@ -441,7 +487,7 @@ MESH makes a node only where a template wrote an element. `mesh-fragment` is how
 
 - **Where it is placed.** A fragment is built in (a model need not declare it), has no props and no events. It may be a composite template's root, a branch or body of a [block](#blocks), or simply a child among others, where its content is placed in the node around it. A block writes one for you where its branch or body is not exactly one element.
 - **Never a node.** The render tree has its content, as children of the nearest node above. Text it places that is next to other text is one run (a render tree's runs are maximal).
-- **Not the program's root.** The root renders one node: a root template that starts with a fragment, or with a composite that does, is `assembly-root-fragment`.
+- **Not the program's root.** The root renders one node: a root template that starts with a fragment, or with a composite that does (a template that is only a `{@render}` is one), is `assembly-root-fragment`.
 - **Identity.** A fragment adds a step (`0x07`, [runtime](runtime.md)) so its content's keys are its own; a repeat inside a fragment that is a repeat's item is made again on each update (it is not remembered per item).
 - **Blocks and fragments.** A block stands for several siblings, so it may be a fragment's child but not a template's root.
 
@@ -495,7 +541,7 @@ Conditional and repeated structure are syntax, not elements ([spec §3.1](../MPR
 - **`{#if condition}`** opens a conditional, zero or more **`{:else if condition}`** follow, then an optional **`{:else}`**, and **`{/if}`** closes it. Conditions are boolean. The first condition that holds chooses its branch; with none, the `{:else}` branch; with no `{:else}`, nothing is rendered.
 - **`{#each items as item (key)}`** opens a repeat and **`{/each}`** closes it. `item` is the name bound to one element, readable in the key and in the body, not in `items`. The key identifies an item across updates, is a string or a number, and is **mandatory** (`missing-repeat-key`).
 - **A branch or body is one element.** If it is exactly one element it is that element; anything else (text, several nodes, none, a lone block or slot) is wrapped in a `mesh-fragment` automatically, so `{#if ok}Saved {count} item(s){/if}` needs no fragment written.
-- **A block is a child of an element.** It cannot be the document, because a document is one element.
+- **A block is a child of an element.** It cannot be the document, because a document is one element. The one exception is `{@render name(args)}`: see [Snippets](#snippets), a template that is only a render tag.
 - **Text cannot contain `{#`, `{:` or `{/`.** To show one, write a string expression: `{"{#if}"}`.
 - **Nesting.** A block counts as three levels toward the nesting limit.
 - **The elements they replace are errors.** `mesh-if`, `mesh-each`, `mesh-switch`, `mesh-case` and `mesh-default` as elements are `retired-element`, and the message names the block to write.

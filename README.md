@@ -70,7 +70,7 @@ MESH AST
     ↓  mesh-semantic (lowering + validation)
 MESH Semantic IR
     ↓  mesh-analysis (checked against the component manifest)
-Template (template-v1), one per component
+Template (template-v1 or template-v2), one per component
     ↓  a program: a root and its templates
 mesh-runtime: render  ──▶  render tree (render-v1)  ──▶  PORT renderer
 mesh-runtime: dispatch ◀── handler identifier, payload ◀─┘
@@ -90,7 +90,7 @@ mesh/
 │   ├── mesh-semantic/        semantic model, lowering, structural validation
 │   ├── mesh-manifest/        component manifest loading and validation
 │   ├── mesh-analysis/        checking templates against a component manifest
-│   ├── mesh-template/        the template format (template-v1) and the model fingerprint
+│   ├── mesh-template/        the template format (template-v1, template-v2) and the model fingerprint
 │   ├── mesh-compiler/        compile API, diagnostics, and rendering
 │   ├── mesh-runtime/         the runtime: render and dispatch, MPRX's one evaluator
 │   ├── mesh-runtime-wasm/    the runtime, built for WebAssembly
@@ -115,7 +115,7 @@ mesh/
 
 ## Status
 
-**v0.13.0 prepared** (2026-10-17; not yet released: v0.12.0 is the latest release): a space written between two interpolations is content, so `{first} {last}` reads "Ada Lovelace". See the [release notes](./docs/releases/v0.13.md), the [v0.12 notes](./docs/releases/v0.12.md) (the editor formats and indents MPRX; released 2026-10-13), the [v0.11 notes](./docs/releases/v0.11.md) and [CHANGELOG](./CHANGELOG.md). What works today:
+**v0.14.0 prepared** (2026-10-18; not yet published: v0.13.0 is the latest release): enum types, `has(x)` and `x ?? y`, defaults for props, and snippets (`{#snippet}` and `{@render}`), with the language server completing and signing them. A program that uses none of it is unchanged. See the [release notes](./docs/releases/v0.14.md), the [v0.13 notes](./docs/releases/v0.13.md) (released 2026-10-17), the [v0.12 notes](./docs/releases/v0.12.md) (the editor formats and indents MPRX; released 2026-10-13), the [v0.11 notes](./docs/releases/v0.11.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 
 - The MPRX language: elements, attributes, text, `{...}` expressions (literals, references, member access, unary, binary and conditional operators, arrays, objects, command invocations, and `$event`), event bindings (`on.click={...}`), and control-flow blocks (`{#if}` … `{:else if}` … `{:else}` … `{/if}`, `{#each items as item (key)}` … `{/each}`)
 - Structural validation: mismatched closing tags, and duplicate attributes or event bindings

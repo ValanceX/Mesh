@@ -77,9 +77,10 @@ fn a_manifest_that_isnt_utf8_is_logged_and_unused() {
     all_answer(&mut client, &uri, 0, 14);
 }
 
-/// Findings A1's shapes, far deeper than the stack could once take.
+/// Findings A1's shapes, far deeper than the stack could once take (as deep
+/// as fits in the 64 KB source limit).
 fn deep_documents() -> Vec<(&'static str, String)> {
-    const DEEP: usize = 20_000;
+    const DEEP: usize = 9_000;
     vec![
         (
             "elements",

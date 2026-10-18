@@ -19,7 +19,8 @@ mod common;
 
 use mesh_compiler::check;
 use mesh_runtime::{
-    resolve, HostRecord, Interaction, Node, Program, Render, ResolveError, Tree, TreeChild,
+    resolve, HostRecord, HostValue, Interaction, Node, Program, Render, ResolveError,
+    RuntimeDiagnostic, Tree, TreeChild,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -41,8 +42,36 @@ fn json(path: &Path) -> Value {
 /// Renders the program in `examples/conformance/<name>/`, checks its tree
 /// against the committed one (or rewrites it, blessing), and returns it.
 fn render(name: &str) -> Render {
-    let model = read(&dir().join("components.json"));
     let here = dir().join(name);
+    let render = render_with(name, &read(&here.join("snapshot.json")))
+        .unwrap_or_else(|diagnostics| panic!("{name} renders: {diagnostics:#?}"));
+    let tree = render.tree().to_json() + "\n";
+    let expected = here.join("expected.tree.json");
+    if std::env::var_os("MESH_BLESS").is_some() {
+        fs::write(&expected, &tree).unwrap();
+    } else {
+        assert_eq!(read(&expected), tree, "{name}'s tree is the committed one");
+    }
+    render
+}
+
+/// A program's manifest: its own `components.json` if the directory has
+/// one (`enums/` does, so the shared one, and with it every other
+/// program's keys, is untouched), else the shared one.
+fn model_of(here: &Path) -> PathBuf {
+    let own = here.join("components.json");
+    if own.is_file() {
+        own
+    } else {
+        dir().join("components.json")
+    }
+}
+
+/// The program's render for a snapshot given as JSON text, or why it
+/// doesn't render.
+fn render_with(name: &str, snapshot_text: &str) -> Result<Render, Vec<RuntimeDiagnostic>> {
+    let here = dir().join(name);
+    let model = &read(&model_of(&here));
     let program = json(&here.join("program.json"));
     let root = program["root"].as_str().unwrap();
     let templates: Vec<String> = program["templates"]
@@ -51,7 +80,7 @@ fn render(name: &str) -> Render {
         .iter()
         .map(|component| {
             let component = component.as_str().unwrap();
-            let loaded = check::Model::load(&model, component).expect("the manifest loads");
+            let loaded = check::Model::load(model, component).expect("the manifest loads");
             let compiled = check::template(&read(&here.join(format!("{component}.mprx"))), &loaded);
             assert!(
                 compiled.diagnostics.is_empty(),
@@ -62,24 +91,15 @@ fn render(name: &str) -> Render {
         })
         .collect();
     let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
-    let snapshot = HostRecord::from_json(&read(&here.join("snapshot.json"))).unwrap();
-    let render = mesh_runtime::render(
+    let snapshot = HostRecord::from_json(snapshot_text).unwrap();
+    mesh_runtime::render(
         &Program {
             root,
             templates: &texts,
         },
-        &model,
+        model,
         &snapshot,
     )
-    .unwrap_or_else(|diagnostics| panic!("{name} renders: {diagnostics:#?}"));
-    let tree = render.tree().to_json() + "\n";
-    let expected = here.join("expected.tree.json");
-    if std::env::var_os("MESH_BLESS").is_some() {
-        fs::write(&expected, &tree).unwrap();
-    } else {
-        assert_eq!(read(&expected), tree, "{name}'s tree is the committed one");
-    }
-    render
 }
 
 fn nodes<'t>(node: &'t Node, out: &mut BTreeMap<&'t str, &'t Node>) {
@@ -410,3 +430,251 @@ fn an_interaction_on_a_key_the_tree_lacks_is_refused() {
         Err(ResolveError::UnknownTarget)
     );
 }
+
+/// `enums/`: the first program with its own manifest. Its `cases.json` is
+/// `{ props, rejects, dispatches }`:
+///
+/// - `props`: a node's prop, present (`value`) or `absent`;
+/// - `rejects`: a snapshot that doesn't render, and the first diagnostic's
+///   code and location;
+/// - `dispatches`: an event reported on a node with a payload, and the
+///   intent it gives, or the diagnostic's code and location.
+mod enums {
+    use super::*;
+
+    /// The `location` member of the diagnostic as the runtime writes it.
+    fn location(diagnostic: &RuntimeDiagnostic) -> Value {
+        let model = read(&dir().join("enums/components.json"));
+        let document: Value = serde_json::from_str(&mesh_runtime::to_json(
+            std::slice::from_ref(diagnostic),
+            &model,
+        ))
+        .unwrap();
+        document["diagnostics"][0]["location"].clone()
+    }
+
+    #[test]
+    fn the_props_are_as_committed() {
+        let render = render("enums");
+        let mut all = BTreeMap::new();
+        nodes(&render.tree().root, &mut all);
+        let cases = json(&dir().join("enums/cases.json"));
+        let mut failures = Vec::new();
+        for case in cases["props"].as_array().unwrap() {
+            let node = all[case["node"].as_str().unwrap()];
+            let value = entry(node.props.get(case["prop"].as_str().unwrap()));
+            if value != case["value"] {
+                failures.push(format!("{}: {value}", case["case"]));
+            }
+        }
+        assert!(failures.is_empty(), "{failures:#?}");
+    }
+
+    #[test]
+    fn a_value_that_is_not_a_variant_is_refused_at_the_boundary() {
+        let cases = json(&dir().join("enums/cases.json"));
+        let mut failures = Vec::new();
+        for case in cases["rejects"].as_array().unwrap() {
+            let snapshot = case["snapshot"].to_string();
+            match render_with("enums", &snapshot) {
+                Ok(_) => failures.push(format!("{}: rendered", case["case"])),
+                Err(diagnostics) => {
+                    let first = &diagnostics[0];
+                    if first.code != case["code"] || location(first) != case["location"] {
+                        failures.push(format!(
+                            "{}: {} at {}",
+                            case["case"],
+                            first.code,
+                            location(first)
+                        ));
+                    }
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{failures:#?}");
+    }
+
+    #[test]
+    fn an_event_whose_payload_or_argument_is_not_a_variant_is_refused() {
+        let render = render("enums");
+        let mut all = BTreeMap::new();
+        nodes(&render.tree().root, &mut all);
+        let cases = json(&dir().join("enums/cases.json"));
+        let mut failures = Vec::new();
+        for case in cases["dispatches"].as_array().unwrap() {
+            let node = all[case["node"].as_str().unwrap()];
+            let handler = &node.events[case["event"].as_str().unwrap()];
+            let payload = case
+                .get("payload")
+                .map(|p| HostValue::from_json(&p.to_string()).unwrap());
+            let actual = match mesh_runtime::dispatch(&render, handler, payload.as_ref()) {
+                Ok(intent) => {
+                    serde_json::json!({ "intent": serde_json::from_str::<Value>(&intent.to_json()).unwrap() })
+                }
+                Err(diagnostics) => serde_json::json!({
+                    "code": diagnostics[0].code,
+                    "location": location(&diagnostics[0]),
+                }),
+            };
+            if actual != case["expect"] {
+                failures.push(format!("{}: {actual}", case["case"]));
+            }
+        }
+        assert!(failures.is_empty(), "{failures:#?}");
+    }
+}
+
+/// `snippets/`: typed template values (decisions U1 to U14), the program of `snippets/components.json`
+/// rendered for a snapshot and then for each `step-N.snapshot.json` after it, each against its committed
+/// tree (`expected.tree.json`, `step-N.expected.tree.json`). `cases.json` is `{ distinct, same, … }`:
+/// relations between the keys of nodes, which a node's place in a tree names by the indexes of the
+/// nodes (not text runs) on the way down from the root.
+/// The vectors of a directory of programs that use snippets: every step's tree, update equal to render, and the keys the cases pin.
+macro_rules! snippet_vectors {
+    ($name:ident, $dir:literal) => {
+        mod $name {
+            use super::*;
+
+            fn steps() -> Vec<(String, String)> {
+                let mut steps = vec![(
+                    "snapshot.json".to_string(),
+                    "expected.tree.json".to_string(),
+                )];
+                let mut at = 1;
+                while dir()
+                    .join(format!("{}/step-{at}.snapshot.json", $dir))
+                    .is_file()
+                {
+                    steps.push((
+                        format!("step-{at}.snapshot.json"),
+                        format!("step-{at}.expected.tree.json"),
+                    ));
+                    at += 1;
+                }
+                steps
+            }
+
+            /// Renders `snapshot` of the program, comparing with the committed tree `expected` (or blessing).
+            fn rendered(snapshot: &str, expected: &str) -> Render {
+                let here = dir().join($dir);
+                let render = render_with($dir, &read(&here.join(snapshot)))
+                    .unwrap_or_else(|d| panic!("{snapshot} renders: {d:#?}"));
+                let tree = render.tree().to_json() + "\n";
+                if std::env::var_os("MESH_BLESS").is_some() {
+                    fs::write(here.join(expected), &tree).unwrap();
+                } else {
+                    assert_eq!(
+                        read(&here.join(expected)),
+                        tree,
+                        "{snapshot}'s tree is the committed one"
+                    );
+                }
+                render
+            }
+
+            fn key_at(tree: &Tree, path: &[usize]) -> String {
+                let mut node = &tree.root;
+                for step in path {
+                    let child = node
+                        .children
+                        .iter()
+                        .filter_map(|child| match child {
+                            TreeChild::Node(child) => Some(child),
+                            TreeChild::Text { .. } => None,
+                        })
+                        .nth(*step)
+                        .unwrap_or_else(|| panic!("no node {path:?}"));
+                    node = child;
+                }
+                node.key.clone()
+            }
+
+            fn path(value: &Value) -> Vec<usize> {
+                value
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|step| step.as_u64().unwrap() as usize)
+                    .collect()
+            }
+
+            #[test]
+            fn every_step_renders_its_committed_tree() {
+                for (snapshot, expected) in steps() {
+                    rendered(&snapshot, &expected);
+                }
+            }
+
+            #[test]
+            fn updating_from_each_step_to_the_next_is_the_render_of_the_next() {
+                let all = steps();
+                let mut previous = rendered(&all[0].0, &all[0].1);
+                for (snapshot, expected) in &all[1..] {
+                    let fresh = rendered(snapshot, expected);
+                    let record =
+                        HostRecord::from_json(&read(&dir().join($dir).join(snapshot))).unwrap();
+                    let updated = mesh_runtime::update(&previous, &record)
+                        .unwrap_or_else(|d| panic!("{snapshot} updates: {d:#?}"));
+                    assert_eq!(
+                        updated.render.tree(),
+                        fresh.tree(),
+                        "an update to {snapshot} is its render"
+                    );
+                    previous = updated.render;
+                }
+            }
+
+            #[test]
+            fn keys_are_distinct_or_the_same_as_committed() {
+                let all = steps();
+                let trees: Vec<Render> = all.iter().map(|(s, e)| rendered(s, e)).collect();
+                let cases = json(&dir().join(concat!($dir, "/cases.json")));
+                let mut failures = Vec::new();
+                for case in cases["distinct"].as_array().unwrap() {
+                    let tree = trees[case["step"].as_u64().unwrap() as usize].tree();
+                    let keys: Vec<String> = case["paths"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|p| key_at(tree, &path(p)))
+                        .collect();
+                    let mut unique = keys.clone();
+                    unique.sort();
+                    unique.dedup();
+                    if unique.len() != keys.len() {
+                        failures.push(format!("{}: two of {keys:?} are one key", case["case"]));
+                    }
+                }
+                for case in cases["same"].as_array().unwrap() {
+                    let at = |side: &str| {
+                        let side = &case[side];
+                        key_at(
+                            trees[side["step"].as_u64().unwrap() as usize].tree(),
+                            &path(&side["path"]),
+                        )
+                    };
+                    if at("a") != at("b") {
+                        failures.push(format!("{}: the keys differ", case["case"]));
+                    }
+                }
+                for case in cases["different"].as_array().unwrap() {
+                    let at = |side: &str| {
+                        let side = &case[side];
+                        key_at(
+                            trees[side["step"].as_u64().unwrap() as usize].tree(),
+                            &path(&side["path"]),
+                        )
+                    };
+                    if at("a") == at("b") {
+                        failures.push(format!("{}: the keys are one", case["case"]));
+                    }
+                }
+                assert!(failures.is_empty(), "{failures:#?}");
+            }
+        }
+    };
+}
+
+snippet_vectors!(snippets, "snippets");
+snippet_vectors!(forwarder, "forwarder");
+snippet_vectors!(passing, "passing");

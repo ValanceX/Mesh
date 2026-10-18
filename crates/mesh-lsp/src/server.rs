@@ -26,7 +26,8 @@ use lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CompletionParams,
     DocumentChanges, DocumentFormattingParams, DocumentOnTypeFormattingParams,
     DocumentRangeFormattingParams, GotoDefinitionParams, HoverParams, MessageType, OneOf,
-    OptionalVersionedTextDocumentIdentifier, TextDocumentEdit, TextEdit, WorkspaceEdit,
+    OptionalVersionedTextDocumentIdentifier, SignatureHelpParams, TextDocumentEdit, TextEdit,
+    WorkspaceEdit,
 };
 use manifest::ManifestState;
 use mesh_compiler::{ColumnUnit, SourceMap};
@@ -333,6 +334,20 @@ impl Server {
                     Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
                 }
             }
+            (Protocol::Running, "textDocument/signatureHelp") => {
+                match decode::<SignatureHelpParams>(&method, params) {
+                    Ok(params) => {
+                        let position = params.text_document_position_params;
+                        let document = position.text_document.uri.as_str().to_string();
+                        self.answer_or_hold(
+                            id,
+                            &document,
+                            Query::SignatureHelp(position.position),
+                        )?;
+                    }
+                    Err(message) => self.respond_error(id, ErrorCode::InvalidParams, message)?,
+                }
+            }
             (Protocol::Running, "textDocument/completion") => {
                 match decode::<CompletionParams>(&method, params) {
                     Ok(params) => {
@@ -488,6 +503,7 @@ impl Server {
                     "codeActionProvider": { "codeActionKinds": ["quickfix"] },
                     "hoverProvider": true,
                     "definitionProvider": true,
+                    "signatureHelpProvider": { "triggerCharacters": ["(", ","] },
                     "completionProvider": { "triggerCharacters": ["<", "."], "resolveProvider": false },
                     "documentFormattingProvider": true,
                     "documentRangeFormattingProvider": true,

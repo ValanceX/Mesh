@@ -4,6 +4,9 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
+/// How many values of an enum a type prints before it says how many there are.
+const ENUM_DISPLAY: usize = 8;
+
 /// A type, as analysis computes and compares them.
 ///
 /// The variants a manifest can write mirror [`mesh_manifest::Type`]
@@ -29,6 +32,13 @@ pub enum Ty {
     /// `T?`: a `T`, or absent. Never wraps a type that is already
     /// optional, directly or through named references.
     Optional(Box<Ty>),
+    /// A closed set of strings, in the order they were written (the order
+    /// is for messages; the type is the set).
+    Enum(Vec<String>),
+    /// `snippet<A, B>`: a piece of template with these parameters. Second-class: only a
+    /// composite's prop or scope name has this type, and only a render, a passing-along or a
+    /// whole attribute value uses it.
+    Snippet(Vec<Ty>),
     /// The element type of `[]`. Assignable to every type.
     Nothing,
     /// The result of a command invocation. Compatible with nothing.
@@ -69,6 +79,8 @@ impl From<&mesh_manifest::Type> for Ty {
             ),
             Type::Named(name) => Ty::Named(name.clone()),
             Type::Optional(inner) => Ty::Optional(Box::new(Ty::from(inner.as_ref()))),
+            Type::Enum(values) => Ty::Enum(values.clone()),
+            Type::Snippet(params) => Ty::Snippet(params.iter().map(Ty::from).collect()),
         }
     }
 }
@@ -88,6 +100,30 @@ impl fmt::Display for Ty {
             Ty::List(element) => write!(f, "list<{element}>"),
             Ty::Named(name) => f.write_str(name),
             Ty::Optional(inner) => write!(f, "{inner}?"),
+            // `"sm" | "md" | "lg"`, as the documentation writes it; a long
+            // set is cut after eight.
+            Ty::Enum(values) => {
+                for (index, value) in values.iter().take(ENUM_DISPLAY).enumerate() {
+                    if index > 0 {
+                        f.write_str(" | ")?;
+                    }
+                    write!(f, "{value:?}")?;
+                }
+                if values.len() > ENUM_DISPLAY {
+                    write!(f, " | … ({} values)", values.len())?;
+                }
+                Ok(())
+            }
+            Ty::Snippet(params) => {
+                f.write_str("snippet<")?;
+                for (index, param) in params.iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{param}")?;
+                }
+                f.write_str(">")
+            }
             Ty::Record(fields) if fields.is_empty() => f.write_str("{}"),
             Ty::Record(fields) => {
                 f.write_str("{ ")?;

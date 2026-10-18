@@ -37,7 +37,11 @@ const SCHEMA_CODES: [&str; 6] = [
 ];
 
 /// Codes for mistakes only the loader can find.
-const LOADER_CODES: [&str; 6] = [
+const LOADER_CODES: [&str; 10] = [
+    "manifest-snippet-misplaced",
+    "manifest-children-not-snippet",
+    "manifest-enum-too-large",
+    "manifest-duplicate-variant",
     "manifest-duplicate-key",
     "manifest-duplicate-parameter",
     "manifest-unknown-type",

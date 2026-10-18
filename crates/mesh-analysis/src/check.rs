@@ -33,6 +33,9 @@ impl<'m> Walker<'m> {
             types: Vec::new(),
             loops: Vec::new(),
             parents: Vec::new(),
+            snippets: Vec::new(),
+            snippets_changed: false,
+            present: Vec::new(),
         }
     }
 
@@ -91,6 +94,36 @@ struct Walker<'m> {
     /// The tags of the elements being walked, innermost last, the current
     /// element not among them.
     parents: Vec<String>,
+    /// The snippets declared among the children being walked, and among the children around them,
+    /// innermost last: each a name for a piece of template, whose parameters' types are the ones
+    /// its render sites give.
+    snippets: Vec<Local>,
+    /// Whether a render site has widened a local snippet's parameter type since the last time its
+    /// body was checked (the checks are repeated until none does).
+    snippets_changed: bool,
+    /// The names of optional snippets known to be present here: those a `has(name)` among the
+    /// conditions of the `{#if}`s around this content, in their first branch, vouches for. A
+    /// snippet's body starts with none: it is rendered where its holder chooses.
+    present: Vec<String>,
+}
+
+/// A snippet declared among some children, and not passed to a component.
+struct Local {
+    name: String,
+    name_span: Span,
+    params: Vec<(String, Span)>,
+    /// What the render sites give each parameter, joined; `None` while no render has.
+    inferred: Vec<Option<Ty>>,
+}
+
+/// What `declare_snippets` found among an element's children.
+struct Declared<'e> {
+    /// How long `snippets` was before.
+    base: usize,
+    /// The local snippets, as their place in `snippets` and their declaration.
+    local: Vec<(usize, &'e Element)>,
+    /// The snippets passed as props: the declaration and the prop.
+    passed: Vec<(&'e Element, String)>,
 }
 
 /// The reserved elements that blocks replaced. Written as elements they are reported while lowering, so a missing
@@ -115,6 +148,10 @@ impl<'m> Walker<'m> {
     /// Checks one element as an instance of the component its tag names,
     /// then its attribute values, its handlers and its children.
     fn element(&mut self, element: &Element) {
+        if element.construct == Some(Construct::Render) {
+            self.render_site(element);
+            return;
+        }
         let manifest = self.manifest();
         // A block lowered to this element: it is the language's, not a component of the manifest's, so no tool is
         // offered it and nothing about it resolves.
@@ -142,8 +179,10 @@ impl<'m> Walker<'m> {
             },
         };
 
+        let declared = self.declare_snippets(element, component, tracked);
         if let Some((name, component)) = component {
             self.missing_props(element, name, component);
+            self.children_conflict(element, name, component);
         }
 
         let repeating = element.construct == Some(Construct::Each);
@@ -209,8 +248,11 @@ impl<'m> Walker<'m> {
                 }
             }
             match (&attribute.value, expected) {
-                (AttributeValue::String { span, .. }, Some((expected, expectation))) => {
-                    self.expect(Ty::String, *span, expectation, &expected);
+                (AttributeValue::String { value, span }, Some((expected, expectation))) => {
+                    // Where an enum is expected, a quoted value is a literal site (T3).
+                    if self.variant(value, *span, &expected).is_none() {
+                        self.expect(Ty::String, *span, expectation, &expected);
+                    }
                 }
                 (AttributeValue::String { .. }, None) => {}
                 (AttributeValue::Expression(expression), Some((expected, expectation))) => {
@@ -273,7 +315,46 @@ impl<'m> Walker<'m> {
         }
 
         self.parents.push(element.name.clone());
+        self.walk_children(element);
+        self.parents.pop();
+        self.finish_snippets(declared, component);
+        if pushed {
+            self.loops.pop();
+        }
+    }
+
+    /// The content of `element`: text, interpolations and elements. A snippet declaration is not
+    /// content; `finish_snippets` checks it.
+    fn walk_children(&mut self, element: &Element) {
+        // The first branch of a conditional is reached only when its condition holds.
+        let vouched = if matches!(
+            element.construct,
+            Some(Construct::If | Construct::Case { .. })
+        ) {
+            element
+                .attributes
+                .iter()
+                .find(|attribute| attribute.name == "when")
+                .and_then(|attribute| match &attribute.value {
+                    AttributeValue::Expression(condition) => Some(present_names(condition)),
+                    _ => None,
+                })
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let mut first = true;
         for child in &element.children {
+            let guard = (first || element.construct != Some(Construct::If))
+                && matches!(child, Child::Element(_))
+                && !vouched.is_empty();
+            if matches!(child, Child::Element(_)) {
+                first = false;
+            }
+            let before = self.present.len();
+            if guard {
+                self.present.extend(vouched.iter().cloned());
+            }
             match child {
                 Child::Text { .. } => {}
                 Child::Expression(expression) => {
@@ -281,12 +362,367 @@ impl<'m> Walker<'m> {
                         self.content(&ty, expression.span());
                     }
                 }
+                Child::Element(child) if child.construct == Some(Construct::Snippet) => {}
                 Child::Element(child) => self.element(child),
             }
+            self.present.truncate(before);
         }
+    }
+
+    /// A snippet declaration's name and its parameters, as lowering wrote them.
+    fn snippet_parts(declaration: &Element) -> (String, Span, Vec<(String, Span)>) {
+        let mut name = (String::new(), declaration.name_span);
+        let mut params = Vec::new();
+        for attribute in &declaration.attributes {
+            match (&attribute.value, attribute.name.as_str()) {
+                (AttributeValue::String { value, span }, "name") => name = (value.clone(), *span),
+                (AttributeValue::Expression(Expression::Array { elements, .. }), "params") => {
+                    for element in elements {
+                        if let Expression::Literal {
+                            value: Literal::String(text),
+                            span,
+                        } = element
+                        {
+                            params.push((text.clone(), *span));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        (name.0, name.1, params)
+    }
+
+    /// Registers the snippets declared among `element`'s children: a declaration whose name is a prop
+    /// of the component the element is an occurrence of is passed as that prop; any other is a local
+    /// name, readable among all of `element`'s children (and in its own attributes, to pass it along).
+    fn declare_snippets<'e>(
+        &mut self,
+        element: &'e Element,
+        component: Option<(&str, &Component)>,
+        tracked: bool,
+    ) -> Declared<'e> {
+        let mut declared = Declared {
+            base: self.snippets.len(),
+            local: Vec::new(),
+            passed: Vec::new(),
+        };
+        let mut seen: Vec<String> = Vec::new();
+        for child in &element.children {
+            let Child::Element(child) = child else {
+                continue;
+            };
+            if child.construct != Some(Construct::Snippet) {
+                continue;
+            }
+            let (name, name_span, params) = Self::snippet_parts(child);
+            if seen.contains(&name) {
+                self.facts.push(Fact::DuplicateSnippet {
+                    name: name.clone(),
+                    span: name_span,
+                });
+            }
+            seen.push(name.clone());
+            match component {
+                Some((_, component)) if tracked && component.props.contains_key(&name) => {
+                    declared.passed.push((child, name));
+                }
+                _ => {
+                    let inferred = vec![None; params.len()];
+                    declared.local.push((self.snippets.len(), child));
+                    self.snippets.push(Local {
+                        name,
+                        name_span,
+                        params,
+                        inferred,
+                    });
+                }
+            }
+        }
+        declared
+    }
+
+    /// Checks the bodies of the snippets `declared` found, and forgets the local names.
+    fn finish_snippets(&mut self, declared: Declared<'_>, component: Option<(&str, &Component)>) {
+        let name = component.map(|(name, _)| name.to_string());
+        for (declaration, prop) in &declared.passed {
+            let (_, name_span, params) = Self::snippet_parts(declaration);
+            let component_name = name.clone().unwrap_or_default();
+            let field = component
+                .and_then(|(_, component)| component.props.get(prop))
+                .expect("a passed snippet names a prop");
+            self.resolve(
+                name_span,
+                Target::Prop {
+                    component: component_name.clone(),
+                    prop: prop.clone(),
+                },
+            );
+            let expected = Ty::from(&field.ty);
+            let wanted = match relation::expand(self.manifest(), &expected) {
+                Ty::Optional(inner) => relation::expand(self.manifest(), &inner),
+                other => other,
+            };
+            let types = match &wanted {
+                Ty::Snippet(parameters) => {
+                    if parameters.len() != params.len() {
+                        self.facts.push(Fact::SnippetArity {
+                            name: prop.clone(),
+                            expected: parameters.len(),
+                            found: params.len(),
+                            span: name_span,
+                        });
+                    }
+                    parameters.clone()
+                }
+                _ => {
+                    let given = Ty::Snippet(vec![Ty::Any; params.len()]);
+                    self.expect(
+                        given,
+                        name_span,
+                        Expectation::Prop {
+                            component: component_name,
+                            prop: prop.clone(),
+                        },
+                        &expected,
+                    );
+                    Vec::new()
+                }
+            };
+            let types: Vec<Ty> = (0..params.len())
+                .map(|index| types.get(index).cloned().unwrap_or(Ty::Any))
+                .collect();
+            self.snippet_body(declaration, &params, &types);
+        }
+        // The local snippets' parameters are what their render sites give them, and a body can
+        // render itself and the others, so the bodies are checked again until no render widens a
+        // parameter (what an earlier round reported is dropped, and found again if it still holds).
+        for round in 0..4 {
+            let marks = (self.facts.len(), self.resolutions.len(), self.types.len());
+            self.snippets_changed = false;
+            for (index, declaration) in &declared.local {
+                let params = self.snippets[*index].params.clone();
+                let types: Vec<Ty> = self.snippets[*index]
+                    .inferred
+                    .iter()
+                    .map(|ty| ty.clone().unwrap_or(Ty::Any))
+                    .collect();
+                self.snippet_body(declaration, &params, &types);
+            }
+            if !self.snippets_changed || round == 3 {
+                break;
+            }
+            self.facts.truncate(marks.0);
+            self.resolutions.truncate(marks.1);
+            self.types.truncate(marks.2);
+        }
+        self.snippets.truncate(declared.base);
+    }
+
+    /// Checks the body of the snippet `declaration` with its parameters bound to `types`.
+    fn snippet_body(&mut self, declaration: &Element, params: &[(String, Span)], types: &[Ty]) {
+        for ((name, span), ty) in params.iter().zip(types) {
+            // A parameter is a declaration: it resolves to itself and has the type it is given.
+            self.resolve(
+                *span,
+                Target::Binding {
+                    name: name.clone(),
+                    declaration: *span,
+                },
+            );
+            self.typed(*span, ty.clone());
+            self.loops.push((name.clone(), ty.clone(), *span));
+        }
+        let inner = self.declare_snippets(declaration, None, false);
+        self.parents.push(declaration.name.clone());
+        let outer = std::mem::take(&mut self.present);
+        self.walk_children(declaration);
+        self.present = outer;
         self.parents.pop();
-        if pushed {
+        self.finish_snippets(inner, None);
+        for _ in params {
             self.loops.pop();
+        }
+    }
+
+    /// `{@render name(arguments)}`: the snippet it names must be one declared among the children it
+    /// is in or around (its arguments then give its parameters their types), or a snippet-typed name
+    /// of the template's scope (its arguments are then checked against its parameters).
+    fn render_site(&mut self, site: &Element) {
+        let mut name = (String::new(), site.name_span);
+        let mut arguments: &[Expression] = &[];
+        for attribute in &site.attributes {
+            match (&attribute.value, attribute.name.as_str()) {
+                (AttributeValue::String { value, span }, "name") => name = (value.clone(), *span),
+                (AttributeValue::Expression(Expression::Array { elements, .. }), "arguments") => {
+                    arguments = elements;
+                }
+                _ => {}
+            }
+        }
+        let (name, name_span) = name;
+
+        if let Some(index) = self.snippets.iter().rposition(|local| local.name == name) {
+            let (expected, declaration) = {
+                let local = &self.snippets[index];
+                (local.params.len(), local.name_span)
+            };
+            self.resolve(
+                name_span,
+                Target::Binding {
+                    name: name.clone(),
+                    declaration,
+                },
+            );
+            if arguments.len() != expected {
+                self.facts.push(Fact::SnippetArity {
+                    name,
+                    expected,
+                    found: arguments.len(),
+                    span: site.span,
+                });
+                for argument in arguments {
+                    self.expression(argument, Place::Value);
+                }
+                return;
+            }
+            for (position, argument) in arguments.iter().enumerate() {
+                if let Some(ty) = self.expression(argument, Place::Value) {
+                    self.give(index, position, ty, argument.span());
+                }
+            }
+            return;
+        }
+
+        let scope = &self.template.component().scope;
+        let snippet_named = scope.get_key_value(&name).and_then(|(key, declared)| {
+            let ty = Ty::from(declared);
+            let (present, optional) = match relation::expand(self.template.manifest(), &ty) {
+                Ty::Optional(inner) => (relation::expand(self.template.manifest(), &inner), true),
+                other => (other, false),
+            };
+            match present {
+                Ty::Snippet(parameters) => Some((key.clone(), parameters, optional)),
+                _ => None,
+            }
+        });
+        match snippet_named {
+            Some((key, parameters, optional)) => {
+                self.resolve(name_span, Target::Scope(key));
+                if optional && !self.present.contains(&name) {
+                    self.facts.push(Fact::PossiblyAbsentSnippet {
+                        name: name.clone(),
+                        span: name_span,
+                    });
+                }
+                if arguments.len() != parameters.len() {
+                    self.facts.push(Fact::SnippetArity {
+                        name,
+                        expected: parameters.len(),
+                        found: arguments.len(),
+                        span: site.span,
+                    });
+                    for argument in arguments {
+                        self.expression(argument, Place::Value);
+                    }
+                    return;
+                }
+                for (position, (argument, parameter)) in
+                    arguments.iter().zip(&parameters).enumerate()
+                {
+                    let expectation = Expectation::SnippetArgument {
+                        snippet: name.clone(),
+                        index: position,
+                    };
+                    self.check(argument, Place::Value, parameter, expectation);
+                }
+            }
+            None => {
+                let mut candidates: Vec<String> = self
+                    .snippets
+                    .iter()
+                    .map(|local| local.name.clone())
+                    .collect();
+                candidates.extend(scope.iter().filter_map(|(key, declared)| {
+                    let present = match declared {
+                        Type::Optional(inner) => inner.as_ref(),
+                        other => other,
+                    };
+                    matches!(present, Type::Snippet(_)).then(|| key.clone())
+                }));
+                self.facts.push(Fact::UnknownSnippet {
+                    name,
+                    span: name_span,
+                    candidates,
+                });
+                for argument in arguments {
+                    self.expression(argument, Place::Value);
+                }
+            }
+        }
+    }
+
+    /// A render gives the local snippet `index` the argument of type `ty` for parameter `position`:
+    /// the parameter's type becomes the common type of everything it was given. An argument that has
+    /// none with an earlier one is reported at the argument.
+    fn give(&mut self, index: usize, position: usize, ty: Ty, span: Span) {
+        if matches!(ty, Ty::Snippet(_)) {
+            let snippet = self.snippets[index].name.clone();
+            self.expect(
+                ty,
+                span,
+                Expectation::SnippetArgument {
+                    snippet,
+                    index: position,
+                },
+                &Ty::Any,
+            );
+            return;
+        }
+        let previous = self.snippets[index].inferred[position].clone();
+        match previous {
+            None => {
+                self.snippets[index].inferred[position] = Some(ty);
+                self.snippets_changed = true;
+            }
+            Some(previous) => match join(self.manifest(), &previous, &ty) {
+                Some(joined) => {
+                    if joined != previous {
+                        self.snippets[index].inferred[position] = Some(joined);
+                        self.snippets_changed = true;
+                    }
+                }
+                None => self.facts.push(Fact::NoCommonType {
+                    combination: Combination::SnippetArgument,
+                    left: previous,
+                    right: ty,
+                    span,
+                }),
+            },
+        }
+    }
+
+    /// `children={…}` together with content between the tags of a component that takes `children`:
+    /// two answers to one prop.
+    fn children_conflict(&mut self, element: &Element, name: &str, component: &Component) {
+        if !component.props.contains_key("children") {
+            return;
+        }
+        let loose = element.children.iter().any(|child| match child {
+            Child::Element(child) => child.construct != Some(Construct::Snippet),
+            _ => true,
+        });
+        if let Some(attribute) = element
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name == "children")
+        {
+            if loose {
+                self.facts.push(Fact::ChildrenConflict {
+                    component: name.to_string(),
+                    span: attribute.name_span,
+                });
+            }
         }
     }
 
@@ -332,7 +768,7 @@ impl<'m> Walker<'m> {
             Ty::Optional(inner) => relation::expand(self.manifest(), &inner),
             other => other,
         };
-        if matches!(present, Ty::List(_) | Ty::Record(_)) {
+        if matches!(present, Ty::List(_) | Ty::Record(_) | Ty::Snippet(_)) {
             self.facts.push(Fact::ContentNotText {
                 ty: ty.clone(),
                 span,
@@ -347,7 +783,16 @@ impl<'m> Walker<'m> {
             let supplied = element
                 .attributes
                 .iter()
-                .any(|attribute| &attribute.name == prop);
+                .any(|attribute| &attribute.name == prop)
+                // A snippet declared among the children is passed as the prop of its name, and content
+                // between the tags is the prop `children`.
+                || element.children.iter().any(|child| match child {
+                    Child::Element(child) if child.construct == Some(Construct::Snippet) => {
+                        Self::snippet_parts(child).0 == *prop
+                    }
+                    Child::Element(_) | Child::Expression(_) => prop == "children",
+                    Child::Text { .. } => prop == "children",
+                });
             // A repeat without a key is reported while lowering, with a message of its own.
             let reported = element.construct == Some(Construct::Each) && prop == "key";
             if field.required && !supplied && !reported {
@@ -509,6 +954,32 @@ impl<'m> Walker<'m> {
             _ => expected.clone(),
         };
         match expression {
+            // A string literal where an enum is expected is checked for membership (T3).
+            Expression::Literal {
+                value: Literal::String(text),
+                span,
+            } if self.enum_values(&present()).is_some() => {
+                return self.variant(text, *span, &present()).flatten();
+            }
+            // A local snippet passed along where a snippet is expected is given the parameters the
+            // expected one is called with.
+            Expression::Reference { name, span }
+                if !self.loops.iter().any(|(bound, _, _)| bound == name)
+                    && self.snippets.iter().any(|local| &local.name == name) =>
+            {
+                let index = self
+                    .snippets
+                    .iter()
+                    .rposition(|local| &local.name == name)
+                    .expect("just found");
+                if let Ty::Snippet(parameters) = relation::expand(self.manifest(), &present()) {
+                    if parameters.len() == self.snippets[index].params.len() {
+                        for (position, parameter) in parameters.iter().enumerate() {
+                            self.give(index, position, parameter.clone(), *span);
+                        }
+                    }
+                }
+            }
             Expression::Object { members, span } => {
                 let present = present();
                 if let Ty::Record(fields) = relation::expand(self.manifest(), &present) {
@@ -631,6 +1102,45 @@ impl<'m> Walker<'m> {
         }
     }
 
+    /// The values of `ty` if it is an enum once named references and one
+    /// `optional` are stripped (`size?` and a named alias of an enum
+    /// included); `None` for every other type.
+    fn enum_values(&self, ty: &Ty) -> Option<Vec<String>> {
+        let manifest = self.manifest();
+        let present = match relation::expand(manifest, ty) {
+            Ty::Optional(inner) => relation::expand(manifest, &inner),
+            other => other,
+        };
+        match present {
+            Ty::Enum(values) => Some(values),
+            _ => None,
+        }
+    }
+
+    /// A string literal `text` (at `span`, quotes included) where `expected`
+    /// is expected: a literal site (T3). `None` if `expected` is not an
+    /// enum, so this is no literal site. Otherwise `Some` of the literal's
+    /// type, which is the enum's (the type as written, `Size`, not its
+    /// values) when `text` is one of its values, and `Some(None)`, the
+    /// error marker, after reporting `unknown-variant` when it is not.
+    fn variant(&mut self, text: &str, span: Span, expected: &Ty) -> Option<Option<Ty>> {
+        let values = self.enum_values(expected)?;
+        if values.iter().any(|value| value == text) {
+            let manifest = self.manifest();
+            let present = match relation::expand(manifest, expected) {
+                Ty::Optional(inner) => *inner,
+                _ => expected.clone(),
+            };
+            return Some(self.typed(span, present));
+        }
+        self.facts.push(Fact::UnknownVariant {
+            value: text.to_string(),
+            values,
+            span,
+        });
+        Some(None)
+    }
+
     /// Records that the expression at `span` has type `ty`, and returns
     /// it.
     fn typed(&mut self, span: Span, ty: Ty) -> Option<Ty> {
@@ -663,6 +1173,32 @@ impl<'m> Walker<'m> {
                     .find(|(bound, _, _)| bound == name)
                     .expect("just found");
                 let (ty, declaration) = (ty.clone(), *declaration);
+                self.resolve(
+                    *span,
+                    Target::Binding {
+                        name: name.clone(),
+                        declaration,
+                    },
+                );
+                Some(ty)
+            }
+            Expression::Reference { name, span }
+                if self.snippets.iter().any(|local| &local.name == name) =>
+            {
+                let local = self
+                    .snippets
+                    .iter()
+                    .rev()
+                    .find(|local| &local.name == name)
+                    .expect("just found");
+                let declaration = local.name_span;
+                let ty = Ty::Snippet(
+                    local
+                        .inferred
+                        .iter()
+                        .map(|ty| ty.clone().unwrap_or(Ty::Any))
+                        .collect(),
+                );
                 self.resolve(
                     *span,
                     Target::Binding {
@@ -732,6 +1268,14 @@ impl<'m> Walker<'m> {
             // A handler's own command never gets here (see `handler`), so
             // this one is misplaced. It is reported once, and neither its
             // name nor its arguments are checked.
+            // `has(x)`: whether `x` is present. Not a command, and no name is
+            // reserved: it is this only where a command could not be.
+            Expression::Command {
+                command,
+                arguments,
+                span,
+                ..
+            } if command == "has" => self.presence(arguments, *span, place),
             Expression::Command { command, span, .. } => {
                 self.facts.push(Fact::CommandOutsideHandler {
                     command: command.clone(),
@@ -742,6 +1286,82 @@ impl<'m> Walker<'m> {
             Expression::EventValue { name, span } => self.event_value(name, *span, place),
         }?;
         self.typed(expression.span(), ty)
+    }
+
+    /// `has(operand)`: a boolean. The operand must be able to be absent;
+    /// otherwise the test is always true, which is a warning.
+    fn presence(&mut self, arguments: &[Expression], span: Span, place: Place<'m>) -> Option<Ty> {
+        if arguments.len() != 1 {
+            self.facts.push(Fact::PresenceArity {
+                found: arguments.len(),
+                span,
+            });
+            for argument in arguments {
+                self.expression(argument, place);
+            }
+            return None;
+        }
+        let ty = self.expression(&arguments[0], place)?;
+        if !matches!(relation::expand(self.manifest(), &ty), Ty::Optional(_)) {
+            self.facts.push(Fact::RedundantPresenceTest { ty, span });
+        }
+        Some(Ty::Boolean)
+    }
+
+    /// `left ?? right`: `left` if it is present, otherwise `right`. The
+    /// result is never optional: the common type of what `left` is when
+    /// present and what `right` is. `right` must not be optional itself,
+    /// and a `left` that cannot be absent makes `right` dead code, which is
+    /// a warning. Where `left` is an enum, a string literal `right` is a
+    /// literal site, so `size ?? "md"` is still the enum.
+    fn coalesce(
+        &mut self,
+        left: &Expression,
+        right: &Expression,
+        span: Span,
+        place: Place<'m>,
+    ) -> Option<Ty> {
+        let manifest = self.manifest();
+        let left_ty = self.expression(left, place);
+        let left_present = left_ty
+            .as_ref()
+            .map(|ty| match relation::expand(manifest, ty) {
+                Ty::Optional(inner) => *inner,
+                _ => ty.clone(),
+            });
+        if let (Some(ty), Some(_)) = (&left_ty, &left_present) {
+            if !matches!(relation::expand(manifest, ty), Ty::Optional(_)) {
+                self.facts.push(Fact::RedundantDefault {
+                    ty: ty.clone(),
+                    span,
+                });
+            }
+        }
+        let right_ty = match (&left_present, right) {
+            (
+                Some(expected),
+                Expression::Literal {
+                    value: Literal::String(text),
+                    span: literal,
+                },
+            ) if self.enum_values(expected).is_some() => {
+                self.variant(text, *literal, expected).flatten()
+            }
+            _ => self.expression(right, place),
+        };
+        let (left_present, right_ty) = (left_present?, right_ty?);
+        // The default is a value, not a maybe-value.
+        if let Ty::Optional(inner) = relation::expand(manifest, &right_ty) {
+            self.facts.push(Fact::TypeMismatch {
+                expectation: Expectation::Operand(Operator::Binary(BinaryOperator::Coalesce)),
+                expected: *inner,
+                actual: right_ty,
+                possibly_absent: true,
+                span: right.span(),
+            });
+            return None;
+        }
+        self.common(left_present, right_ty, span, Combination::Default)
     }
 
     /// The type of `object.property`, where `object` has type `object_ty`.
@@ -840,16 +1460,38 @@ impl<'m> Walker<'m> {
     ) -> Option<Ty> {
         use BinaryOperator::*;
         let (needs, result) = match operator {
+            Coalesce => return self.coalesce(left, right, span, place),
             Mul | Div | Mod | Add | Sub => (Ty::Number, Ty::Number),
             Lt | Le | Gt | Ge => (Ty::Number, Ty::Boolean),
             And | Or => (Ty::Boolean, Ty::Boolean),
             // Strict equality: the operands need a common type, and
             // nothing else.
             Eq | Ne => {
-                let left = self.expression(left, place);
-                let right = self.expression(right, place);
-                if let (Some(left), Some(right)) = (left, right) {
-                    self.common(left, right, span, Combination::Equality(operator));
+                let left_ty = self.expression(left, place);
+                let right_ty = self.expression(right, place);
+                if let (Some(left_ty), Some(right_ty)) = (left_ty, right_ty) {
+                    // A string literal against an enum is a literal site (T3): the
+                    // literal must be one of its values. Nothing else narrows.
+                    let site = match (left, right) {
+                        (
+                            Expression::Literal {
+                                value: Literal::String(text),
+                                span,
+                            },
+                            _,
+                        ) => self.variant(text, *span, &right_ty),
+                        (
+                            _,
+                            Expression::Literal {
+                                value: Literal::String(text),
+                                span,
+                            },
+                        ) => self.variant(text, *span, &left_ty),
+                        _ => None,
+                    };
+                    if site.is_none() {
+                        self.common(left_ty, right_ty, span, Combination::Equality(operator));
+                    }
                 }
                 return Some(Ty::Boolean);
             }
@@ -967,4 +1609,27 @@ fn last_occurrences(members: &[ObjectMember]) -> BTreeMap<&str, usize> {
         .enumerate()
         .map(|(index, member)| (member.key.as_str(), index))
         .collect()
+}
+
+/// The names `condition` vouches for: the operands of `has(name)` among its `&&`-joined conjuncts.
+fn present_names(condition: &Expression) -> Vec<String> {
+    match condition {
+        Expression::Binary {
+            operator: mesh_syntax::BinaryOperator::And,
+            left,
+            right,
+            ..
+        } => {
+            let mut names = present_names(left);
+            names.extend(present_names(right));
+            names
+        }
+        Expression::Command {
+            command, arguments, ..
+        } if command == "has" => match arguments.as_slice() {
+            [Expression::Reference { name, .. }] => vec![name.clone()],
+            _ => Vec::new(),
+        },
+        _ => Vec::new(),
+    }
 }

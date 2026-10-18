@@ -1,0 +1,5 @@
+error[type-mismatch]: the prop "shade" of component "badge" needs "info" | "warning" | "danger" | "success", found string
+ --> fixtures/check/fail/enum-wider-than-prop.mprx:1:27
+  |
+1 | <badge tone={tone} shade={name}></badge>
+  |                           ^^^^

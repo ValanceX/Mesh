@@ -222,7 +222,11 @@ fn corpus() -> Vec<(String, String, String, String)> {
         example_manifest.clone(),
         "users-page".to_string(),
     ));
-    for dir in ["fixtures/check/pass", "fixtures/check/fail"] {
+    for dir in [
+        "fixtures/check/pass",
+        "fixtures/check/warn",
+        "fixtures/check/fail",
+    ] {
         let mut files: Vec<PathBuf> = fs::read_dir(examples.join(dir))
             .unwrap()
             .map(|entry| entry.unwrap().path())
@@ -364,4 +368,47 @@ fn navigation_agrees_with_analysis_in_utf16() {
 #[test]
 fn navigation_agrees_with_analysis_in_utf8() {
     navigation_agrees_with_analysis("utf-8");
+}
+
+#[test]
+fn hovering_an_optional_snippet_says_it_may_be_absent_and_a_required_one_does_not() {
+    let (workspace, mut client) = server(
+        &snippet_manifest(),
+        &[("page.mprx", "users-page")],
+        "utf-16",
+    );
+    let uri = workspace.uri("page.mprx");
+    let source = "<page>{#if has(footer)}{@render footer()}{/if}{@render row(1)}</page>";
+    client.open(&uri, 1, source);
+    client.next_publication(&uri);
+
+    let footer = hover(&mut client, &uri, source, at(source, "footer()", 1));
+    assert!(
+        hover_value(&footer).starts_with("footer: snippet<>?"),
+        "{footer}"
+    );
+    assert!(
+        hover_value(&footer).contains("may be absent, so render it inside `{#if has(footer)}`"),
+        "{footer}"
+    );
+
+    let row = hover(&mut client, &uri, source, at(source, "row(1)", 1));
+    assert!(
+        hover_value(&row).starts_with("row: snippet<number>"),
+        "{row}"
+    );
+    assert!(
+        hover_value(&row).contains("A snippet: render it with"),
+        "{row}"
+    );
+    assert!(!hover_value(&row).contains("may be absent"), "{row}");
+}
+
+fn snippet_manifest() -> String {
+    r#"{ "version": 1, "types": {}, "components": {
+      "page": { "props": {}, "events": {}, "commands": {}, "scope": {} },
+      "users-page": { "props": {}, "events": {}, "commands": {}, "scope": {
+        "footer": { "kind": "optional", "type": { "kind": "snippet", "params": [] } },
+        "row": { "kind": "snippet", "params": [ { "kind": "number" } ] } } } } }"#
+        .to_string()
 }

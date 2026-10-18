@@ -173,7 +173,7 @@ fn recover_child<'t>(
         }
         "expression_block" => dropped.push(inner),
         // A block with no error is kept whole; one with an error is pruned to the elements inside it.
-        "if_block" | "each_block" if !inner.has_error() => {
+        "if_block" | "each_block" | "snippet_block" | "render_tag" if !inner.has_error() => {
             children.push(lower_child(node, source));
         }
         // The `element` wrapper, or anything else: whatever elements it

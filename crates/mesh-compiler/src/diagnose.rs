@@ -9,7 +9,8 @@ use mesh_syntax::{
     BinaryOperator, Diagnostic, DiagnosticCode, Severity, Span, Suggestion, UnaryOperator,
 };
 
-/// The diagnostic for `fact`. Every analysis fact is an error.
+/// The diagnostic for `fact`. Every analysis fact is an error, except the
+/// two redundancy facts, which are warnings.
 pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
     let (code, message, suggestions) = match fact {
         Fact::UnknownComponent {
@@ -189,6 +190,12 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
                 Combination::Elements => format!(
                     "this element doesn't fit with the ones before it: {left} and {right} have no common type"
                 ),
+                Combination::SnippetArgument => format!(
+                    "the renders of this snippet give this parameter {left} at one and {right} at another, which have no common type"
+                ),
+                Combination::Default => format!(
+                    "`??` falls back from {left} to {right}, which have no common type"
+                ),
                 Combination::Equality(operator) => format!(
                     "`{}` compares {left} with {right}, which have no common type",
                     binary(*operator)
@@ -216,18 +223,110 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
             format!("the object is missing the field {field:?}, which {record} requires"),
             Vec::new(),
         ),
+        Fact::UnknownVariant {
+            value,
+            values,
+            span,
+        } => {
+            // The span is the literal, quotes included; the suggestion
+            // replaces what is between them.
+            let inner = Span {
+                start_byte: span.start_byte + 1,
+                end_byte: span.end_byte.saturating_sub(1).max(span.start_byte + 1),
+            };
+            (
+                DiagnosticCode::UNKNOWN_VARIANT,
+                format!("{value:?} is not one of {}", listed(values)),
+                suggest(value, values, inner, ""),
+            )
+        }
+        Fact::RedundantPresenceTest { ty, .. } => (
+            DiagnosticCode::REDUNDANT_PRESENCE_TEST,
+            format!("this value is {ty}, which is never absent, so `has` is always true"),
+            Vec::new(),
+        ),
+        Fact::RedundantDefault { ty, .. } => (
+            DiagnosticCode::REDUNDANT_DEFAULT,
+            format!("the left side is {ty}, which is never absent, so the default is never used"),
+            Vec::new(),
+        ),
+        Fact::PresenceArity { found, .. } => (
+            DiagnosticCode::SYNTAX_ERROR,
+            format!("`has` takes one argument, found {found}"),
+            Vec::new(),
+        ),
+        Fact::UnknownSnippet {
+            name,
+            span,
+            candidates,
+        } => (
+            DiagnosticCode::UNKNOWN_SNIPPET,
+            format!(
+                "unknown snippet {name:?}: it is neither declared among the children it is in or around, nor a snippet of this component"
+            ),
+            suggest(name, candidates, *span, ""),
+        ),
+        Fact::SnippetArity {
+            name,
+            expected,
+            found,
+            ..
+        } => (
+            DiagnosticCode::SNIPPET_ARITY_MISMATCH,
+            format!(
+                "the snippet {name:?} takes {expected} {}, found {found}",
+                if *expected == 1 { "parameter" } else { "parameters" }
+            ),
+            Vec::new(),
+        ),
+        Fact::PossiblyAbsentSnippet { name, .. } => (
+            DiagnosticCode::POSSIBLY_ABSENT_SNIPPET,
+            format!(
+                "the snippet {name:?} may be absent (its type is optional), so it can't be rendered here; render it inside `{{#if has({name})}}`"
+            ),
+            Vec::new(),
+        ),
+        Fact::DuplicateSnippet { name, .. } => (
+            DiagnosticCode::DUPLICATE_SNIPPET,
+            format!("a second snippet named {name:?} among the same children"),
+            Vec::new(),
+        ),
+        Fact::ChildrenConflict { component, .. } => (
+            DiagnosticCode::CHILDREN_CONFLICT,
+            format!(
+                "{component:?} gets its `children` twice: as an attribute and as the content between its tags; write one"
+            ),
+            Vec::new(),
+        ),
         Fact::ContentNotText { ty, .. } => (
             DiagnosticCode::CONTENT_NOT_TEXT,
-            format!("a value of type {ty} can't be shown as text: interpolate one of its fields, or a string, number, boolean or null"),
+            format!(
+                "a value of type {ty} can't be shown as text: interpolate one of its fields, or a string, number, boolean or null{}",
+                if ty.to_string().starts_with("snippet<") { " (a snippet is rendered with `{@render}`)" } else { "" }
+            ),
             Vec::new(),
         ),
     };
+    let severity = match fact {
+        Fact::RedundantPresenceTest { .. } | Fact::RedundantDefault { .. } => Severity::Warning,
+        _ => Severity::Error,
+    };
     Diagnostic {
-        severity: Severity::Error,
+        severity,
         code,
         message,
         span: fact.span(),
         suggestions,
+    }
+}
+
+/// An enum's values for a message: quoted, cut after eight.
+fn listed(values: &[String]) -> String {
+    let shown: Vec<String> = values.iter().take(8).map(|v| format!("{v:?}")).collect();
+    if values.len() > 8 {
+        format!("{}, … ({} values)", shown.join(", "), values.len())
+    } else {
+        shown.join(", ")
     }
 }
 
@@ -248,6 +347,9 @@ fn expecting(expectation: &Expectation) -> String {
             format!("the argument {parameter:?} of command {command:?}")
         }
         Expectation::Field { field } => format!("the field {field:?}"),
+        Expectation::SnippetArgument { snippet, index } => {
+            format!("argument {} of the snippet {snippet:?}", index + 1)
+        }
         Expectation::Element => "the list element".to_string(),
         Expectation::RepeatKey => "the key of `{#each}`".to_string(),
         Expectation::Block(BlockPart::IfCondition) => "the condition of `{#if}`".to_string(),
@@ -280,6 +382,7 @@ fn binary(operator: BinaryOperator) -> &'static str {
         BinaryOperator::Ne => "!=",
         BinaryOperator::And => "&&",
         BinaryOperator::Or => "||",
+        BinaryOperator::Coalesce => "??",
     }
 }
 

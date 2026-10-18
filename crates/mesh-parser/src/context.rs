@@ -16,7 +16,7 @@
 use mesh_syntax::{Expression, Span};
 use tree_sitter::Node;
 
-use crate::{lower_member_access, lower_reference, nesting, span_of, text_of};
+use crate::{lower_expression, lower_member_access, lower_reference, nesting, span_of, text_of};
 
 /// Where the cursor is, and the partial name it would replace.
 #[non_exhaustive]
@@ -49,6 +49,47 @@ pub enum Context {
         object: Expression,
         object_span: Span,
     },
+    /// The name of a snippet, after `{@render `.
+    Render,
+    /// Inside the quotes of a string that is a closed set's value, or may be: the text between them is what a completion replaces.
+    Text(TextSite),
+}
+
+/// Where a string literal is, for the values a closed set offers there.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TextSite {
+    /// The value of the prop `prop` of an element named `tag`, written `prop="…"` or `prop={"…"}`.
+    Prop { tag: String, prop: String },
+    /// An operand of `==` or `!=`; `other` is the operand beside it.
+    Compared { other: Expression, other_span: Span },
+}
+
+/// A snippet declared among the children of an element or a block, which a render beside it can name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalSnippet {
+    pub name: String,
+    pub name_span: Span,
+    pub parameters: Vec<String>,
+    /// Where each parameter is declared, in order.
+    pub parameter_spans: Vec<Span>,
+}
+
+/// The `{@render name(` the cursor is inside the arguments of.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderCall {
+    pub name: String,
+    pub name_span: Span,
+    /// How many arguments are complete before the cursor: the index of the one being written.
+    pub active: usize,
+}
+
+/// What a name written at the cursor can mean beyond the template's scope.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Reach {
+    /// Local snippets in reach, outermost first, in the order declared.
+    pub snippets: Vec<LocalSnippet>,
+    /// Names bound around the cursor by a snippet's parameters and an `{#each}`'s item, innermost first.
+    pub bindings: Vec<String>,
 }
 
 /// The completion context at byte `offset` of `source`, or `None` if the
@@ -90,6 +131,10 @@ pub fn context_at(source: &str, offset: usize) -> Option<Completion> {
     if let Some(completion) = event_name(source, offset, &tokens) {
         return Some(completion);
     }
+    // Inside the quotes of a string that is a prop's value or an operand of a comparison.
+    if let Some(completion) = text_value(root, source, offset, &tokens) {
+        return Some(completion);
+    }
     let (index, p) = previous?;
     let context = match p.kind() {
         // K1; a `<` that is an operator is K6.
@@ -121,8 +166,10 @@ pub fn context_at(source: &str, offset: usize) -> Option<Completion> {
         },
         // K7: a block's condition or list starts right after its opener.
         "if_open" | "each_open" | "else_if_open" => Some(Context::Value),
+        // The name of the snippet a render tag renders.
+        "render_open" => Some(Context::Render),
         "(" | "," | "[" | "?" | ":" | "!" | "-" | "+" | "*" | "/" | "%" | "<=" | ">=" | "=="
-        | "!=" | "&&" | "||" | ">" => value_after(p),
+        | "!=" | "&&" | "||" | "??" | ">" => value_after(p),
         _ => None,
     };
     // K4, where nothing above matched.
@@ -299,4 +346,235 @@ fn floor_char_boundary(source: &str, offset: usize) -> usize {
         offset -= 1;
     }
     offset
+}
+
+/// The string, with the cursor inside its quotes (or in its content), that is a prop's value or an operand of `==` or `!=`.
+fn text_value(root: Node, source: &str, offset: usize, tokens: &[Node]) -> Option<Completion> {
+    let last = *tokens.last()?;
+    let string = match last.kind() {
+        "string_content" if last.start_byte() < offset && offset <= last.end_byte() => {
+            last.parent()?
+        }
+        // An empty string: the cursor between the quotes.
+        "\"" if last.end_byte() == offset => {
+            let string = last.parent()?;
+            let first = string.child(0)?;
+            let closed = string.child_count() >= 2 && string.end_byte() > offset;
+
+            (string.kind() == "string" && first.id() == last.id() && closed).then_some(string)?
+        }
+        _ => return None,
+    };
+    if string.kind() != "string" || string.has_error() {
+        return None;
+    }
+    let replace = string
+        .child_by_field_name("value")
+        .map(span_of)
+        .unwrap_or(Span {
+            start_byte: offset,
+            end_byte: offset,
+        });
+    let site = string_site(root, string, source)?;
+
+    Some(Completion {
+        context: Context::Text(site),
+        replace,
+    })
+}
+
+fn string_site(_root: Node, string: Node, source: &str) -> Option<TextSite> {
+    let parent = string.parent()?;
+    match parent.kind() {
+        "attribute" if parent.child_by_field_name("value")?.id() == string.id() => {
+            attribute_site(parent, source)
+        }
+        "literal" => {
+            let expression = parent.parent().filter(|node| node.kind() == "expression")?;
+            let owner = expression.parent()?;
+            match owner.kind() {
+                // `prop={"…"}`.
+                "expression_block" => {
+                    let attribute = owner.parent().filter(|node| node.kind() == "attribute")?;
+                    attribute_site(attribute, source)
+                }
+                "binary_expression" => {
+                    let operator = owner.child_by_field_name("operator")?;
+                    if !matches!(
+                        &source[operator.start_byte()..operator.end_byte()],
+                        "==" | "!="
+                    ) {
+                        return None;
+                    }
+                    let left = owner.child_by_field_name("left")?;
+                    let right = owner.child_by_field_name("right")?;
+                    let other = if left.id() == expression.id() {
+                        right
+                    } else {
+                        left
+                    };
+
+                    Some(TextSite::Compared {
+                        other: lower_expression(other, source),
+                        other_span: span_of(other),
+                    })
+                }
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+fn attribute_site(attribute: Node, source: &str) -> Option<TextSite> {
+    let prop = text_of(attribute.child_by_field_name("name")?, source);
+    let element = attribute.parent()?;
+    let tag = text_of(element.child_by_field_name("name")?, source);
+
+    Some(TextSite::Prop { tag, prop })
+}
+
+/// The snippets in reach of byte `offset` and the names bound around it (see [`Reach`]): read from the tree, so the file has to parse apart from the name being typed.
+pub fn reach_at(source: &str, offset: usize) -> Reach {
+    let offset = floor_char_boundary(source, offset);
+    let mut parser = tree_sitter::Parser::new();
+    let mut reach = Reach::default();
+    if parser.set_language(&tree_sitter_mprx::language()).is_err() {
+        return reach;
+    }
+    let Some(tree) = parser.parse(source, None) else {
+        return reach;
+    };
+    let root = tree.root_node();
+    if nesting::check(root).is_some() {
+        return reach;
+    }
+    let Some(mut node) = root.descendant_for_byte_range(offset, offset) else {
+        return reach;
+    };
+    let mut outer_first: Vec<Vec<LocalSnippet>> = Vec::new();
+    loop {
+        // Names this block binds, for what is after its header.
+        match node.kind() {
+            "snippet_block" if after_header(node, offset) => {
+                let mut cursor = node.walk();
+                for name in node.children_by_field_name("parameter", &mut cursor) {
+                    reach.bindings.push(text_of(name, source));
+                }
+            }
+            "each_block" => {
+                if let Some(binding) = node.child_by_field_name("binding") {
+                    if binding.end_byte() <= offset {
+                        reach.bindings.push(text_of(binding, source));
+                    }
+                }
+            }
+            _ => {}
+        }
+        // The snippets declared among this node's children, when the cursor is in them.
+        if after_header(node, offset) {
+            let mut declared = Vec::new();
+            let mut cursor = node.walk();
+            for child in node
+                .children(&mut cursor)
+                .filter(|child| child.kind() == "child")
+            {
+                let Some(block) = child
+                    .child(0)
+                    .filter(|block| block.kind() == "snippet_block")
+                else {
+                    continue;
+                };
+                let Some(name) = block.child_by_field_name("name") else {
+                    continue;
+                };
+                let mut parameters = Vec::new();
+                let mut parameter_spans = Vec::new();
+                let mut inner = block.walk();
+                for parameter in block.children_by_field_name("parameter", &mut inner) {
+                    parameters.push(text_of(parameter, source));
+                    parameter_spans.push(span_of(parameter));
+                }
+                declared.push(LocalSnippet {
+                    name: text_of(name, source),
+                    name_span: span_of(name),
+                    parameters,
+                    parameter_spans,
+                });
+            }
+            if !declared.is_empty() {
+                outer_first.push(declared);
+            }
+        }
+        match node.parent() {
+            Some(parent) => node = parent,
+            None => break,
+        }
+    }
+    reach.snippets = outer_first.into_iter().rev().flatten().collect();
+    reach
+}
+
+/// Whether `offset` is in the part of `node` after its opening (the children's part), for a node that has children.
+fn after_header(node: Node, offset: usize) -> bool {
+    let opener = match node.kind() {
+        "container_element" => ">",
+        "snippet_block" | "each_block" | "if_block" | "else_if_clause" | "else_clause" => "}",
+        _ => return node.kind() == "source_file",
+    };
+    let mut cursor = node.walk();
+    let header = node
+        .children(&mut cursor)
+        .find(|child| child.kind() == opener);
+
+    header.is_some_and(|header| header.end_byte() <= offset)
+}
+
+/// The render tag whose arguments contain byte `offset`: the unmatched `(` before it, right after
+/// `{@render name`. Read from the tokens before the cursor, so it answers while the call is being
+/// typed, closed or not.
+pub fn render_call_at(source: &str, offset: usize) -> Option<RenderCall> {
+    let offset = floor_char_boundary(source, offset);
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_mprx::language()).ok()?;
+    let tree = parser.parse(source, None)?;
+    let root = tree.root_node();
+    if nesting::check(root).is_some() {
+        return None;
+    }
+    let tokens = tokens_before(root, offset);
+    let mut depth = 0usize;
+    let mut commas = 0usize;
+    for index in (0..tokens.len()).rev() {
+        let token = tokens[index];
+        match token.kind() {
+            ")" | "]" | "}" => depth += 1,
+            "[" | "{" => {
+                // An opener of something other than the call: the cursor is not directly in its arguments.
+                if depth == 0 {
+                    return None;
+                }
+                depth -= 1;
+            }
+            "(" => {
+                if depth > 0 {
+                    depth -= 1;
+                    continue;
+                }
+                let name = *tokens.get(index.checked_sub(1)?)?;
+                let opener = *tokens.get(index.checked_sub(2)?)?;
+                if name.kind() != "identifier" || opener.kind() != "render_open" {
+                    return None;
+                }
+                return Some(RenderCall {
+                    name: text_of(name, source),
+                    name_span: span_of(name),
+                    active: commas,
+                });
+            }
+            "," if depth == 0 => commas += 1,
+            _ => {}
+        }
+    }
+    None
 }

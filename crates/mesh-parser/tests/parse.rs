@@ -334,6 +334,10 @@ fn parses_every_binary_operator() {
         (r#"<page v={a != b} />"#, mesh_syntax::BinaryOperator::Ne),
         (r#"<page v={a && b} />"#, mesh_syntax::BinaryOperator::And),
         (r#"<page v={a || b} />"#, mesh_syntax::BinaryOperator::Or),
+        (
+            r#"<page v={a ?? b} />"#,
+            mesh_syntax::BinaryOperator::Coalesce,
+        ),
     ];
 
     for (source, expected_operator) in cases {
@@ -991,4 +995,60 @@ fn name_spans_are_raw_byte_offsets_in_bom_and_multi_byte_sources() {
     };
     assert_eq!(slice(source, member.property_span), "b");
     assert_eq!(slice(source, element.event_bindings[0].name_span), "go");
+}
+
+/// `??` binds looser than `||` and tighter than `?:`, and left-associates:
+/// `a ?? b || c` is `a ?? (b || c)`, `a ?? b ?? c` is `(a ?? b) ?? c`, and
+/// `c ? a : b ?? d` is `c ? a : (b ?? d)`.
+#[test]
+fn coalesce_has_its_own_precedence_between_conditional_and_or() {
+    use mesh_syntax::{AttributeValue, BinaryOperator, Expression};
+    let parse = |source: &str| match mesh_parser::parse(source)
+        .ast
+        .unwrap_or_else(|| panic!("should parse: {source}"))
+        .attributes
+        .remove(0)
+        .value
+    {
+        AttributeValue::Expression(expression) => expression,
+        other => panic!("{other:?}"),
+    };
+    let Expression::Binary(top) = parse("<page v={a ?? b || c} />") else {
+        panic!("a binary")
+    };
+    assert_eq!(top.operator, BinaryOperator::Coalesce);
+    assert!(matches!(*top.right, Expression::Binary(ref r) if r.operator == BinaryOperator::Or));
+
+    let Expression::Binary(top) = parse("<page v={a ?? b ?? c} />") else {
+        panic!("a binary")
+    };
+    assert_eq!(top.operator, BinaryOperator::Coalesce);
+    assert!(
+        matches!(*top.left, Expression::Binary(ref l) if l.operator == BinaryOperator::Coalesce)
+    );
+
+    let Expression::Conditional(top) = parse("<page v={c ? a : b ?? d} />") else {
+        panic!("a conditional")
+    };
+    assert!(
+        matches!(*top.alternate, Expression::Binary(ref a) if a.operator == BinaryOperator::Coalesce)
+    );
+}
+
+/// `has(x)` is not special to the parser: it is the command-shaped
+/// `name(arguments)`, and analysis decides what it means by where it is.
+#[test]
+fn has_parses_as_a_call_and_is_not_reserved() {
+    use mesh_syntax::{AttributeValue, Expression};
+    let element = mesh_parser::parse("<page v={has(x)} w={has} />")
+        .ast
+        .expect("parses");
+    assert!(matches!(
+        &element.attributes[0].value,
+        AttributeValue::Expression(Expression::Command(c)) if c.command == "has" && c.arguments.len() == 1
+    ));
+    assert!(matches!(
+        &element.attributes[1].value,
+        AttributeValue::Expression(Expression::Reference(r)) if r.name == "has"
+    ));
 }

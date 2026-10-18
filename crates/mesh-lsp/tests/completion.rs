@@ -289,3 +289,267 @@ fn a_block_is_not_offered_as_a_tag() {
         labels(&list)
     );
 }
+
+// --- Snippets and enums (Bet 5, Bet 4) -------------------------------------
+
+/// A manifest where `users-page` has a closed set, an optional one, a snippet and a list, and `badge` and `data-list` take them.
+const SNIPPET_MANIFEST: &str = r#"{
+  "version": 1,
+  "types": { "Person": { "kind": "record", "fields": { "name": { "type": { "kind": "string" }, "required": true } } } },
+  "components": {
+    "page": { "props": {}, "events": {}, "commands": {}, "scope": {} },
+    "text": { "props": {}, "events": {}, "commands": {}, "scope": {} },
+    "badge": { "props": {
+        "tone": { "type": { "kind": "enum", "values": ["info", "danger", "warn"] }, "required": true },
+        "shade": { "type": { "kind": "optional", "type": { "kind": "enum", "values": ["light", "dark"] } }, "required": false },
+        "label": { "type": { "kind": "string" }, "required": false } }, "events": {}, "commands": {}, "scope": {} },
+    "data-list": { "props": {
+        "items": { "type": { "kind": "list", "element": { "kind": "named", "name": "Person" } }, "required": true },
+        "row": { "type": { "kind": "snippet", "params": [ { "kind": "named", "name": "Person" } ] }, "required": true } },
+      "events": {}, "commands": {}, "scope": {} },
+    "users-page": { "props": {}, "events": {}, "commands": {}, "scope": {
+        "tone": { "kind": "enum", "values": ["info", "danger"] },
+        "title": { "kind": "string" },
+        "people": { "kind": "list", "element": { "kind": "named", "name": "Person" } },
+        "row": { "kind": "snippet", "params": [ { "kind": "named", "name": "Person" } ] },
+        "footer": { "kind": "optional", "type": { "kind": "snippet", "params": [] } } } }
+  }
+}"#;
+
+fn snippet_page() -> (Workspace, Client, String) {
+    server(SNIPPET_MANIFEST, true, test_options())
+}
+
+fn kinds(list: &Value) -> Vec<(String, u64)> {
+    items(list)
+        .iter()
+        .map(|item| {
+            (
+                item["label"].as_str().unwrap().to_string(),
+                item["kind"].as_u64().unwrap(),
+            )
+        })
+        .collect()
+}
+
+// CompletionItemKind: Function 3, Variable 6, EnumMember 20.
+const FUNCTION: u64 = 3;
+const VARIABLE: u64 = 6;
+const ENUM_MEMBER: u64 = 20;
+
+#[test]
+fn after_a_render_opener_the_snippets_in_reach_local_ones_first_then_the_scopes() {
+    let (_workspace, mut client, uri) = snippet_page();
+    let list = complete_at(
+        &mut client,
+        &uri,
+        "<page>{#snippet greet(name)}<text>{name}</text>{/snippet}{#snippet other()}<text>x</text>{/snippet}{@render |}</page>",
+    );
+
+    assert_eq!(
+        kinds(&list),
+        [
+            ("greet".to_string(), FUNCTION),
+            ("other".to_string(), FUNCTION),
+            ("footer".to_string(), FUNCTION),
+            ("row".to_string(), FUNCTION)
+        ]
+    );
+    let details: Vec<String> = items(&list)
+        .iter()
+        .map(|item| item["detail"].as_str().unwrap_or("").to_string())
+        .collect();
+    assert_eq!(
+        details,
+        [
+            "greet(name)",
+            "other()",
+            "snippet<>?, may be absent: render it inside {#if has(footer)}",
+            "snippet<Person>"
+        ]
+    );
+}
+
+#[test]
+fn a_snippet_is_in_reach_of_the_children_of_the_element_it_is_in_and_of_nothing_outside() {
+    let (_workspace, mut client, uri) = snippet_page();
+    // `inner` is declared inside `<text>`: not in reach of a render beside it.
+    let beside = complete_at(
+        &mut client,
+        &uri,
+        "<page><text>{#snippet inner()}<text>x</text>{/snippet}</text>{@render |}</page>",
+    );
+    assert_eq!(labels(&beside), ["footer", "row"]);
+    // A snippet in the body of another is in reach of that body, and of nothing outside it.
+    let inside = complete_at(&mut client, &uri, "<page>{#snippet outer()}{#snippet inner()}<text>x</text>{/snippet}{@render |}{/snippet}</page>");
+    assert_eq!(labels(&inside), ["outer", "inner", "footer", "row"]);
+}
+
+#[test]
+fn a_render_completes_a_partial_name_and_replaces_it() {
+    let (_workspace, mut client, uri) = snippet_page();
+    let marked = "<page>{#snippet greet()}<text>x</text>{/snippet}{@render gr|}</page>";
+    let list = complete_at(&mut client, &uri, marked);
+    let source = marked.replacen('|', "", 1);
+    let start = source.find("gr}").unwrap();
+    let (line, character) = position(&source, start);
+    let first = &items(&list)[0];
+
+    assert_eq!(first["label"], "greet");
+    assert_eq!(
+        first["textEdit"]["range"]["start"],
+        json!({ "line": line, "character": character })
+    );
+}
+
+#[test]
+fn in_a_snippets_body_its_parameters_are_offered_and_in_its_header_they_are_not() {
+    let (_workspace, mut client, uri) = snippet_page();
+    let body = complete_at(
+        &mut client,
+        &uri,
+        "<page>{#snippet row2(person, index)}<text>{|}</text>{/snippet}</page>",
+    );
+    assert_eq!(
+        kinds(&body)[..2],
+        [
+            ("person".to_string(), VARIABLE),
+            ("index".to_string(), VARIABLE)
+        ]
+    );
+    assert!(
+        labels(&body).contains(&"title".to_string()),
+        "the scope too: {:?}",
+        labels(&body)
+    );
+
+    let outside = complete_at(
+        &mut client,
+        &uri,
+        "<page>{#snippet row2(person)}<text>x</text>{/snippet}<text>{|}</text></page>",
+    );
+    assert!(
+        !labels(&outside).contains(&"person".to_string()),
+        "{:?}",
+        labels(&outside)
+    );
+}
+
+#[test]
+fn a_parameter_shadows_a_scope_name_of_the_same_name_and_the_item_of_an_each_is_one() {
+    let (_workspace, mut client, uri) = snippet_page();
+    let list = complete_at(&mut client, &uri, "<page>{#each people as title (title.name)}{#snippet s(row)}<text>{|}</text>{/snippet}{/each}</page>");
+    let found = kinds(&list);
+
+    assert_eq!(
+        found[..2],
+        [
+            ("row".to_string(), VARIABLE),
+            ("title".to_string(), VARIABLE)
+        ]
+    );
+    assert_eq!(
+        found.iter().filter(|(label, _)| label == "title").count(),
+        1,
+        "{found:?}"
+    );
+    assert_eq!(
+        found.iter().filter(|(label, _)| label == "row").count(),
+        1,
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_string_attribute_of_a_closed_set_offers_its_members_and_replaces_the_text_inside_the_quotes() {
+    let (_workspace, mut client, uri) = snippet_page();
+    let empty = complete_at(&mut client, &uri, &page("<badge tone=\"|\" />"));
+    assert_eq!(
+        kinds(&empty),
+        [
+            ("info".to_string(), ENUM_MEMBER),
+            ("danger".to_string(), ENUM_MEMBER),
+            ("warn".to_string(), ENUM_MEMBER)
+        ]
+    );
+
+    let marked = page("<badge tone=\"da|\" />");
+    let partial = complete_at(&mut client, &uri, &marked);
+    let source = marked.replacen('|', "", 1);
+    let start = source.find("da\"").unwrap();
+    let (line, character) = position(&source, start);
+
+    assert_eq!(
+        labels(&partial),
+        ["info", "danger", "warn"],
+        "the editor filters; the list is the set"
+    );
+    assert_eq!(
+        items(&partial)[0]["textEdit"]["range"]["start"],
+        json!({ "line": line, "character": character })
+    );
+    assert_eq!(
+        items(&partial)[0]["textEdit"]["range"]["end"],
+        json!({ "line": line, "character": character + 2 })
+    );
+}
+
+#[test]
+fn an_optional_closed_set_offers_its_members_and_a_string_prop_offers_nothing() {
+    let (_workspace, mut client, uri) = snippet_page();
+    assert_eq!(
+        labels(&complete_at(
+            &mut client,
+            &uri,
+            &page("<badge tone=\"info\" shade=\"|\" />")
+        )),
+        ["light", "dark"]
+    );
+    assert!(labels(&complete_at(
+        &mut client,
+        &uri,
+        &page("<badge tone=\"info\" label=\"|\" />")
+    ))
+    .is_empty());
+}
+
+#[test]
+fn a_string_written_as_an_expression_for_a_closed_set_offers_its_members_too() {
+    let (_workspace, mut client, uri) = snippet_page();
+    assert_eq!(
+        labels(&complete_at(
+            &mut client,
+            &uri,
+            &page("<badge tone={\"|\"} />")
+        )),
+        ["info", "danger", "warn"]
+    );
+}
+
+#[test]
+fn a_string_compared_with_a_closed_set_offers_its_members() {
+    let (_workspace, mut client, uri) = snippet_page();
+    assert_eq!(
+        labels(&complete_at(
+            &mut client,
+            &uri,
+            &page("<text>{tone == \"|\" ? title : title}</text>")
+        )),
+        ["info", "danger"]
+    );
+    assert_eq!(
+        labels(&complete_at(
+            &mut client,
+            &uri,
+            &page("<text>{\"|\" != tone ? title : title}</text>")
+        )),
+        ["info", "danger"]
+    );
+    // Not a closed set: nothing.
+    assert!(labels(&complete_at(
+        &mut client,
+        &uri,
+        &page("<text>{title == \"|\" ? title : title}</text>")
+    ))
+    .is_empty());
+}
