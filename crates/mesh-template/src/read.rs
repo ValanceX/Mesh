@@ -164,7 +164,7 @@ fn too_deep(text: &str) -> Option<usize> {
 /// (`from_json`, and the runtime's identity and error paths), refusing it,
 /// with the reason, if it isn't JSON or nests deeper than
 /// [`MAX_JSON_DEPTH`]. `serde_json`'s own depth limit is off, since
-/// [`too_deep`] has already bounded the document.
+/// `too_deep` has already bounded the document.
 pub fn value_from_json(text: &str) -> Result<Value, String> {
     use serde::Deserialize;
     if let Some(offset) = too_deep(text) {
