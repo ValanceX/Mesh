@@ -230,11 +230,7 @@ fn a_local_snippet_passed_along_as_a_value_goes_to_its_declaration() {
 fn a_snippet_of_the_scope_goes_to_the_manifest_and_a_snippet_given_to_a_component_to_its_prop() {
     let (workspace, mut client, uri) = server();
     let manifest = MANIFEST;
-    let (_, scope) = definition(
-        &mut client,
-        &uri,
-        "<page>{@render ro|w(people, 1)}</page>",
-    );
+    let (_, scope) = definition(&mut client, &uri, "<page>{@render ro|w(people, 1)}</page>");
     assert_eq!(scope["uri"], json!(workspace.uri("components.json")));
     let line = scope["range"]["start"]["line"].as_u64().unwrap() as usize;
     assert!(

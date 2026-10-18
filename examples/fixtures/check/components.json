@@ -174,9 +174,7 @@
         "flag": { "kind": "boolean" },
         "maybeFlag": { "kind": "optional", "type": { "kind": "boolean" } },
         "anything": { "kind": "any" },
-        "maybeAnything": { "kind": "optional", "type": { "kind": "any" } },
-        "maybeFooter": { "kind": "optional", "type": { "kind": "snippet", "params": [] } },
-        "maybeRow": { "kind": "optional", "type": { "kind": "snippet", "params": [ { "kind": "named", "name": "User" } ] } }
+        "maybeAnything": { "kind": "optional", "type": { "kind": "any" } }
       }
     }
   }

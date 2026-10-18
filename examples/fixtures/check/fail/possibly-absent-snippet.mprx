@@ -1,6 +1,0 @@
-<page title="x">
-  {@render maybeFooter()}
-  {#if has(maybeFooter)}{@render maybeFooter()}{:else}{@render maybeFooter()}{/if}
-  {#each users as u (u.name)}{@render maybeRow(u)}{/each}
-  {#if has(maybeFooter)}{#snippet inner()}{@render maybeFooter()}{/snippet}{@render inner()}{/if}
-</page>

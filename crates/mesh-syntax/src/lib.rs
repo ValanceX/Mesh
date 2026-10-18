@@ -1201,6 +1201,7 @@ mod tests {
                 "unknown-snippet",
                 "snippet-arity-mismatch",
                 "duplicate-snippet",
+                "possibly-absent-snippet",
                 "children-conflict",
             ]
         );
