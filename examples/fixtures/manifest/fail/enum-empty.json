@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "types": {},
+  "components": {
+    "page": {
+      "props": {
+        "tone": { "type": { "kind": "enum", "values": [] }, "required": true }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "template": { "props": {}, "events": {}, "commands": {}, "scope": {} }
+  }
+}

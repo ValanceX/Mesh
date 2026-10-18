@@ -1,0 +1,5 @@
+error[manifest-duplicate-variant]: the enum lists the value "a" twice
+ --> fixtures/manifest/fail/duplicate-variant.json:7:66
+  |
+7 |         "tone": { "type": { "kind": "enum", "values": ["a", "b", "a"] }, "required": true }
+  |                                                                  ^^^

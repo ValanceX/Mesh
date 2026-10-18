@@ -12,7 +12,7 @@
     },
     "template": {
       "props": {
-        "size": { "type": { "kind": "string" }, "required": false, "default": "md" }
+        "size": { "type": { "kind": "string" }, "required": false, "placeholder": "md" }
       },
       "events": {},
       "commands": {},

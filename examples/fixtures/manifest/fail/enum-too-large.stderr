@@ -1,0 +1,5 @@
+error[manifest-enum-too-large]: an enum has 257 values, more than the 256 MESH supports; keep a larger set as `string` and validate it in the application
+  --> fixtures/manifest/fail/enum-too-large.json:10:23
+   |
+10 |             "values": [
+   |                       ^
