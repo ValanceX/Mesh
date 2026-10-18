@@ -309,6 +309,24 @@ pub(crate) enum Value {
 }
 
 impl Value {
+    /// A manifest `default`, as the value it denotes.
+    pub(crate) fn from_constant(constant: &mesh_manifest::Constant) -> Value {
+        use mesh_manifest::Constant as C;
+        match constant {
+            C::Null => Value::Null,
+            C::Boolean(b) => Value::Boolean(*b),
+            C::Number(n) => Value::Number(if *n == 0.0 { 0.0 } else { *n }),
+            C::String(text) => Value::String(Rc::from(text.as_str())),
+            C::List(items) => Value::List(items.iter().map(Value::from_constant).collect()),
+            C::Record(fields) => Value::Record(Rc::new(
+                fields
+                    .iter()
+                    .map(|(name, value)| (name.clone(), Value::from_constant(value)))
+                    .collect(),
+            )),
+        }
+    }
+
     /// §9.7.4's `==`: strict, structural, IEEE 754 for numbers.
     pub(crate) fn equals(&self, other: &Value) -> bool {
         match (self, other) {

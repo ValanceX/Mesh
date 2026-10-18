@@ -1,0 +1,229 @@
+{
+  "props": [
+    {
+      "case": "a snapshot enum is carried as its string",
+      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "prop": "tone",
+      "value": {
+        "value": "danger"
+      }
+    },
+    {
+      "case": "?? takes the default when the left side is absent",
+      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "prop": "label",
+      "value": {
+        "value": "untitled"
+      }
+    },
+    {
+      "case": "?? takes the default for an absent enum",
+      "node": "k2ICiFY880RSZ_TCZcV3-5Q",
+      "prop": "tone",
+      "value": {
+        "value": "info"
+      }
+    },
+    {
+      "case": "an enum prop accepts an enum with fewer values",
+      "node": "k2ICiFY880RSZ_TCZcV3-5Q",
+      "prop": "shade",
+      "value": {
+        "value": "danger"
+      }
+    },
+    {
+      "case": "a conditional of two literals is checked at each branch",
+      "node": "kaXoWtwClNJuFfsxiMY1gdA",
+      "prop": "tone",
+      "value": {
+        "value": "warning"
+      }
+    },
+    {
+      "case": "a value through any that is a variant is accepted",
+      "node": "koAWdV0bkH7S-jbmmegvkmA",
+      "prop": "tone",
+      "value": {
+        "value": "info"
+      }
+    },
+    {
+      "case": "an unwritten prop with a default binds the default in a composite",
+      "node": "klM4CjtWWoicZLz3qmerX4A",
+      "prop": "tone",
+      "value": {
+        "value": "info"
+      }
+    },
+    {
+      "case": "a written prop wins over the default",
+      "node": "k_tEMFl11P6GJaFXenOsApg",
+      "prop": "tone",
+      "value": {
+        "value": "danger"
+      }
+    },
+    {
+      "case": "a written prop wins over the default (a scope name)",
+      "node": "k3-um1nfaCihH5yN4e_tfgA",
+      "prop": "tone",
+      "value": {
+        "value": "danger"
+      }
+    },
+    {
+      "case": "an unwritten optional prop is absent",
+      "node": "klM4CjtWWoicZLz3qmerX4A",
+      "prop": "shade",
+      "value": {
+        "absent": true
+      }
+    }
+  ],
+  "rejects": [
+    {
+      "case": "a snapshot field that is not a variant",
+      "snapshot": {
+        "tone": "loud",
+        "anything": "info"
+      },
+      "code": "runtime-value-mismatch",
+      "location": {
+        "kind": "input",
+        "path": [
+          "tone"
+        ]
+      }
+    },
+    {
+      "case": "an optional enum field that is not a variant",
+      "snapshot": {
+        "tone": "info",
+        "maybeTone": "loud",
+        "anything": "info"
+      },
+      "code": "runtime-value-mismatch",
+      "location": {
+        "kind": "input",
+        "path": [
+          "maybeTone"
+        ]
+      }
+    },
+    {
+      "case": "a non-string where an enum is expected",
+      "snapshot": {
+        "tone": 3,
+        "anything": "info"
+      },
+      "code": "runtime-value-mismatch",
+      "location": {
+        "kind": "input",
+        "path": [
+          "tone"
+        ]
+      }
+    },
+    {
+      "case": "a value through any that reaches an enum prop",
+      "snapshot": {
+        "tone": "info",
+        "anything": "loud"
+      },
+      "code": "runtime-prop-mismatch",
+      "location": {
+        "component": "enums",
+        "kind": "source",
+        "span": {
+          "end": {
+            "byte": 241,
+            "utf16": 241
+          },
+          "start": {
+            "byte": 233,
+            "utf16": 233
+          }
+        }
+      }
+    }
+  ],
+  "dispatches": [
+    {
+      "case": "a payload that is a variant",
+      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "event": "pick",
+      "payload": "warning",
+      "expect": {
+        "intent": {
+          "arguments": [
+            {
+              "value": "warning"
+            }
+          ],
+          "command": {
+            "component": "enums",
+            "name": "choose"
+          }
+        }
+      }
+    },
+    {
+      "case": "a payload that is not a variant",
+      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "event": "pick",
+      "payload": "loud",
+      "expect": {
+        "code": "runtime-value-mismatch",
+        "location": {
+          "kind": "input",
+          "path": [
+            "$event"
+          ]
+        }
+      }
+    },
+    {
+      "case": "a payload through any that is a variant",
+      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "event": "note",
+      "payload": "info",
+      "expect": {
+        "intent": {
+          "arguments": [
+            {
+              "value": "info"
+            }
+          ],
+          "command": {
+            "component": "enums",
+            "name": "choose"
+          }
+        }
+      }
+    },
+    {
+      "case": "a payload through any that is not a variant reaches the command argument",
+      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "event": "note",
+      "payload": "loud",
+      "expect": {
+        "code": "runtime-argument-mismatch",
+        "location": {
+          "component": "enums",
+          "kind": "source",
+          "span": {
+            "end": {
+              "byte": 103,
+              "utf16": 103
+            },
+            "start": {
+              "byte": 97,
+              "utf16": 97
+            }
+          }
+        }
+      }
+    }
+  ]
+}

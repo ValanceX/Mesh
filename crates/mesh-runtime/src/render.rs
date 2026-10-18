@@ -270,7 +270,9 @@ fn reads<'t>(expression: &'t Expression, names: &mut BTreeSet<&'t str>) {
             names.insert(name);
         }
         Expression::Member { object, .. } => reads(object, names),
-        Expression::Unary { operand, .. } => reads(operand, names),
+        Expression::Unary { operand, .. } | Expression::Has { operand, .. } => {
+            reads(operand, names)
+        }
         Expression::Binary { left, right, .. } => {
             reads(left, names);
             reads(right, names);
@@ -615,7 +617,7 @@ pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
 /// The scope of the template of a composite occurrence (docs/manual/
 /// templates.md, "Binding a composite's scope"): each written prop,
 /// evaluated in the enclosing template and checked against its declared
-/// type; each scope name bound to its prop's value, or absent.
+/// type; each scope name bound to its prop's value, else the prop's `default`, else absent.
 pub(crate) fn bind(
     valid: &Valid,
     scope: &Scope<'_, '_>,
@@ -646,7 +648,17 @@ pub(crate) fn bind(
         .map(|name| {
             (
                 name.clone(),
-                written.get(name).cloned().unwrap_or(Value::Absent),
+                written
+                    .get(name)
+                    .cloned()
+                    .or_else(|| {
+                        composite
+                            .props
+                            .get(name)
+                            .and_then(|prop| prop.default.as_ref())
+                            .map(Value::from_constant)
+                    })
+                    .unwrap_or(Value::Absent),
             )
         })
         .collect())

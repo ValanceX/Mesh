@@ -1,0 +1,131 @@
+{
+  "$schema": "../../../schemas/manifest-v1.schema.json",
+  "version": 1,
+  "types": {
+    "Tone": {
+      "kind": "enum",
+      "values": [
+        "info",
+        "warning",
+        "danger"
+      ]
+    }
+  },
+  "components": {
+    "page": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "text": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "enums": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "choose": {
+          "parameters": [
+            {
+              "name": "tone",
+              "type": {
+                "kind": "named",
+                "name": "Tone"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "tone": {
+          "kind": "named",
+          "name": "Tone"
+        },
+        "maybeTone": {
+          "kind": "optional",
+          "type": {
+            "kind": "named",
+            "name": "Tone"
+          }
+        },
+        "title": {
+          "kind": "optional",
+          "type": {
+            "kind": "string"
+          }
+        },
+        "anything": {
+          "kind": "any"
+        }
+      }
+    },
+    "badge": {
+      "props": {
+        "tone": {
+          "type": {
+            "kind": "named",
+            "name": "Tone"
+          },
+          "required": true
+        },
+        "shade": {
+          "type": {
+            "kind": "enum",
+            "values": [
+              "info",
+              "warning",
+              "danger",
+              "success"
+            ]
+          },
+          "required": false
+        },
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": false
+        }
+      },
+      "events": {
+        "pick": {
+          "payload": {
+            "kind": "named",
+            "name": "Tone"
+          }
+        },
+        "note": {
+          "payload": {
+            "kind": "any"
+          }
+        }
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "chip": {
+      "props": {
+        "tone": {
+          "type": {
+            "kind": "named",
+            "name": "Tone"
+          },
+          "required": false,
+          "default": "info"
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "tone": {
+          "kind": "named",
+          "name": "Tone"
+        }
+      }
+    }
+  }
+}

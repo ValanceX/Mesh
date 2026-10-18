@@ -470,7 +470,7 @@ pub(crate) fn visit(expression: &Expression, f: &mut impl FnMut(&Expression)) {
     match expression {
         Expression::Literal { .. } | Expression::Scope { .. } | Expression::Event { .. } => {}
         Expression::Member { object, .. } => visit(object, f),
-        Expression::Unary { operand, .. } => visit(operand, f),
+        Expression::Unary { operand, .. } | Expression::Has { operand, .. } => visit(operand, f),
         Expression::Binary { left, right, .. } => {
             visit(left, f);
             visit(right, f);
@@ -649,7 +649,9 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
                         source(template, element.span),
                     )),
                     Some(prop) => {
-                        let bound = if prop.required || matches!(manifest.expand(&prop.ty), Type::Optional(_)) {
+                        let bound = if prop.required
+                            || prop.default.is_some()
+                            || matches!(manifest.expand(&prop.ty), Type::Optional(_)) {
                             prop.ty.clone()
                         } else {
                             Type::Optional(Box::new(prop.ty.clone()))
@@ -664,7 +666,7 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
                                 RuntimeCode::UNSOUND_BINDING,
                                 format!(
                                     "`{name}`'s prop `{scope_name}` can't bind its scope name `{scope_name}`: {}",
-                                    if prop.required { "its type isn't assignable" } else { "it's optional, and an unwritten prop binds absence" }
+                                    if prop.required || prop.default.is_some() { "its type isn't assignable" } else { "it's optional, and an unwritten prop binds absence" }
                                 ),
                                 source(template, element.span),
                             ));

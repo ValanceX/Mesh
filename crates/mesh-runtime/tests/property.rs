@@ -211,6 +211,7 @@ fn fitting(manifest: &Manifest, rng: &mut Rng, ty: &Type, depth: usize) -> Optio
         Type::Number => Some(HostValue::Number(number(rng))),
         Type::Boolean => Some(HostValue::Boolean(rng.chance(2))),
         Type::Null => Some(HostValue::Null),
+        Type::Enum(values) => Some(HostValue::String(values[rng.below(values.len())].clone())),
         Type::Any => Some(anything(rng, depth)),
         Type::List(element) => {
             let length = if depth >= 3 { 0 } else { rng.below(4) };
@@ -261,7 +262,7 @@ fn contains_any(manifest: &Manifest, ty: &Type, seen: &mut BTreeSet<String>) -> 
         Type::Named(name) => {
             seen.insert(name.clone()) && contains_any(manifest, &manifest.types()[name], seen)
         }
-        Type::String | Type::Number | Type::Boolean | Type::Null => false,
+        Type::String | Type::Number | Type::Boolean | Type::Null | Type::Enum(_) => false,
     }
 }
 

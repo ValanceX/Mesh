@@ -17,6 +17,7 @@ pub(crate) fn fits(manifest: &Manifest, value: &Value, ty: &Type) -> bool {
         | (Type::Number, Value::Number(_))
         | (Type::Boolean, Value::Boolean(_))
         | (Type::Null, Value::Null) => true,
+        (Type::Enum(values), Value::String(text)) => values.iter().any(|v| v.as_str() == &**text),
         (Type::List(element), Value::List(items)) => {
             items.iter().all(|item| fits(manifest, item, element))
         }
@@ -125,6 +126,7 @@ impl<'m> Statics<'m> {
             Expression::Event { .. } => self.payload.map_or(Static::Other, Static::Declared),
             Expression::Literal { .. }
             | Expression::Unary { .. }
+            | Expression::Has { .. }
             | Expression::Binary { .. }
             | Expression::List { .. } => Static::Other,
         }

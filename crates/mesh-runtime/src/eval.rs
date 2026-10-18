@@ -113,6 +113,10 @@ impl Scope<'_, '_> {
                     other => return Err(self.operand(&other, "a number", operand.span())),
                 },
             },
+            // Presence, and nothing else: an absent operand is false, and every present value, `null` and `false` included, is true.
+            Expression::Has { operand, .. } => {
+                Value::Boolean(!matches!(self.eval(operand)?, Value::Absent))
+            }
             Expression::Binary {
                 operator,
                 left,
@@ -163,6 +167,13 @@ impl Scope<'_, '_> {
         match operator {
             B::And => return Ok(Value::Boolean(self.boolean(left)? && self.boolean(right)?)),
             B::Or => return Ok(Value::Boolean(self.boolean(left)? || self.boolean(right)?)),
+            // The right operand is evaluated only when the left is absent.
+            B::Coalesce => {
+                return match self.eval(left)? {
+                    Value::Absent => self.eval(right),
+                    present => Ok(present),
+                }
+            }
             _ => {}
         }
         let (a, b) = (self.eval(left)?, self.eval(right)?);
@@ -187,7 +198,7 @@ impl Scope<'_, '_> {
             B::LessEqual => Value::Boolean(x <= y),
             B::Greater => Value::Boolean(x > y),
             B::GreaterEqual => Value::Boolean(x >= y),
-            B::And | B::Or | B::Equal | B::NotEqual => unreachable!("handled above"),
+            B::And | B::Or | B::Coalesce | B::Equal | B::NotEqual => unreachable!("handled above"),
         })
     }
 }

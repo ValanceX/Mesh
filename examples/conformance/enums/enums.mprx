@@ -1,0 +1,10 @@
+<page>
+  <badge tone={tone} label={title ?? "untitled"} on.pick={choose($event)} on.note={choose($event)} />
+  <badge tone={maybeTone ?? "info"} shade={tone} />
+  <badge tone={tone == "danger" ? "warning" : "info"} />
+  <badge tone={anything} />
+  <chip />
+  <chip tone="danger" />
+  <chip tone={tone} />
+  <text>{has(title)} {has(maybeTone)} {title ?? "none"}</text>
+</page>

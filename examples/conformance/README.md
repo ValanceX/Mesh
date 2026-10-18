@@ -35,6 +35,16 @@ Each node must be exactly as given, and no two states may be written alike: abse
 
 A renderer realizing any of these props in a slot that holds only text must produce exactly the value (for a string) or the `propText` entry, and must refuse a list or record there. It never makes a text itself.
 
+## `enums/`: enum types, `has`, `??` and prop defaults (spec §9.2, §9.3, §9.4, §9.8)
+
+This program has **its own `components.json`** (the shared one, and so every other program's keys, is untouched). `cases.json` is `{ props, rejects, dispatches }`:
+
+- `props`: a node's prop, present (`value`) or `absent`: an enum is carried as its string, `??` takes its default, and a composite's unwritten prop binds its `default`;
+- `rejects`: a snapshot that doesn't render, and the first diagnostic's `code` and `location` (a string that isn't a variant is `runtime-value-mismatch` at its path, through `any` to an enum prop `runtime-prop-mismatch`);
+- `dispatches`: an event reported on a node with a payload, and the `intent` it gives, or the first diagnostic's `code` and `location` (`runtime-value-mismatch` at `$event`; `runtime-argument-mismatch` at the argument).
+
+A renderer needs none of this: an enum is a string in the tree, and the tree's format is unchanged. A host runtime implementing MESH's boundary does.
+
 ## `events/`: event resolution (spec §9.9)
 
 Each case gives an **interaction** and what it resolves to:

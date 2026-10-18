@@ -12,7 +12,7 @@
 // without any target. Each resolved handler is dispatched through the
 // package, once, and gives the committed intent.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { compile } from "../../mesh-compiler/dist/index.js";
@@ -21,9 +21,12 @@ import { root, validateTree } from "./common.mjs";
 
 const conformance = join(root, "examples", "conformance");
 const read = (...path) => readFileSync(join(conformance, ...path), "utf8");
-const model = read("components.json");
+const shared = read("components.json");
+// A program's own manifest if its directory has one (`enums/` does), else the shared one.
+const modelOf = (name) => (existsSync(join(conformance, name, "components.json")) ? read(name, "components.json") : shared);
 
-async function rendered(name) {
+async function build(name, snapshot = JSON.parse(read(name, "snapshot.json"))) {
+  const model = modelOf(name);
   const program = JSON.parse(read(name, "program.json"));
   const templates = [];
   for (const component of program.templates) {
@@ -38,8 +41,13 @@ async function rendered(name) {
   const result = await render({
     program: { root: program.root, templates },
     model,
-    snapshot: JSON.parse(read(name, "snapshot.json")),
+    snapshot,
   });
+  return result;
+}
+
+async function rendered(name) {
+  const result = await build(name);
   assert.ok(result.render, JSON.stringify(result.diagnostics));
   const tree = result.render.tree;
   // By value: JSON.parse reads each committed number as its exact binary64
@@ -147,5 +155,41 @@ test("events: each interaction resolves to its committed binding, and one intent
     const { intent, diagnostics } = await dispatch(kept, resolved.handler);
     assert.equal(diagnostics, undefined, item.case);
     assert.deepEqual({ ...resolved, intent }, item.expect, item.case);
+  }
+});
+
+// `enums/`: the first program with its own manifest. Its cases are
+// `{ props, rejects, dispatches }`: a node's props; snapshots that don't
+// render, with the first diagnostic's code and location; and events with a
+// payload, with the intent they give or the diagnostic.
+const enumCases = () => JSON.parse(read("enums", "cases.json"));
+
+test("enums: props are as committed", async () => {
+  const kept = await rendered("enums");
+  const all = nodes(kept.tree.root);
+  for (const item of enumCases().props) {
+    assert.deepEqual(entry(all.get(item.node).props, item.prop, "value"), item.value, item.case);
+  }
+});
+
+test("enums: a value that is not a variant is refused at the boundary", async () => {
+  for (const item of enumCases().rejects) {
+    const result = await build("enums", item.snapshot);
+    assert.equal(result.render, undefined, item.case);
+    const [first] = result.diagnostics.diagnostics;
+    assert.deepEqual({ code: first.code, location: first.location }, { code: item.code, location: item.location }, item.case);
+  }
+});
+
+test("enums: an event whose payload or argument is not a variant is refused", async () => {
+  const kept = await rendered("enums");
+  const all = nodes(kept.tree.root);
+  for (const item of enumCases().dispatches) {
+    const handler = all.get(item.node).events[item.event];
+    const result = await dispatch(kept, handler, item.payload);
+    const actual = result.intent
+      ? { intent: result.intent }
+      : { code: result.diagnostics.diagnostics[0].code, location: result.diagnostics.diagnostics[0].location };
+    assert.deepEqual(actual, item.expect, item.case);
   }
 });
