@@ -164,7 +164,11 @@ fn a_program_cannot_start_with_a_forwarder() {
 
 #[test]
 fn a_forwarder_inside_an_element_renders_what_its_caller_wrote() {
-    let view = compile_with(MODEL, "view", "<page><fwd>{title}</fwd><fwd><page /></fwd></page>");
+    let view = compile_with(
+        MODEL,
+        "view",
+        "<page><fwd>{title}</fwd><fwd><page /></fwd></page>",
+    );
     let fwd = compile_with(MODEL, "fwd", "{@render children()}");
     let rendered = render(
         &Program {

@@ -36,7 +36,8 @@ The language's first new types (direction Bet 4). A compatible addition: a manif
 - **Codes:** `unknown-snippet`, `snippet-arity-mismatch`, `duplicate-snippet`, `children-conflict`, `manifest-snippet-misplaced`, `manifest-children-not-snippet`, `assembly-snippet-to-primitive`, `assembly-snippet-root-scope` and `runtime-snippet-depth`.
 - **Identity:** a render site adds the step `0x08`; a subtree that renders a snippet is never kept on its own memo (as with a slot), and the vectors in `examples/conformance/snippets` fail without that rule. Snippets render at most 64 levels deep. `render-v1` and the patch format are unchanged; a template that has a snippet is `template-v2`.
 - **A forwarder (U13).** A template may be only `{@render children()}`: the document is read as `<mesh-fragment>{@render …}</mesh-fragment>`, so a composite can forward what its caller wrote without a node of its own. The grammar's `source_file` is an element or a render tag; the output is `template-v2`; a program's root cannot be one (`assembly-root-fragment`, whose message now says so). Vectors: `examples/conformance/forwarder`.
-- **Not yet:** language-server support for snippets (hover, completion, go to declaration), contract inference for snippet props (declare them in the manifest), and the Valance `component()` side.
+- **The language server** hovers a snippet's name, and completes snippet names after `{@render `, a snippet's parameters and an `{#each}` item where a value starts, and the members of a closed set inside the quotes of a prop's value or beside `==` and `!=` (the new candidate kinds `Snippet`, `Parameter` and `EnumValue`).
+- **Not yet:** go to declaration for a snippet's name, contract inference for snippet props (declare them in the manifest), and signature help for a render's arguments.
 
 ### Changed
 

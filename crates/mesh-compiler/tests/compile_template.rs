@@ -394,7 +394,10 @@ fn a_template_that_is_a_render_tag_is_a_fragment_and_a_version_2_document() {
     let written: Value = serde_json::from_str(&mesh_template::to_json(&template)).unwrap();
 
     assert_eq!(written["root"]["component"], "mesh-fragment");
-    assert_eq!(written["root"]["children"][0]["element"]["component"], "mesh-render");
+    assert_eq!(
+        written["root"]["children"][0]["element"]["component"],
+        "mesh-render"
+    );
     assert_eq!(written["version"], 2);
 
     let [v1, v2] = validators();

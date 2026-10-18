@@ -124,6 +124,12 @@ pub enum CandidateKind {
     ScopeName,
     Member,
     Command,
+    /// A snippet that `{@render}` can name: one declared among the children around it, or a snippet of the template's scope.
+    Snippet,
+    /// A name bound around the cursor: a snippet's parameter, or the item of an `{#each}`.
+    Parameter,
+    /// A member of a closed set of strings, written inside quotes.
+    EnumValue,
 }
 
 /// A name that may be written at the cursor (outline D4), derived from a
@@ -166,7 +172,7 @@ pub fn candidates(
     analysis: Option<&Analysis>,
 ) -> Vec<Candidate> {
     use mesh_analysis::{members, read_field, Ty};
-    use mesh_parser::Context;
+    use mesh_parser::{Context, TextSite};
 
     let Some(completion) = mesh_parser::context_at(source, offset) else {
         return Vec::new();
@@ -259,19 +265,92 @@ pub fn candidates(
                 )
             })
             .collect(),
-        Context::Value => template
-            .component()
-            .scope
-            .iter()
-            .map(|(name, ty)| {
+        Context::Value => {
+            let reach = mesh_parser::reach_at(source, offset);
+            let bound = reach
+                .bindings
+                .iter()
+                .map(|name| candidate(name.clone(), CandidateKind::Parameter, None, false));
+            // What a binding names hides a scope name of the same name.
+            let scope = template
+                .component()
+                .scope
+                .iter()
+                .filter(|(name, _)| !reach.bindings.contains(name))
+                .map(|(name, ty)| {
+                    candidate(
+                        name.clone(),
+                        CandidateKind::ScopeName,
+                        Some(Ty::from(ty).to_string()),
+                        false,
+                    )
+                });
+            bound.chain(scope).collect()
+        }
+        Context::Render => {
+            let reach = mesh_parser::reach_at(source, offset);
+            // The nearest declaration of a name is the one a render means: the later of two of one name hides the earlier.
+            let mut local: Vec<&mesh_parser::LocalSnippet> = Vec::new();
+            for snippet in &reach.snippets {
+                local.retain(|earlier| earlier.name != snippet.name);
+                local.push(snippet);
+            }
+            let declared = local.iter().map(|snippet| {
                 candidate(
-                    name.clone(),
-                    CandidateKind::ScopeName,
-                    Some(Ty::from(ty).to_string()),
+                    snippet.name.clone(),
+                    CandidateKind::Snippet,
+                    Some(format!(
+                        "{}({})",
+                        snippet.name,
+                        snippet.parameters.join(", ")
+                    )),
                     false,
                 )
-            })
-            .collect(),
+            });
+            let scope = template
+                .component()
+                .scope
+                .iter()
+                .filter(|(name, _)| !local.iter().any(|snippet| &snippet.name == *name))
+                .filter(|(_, ty)| {
+                    matches!(Ty::from(*ty), Ty::Snippet(_))
+                        || matches!(Ty::from(*ty), Ty::Optional(inner) if matches!(*inner, Ty::Snippet(_)))
+                })
+                .map(|(name, ty)| {
+                    let shown = match Ty::from(ty) {
+                        Ty::Optional(inner) => inner.to_string(),
+                        other => other.to_string(),
+                    };
+                    candidate(name.clone(), CandidateKind::Snippet, Some(shown), false)
+                });
+            declared.chain(scope).collect()
+        }
+        Context::Text(site) => {
+            let ty = match site {
+                TextSite::Prop { tag, prop } => manifest
+                    .components()
+                    .get(&tag)
+                    .filter(|_| mesh_semantic::retired_block(&tag).is_none())
+                    .and_then(|component| component.props.get(&prop))
+                    .map(|field| Ty::from(&field.ty)),
+                TextSite::Compared { other, other_span } => match analysis {
+                    Some(analysis) => analysis.type_at(other_span).cloned(),
+                    None => {
+                        let other = mesh_semantic::lower_expression(&other);
+                        mesh_analysis::analyze_expression(&other, template)
+                            .type_at(other_span)
+                            .cloned()
+                    }
+                },
+            };
+            let Some(ty) = ty else {
+                return Vec::new();
+            };
+            enum_values(manifest, &ty, 0)
+                .into_iter()
+                .map(|value| candidate(value, CandidateKind::EnumValue, None, false))
+                .collect()
+        }
         Context::Member {
             object,
             object_span,
@@ -304,4 +383,24 @@ pub fn candidates(
     let mut seen = std::collections::BTreeSet::new();
     out.retain(|candidate| seen.insert((candidate.label.clone(), candidate.kind)));
     out
+}
+
+/// The members of the closed set `ty` is, or is optionally, or names; none if it is not one.
+fn enum_values(
+    manifest: &mesh_manifest::Manifest,
+    ty: &mesh_analysis::Ty,
+    depth: usize,
+) -> Vec<String> {
+    use mesh_analysis::Ty;
+
+    match ty {
+        Ty::Enum(values) => values.clone(),
+        Ty::Optional(inner) if depth < 8 => enum_values(manifest, inner, depth + 1),
+        Ty::Named(name) if depth < 8 => manifest
+            .types()
+            .get(name)
+            .map(|named| enum_values(manifest, &Ty::from(named), depth + 1))
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    }
 }

@@ -102,10 +102,12 @@ Completion offers only names the manifest declares, and each only where the comp
 - **After `<`:** every component.
 - **In an opening tag,** after its name or a whole attribute: the component's props, required ones first (marked *required*), then the rest, then its events as `on.click`. After `on.`, just its events.
 - **At the start of an `on.` handler:** the template's commands. A handler must be a command, so nothing else is offered there.
-- **Where any other expression starts:** the names in the template's scope.
+- **Where any other expression starts:** the names bound around the cursor first (a snippet's parameters inside its body, the item of an `{#each}` inside its key and body; a binding hides a scope name of the same name), then the names in the template's scope.
+- **After `{@render `:** the snippets a render can name: those declared among the children of the elements and blocks around the cursor (in the order declared; a later one of the same name hides an earlier; shown as `name(params)`), then the template's scope names whose type is a snippet (shown as `snippet<…>`).
+- **Inside the quotes of a string** that is a prop's value (`tone="…"` or `tone={"…"}`) or an operand of `==` and `!=`: the members of the closed set the prop, or the other operand, has as its type (a set written in place, a named one, or an optional one). Nothing for a string prop that is not a closed set.
 - **After `.`:** the fields of the value's type, if it's a record. A value that may be absent has none (reading through it is `possibly-absent-access`), and neither does `any` or a value whose type isn't known, such as a name that isn't in scope.
 
-Everything else is in name order. It works while the file is broken, which it almost always is while you type: after `user.`, after `<avatar `, after a bare `<`. Like hover, it needs a model; without one it offers nothing. It doesn't complete attribute values, text inside strings, closing tags, object keys, `$event`, or argument lists.
+Everything else is in name order. It works while the file is broken, which it almost always is while you type: after `user.`, after `<avatar `, after a bare `<`. Like hover, it needs a model; without one it offers nothing. It doesn't complete other attribute values (a local snippet passed along as `row={row}` is not offered), other text inside strings, closing tags, object keys, `$event`, or argument lists. The snippets and bindings in reach are read from the syntax tree, so the file has to parse apart from the name being typed (an editor that closes `{` and `"` as you type gives it that).
 
 ## Formatting
 

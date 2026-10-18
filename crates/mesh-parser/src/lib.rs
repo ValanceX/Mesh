@@ -20,7 +20,7 @@ mod nesting;
 mod recover;
 mod syntax_errors;
 
-pub use context::{context_at, Completion, Context};
+pub use context::{context_at, reach_at, Completion, Context, LocalSnippet, Reach, TextSite};
 pub use limits::{MAX_ATTRIBUTES, MAX_ELEMENTS, MAX_SOURCE_BYTES};
 pub use nesting::MAX_NESTING_DEPTH;
 pub use recover::{recover, Recovered, RecoveredExpression};
