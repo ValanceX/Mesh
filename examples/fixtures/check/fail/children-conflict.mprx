@@ -1,0 +1,4 @@
+<page title="x">
+  {#snippet s()}<text>a</text>{/snippet}
+  <panel title="t" children={s}><text>b</text></panel>
+</page>

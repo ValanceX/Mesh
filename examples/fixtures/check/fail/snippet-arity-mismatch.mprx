@@ -1,0 +1,5 @@
+<page title="x">
+  {#snippet pair(a, b)}<text>{a}</text>{/snippet}
+  {@render pair(name)}
+  <data-list items={users}>{#snippet row(u, v)}<text>{u.name}</text>{/snippet}</data-list>
+</page>

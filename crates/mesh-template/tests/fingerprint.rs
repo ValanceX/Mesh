@@ -271,3 +271,31 @@ fn a_default_changes_the_fingerprint_and_only_a_default_does() {
         of_value(&with_prop(number, Some(json!(-0.0))))
     );
 }
+
+fn with_scope(ty: Value) -> Value {
+    json!({ "version": 1, "types": {}, "components": {
+        "c": { "props": {}, "events": {}, "commands": {}, "scope": { "x": ty } }
+    } })
+}
+
+#[test]
+fn a_snippet_is_its_ordered_parameters() {
+    let snippet = |params: Value| json!({ "kind": "snippet", "params": params });
+    let (s, n) = (json!({ "kind": "string" }), json!({ "kind": "number" }));
+    let sn = of_value(&with_scope(snippet(json!([s, n]))));
+    assert_eq!(sn, of_value(&with_scope(snippet(json!([s, n])))));
+    assert_ne!(
+        sn,
+        of_value(&with_scope(snippet(json!([n, s])))),
+        "order counts"
+    );
+    assert_ne!(
+        sn,
+        of_value(&with_scope(snippet(json!([s])))),
+        "arity counts"
+    );
+    assert_ne!(
+        of_value(&with_scope(snippet(json!([])))),
+        of_value(&with_scope(snippet(json!([s])))),
+    );
+}

@@ -45,6 +45,12 @@ This program has **its own `components.json`** (the shared one, and so every oth
 
 A renderer needs none of this: an enum is a string in the tree, and the tree's format is unchanged. A host runtime implementing MESH's boundary does.
 
+## `snippets/`: typed template values (spec §9.2 to §9.4, §9.10.2; decisions U1 to U14)
+
+This program has **its own `components.json`** too, and is a `template-v2` program (`mesh-snippet`, `mesh-render`). It renders a generic list whose rows the caller supplies (`data-list`), the same through a second composite that passes the snippet along (`shell`), a card that takes `children` and an optional `footer`, local snippets rendered twice, a snippet that renders itself over a tree, and a snippet declared inside a repeat's item. Beyond `snapshot.json` and `expected.tree.json` it has **steps**: `step-N.snapshot.json` with `step-N.expected.tree.json`, a reordered list, an edit that changes a card whose own props do not change, and an emptied one. Each step renders its tree, and updating from a step to the next is the render of the next (the memo hazard of slots, for snippets).
+
+`cases.json` is `{ distinct, same, different }`, relations between keys. A node is named by `step` and `path`, the indexes of the nodes (text runs not counted) from the root down: `distinct` lists nodes of one step whose keys are pairwise different; `same` pairs two nodes, possibly of different steps, with the same key (a row follows its item when the list is reordered); `different` pairs two with different keys.
+
 ## `events/`: event resolution (spec §9.9)
 
 Each case gives an **interaction** and what it resolves to:

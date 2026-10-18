@@ -195,3 +195,11 @@ fn leaves_a_space_between_two_interpolations_alone() {
         "<page>\n  <text>{first}  {last}</text>\n</page>\n"
     );
 }
+
+#[test]
+fn snippets_indent_like_blocks_and_a_render_tag_is_a_leaf() {
+    let source = "<list>\n{#snippet row(p, q)}\n<i>{p}</i>\n{@render row(q, p)}\n{/snippet}\n{@render row(a, b)}\n</list>\n";
+    let expected = "<list>\n  {#snippet row(p, q)}\n    <i>{p}</i>\n    {@render row(q, p)}\n  {/snippet}\n  {@render row(a, b)}\n</list>\n";
+    assert_eq!(fmt(source), expected);
+    assert_eq!(fmt(expected), expected, "formatting is idempotent");
+}

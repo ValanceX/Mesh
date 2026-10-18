@@ -1,0 +1,5 @@
+error[unknown-snippet]: unknown snippet "nothing": it is neither declared among the children it is in or around, nor a snippet of this component
+ --> fixtures/check/fail/unknown-snippet.mprx:1:26
+  |
+1 | <page title="x">{@render nothing()}</page>
+  |                          ^^^^^^^

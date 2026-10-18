@@ -319,4 +319,67 @@ mod tests {
             Some(en(&["a", "b"]))
         );
     }
+
+    fn snippet(params: &[Ty]) -> Ty {
+        Ty::Snippet(params.to_vec())
+    }
+
+    #[test]
+    fn snippets_compare_their_parameters_contravariantly_with_the_same_arity() {
+        let manifest = manifest();
+        let narrow = en(&["a"]);
+        let wide = en(&["a", "b"]);
+        // A snippet that takes any string can be given where one that is given "a" is wanted.
+        assert!(is_assignable(
+            &manifest,
+            &snippet(&[Ty::String]),
+            &snippet(std::slice::from_ref(&narrow))
+        ));
+        assert!(!is_assignable(
+            &manifest,
+            &snippet(std::slice::from_ref(&narrow)),
+            &snippet(&[Ty::String])
+        ));
+        assert!(is_assignable(
+            &manifest,
+            &snippet(std::slice::from_ref(&narrow)),
+            &snippet(std::slice::from_ref(&narrow))
+        ));
+        // Taking the wider enum is fine for being given the narrower one, not the other way round.
+        assert!(is_assignable(
+            &manifest,
+            &snippet(std::slice::from_ref(&wide)),
+            &snippet(std::slice::from_ref(&narrow))
+        ));
+        assert!(!is_assignable(
+            &manifest,
+            &snippet(&[narrow]),
+            &snippet(&[wide])
+        ));
+        // The arity is exact.
+        assert!(!is_assignable(
+            &manifest,
+            &snippet(&[]),
+            &snippet(&[Ty::String])
+        ));
+        assert!(!is_assignable(
+            &manifest,
+            &snippet(&[Ty::String]),
+            &snippet(&[])
+        ));
+        assert!(is_assignable(&manifest, &snippet(&[]), &snippet(&[])));
+    }
+
+    #[test]
+    fn a_snippet_is_not_an_any_and_has_a_common_type_with_nothing_else() {
+        let manifest = manifest();
+        let s = snippet(&[Ty::String]);
+        assert!(!is_assignable(&manifest, &s, &Ty::Any));
+        assert!(!is_assignable(&manifest, &Ty::Any, &s));
+        assert!(!is_assignable(&manifest, &s, &Ty::String));
+        assert!(is_assignable(&manifest, &s, &opt(s.clone())));
+        assert_eq!(join(&manifest, &s, &s), Some(s.clone()));
+        assert_eq!(join(&manifest, &s, &Ty::Any), None);
+        assert_eq!(join(&manifest, &s, &snippet(&[Ty::Number])), None);
+    }
 }

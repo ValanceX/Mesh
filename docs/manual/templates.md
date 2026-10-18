@@ -367,6 +367,7 @@ The fingerprint is determined by the model's **meaning**, and by nothing else.
 | `U?` | `0x07`, `D(U)` |
 | record | `0x08`, the count of fields, then for each field: its name (a string), its requiredness (a flag, `0x01` for required), `D(its type)` |
 | `enum` | `0x09`, the count of values, then each value (a string), in code-point order: an enum is a set |
+| `snippet<A, B>` | `0x0a`, the count of parameters, then `D(each parameter)` in order |
 | a named type | nothing of its own: `D(named)` is `D(its definition)` |
 
 A digest is computed once per named type and reused, so the fingerprint costs time linear in the manifest's size, however often a named type is used, and equals what hashing the full expansion would give.
@@ -442,6 +443,32 @@ Only the root template's scope comes from the snapshot. The root component's own
 **Nesting.** A composite's template may contain composite occurrences, as long as the program has no cycle, and a render may nest 512 levels (an element, a composite's expansion, a fragment, a slot or a repeated item is one each); deeper is `runtime-nesting-too-deep`. A template document may nest 1,024 levels of JSON, which holds the 128 levels of MPRX nesting (an element is three levels of JSON); deeper is `assembly-malformed-template`.
 
 **Handlers inside a composite** invoke that composite's own commands: a `user-card` template's `on.click={selectUser(user)}` produces `user-card`'s `selectUser`. A composite can raise events of its own: see [Composite events](#composite-events).
+
+### Snippets
+
+A **snippet** is a piece of template with parameters, which a component passes to another, or a template names and renders itself ([the language spec](../MPRX-SPEC.md#9-checking-against-a-component-model), §9.4). It is pure: a function of its arguments and the scope it was declared in, and it runs no code.
+
+```xml
+<!-- the template of `data-list` (props `items` and `row`, a `snippet<Person>`) -->
+<list>
+  {#each items as item (item.id)}{@render row(item)}{/each}
+</list>
+
+<!-- an occurrence of it, with the snippet declared as a child -->
+<data-list items={people}>
+  {#snippet row(p)}<row label={p.name} on.press={select(p.id)} />{/snippet}
+</data-list>
+```
+
+- **Declared** with `{#snippet name(a, b)} … {/snippet}`, and **rendered** with `{@render name(args)}`, wherever an element may be.
+- **Passed.** A snippet declared as a direct child of an occurrence whose component declares a prop of that name is passed as that prop. Content between the tags of a component that declares a `children` snippet prop is passed as `children`, with no parameters. Any other declaration is **local**: a name for all the children of the element it is in, itself and its siblings included, so a snippet can render itself. A snippet is also passed along by name: `row={row}`.
+- **Scope.** A snippet reads the scope of the template that declares it, plus its parameters. A handler in its body names that template's commands and events, and a `mesh-slot` in it places the content of the occurrence of the declaring template's component, wherever it is rendered.
+- **Where it lives.** The manifest kind `snippet` (with ordered `params`) may be a composite's prop or scope name. It is never in a primitive's prop (`assembly-snippet-to-primitive`), a record, a list, a named type, an event payload, a command parameter, or the root scope (`assembly-snippet-root-scope`), and in an expression only as a whole attribute value, or a name passed along. A prop named `children` is a `snippet` with no parameters.
+- **In the template** it is the built-in elements `mesh-snippet` (props `name`, a string, and `params`, a list of strings; its children are the body) and `mesh-render` (props `name` and `arguments`, a list of the argument expressions; no children), as blocks are `mesh-if` and `mesh-each`. A template that has either is a `template-v2`. The runtime keeps a snippet as a value (the declaration and the scope it reads), never in a snapshot, a payload or a render tree.
+- **Identity.** A `{@render}` adds a **render step** (`0x08`) to the path of every node of the body: its position among the children of the rendering template, and no component. The body's own positions follow, so the same snippet rendered twice under one parent, in every item of a repeat, or through two composites, never shares a key (`examples/conformance/snippets`). The declaring template contributes only the positions inside the body.
+- **Update.** A node that renders a snippet, like one that places a slot, is never kept on its own memo: what it renders depends on the snippet, which its memo doesn't record. The nodes the snippet's body made are kept as any node is, by the values they read.
+- **Limit.** Snippets render at most 64 levels deep, one inside another (`runtime-snippet-depth`), and the 512 levels of all nesting apply (`runtime-nesting-too-deep`). Neither is configurable by the host.
+- Slots (`mesh-slot`, `mesh-fill`) keep working. A component that declares `children` is given its content as a snippet, any other as before.
 
 ### Fragments
 

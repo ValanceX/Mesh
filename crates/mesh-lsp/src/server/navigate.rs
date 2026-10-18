@@ -89,6 +89,15 @@ pub(super) fn hover(
     markdown: bool,
 ) -> Option<Hover> {
     let (span, block, sentence) = match hovered(facts, offset)? {
+        // A binding with no type of its own is the name of a snippet.
+        Hovered::Declaration(Resolution {
+            span,
+            target: Target::Binding { name, .. },
+        }) => (
+            *span,
+            format!("snippet {name}"),
+            Some("Declared by `{#snippet}` in this template.".to_string()),
+        ),
         Hovered::Declaration(resolution) => {
             let (block, sentence) = declaration(&resolution.target, model)?;
             (resolution.span, block, sentence)

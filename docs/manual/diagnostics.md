@@ -414,10 +414,10 @@ This covers every level: component names, props, events, commands, scope names, 
 
 ### `manifest-unknown-kind`
 
-A type's `"kind"` isn't one of `string`, `number`, `boolean`, `null`, `any`, `list`, `record`, `named`, `optional` or `enum`.
+A type's `"kind"` isn't one of `string`, `number`, `boolean`, `null`, `any`, `list`, `record`, `named`, `optional`, `enum` or `snippet`.
 
 ```text
-error[manifest-unknown-kind]: unknown type kind "integer"; expected string, number, boolean, null, any, list, record, named, optional or enum
+error[manifest-unknown-kind]: unknown type kind "integer"; expected string, number, boolean, null, any, list, record, named, optional, enum or snippet
   --> examples/fixtures/manifest/fail/unknown-kind.json:18:28
    |
 18 |         "count": { "kind": "integer" }
@@ -535,6 +535,34 @@ error[manifest-duplicate-variant]: the enum lists the value "a" twice
 ```
 
 **Fix:** delete the repeat.
+
+### `manifest-snippet-misplaced`
+
+A `snippet` type is somewhere but a component's prop or scope name (or an `optional` of one there). A snippet is never stored, returned or sent, so it isn't a record's field, a list's element, a named type, an event's payload, a command's parameter, or another snippet's parameter. Points at the `"snippet"`.
+
+```text
+error[manifest-snippet-misplaced]: a snippet type can only be the type of a component's prop or scope name: it is never stored, returned or sent, so it is not a record field, a list element, a named type, an event payload or a command parameter, and not a snippet's own parameter
+ --> examples/fixtures/manifest/fail/snippet-misplaced.json:8:79
+  |
+8 |           "type": { "kind": "record", "fields": { "body": { "type": { "kind": "snippet", "params": [] }, "required": true } } },
+  |                                                                               ^^^^^^^^^
+```
+
+**Fix:** pass the data a snippet would need instead, and give the snippet to the component through a prop.
+
+### `manifest-children-not-snippet`
+
+A prop named `children` isn't a `snippet` with no parameters. `children` is reserved for the content written between a component's tags, which a component with a template receives as a snippet. Points at the prop's name.
+
+```text
+error[manifest-children-not-snippet]: the prop `children` is the content written inside the component, so its type must be a snippet with no parameters: { "kind": "snippet" }
+ --> examples/fixtures/manifest/fail/children-not-snippet.json:7:9
+  |
+7 |         "children": { "type": { "kind": "string" }, "required": true }
+  |         ^^^^^^^^^^
+```
+
+**Fix:** type it `{ "kind": "snippet" }`, or give the prop another name.
 
 ### `manifest-missing-component`
 
@@ -831,7 +859,7 @@ error[type-mismatch]: the condition needs boolean, found boolean?, which may be 
 
 ### `no-common-type`
 
-Two types that must have a common type don't: the operands of `==` or `!=`, the two branches of `c ? a : b`, the elements of an array, or the two sides of `x ?? y`. Points at the comparison or conditional, or at the first array element that doesn't fit with the ones before it.
+Two types that must have a common type don't: the operands of `==` or `!=`, the two branches of `c ? a : b`, the elements of an array, the two sides of `x ?? y`, or what two renders give one parameter of a local snippet. Points at the comparison or conditional, or at the first array element that doesn't fit with the ones before it.
 
 ```text
 error[no-common-type]: `==` compares string with number, which have no common type
@@ -941,6 +969,68 @@ warning[redundant-default]: the left side is string, which is never absent, so t
 `x ?? y` is `x` when `x` is present, otherwise `y`. `y` is evaluated only when it is needed. `y` must be present: if it may be absent that is the existing `type-mismatch` ("which may be absent"), so the result of `??` is never absent. If the two have no common type, that is `no-common-type`.
 
 **Fix:** delete the `?? y`, or apply it to an optional value.
+
+### `unknown-snippet`
+
+`{@render name(…)}` names no snippet: none is declared among the children it is in or around, and the template's scope has no snippet-typed name of that name. Points at the name, with a did-you-mean when one is close.
+
+```text
+error[unknown-snippet]: unknown snippet "nothing": it is neither declared among the children it is in or around, nor a snippet of this component
+ --> examples/fixtures/check/fail/unknown-snippet.mprx:1:26
+  |
+1 | <page title="x">{@render nothing()}</page>
+  |                          ^^^^^^^
+```
+
+**Fix:** declare it with `{#snippet name(parameters)} … {/snippet}` in the same children or around, or declare a snippet prop of that name in the manifest.
+
+### `snippet-arity-mismatch`
+
+A render gives a snippet a different number of arguments than it has parameters, or a snippet passed to a component is written with a different number of parameters than the prop's type has. A render points at the whole tag, a declaration at its name.
+
+```text
+error[snippet-arity-mismatch]: the snippet "pair" takes 2 parameters, found 1
+ --> examples/fixtures/check/fail/snippet-arity-mismatch.mprx:3:3
+  |
+3 |   {@render pair(name)}
+  |   ^^^^^^^^^^^^^^^^^^^^
+
+error[snippet-arity-mismatch]: the snippet "row" takes 1 parameter, found 2
+ --> examples/fixtures/check/fail/snippet-arity-mismatch.mprx:4:38
+  |
+4 |   <data-list items={users}>{#snippet row(u, v)}<text>{u.name}</text>{/snippet}</data-list>
+  |                                      ^^^
+```
+
+**Fix:** give exactly as many arguments as parameters.
+
+### `duplicate-snippet`
+
+Two snippets have one name among the same children. Points at the second's name.
+
+```text
+error[duplicate-snippet]: a second snippet named "one" among the same children
+ --> examples/fixtures/check/fail/duplicate-snippet.mprx:3:13
+  |
+3 |   {#snippet one()}<text>b</text>{/snippet}
+  |             ^^^
+```
+
+**Fix:** rename one.
+
+### `children-conflict`
+
+A component that takes `children` is given them twice: as an attribute `children={…}` and as the content between its tags. Points at the attribute.
+
+```text
+error[children-conflict]: "panel" gets its `children` twice: as an attribute and as the content between its tags; write one
+ --> examples/fixtures/check/fail/children-conflict.mprx:3:20
+  |
+3 |   <panel title="t" children={s}><text>b</text></panel>
+  |                    ^^^^^^^^
+```
+
+**Fix:** write one of them.
 
 ### `content-not-text`
 
@@ -1063,6 +1153,22 @@ Location: `source`, every composite occurrence of it.
 A composite occurrence has children that the composite's template has no slot for. A composite takes loose children (text or elements outside a `mesh-fill`) exactly when its template has a default `mesh-slot` ([Children and the slot](templates.md#children-and-the-slot)); and a `mesh-fill` needs a `mesh-slot` of its name, once, in an occurrence of a composite ([Named slots](templates.md#named-slots)). An occurrence of a composite that has slots may have no children.
 
 Location: `source`, the occurrence.
+
+### `assembly-snippet-to-primitive`
+
+A snippet was given to a component that has no template in the program, so it is a primitive, and a primitive's props go to the renderer, which cannot take a snippet. Reported where a primitive's prop of snippet type is written, a snippet is declared among its children for a prop of that name, or content is written inside a primitive that declares a `children` snippet prop. Nothing is rendered.
+
+Location: `source`, the occurrence.
+
+**Fix:** give the component a template, or don't pass it a snippet.
+
+### `assembly-snippet-root-scope`
+
+The root component's scope has a snippet-typed name. The root's scope comes from the host's snapshot, which holds no snippet.
+
+Location: `program`.
+
+**Fix:** make the root take plain data, and put the snippet in a composite it uses.
 
 ### `assembly-root-fragment`
 
@@ -1243,6 +1349,14 @@ Location: `input`, the first path that differs.
 A render nests more than 512 levels deep, counting each element, each composite's expansion, each fragment, slot and repeated item as one. Nothing is rendered. Before this limit, about 680 nested composites (fewer with several elements to a level) crashed the WebAssembly runtime with an internal error. The limit is not configurable by the host; to stay under it, flatten the composites or split the view. (Decision U12 of the direction documents.)
 
 Location: `source`, the element that would be the 513th level.
+
+### `runtime-snippet-depth`
+
+Snippets are rendered more than 64 levels deep, one inside another. Nothing is rendered. The limit stops a snippet that renders itself with the same arguments, which never ends; a snippet that recurses over data needs at most about 64 levels, since the data is at most 128 levels of record and list. It is not configurable by the host (decision U12). The 512-level limit on all nesting, `runtime-nesting-too-deep`, applies as well.
+
+Location: `source`, the `{@render}` that would be the 65th.
+
+**Fix:** end the recursion with an argument that changes, for example `{#if n > 0}{@render again(n - 1)}{/if}`.
 
 ### Internal errors
 

@@ -212,6 +212,13 @@ Conditional and repeated structure are part of the language, not elements. A blo
 
 A block means what the retired element it replaces meant: `{#if}` with no other branch is the conditional (§9.10.2), a chain is the choice among its branches, one conditional site per branch, each true only when no branch before it is, and `{#each}` is the repeat. The runtime, the `template-v1` and `render-v1` documents, node identities and handler identifiers are unchanged, and a program written with the retired elements compiles to the same templates apart from source spans. The constructs a block lowers to are built in: a manifest need not declare them, and one that does is used as declared.
 
+**Snippets.** Two more constructs are written in the children of an element, and lower, as blocks do, to built-in elements (`mesh-snippet`, `mesh-render`) in a `template-v2` (`docs/manual/templates.md`, "Snippets"):
+
+- **`{#snippet name(a, b)} … {/snippet}`** declares a snippet: a piece of template with parameters, whose body is its children as written (not wrapped in a fragment). It is read in the scope of the template that declares it, plus its parameters.
+- **`{@render name(args)}`** renders one, wherever an element may be. The arguments are evaluated where it is written and bound to the parameters; there are exactly as many as parameters.
+
+A snippet declared as a direct child of an occurrence whose component declares a prop of that name is passed as that prop; content between the tags of a component that declares a `children` snippet prop is passed as `children`; any other snippet is a local name, readable among all the children of the element it is in. A snippet is a value of the `snippet` type (§9.2), which is second-class. `mesh-snippet` and `mesh-render` written as elements are `retired-element` errors. A block, a snippet and a render tag count as three, three and zero levels toward the nesting limit.
+
 Diagnostics about a block name the block ("the condition of `{#if}`", "the key of `{#each}`"). Syntax errors in blocks keep the code `syntax-error` with a message located at the block: a block never closed, a closer or `{:else}` with no open block, a malformed opener.
 
 
@@ -452,6 +459,7 @@ Everything here is an **error**, and nothing is checked more loosely to let a fi
 | records, `{ f: T, g?: U }` | objects with exactly the declared fields; each field has a type and its own requiredness |
 | named types | exactly their definition in the manifest's `types` (aliases: compatibility is structural, never nominal) |
 | `T?` | a `T`, **or absent**: no value at all |
+| `snippet<A, B>` | a piece of template with those ordered parameters (§9.4). **Second-class**: the type of a composite's prop or scope name only, never a record field, a list element, a named type, an event payload, a command parameter or a primitive's prop. A prop named `children` is `snippet<>` |
 
 Two more types exist only inside the checker and can't be written in a manifest: `void`, the type of a command invocation, which fits nowhere, not even `any`; and `nothing`, the element type of `[]`, which fits everywhere.
 
@@ -481,6 +489,7 @@ Two more types exist only inside the checker and can't be written in a manifest:
 5. `actual` is `nothing`: **yes**.
 6. Both are primitive (`string`, `number`, `boolean`, `null`): **yes** if they are the same type. There are no coercions.
 6a. Enums: an enum to `string`: **yes**; an enum `A` to an enum `B`: **yes** if every value of `A` is a value of `B`; `string` to an enum: **no**, except at a literal site (§9.4), where a string literal that is one of the values is the enum's type.
+6d. `snippet<A…>` to `snippet<B…>`: **yes** if they have the same number of parameters and, for each, `is_assignable(Bi, Ai)`: the actual snippet must accept what the expected one will be given (contravariance). A snippet to or from `any` is **no**.
 7. `list<T>` to `list<U>`: `is_assignable(T, U)`. Lists are covariant, which is sound because MPRX values are never mutated.
 8. Record to record, comparing **declarations**: yes if every field `expected` declares required is declared required in `actual` with an assignable type; every field `expected` declares optional has an assignable type if `actual` declares it at all; and `actual` declares no field `expected` lacks. So `f?: T` and `f: T?` are not interchangeable, either way round.
 9. Anything else: **no**.
@@ -523,6 +532,7 @@ Every expression has a type, computed bottom-up. "Needs `T`" means `is_assignabl
 | `[a, b, ...]` | `list<join of all elements>` |
 | `{ k: v, ... }` | an exact record with every key declared required, each typed by its value |
 | a command invocation | `void` (§9.5) |
+| a snippet-typed name | its `snippet<…>` type, and only a whole attribute value (for a snippet-typed prop), or a name passed along, may be one; as an operand, an interpolation or an argument it is a `type-mismatch` or `content-not-text` |
 | `$event` | the event's payload type (§9.5) |
 
 - **`+` is numeric only.** There is no string concatenation: text content already interleaves text and expressions.
@@ -530,6 +540,7 @@ Every expression has a type, computed bottom-up. "Needs `T`" means `is_assignabl
 - **`has(x)`** is `true` when `x` is present and `false` when it is absent; `null` is present. It is an expression, not a command: wherever a command invocation is allowed (a handler), `has(...)` is still a command call, and `has` is not a reserved word. A `has` with other than one argument is a `syntax-error`. Testing a type that cannot be absent is the warning `redundant-presence-test`.
 - **`x ?? y`** is `x` if `x` is present, otherwise `y`; `y` is evaluated only then. Its precedence is between `?:` and `||`, and it associates to the left. If `x` cannot be absent, `y` is never used: the warning `redundant-default`. `y` must be present: an optional `y` is the existing `type-mismatch` ("which may be absent"), so the result of `??` is never absent. It does not narrow `x`.
 - **Literal sites.** A string literal is checked against an enum, not just typed `string`, in these places: an attribute value, an operand of `==` or `!=` when the other side is an enum, a branch of `?:`, an element of an array, and the right side of `??`, whenever the type expected there is an enum (or an optional one). A literal that is not one of the values is `unknown-variant` at the literal, with a help line when a value is close. Nowhere else is a string a variant: there is no narrowing, so `x == "a"` does not make a `string` an enum.
+- **Snippets.** `{@render name(args)}` renders the snippet `name`, which is a local snippet or a snippet-typed name of the template's scope, with exactly as many arguments as it has parameters (`snippet-arity-mismatch`), each of the parameter's type when the snippet's type is declared; a name that is neither is `unknown-snippet`. A local snippet's parameter types are inferred from its render sites, joined, and from the prop's `snippet<…>` type when it is passed or passed along (two renders that have no common type are `no-common-type` at the second); a snippet that is never rendered has `any` parameters. A snippet passed to a prop is checked against the prop's `snippet<…>`: the number of parameters (`snippet-arity-mismatch`), and the body with its parameters typed by it. Two snippets with one name among the same children are `duplicate-snippet`, and `children={…}` with content between the tags is `children-conflict`. A snippet type is compared with `is_assignable` (§9.3) contravariantly with the same arity, is never an `any` or fitted to one, and has a common type with nothing but itself.
 - **Common types:** equality, a conditional's branches and an array's elements with no common type are `no-common-type`: at the whole comparison, at the whole conditional, or at the first element that has none with the elements before it.
 - **Object keys:** a repeated key is `duplicate-object-key` at each earlier occurrence, and the last occurrence counts, as for attributes (§3). An earlier occurrence's value is still typed, but isn't part of the object's type.
 
@@ -897,6 +908,8 @@ Identity is MESH's, and it is semantic: it is not a target object, not a positio
 - Every other site, static or conditional, has **no instance**.
 
 An occurrence's identity is the sequence of steps from the root, each step being **(site, instance)**, the instance being absent where the site has none. Neither the order of siblings nor an occurrence's position among them is in any step.
+
+- A **render site** (`{@render}`, §3.1) is a site that produces, for each occurrence of its parent, the occurrences of the snippet's body. It adds one step to the path of every node of the body, of kind `0x08` (`0x06` is a slot's, `0x07` a fragment's) at the render site's position among the *rendering* template's children, with no component; the body's own sites follow, at their positions inside the body. So one snippet rendered at two sites, twice under one parent, in each item of a repeat, or passed through several composites, never shares a key, and the declaring template contributes only the positions within the body. A snippet declaration is not a site: nothing is placed where it is written.
 
 #### 9.10.3 Declared keys
 

@@ -1,0 +1,12 @@
+<page title="x">
+  <data-list items={users}>{#snippet row(u)}<text>{u.name}</text>{/snippet}</data-list>
+  <panel title="t"><text>inside</text></panel>
+  {#snippet pair(a, b)}<text>{a}{b}</text>{/snippet}
+  {@render pair(name, count)}
+  {@render pair("x", 1)}
+  {#snippet again(n)}{#if n > 0}{@render again(n - 1)}{/if}{/snippet}
+  {@render again(3)}
+  <data-list items={users}>{#snippet row(u)}{@render pair(u.name, 1)}{/snippet}</data-list>
+  {#snippet cell(u)}<text>{u.name}</text>{/snippet}
+  <data-list items={users} row={cell} />
+</page>

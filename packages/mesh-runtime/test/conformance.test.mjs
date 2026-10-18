@@ -16,7 +16,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { compile } from "../../mesh-compiler/dist/index.js";
-import { dispatch, render } from "../dist/index.js";
+import { dispatch, render, update } from "../dist/index.js";
 import { root, validateTree } from "./common.mjs";
 
 const conformance = join(root, "examples", "conformance");
@@ -192,4 +192,67 @@ test("enums: an event whose payload or argument is not a variant is refused", as
       : { code: result.diagnostics.diagnostics[0].code, location: result.diagnostics.diagnostics[0].location };
     assert.deepEqual(actual, item.expect, item.case);
   }
+});
+
+// `snippets/`: typed template values (decisions U1 to U14). The program of its own manifest is
+// rendered for `snapshot.json` and for each `step-N.snapshot.json` after it, each against its committed
+// tree; updating from a step to the next is the render of the next; and `cases.json` relates the keys of
+// nodes (a node is named by the indexes of the nodes, not text runs, on the way down from the root).
+const snippetSteps = () => {
+  const steps = [{ snapshot: "snapshot.json", expected: "expected.tree.json" }];
+  for (let at = 1; existsSync(join(conformance, "snippets", `step-${at}.snapshot.json`)); at += 1) {
+    steps.push({ snapshot: `step-${at}.snapshot.json`, expected: `step-${at}.expected.tree.json` });
+  }
+  return steps;
+};
+
+const snippetRender = async (step) => {
+  const result = await build("snippets", JSON.parse(read("snippets", step.snapshot)));
+  assert.ok(result.render, JSON.stringify(result.diagnostics));
+  assert.deepEqual(result.render.tree, JSON.parse(read("snippets", step.expected)), step.snapshot);
+  return result.render;
+};
+
+test("snippets: every step renders its committed tree, and an update is a render", async () => {
+  const steps = snippetSteps();
+  assert.ok(steps.length >= 4);
+  let previous = await snippetRender(steps[0]);
+  for (const step of steps.slice(1)) {
+    const fresh = await snippetRender(step);
+    const updated = await update(previous, JSON.parse(read("snippets", step.snapshot)));
+    assert.ok(updated.render, JSON.stringify(updated.diagnostics));
+    assert.deepEqual(updated.render.tree, fresh.tree, `an update to ${step.snapshot} is its render`);
+    previous = updated.render;
+  }
+});
+
+test("snippets: keys are distinct, the same, or different, as committed", async () => {
+  const steps = snippetSteps();
+  const trees = [];
+  for (const step of steps) trees.push((await snippetRender(step)).tree);
+  const nodeAt = (tree, path) => {
+    let node = tree.root;
+    for (const index of path) {
+      node = node.children.filter((child) => child.type === "node")[index];
+      assert.ok(node, `no node ${JSON.stringify(path)}`);
+    }
+    return node.key;
+  };
+  const cases = JSON.parse(read("snippets", "cases.json"));
+  for (const item of cases.distinct) {
+    const keys = item.paths.map((path) => nodeAt(trees[item.step], path));
+    assert.equal(new Set(keys).size, keys.length, item.case);
+  }
+  const at = (side) => nodeAt(trees[side.step], side.path);
+  for (const item of cases.same) assert.equal(at(item.a), at(item.b), item.case);
+  for (const item of cases.different) assert.notEqual(at(item.a), at(item.b), item.case);
+});
+
+test("snippets: an event in a snippet's body is the declaring template's, and dispatches", async () => {
+  const kept = await snippetRender(snippetSteps()[0]);
+  const all = nodes(kept.tree.root);
+  const press = [...all.values()].find((node) => node.component === "row" && node.props.label === "Grace");
+  const { intent, diagnostics } = await dispatch(kept, press.events.press);
+  assert.equal(diagnostics, undefined);
+  assert.deepEqual(intent, { command: { component: "screen", name: "select" }, arguments: [{ value: 2 }] });
 });

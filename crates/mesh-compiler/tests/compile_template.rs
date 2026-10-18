@@ -303,7 +303,14 @@ fn names(element: &mesh_template::Element, out: &mut Vec<String>) {
     let component = &element.component;
     // A block lowers to a construct that is built in, and resolves no component of the manifest's: only the
     // expressions inside it hold names.
-    let block = ["mesh-if", "mesh-each", "mesh-fragment"].contains(&component.as_str());
+    let block = [
+        "mesh-if",
+        "mesh-each",
+        "mesh-fragment",
+        "mesh-snippet",
+        "mesh-render",
+    ]
+    .contains(&component.as_str());
     if !block {
         out.push(format!("{:?}", Target::Component(component.clone())));
     }

@@ -144,6 +144,14 @@
           "additionalProperties": false
         },
         {
+          "description": "A piece of template with ordered parameters: only a component's prop or scope name may have this type (the loader checks the placement). A prop named `children` is a snippet with no parameters.",
+          "properties": {
+            "kind": { "const": "snippet" },
+            "params": { "type": "array", "items": { "$ref": "#/$defs/type" } }
+          },
+          "additionalProperties": false
+        },
+        {
           "properties": {
             "kind": { "const": "named" },
             "name": { "type": "string" }

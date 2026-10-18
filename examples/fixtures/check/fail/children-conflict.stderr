@@ -1,0 +1,5 @@
+error[children-conflict]: "panel" gets its `children` twice: as an attribute and as the content between its tags; write one
+ --> fixtures/check/fail/children-conflict.mprx:3:20
+  |
+3 |   <panel title="t" children={s}><text>b</text></panel>
+  |                    ^^^^^^^^

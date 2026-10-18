@@ -1005,3 +1005,102 @@ fn a_default_is_for_props_only() {
         DiagnosticCode::MANIFEST_UNKNOWN_PROPERTY
     );
 }
+
+#[test]
+fn a_snippet_is_a_components_prop_or_scope_name_and_nothing_else() {
+    let snippet = r#"{ "kind": "snippet", "params": [{ "kind": "string" }] }"#;
+    // A prop, an optional prop, and a scope name.
+    let loaded = load(&component(
+        &format!(
+            r#"{{ "body": {{ "type": {snippet}, "required": true }},
+                  "footer": {{ "type": {{ "kind": "optional", "type": {snippet} }}, "required": false }} }}"#
+        ),
+        "{}",
+        "{}",
+        &format!(r#"{{ "body": {snippet} }}"#),
+    ))
+    .expect("a snippet may be a prop and a scope name");
+    let (_, declared) = loaded.component("c").unwrap();
+    assert_eq!(declared.props["body"].ty, Type::Snippet(vec![Type::String]));
+
+    // Everywhere else it is refused, once, at the snippet.
+    for (place, source) in [
+        (
+            "a record field",
+            scope_type(&format!(
+                r#"{{ "kind": "record", "fields": {{ "f": {{ "type": {snippet}, "required": true }} }} }}"#
+            )),
+        ),
+        (
+            "a list element",
+            scope_type(&format!(r#"{{ "kind": "list", "element": {snippet} }}"#)),
+        ),
+        (
+            "an event payload",
+            component(
+                "{}",
+                &format!(r#"{{ "e": {{ "payload": {snippet} }} }}"#),
+                "{}",
+                "{}",
+            ),
+        ),
+        (
+            "a command parameter",
+            component(
+                "{}",
+                "{}",
+                &format!(
+                    r#"{{ "go": {{ "parameters": [{{ "name": "p", "type": {snippet} }}] }} }}"#
+                ),
+                "{}",
+            ),
+        ),
+        (
+            "a snippet's own parameter",
+            scope_type(r#"{ "kind": "snippet", "params": [{ "kind": "snippet", "params": [] }] }"#),
+        ),
+        (
+            "a named type",
+            manifest(
+                &format!(r#"{{ "T": {snippet} }}"#),
+                r#"{ "c": { "props": {}, "events": {}, "commands": {}, "scope": {} } }"#,
+            ),
+        ),
+    ] {
+        let found = errors(&source);
+        assert_eq!(found.len(), 1, "{place}: {found:?}");
+        assert_eq!(
+            found[0].0,
+            DiagnosticCode::MANIFEST_SNIPPET_MISPLACED,
+            "{place}"
+        );
+    }
+}
+
+#[test]
+fn the_prop_children_is_a_snippet_with_no_parameters() {
+    let props = |ty: &str| format!(r#"{{ "children": {{ "type": {ty}, "required": true }} }}"#);
+    load(&component(
+        &props(r#"{ "kind": "snippet", "params": [] }"#),
+        "{}",
+        "{}",
+        "{}",
+    ))
+    .expect("children is a snippet");
+    load(&component(
+        &props(r#"{ "kind": "snippet" }"#),
+        "{}",
+        "{}",
+        "{}",
+    ))
+    .expect("params may be left out");
+    for ty in [
+        r#"{ "kind": "string" }"#,
+        r#"{ "kind": "snippet", "params": [{ "kind": "string" }] }"#,
+    ] {
+        let source = component(&props(ty), "{}", "{}", "{}");
+        let found = errors(&source);
+        assert_eq!(found.len(), 1, "{ty}");
+        assert_eq!(found[0].0, DiagnosticCode::MANIFEST_CHILDREN_NOT_SNIPPET);
+    }
+}

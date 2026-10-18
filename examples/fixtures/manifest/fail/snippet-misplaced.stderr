@@ -1,0 +1,5 @@
+error[manifest-snippet-misplaced]: a snippet type can only be the type of a component's prop or scope name: it is never stored, returned or sent, so it is not a record field, a list element, a named type, an event payload or a command parameter, and not a snippet's own parameter
+ --> fixtures/manifest/fail/snippet-misplaced.json:8:79
+  |
+8 |           "type": { "kind": "record", "fields": { "body": { "type": { "kind": "snippet", "params": [] }, "required": true } } },
+  |                                                                               ^^^^^^^^^

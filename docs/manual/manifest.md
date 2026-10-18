@@ -148,7 +148,7 @@ The runtime's tests check that such a manifest's list and record props are carri
 
 ## Types
 
-Every type is a JSON object with a `"kind"`. There are ten kinds, and no others:
+Every type is a JSON object with a `"kind"`. There are eleven kinds, and no others:
 
 | `"kind"` | Other properties | The type | Written in these docs as |
 |---|---|---|---|
@@ -160,12 +160,14 @@ Every type is a JSON object with a `"kind"`. There are ten kinds, and no others:
 | `"list"` | `"element"`: a type | a list whose elements all have that type | `list<T>` |
 | `"record"` | `"fields"`: name → [field declaration](#field-declarations) | an object with exactly those fields | `{ name: string, avatar?: string }` |
 | `"enum"` | `"values"`: 1 to 256 distinct strings | a string that is one of those values | `"a" \| "b"` |
+| `"snippet"` | `"params"`: an ordered array of types (default none) | a piece of template with those parameters | `snippet<A, B>` |
 | `"named"` | `"name"`: a key of `"types"` | the type declared under that name | `User` |
 | `"optional"` | `"type"`: a type | a value of that type, or no value at all (absent) | `T?` |
 
 - **`null` is a value, not absence.** `optional` of `string` accepts a string or absence, not `null`.
 - **`any` never includes absence.** A value that may be absent is `optional` of `any`, `any?`.
 - **An enum is a set of strings.** Its values are distinct and at most 256 (`manifest-duplicate-variant`, `manifest-enum-too-large`); an empty or non-string `"values"` is `manifest-invalid-value`. Their order is used only to word messages, and doesn't change the fingerprint. An enum fits `string`; `string` fits an enum only as a literal that is one of its values. A larger set stays `string`. A MESH from before 0.14 reports an enum as `manifest-unknown-kind`.
+- **A snippet is second-class.** It is the type of a composite's prop or scope name (also under `optional`) and nowhere else: not a record field, a list element, a named type, an event payload, a command parameter or a snippet's own parameter (`manifest-snippet-misplaced`). Parameters are compared contravariantly with exact arity: `snippet<string>` fits where `snippet<"a">` is wanted, and not the other way. A prop named `children` is reserved for the content written between the component's tags, so it is a `snippet` with no parameters (`manifest-children-not-snippet`). A snippet is not an `any`.
 - **Records are exact.** A record accepts only the fields it declares.
 - **Named types are aliases.** `{ "kind": "named", "name": "User" }` means exactly what `"types"` declares as `User`. Two named types with the same definition are the same type.
 - **Named types can't be recursive**, directly or through other named types.

@@ -1,0 +1,5 @@
+error[content-not-text]: a value of type snippet<> can't be shown as text: interpolate one of its fields, or a string, number, boolean or null (a snippet is rendered with `{@render}`)
+ --> fixtures/check/fail/snippet-in-content.mprx:3:10
+  |
+3 |   <text>{s}</text>
+  |          ^

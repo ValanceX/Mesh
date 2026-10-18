@@ -125,6 +125,30 @@
       "commands": {},
       "scope": {}
     },
+    "data-list": {
+      "props": {
+        "items": { "type": { "kind": "list", "element": { "kind": "named", "name": "User" } }, "required": true },
+        "row": { "type": { "kind": "snippet", "params": [{ "kind": "named", "name": "User" }] }, "required": true }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "items": { "kind": "list", "element": { "kind": "named", "name": "User" } },
+        "row": { "kind": "snippet", "params": [{ "kind": "named", "name": "User" }] }
+      }
+    },
+    "panel": {
+      "props": {
+        "title": { "type": { "kind": "string" }, "required": true },
+        "children": { "type": { "kind": "snippet", "params": [] }, "required": true }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "title": { "kind": "string" },
+        "children": { "kind": "snippet", "params": [] }
+      }
+    },
     "template": {
       "props": {},
       "events": {},

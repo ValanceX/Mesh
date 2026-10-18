@@ -1,0 +1,5 @@
+error[no-common-type]: the renders of this snippet give this parameter string at one and number at another, which have no common type
+ --> fixtures/check/fail/snippet-renders-disagree.mprx:4:17
+  |
+4 |   {@render pair(count)}
+  |                 ^^^^^

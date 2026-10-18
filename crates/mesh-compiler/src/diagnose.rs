@@ -293,7 +293,10 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
         ),
         Fact::ContentNotText { ty, .. } => (
             DiagnosticCode::CONTENT_NOT_TEXT,
-            format!("a value of type {ty} can't be shown as text: interpolate one of its fields, or a string, number, boolean or null (a snippet is rendered with `{{@render}}`)"),
+            format!(
+                "a value of type {ty} can't be shown as text: interpolate one of its fields, or a string, number, boolean or null{}",
+                if ty.to_string().starts_with("snippet<") { " (a snippet is rendered with `{@render}`)" } else { "" }
+            ),
             Vec::new(),
         ),
     };
