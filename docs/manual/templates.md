@@ -8,7 +8,7 @@ MPRX goes through three stages: **source syntax → semantic resolution → runt
 
 ## What a template contains
 
-- **Its format version,** `1`: the version of its serialized structure, and its only compatibility version.
+- **Its format version,** `1` or `2`: the version of its serialized structure, and its only compatibility version. Version 2 is a superset of version 1 (see [template-v2](#template-v2)).
 - **Its component,** the one whose template it is.
 - **The model fingerprint** of the model it was checked against ([below](#the-model-fingerprint)).
 - **Its compiler version,** for provenance and debugging only. It never affects whether the template runs.
@@ -42,12 +42,12 @@ A reference names the scope declaration it reads. Its value is supplied only at 
 
 ## The format
 
-The format is [`schemas/template-v1.schema.json`](../../schemas/template-v1.schema.json). It is JSON, under the same promise as the diagnostics document: a later MESH may add properties without changing `version`, and removing one or changing its meaning is a new version. A reader must ignore properties it doesn't know.
+The format is [`schemas/template-v1.schema.json`](../../schemas/template-v1.schema.json), or [`schemas/template-v2.schema.json`](../../schemas/template-v2.schema.json) for a template that uses a construct only version 2 has ([below](#template-v2)). It is JSON, under the same promise as the diagnostics document: a later MESH may add properties without changing `version`, and removing one or changing its meaning is a new version. A reader must ignore properties it doesn't know.
 
 | Property | Holds |
 |---|---|
 | `format` | always `"mesh-template"`, so a stray JSON document is refused as malformed rather than as a version mismatch |
-| `version` | `1` |
+| `version` | `1`, or `2` when the template uses `has` or `??` |
 | `component` | the component whose template this is |
 | `fingerprint` | `sha256:` and 64 lowercase hexadecimal digits |
 | `compiler` | the compiler's version, such as `"0.5.0"` |
@@ -320,6 +320,19 @@ Exactly two things decide whether a template runs under a runtime and a model:
 2. its `fingerprint` equals the fingerprint of the model the runtime is given.
 
 A template runs under any runtime that supports its format version, whatever compiler version produced it. Recompiling is the remedy for a changed model.
+
+### template-v2
+
+`template-v2` is a **superset** of `template-v1`, introduced because the stability policy lets a `-v1` format gain only optional properties, and a new expression kind or operator value is more than that ([stability](./stability.md)).
+
+| | Version 1 | Version 2 |
+|---|---|---|
+| Expressions | `literal`, `scope`, `member`, `unary`, `binary`, `conditional`, `list`, `record`, `event` | all of version 1, and `has` (`{ "kind": "has", "operand", "span" }`, `has(x)`) |
+| Binary operators | `add` … `or` | all of version 1, and `coalesce` (`x ?? y`; the right side is evaluated only when the left is absent) |
+
+- **The compiler writes version 2 only for a template that uses a construct of it.** A template that uses none is written as version 1, byte for byte as before: its canonical digest, its program identity, its tree and its keys do not change, and an older runtime still runs it.
+- **The runtime reads both.** A version 1 document that contains a version 2 construct is `assembly-malformed-template`, and a version 2 document that uses none is read as a template. A runtime from before version 2 refuses a version 2 template as `assembly-unsupported-format-version`: recompile with an older MESH, or update the runtime. Both the compiler and the runtime say which versions they read.
+- Version 2 is where the later constructs (snippets, the window clause) are added, with the same rule.
 
 ## The model fingerprint
 

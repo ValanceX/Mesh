@@ -66,15 +66,21 @@ fn corpus() -> Vec<(PathBuf, String, Model)> {
     runs
 }
 
-fn validator() -> jsonschema::Validator {
-    let schema: Value =
-        serde_json::from_str(&read(&root().join("schemas/template-v1.schema.json"))).unwrap();
-    jsonschema::draft202012::new(&schema).expect("the schema is valid")
+/// The validators of `template-v1` and `template-v2`: a template is valid against the one for
+/// the version it says.
+fn validators() -> [jsonschema::Validator; 2] {
+    ["1", "2"].map(|version| {
+        let schema: Value = serde_json::from_str(&read(
+            &root().join(format!("schemas/template-v{version}.schema.json")),
+        ))
+        .unwrap();
+        jsonschema::draft202012::new(&schema).expect("the schema is valid")
+    })
 }
 
 #[test]
 fn every_clean_source_compiles_to_a_valid_template() {
-    let validator = validator();
+    let validators = validators();
     let mut compiled = 0;
     for (path, text, model) in corpus() {
         let result = check::template(&text, &model);
@@ -98,7 +104,8 @@ fn every_clean_source_compiles_to_a_valid_template() {
         assert_eq!(template.component, model.component());
         assert_eq!(template.fingerprint, model.fingerprint());
         let written: Value = serde_json::from_str(&mesh_template::to_json(&template)).unwrap();
-        let errors: Vec<String> = validator
+        let version = written["version"].as_u64().expect("a version") as usize;
+        let errors: Vec<String> = validators[version - 1]
             .iter_errors(&written)
             .map(|e| e.to_string())
             .collect();

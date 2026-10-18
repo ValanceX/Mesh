@@ -43,15 +43,38 @@ test("compiling is deterministic", async () => {
   }
 });
 
-test("every template matches template-v1", async () => {
-  const schema = JSON.parse(readFileSync(join(root, "schemas", "template-v1.schema.json"), "utf8"));
-  const validate = new Ajv2020({ allErrors: true, strict: false }).compile(schema);
+test("every template matches template-v1, or template-v2 where it says so", async () => {
+  const validators = Object.fromEntries(
+    [1, 2].map((version) => [
+      version,
+      new Ajv2020({ allErrors: true, strict: false }).compile(
+        JSON.parse(readFileSync(join(root, "schemas", `template-v${version}.schema.json`), "utf8")),
+      ),
+    ]),
+  );
   for (const run of runs) {
     const { template } = await compile(input(run));
     if (template) {
+      const validate = validators[template.version];
       assert.ok(validate(template), `${run.file}: ${JSON.stringify(validate.errors)}`);
     }
   }
+});
+
+test("a template that uses has or ?? is version 2, and any other stays version 1", async () => {
+  const manifest = JSON.stringify({
+    version: 1,
+    types: {},
+    components: {
+      page: { props: {}, events: {}, commands: {}, scope: { name: { kind: "optional", type: { kind: "string" } } } },
+    },
+  });
+  const of = async (source) =>
+    (await compile({ source, path: "page.mprx", model: { manifest, path: "m.json", component: "page" } })).template;
+
+  assert.equal((await of("<page>{has(name)}</page>")).version, 2);
+  assert.equal((await of('<page>{name ?? "none"}</page>')).version, 2);
+  assert.equal((await of("<page>{name}</page>")).version, 1);
 });
 
 test("compile() needs a model", async () => {

@@ -24,13 +24,14 @@ The language's first new types (direction Bet 4). A compatible addition: a manif
 ### Added
 
 - **`enum` types.** `{ "kind": "enum", "values": ["info", "warning", "danger"] }`: a string that is one of 1 to 256 distinct values. An enum fits `string`; an enum fits another that has all its values; the common type of two enums is the union, and of an enum and `string` is `string`. `string` does not fit an enum, except as a **string literal** at an attribute value, an operand of `==`/`!=`, a `?:` branch, an array element or the right of `??`. New codes `manifest-enum-too-large`, `manifest-duplicate-variant`, `unknown-variant` (with a did-you-mean help line).
-- **`has(x)` and `x ?? y`.** `has(x)` is `true` unless `x` is absent; `x ?? y` is `x` when present, else `y` (lazy, between `?:` and `||`). `has` is not reserved. New warnings `redundant-presence-test` and `redundant-default`. `template-v1` gains the expression `has` and the binary operator `coalesce` (a compatible addition; the schema is updated).
+- **`has(x)` and `x ?? y`.** `has(x)` is `true` unless `x` is absent; `x ?? y` is `x` when present, else `y` (lazy, between `?:` and `||`). `has` is not reserved. New warnings `redundant-presence-test` and `redundant-default`. The expression `has` and the binary operator `coalesce` are **`template-v2`** (see Changed). 
 - **`default` on props.** A prop may declare `"default": <value>`; a composite occurrence that leaves the prop out binds the default instead of absence (primitives ignore it). Binding soundness (rule 4b) is checked with the prop's own type. The model fingerprint includes a default, and is unchanged for a prop without one.
 - The runtime checks an enum where host values enter (snapshot fields, event payloads, values read through `any`, props, command arguments) with the existing `runtime-value-mismatch`, `runtime-prop-mismatch` and `runtime-argument-mismatch`. `render-v1` and the patch format are unchanged.
 - Conformance vectors `examples/conformance/enums/`, with their own manifest.
 
 ### Changed
 
+- **`template-v2`.** The stability policy lets a `-v1` format gain only optional properties, so the expression `has` and the operator `coalesce` are a new version, not an addition to `template-v1`. `template-v2` is a superset (`schemas/template-v2.schema.json`); the compiler writes it **only** for a template that uses `has` or `??`, and every other template is written as version 1, byte for byte as before. The runtime and `mesh-template` read both; a version 1 document that holds a version 2 construct is `assembly-malformed-template`; a runtime from before this reads only version 1 and refuses version 2 with `assembly-unsupported-format-version`. `schemas/template-v1.schema.json` no longer has `has` or `coalesce` (they were never released).
 - `possibly-absent-access` no longer says MPRX has no presence test.
 
 ## [0.13.0] - 2026-10-17

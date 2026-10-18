@@ -335,27 +335,6 @@
         },
         {
           "type": "object",
-          "description": "`has(operand)`: whether the operand is present. A boolean; an absent operand is `false`, and any present value (`null` included) is `true`.",
-          "properties": {
-            "kind": {
-              "const": "has"
-            },
-            "operand": {
-              "$ref": "#/$defs/expression"
-            },
-            "span": {
-              "$ref": "#/$defs/span"
-            }
-          },
-          "required": [
-            "kind",
-            "operand",
-            "span"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
           "description": "A binary operator, named rather than spelt.",
           "properties": {
             "kind": {
@@ -375,8 +354,7 @@
                 "greater",
                 "greater-equal",
                 "and",
-                "or",
-                "coalesce"
+                "or"
               ]
             },
             "left": {
@@ -600,27 +578,6 @@
         },
         {
           "type": "object",
-          "description": "`has(operand)`: whether the operand is present. A boolean; an absent operand is `false`, and any present value (`null` included) is `true`.",
-          "properties": {
-            "kind": {
-              "const": "has"
-            },
-            "operand": {
-              "$ref": "#/$defs/argument"
-            },
-            "span": {
-              "$ref": "#/$defs/span"
-            }
-          },
-          "required": [
-            "kind",
-            "operand",
-            "span"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
           "description": "A binary operator, named rather than spelt.",
           "properties": {
             "kind": {
@@ -640,8 +597,7 @@
                 "greater",
                 "greater-equal",
                 "and",
-                "or",
-                "coalesce"
+                "or"
               ]
             },
             "left": {

@@ -1,5 +1,5 @@
 /**
- * The types of a `template-v1` document: one component's MPRX, checked
+ * The types of a `template-v1` or `template-v2` document: one component's MPRX, checked
  * clean and compiled (see the MESH repository's
  * `docs/manual/templates.md` and `schemas/template-v1.schema.json`).
  *
@@ -23,7 +23,8 @@ export interface TemplateSpan {
 
 export interface Template {
   format: "mesh-template";
-  version: 1;
+  /** 1, or 2 for a template that uses `has` or `??`: the compiler writes version 2 only where a construct of it is used. */
+  version: 1 | 2;
   /** The component whose template this is. */
   component: string;
   /** `sha256:` and 64 hexadecimal digits: the model it was checked against. */
@@ -56,12 +57,16 @@ export type TemplateExpression =
   | { kind: "scope"; name: string; span: TemplateSpan }
   | { kind: "member"; object: TemplateExpression; field: string; span: TemplateSpan }
   | { kind: "unary"; operator: "not" | "negate"; operand: TemplateExpression; span: TemplateSpan }
+  /** `has(operand)`: `template-v2` only. */
+  | { kind: "has"; operand: TemplateExpression; span: TemplateSpan }
   | {
       kind: "binary";
       operator:
         | "add" | "subtract" | "multiply" | "divide" | "remainder"
         | "equal" | "not-equal" | "less" | "less-equal" | "greater" | "greater-equal"
-        | "and" | "or";
+        | "and" | "or"
+        /** `x ?? y`: `template-v2` only. */
+        | "coalesce";
       left: TemplateExpression;
       right: TemplateExpression;
       span: TemplateSpan;

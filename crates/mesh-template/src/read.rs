@@ -1,7 +1,8 @@
 //! Reading a template, and refusing one that isn't.
 
 use crate::types::{Child, Element, Expression, Literal, Template};
-use crate::{Fingerprint, FORMAT, VERSION};
+use crate::version::constructs;
+use crate::{Fingerprint, FIRST_VERSION, FORMAT, VERSION};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -68,8 +69,8 @@ pub fn from_json(text: &str) -> Result<Template, Refusal> {
             format!("a template's `format` is \"{FORMAT}\""),
         ));
     }
-    match object.get("version").and_then(Value::as_u64) {
-        Some(VERSION) => {}
+    let version = match object.get("version").and_then(Value::as_u64) {
+        Some(version) if (FIRST_VERSION..=VERSION).contains(&version) => version,
         Some(other) => return Err(Refusal::UnsupportedVersion(other)),
         None => {
             return Err(malformed(
@@ -77,7 +78,7 @@ pub fn from_json(text: &str) -> Result<Template, Refusal> {
                 "a template's `version` is an integer",
             ))
         }
-    }
+    };
     let document: Document = serde_json::from_value(value)
         .map_err(|error| malformed("", format!("not a template-v1 document: {error}")))?;
 
@@ -94,6 +95,17 @@ pub fn from_json(text: &str) -> Result<Template, Refusal> {
         problems.push(problem("/compiler", "`compiler` is not empty"));
     }
     check_element(&document.root, "/root", &mut problems);
+    if version < 2 {
+        for construct in constructs(&document.root, "/root") {
+            problems.push(problem(
+                &construct.path,
+                format!(
+                    "`{}` is a template-v2 construct, and this document says version {version}",
+                    construct.name
+                ),
+            ));
+        }
+    }
 
     match (problems.is_empty(), fingerprint) {
         (true, Some(fingerprint)) => Ok(Template {

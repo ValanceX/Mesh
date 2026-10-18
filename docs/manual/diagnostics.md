@@ -1004,13 +1004,15 @@ The runtime reports these before it evaluates anything, when it validates a prog
 
 ### `assembly-malformed-template`
 
-A template isn't valid against `template-v1`, or names something the model doesn't declare with the kind the template gives it. Also reported for a template that isn't JSON, or whose `format` isn't `mesh-template`.
+A template isn't valid against `template-v1` or `template-v2` (a version 1 document that holds `has` or `??` is malformed: they are version 2), or names something the model doesn't declare with the kind the template gives it. Also reported for a template that isn't JSON, or whose `format` isn't `mesh-template`.
 
 Location: `template`.
 
 ### `assembly-unsupported-format-version`
 
-A template's `version` is a number this runtime doesn't support.
+A template's `version` is a number this runtime doesn't support. This runtime reads versions 1 and 2; a runtime from before 0.14 reads only version 1, so it refuses a template that uses `has` or `??` (the compiler writes version 2 for those, and version 1 for everything else).
+
+**Fix:** recompile with a MESH whose version the runtime reads, or update the runtime.
 
 Location: `template`.
 

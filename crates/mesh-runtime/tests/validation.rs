@@ -105,11 +105,38 @@ fn a_malformed_template_is_refused_at_the_template() {
 
 #[test]
 fn another_format_version_is_unsupported() {
-    let template = compile("view", PAGE).replace("\"version\":1", "\"version\":2");
+    let template = compile("view", PAGE).replace("\"version\":1", "\"version\":3");
     assert_eq!(
         codes(&try_render("view", &[template], SNAPSHOT).unwrap_err()),
         ["assembly-unsupported-format-version"]
     );
+}
+
+/// `has` and `??` are `template-v2`: the compiler writes version 2 for them and the runtime reads
+/// it; a document that says version 1 and holds one is malformed, and a template of version 2
+/// without any is only a superset.
+#[test]
+fn version_2_carries_has_and_coalesce_and_version_1_may_not() {
+    const WITH: &str = r#"<page title={maybeName ?? "none"}><text>{has(maybeName)}</text></page>"#;
+    let v2 = compile("view", WITH);
+    assert!(v2.contains("\"version\":2"), "{v2}");
+    let render =
+        try_render("view", std::slice::from_ref(&v2), SNAPSHOT).expect("version 2 renders");
+    assert!(format!("{:?}", render.tree()).contains("none"));
+
+    let v1 = v2.replace("\"version\":2", "\"version\":1");
+    assert_eq!(
+        codes(&try_render("view", &[v1], SNAPSHOT).unwrap_err()),
+        ["assembly-malformed-template"]
+    );
+
+    let plain = compile("view", PAGE);
+    assert!(
+        plain.contains("\"version\":1"),
+        "a template that uses nothing of version 2 stays version 1"
+    );
+    let as_v2 = plain.replace("\"version\":1", "\"version\":2");
+    assert!(try_render("view", &[as_v2], SNAPSHOT).is_ok());
 }
 
 #[test]

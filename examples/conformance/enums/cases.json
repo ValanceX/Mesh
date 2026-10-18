@@ -2,7 +2,7 @@
   "props": [
     {
       "case": "a snapshot enum is carried as its string",
-      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "node": "kycdJe4J4P8aS9Ii_ZY_Xtg",
       "prop": "tone",
       "value": {
         "value": "danger"
@@ -10,7 +10,7 @@
     },
     {
       "case": "?? takes the default when the left side is absent",
-      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "node": "kycdJe4J4P8aS9Ii_ZY_Xtg",
       "prop": "label",
       "value": {
         "value": "untitled"
@@ -18,7 +18,7 @@
     },
     {
       "case": "?? takes the default for an absent enum",
-      "node": "k2ICiFY880RSZ_TCZcV3-5Q",
+      "node": "kyZML_aK_Y_kZ53BGgyfzHw",
       "prop": "tone",
       "value": {
         "value": "info"
@@ -26,7 +26,7 @@
     },
     {
       "case": "an enum prop accepts an enum with fewer values",
-      "node": "k2ICiFY880RSZ_TCZcV3-5Q",
+      "node": "kyZML_aK_Y_kZ53BGgyfzHw",
       "prop": "shade",
       "value": {
         "value": "danger"
@@ -34,7 +34,7 @@
     },
     {
       "case": "a conditional of two literals is checked at each branch",
-      "node": "kaXoWtwClNJuFfsxiMY1gdA",
+      "node": "kk88ReR9aMgHoEJck4U0WSg",
       "prop": "tone",
       "value": {
         "value": "warning"
@@ -42,7 +42,7 @@
     },
     {
       "case": "a value through any that is a variant is accepted",
-      "node": "koAWdV0bkH7S-jbmmegvkmA",
+      "node": "kgwxFCHzdVI7HHNrHZATjgg",
       "prop": "tone",
       "value": {
         "value": "info"
@@ -50,7 +50,7 @@
     },
     {
       "case": "an unwritten prop with a default binds the default in a composite",
-      "node": "klM4CjtWWoicZLz3qmerX4A",
+      "node": "kYljrIbHOCyfLR_gWke1Hrw",
       "prop": "tone",
       "value": {
         "value": "info"
@@ -58,7 +58,7 @@
     },
     {
       "case": "a written prop wins over the default",
-      "node": "k_tEMFl11P6GJaFXenOsApg",
+      "node": "kpw3uHShqgP9BnyjifqZeCg",
       "prop": "tone",
       "value": {
         "value": "danger"
@@ -66,7 +66,7 @@
     },
     {
       "case": "a written prop wins over the default (a scope name)",
-      "node": "k3-um1nfaCihH5yN4e_tfgA",
+      "node": "kFLoBaysawPdqyUpRQKLzBw",
       "prop": "tone",
       "value": {
         "value": "danger"
@@ -74,7 +74,7 @@
     },
     {
       "case": "an unwritten optional prop is absent",
-      "node": "klM4CjtWWoicZLz3qmerX4A",
+      "node": "kYljrIbHOCyfLR_gWke1Hrw",
       "prop": "shade",
       "value": {
         "absent": true
@@ -151,7 +151,7 @@
   "dispatches": [
     {
       "case": "a payload that is a variant",
-      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "node": "kycdJe4J4P8aS9Ii_ZY_Xtg",
       "event": "pick",
       "payload": "warning",
       "expect": {
@@ -170,7 +170,7 @@
     },
     {
       "case": "a payload that is not a variant",
-      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "node": "kycdJe4J4P8aS9Ii_ZY_Xtg",
       "event": "pick",
       "payload": "loud",
       "expect": {
@@ -185,7 +185,7 @@
     },
     {
       "case": "a payload through any that is a variant",
-      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "node": "kycdJe4J4P8aS9Ii_ZY_Xtg",
       "event": "note",
       "payload": "info",
       "expect": {
@@ -204,7 +204,7 @@
     },
     {
       "case": "a payload through any that is not a variant reaches the command argument",
-      "node": "kGJIEIab2wlK2dv_dvBW0JQ",
+      "node": "kycdJe4J4P8aS9Ii_ZY_Xtg",
       "event": "note",
       "payload": "loud",
       "expect": {

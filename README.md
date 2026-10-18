@@ -70,7 +70,7 @@ MESH AST
     ↓  mesh-semantic (lowering + validation)
 MESH Semantic IR
     ↓  mesh-analysis (checked against the component manifest)
-Template (template-v1), one per component
+Template (template-v1 or template-v2), one per component
     ↓  a program: a root and its templates
 mesh-runtime: render  ──▶  render tree (render-v1)  ──▶  PORT renderer
 mesh-runtime: dispatch ◀── handler identifier, payload ◀─┘
@@ -90,7 +90,7 @@ mesh/
 │   ├── mesh-semantic/        semantic model, lowering, structural validation
 │   ├── mesh-manifest/        component manifest loading and validation
 │   ├── mesh-analysis/        checking templates against a component manifest
-│   ├── mesh-template/        the template format (template-v1) and the model fingerprint
+│   ├── mesh-template/        the template format (template-v1, template-v2) and the model fingerprint
 │   ├── mesh-compiler/        compile API, diagnostics, and rendering
 │   ├── mesh-runtime/         the runtime: render and dispatch, MPRX's one evaluator
 │   ├── mesh-runtime-wasm/    the runtime, built for WebAssembly

@@ -65,7 +65,8 @@ pub(crate) fn validate(
             Err(Refusal::UnsupportedVersion(version)) => diagnostics.push(RuntimeDiagnostic::new(
                 RuntimeCode::UNSUPPORTED_FORMAT_VERSION,
                 format!(
-                    "the template is format version {version}; this runtime reads version {}",
+                    "the template is format version {version}; this runtime reads versions {} to {}",
+                    mesh_template::FIRST_VERSION,
                     mesh_template::VERSION
                 ),
                 Location::Template { index, component },
