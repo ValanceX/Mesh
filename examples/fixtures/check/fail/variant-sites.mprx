@@ -1,0 +1,4 @@
+<page title="x">
+  <text>{tone == "dagner" ? 1 : 2}</text>
+  <badge tone={flag ? tone : "dangr"}></badge>
+</page>

@@ -1,0 +1,5 @@
+error[syntax-error]: `has` takes one argument, found 2
+ --> fixtures/check/fail/has-arity.mprx:1:8
+  |
+1 | <text>{has(name, count)}</text>
+  |        ^^^^^^^^^^^^^^^^

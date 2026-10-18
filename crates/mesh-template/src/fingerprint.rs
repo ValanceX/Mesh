@@ -1,7 +1,7 @@
 //! The model fingerprint (docs/manual/templates.md, "The model
 //! fingerprint"): a digest of a manifest's meaning, and of nothing else.
 
-use mesh_manifest::{Component, Manifest, Type};
+use mesh_manifest::{Component, Constant, Manifest, Type};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fmt;
@@ -124,6 +124,17 @@ impl<'m> Digests<'m> {
                 hash.update([0x07]);
                 hash.update(self.ty(inner));
             }
+            // A set: its values in code-point order, so the order the
+            // manifest wrote them in is not part of the meaning.
+            Type::Enum(values) => {
+                hash.update([0x09]);
+                let mut sorted: Vec<&String> = values.iter().collect();
+                sorted.sort();
+                count(&mut hash, sorted.len());
+                for value in sorted {
+                    string(&mut hash, value);
+                }
+            }
             Type::Record(fields) => {
                 hash.update([0x08]);
                 count(&mut hash, fields.len());
@@ -146,6 +157,12 @@ impl<'m> Digests<'m> {
             string(&mut hash, name);
             flag(&mut hash, prop.required);
             hash.update(self.ty(&prop.ty));
+            // Only a prop that has a default carries one: a manifest
+            // without defaults keeps the fingerprint it always had.
+            if let Some(default) = &prop.default {
+                hash.update([0x20]);
+                constant(&mut hash, default);
+            }
         }
         count(&mut hash, component.events.len());
         for (name, event) in &component.events {
@@ -172,6 +189,42 @@ impl<'m> Digests<'m> {
             hash.update(self.ty(ty));
         }
         hash.finalize().into()
+    }
+}
+
+/// A default's value: a tag byte and its content; a record's fields in
+/// code-point order; a number as its binary64 bits, `-0` as `0`.
+fn constant(hash: &mut Sha256, value: &Constant) {
+    match value {
+        Constant::Null => hash.update([0x00]),
+        Constant::Boolean(value) => {
+            hash.update([0x01]);
+            flag(hash, *value);
+        }
+        Constant::Number(number) => {
+            hash.update([0x02]);
+            let number = if *number == 0.0 { 0.0 } else { *number };
+            hash.update(number.to_bits().to_be_bytes());
+        }
+        Constant::String(text) => {
+            hash.update([0x03]);
+            string(hash, text);
+        }
+        Constant::List(items) => {
+            hash.update([0x04]);
+            count(hash, items.len());
+            for item in items {
+                constant(hash, item);
+            }
+        }
+        Constant::Record(fields) => {
+            hash.update([0x05]);
+            count(hash, fields.len());
+            for (name, item) in fields {
+                string(hash, name);
+                constant(hash, item);
+            }
+        }
     }
 }
 

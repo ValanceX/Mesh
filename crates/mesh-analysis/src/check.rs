@@ -209,8 +209,11 @@ impl<'m> Walker<'m> {
                 }
             }
             match (&attribute.value, expected) {
-                (AttributeValue::String { span, .. }, Some((expected, expectation))) => {
-                    self.expect(Ty::String, *span, expectation, &expected);
+                (AttributeValue::String { value, span }, Some((expected, expectation))) => {
+                    // Where an enum is expected, a quoted value is a literal site (T3).
+                    if self.variant(value, *span, &expected).is_none() {
+                        self.expect(Ty::String, *span, expectation, &expected);
+                    }
                 }
                 (AttributeValue::String { .. }, None) => {}
                 (AttributeValue::Expression(expression), Some((expected, expectation))) => {
@@ -509,6 +512,13 @@ impl<'m> Walker<'m> {
             _ => expected.clone(),
         };
         match expression {
+            // A string literal where an enum is expected is checked for membership (T3).
+            Expression::Literal {
+                value: Literal::String(text),
+                span,
+            } if self.enum_values(&present()).is_some() => {
+                return self.variant(text, *span, &present()).flatten();
+            }
             Expression::Object { members, span } => {
                 let present = present();
                 if let Ty::Record(fields) = relation::expand(self.manifest(), &present) {
@@ -631,6 +641,45 @@ impl<'m> Walker<'m> {
         }
     }
 
+    /// The values of `ty` if it is an enum once named references and one
+    /// `optional` are stripped (`size?` and a named alias of an enum
+    /// included); `None` for every other type.
+    fn enum_values(&self, ty: &Ty) -> Option<Vec<String>> {
+        let manifest = self.manifest();
+        let present = match relation::expand(manifest, ty) {
+            Ty::Optional(inner) => relation::expand(manifest, &inner),
+            other => other,
+        };
+        match present {
+            Ty::Enum(values) => Some(values),
+            _ => None,
+        }
+    }
+
+    /// A string literal `text` (at `span`, quotes included) where `expected`
+    /// is expected: a literal site (T3). `None` if `expected` is not an
+    /// enum, so this is no literal site. Otherwise `Some` of the literal's
+    /// type, which is the enum's (the type as written, `Size`, not its
+    /// values) when `text` is one of its values, and `Some(None)`, the
+    /// error marker, after reporting `unknown-variant` when it is not.
+    fn variant(&mut self, text: &str, span: Span, expected: &Ty) -> Option<Option<Ty>> {
+        let values = self.enum_values(expected)?;
+        if values.iter().any(|value| value == text) {
+            let manifest = self.manifest();
+            let present = match relation::expand(manifest, expected) {
+                Ty::Optional(inner) => *inner,
+                _ => expected.clone(),
+            };
+            return Some(self.typed(span, present));
+        }
+        self.facts.push(Fact::UnknownVariant {
+            value: text.to_string(),
+            values,
+            span,
+        });
+        Some(None)
+    }
+
     /// Records that the expression at `span` has type `ty`, and returns
     /// it.
     fn typed(&mut self, span: Span, ty: Ty) -> Option<Ty> {
@@ -732,6 +781,14 @@ impl<'m> Walker<'m> {
             // A handler's own command never gets here (see `handler`), so
             // this one is misplaced. It is reported once, and neither its
             // name nor its arguments are checked.
+            // `has(x)`: whether `x` is present. Not a command, and no name is
+            // reserved: it is this only where a command could not be.
+            Expression::Command {
+                command,
+                arguments,
+                span,
+                ..
+            } if command == "has" => self.presence(arguments, *span, place),
             Expression::Command { command, span, .. } => {
                 self.facts.push(Fact::CommandOutsideHandler {
                     command: command.clone(),
@@ -742,6 +799,82 @@ impl<'m> Walker<'m> {
             Expression::EventValue { name, span } => self.event_value(name, *span, place),
         }?;
         self.typed(expression.span(), ty)
+    }
+
+    /// `has(operand)`: a boolean. The operand must be able to be absent;
+    /// otherwise the test is always true, which is a warning.
+    fn presence(&mut self, arguments: &[Expression], span: Span, place: Place<'m>) -> Option<Ty> {
+        if arguments.len() != 1 {
+            self.facts.push(Fact::PresenceArity {
+                found: arguments.len(),
+                span,
+            });
+            for argument in arguments {
+                self.expression(argument, place);
+            }
+            return None;
+        }
+        let ty = self.expression(&arguments[0], place)?;
+        if !matches!(relation::expand(self.manifest(), &ty), Ty::Optional(_)) {
+            self.facts.push(Fact::RedundantPresenceTest { ty, span });
+        }
+        Some(Ty::Boolean)
+    }
+
+    /// `left ?? right`: `left` if it is present, otherwise `right`. The
+    /// result is never optional: the common type of what `left` is when
+    /// present and what `right` is. `right` must not be optional itself,
+    /// and a `left` that cannot be absent makes `right` dead code, which is
+    /// a warning. Where `left` is an enum, a string literal `right` is a
+    /// literal site, so `size ?? "md"` is still the enum.
+    fn coalesce(
+        &mut self,
+        left: &Expression,
+        right: &Expression,
+        span: Span,
+        place: Place<'m>,
+    ) -> Option<Ty> {
+        let manifest = self.manifest();
+        let left_ty = self.expression(left, place);
+        let left_present = left_ty
+            .as_ref()
+            .map(|ty| match relation::expand(manifest, ty) {
+                Ty::Optional(inner) => *inner,
+                _ => ty.clone(),
+            });
+        if let (Some(ty), Some(_)) = (&left_ty, &left_present) {
+            if !matches!(relation::expand(manifest, ty), Ty::Optional(_)) {
+                self.facts.push(Fact::RedundantDefault {
+                    ty: ty.clone(),
+                    span,
+                });
+            }
+        }
+        let right_ty = match (&left_present, right) {
+            (
+                Some(expected),
+                Expression::Literal {
+                    value: Literal::String(text),
+                    span: literal,
+                },
+            ) if self.enum_values(expected).is_some() => {
+                self.variant(text, *literal, expected).flatten()
+            }
+            _ => self.expression(right, place),
+        };
+        let (left_present, right_ty) = (left_present?, right_ty?);
+        // The default is a value, not a maybe-value.
+        if let Ty::Optional(inner) = relation::expand(manifest, &right_ty) {
+            self.facts.push(Fact::TypeMismatch {
+                expectation: Expectation::Operand(Operator::Binary(BinaryOperator::Coalesce)),
+                expected: *inner,
+                actual: right_ty,
+                possibly_absent: true,
+                span: right.span(),
+            });
+            return None;
+        }
+        self.common(left_present, right_ty, span, Combination::Default)
     }
 
     /// The type of `object.property`, where `object` has type `object_ty`.
@@ -840,16 +973,38 @@ impl<'m> Walker<'m> {
     ) -> Option<Ty> {
         use BinaryOperator::*;
         let (needs, result) = match operator {
+            Coalesce => return self.coalesce(left, right, span, place),
             Mul | Div | Mod | Add | Sub => (Ty::Number, Ty::Number),
             Lt | Le | Gt | Ge => (Ty::Number, Ty::Boolean),
             And | Or => (Ty::Boolean, Ty::Boolean),
             // Strict equality: the operands need a common type, and
             // nothing else.
             Eq | Ne => {
-                let left = self.expression(left, place);
-                let right = self.expression(right, place);
-                if let (Some(left), Some(right)) = (left, right) {
-                    self.common(left, right, span, Combination::Equality(operator));
+                let left_ty = self.expression(left, place);
+                let right_ty = self.expression(right, place);
+                if let (Some(left_ty), Some(right_ty)) = (left_ty, right_ty) {
+                    // A string literal against an enum is a literal site (T3): the
+                    // literal must be one of its values. Nothing else narrows.
+                    let site = match (left, right) {
+                        (
+                            Expression::Literal {
+                                value: Literal::String(text),
+                                span,
+                            },
+                            _,
+                        ) => self.variant(text, *span, &right_ty),
+                        (
+                            _,
+                            Expression::Literal {
+                                value: Literal::String(text),
+                                span,
+                            },
+                        ) => self.variant(text, *span, &left_ty),
+                        _ => None,
+                    };
+                    if site.is_none() {
+                        self.common(left_ty, right_ty, span, Combination::Equality(operator));
+                    }
                 }
                 return Some(Ty::Boolean);
             }

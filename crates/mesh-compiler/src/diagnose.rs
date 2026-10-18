@@ -9,7 +9,8 @@ use mesh_syntax::{
     BinaryOperator, Diagnostic, DiagnosticCode, Severity, Span, Suggestion, UnaryOperator,
 };
 
-/// The diagnostic for `fact`. Every analysis fact is an error.
+/// The diagnostic for `fact`. Every analysis fact is an error, except the
+/// two redundancy facts, which are warnings.
 pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
     let (code, message, suggestions) = match fact {
         Fact::UnknownComponent {
@@ -189,6 +190,9 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
                 Combination::Elements => format!(
                     "this element doesn't fit with the ones before it: {left} and {right} have no common type"
                 ),
+                Combination::Default => format!(
+                    "`??` falls back from {left} to {right}, which have no common type"
+                ),
                 Combination::Equality(operator) => format!(
                     "`{}` compares {left} with {right}, which have no common type",
                     binary(*operator)
@@ -216,18 +220,64 @@ pub(crate) fn diagnostic(fact: &Fact) -> Diagnostic {
             format!("the object is missing the field {field:?}, which {record} requires"),
             Vec::new(),
         ),
+        Fact::UnknownVariant {
+            value,
+            values,
+            span,
+        } => {
+            // The span is the literal, quotes included; the suggestion
+            // replaces what is between them.
+            let inner = Span {
+                start_byte: span.start_byte + 1,
+                end_byte: span.end_byte.saturating_sub(1).max(span.start_byte + 1),
+            };
+            (
+                DiagnosticCode::UNKNOWN_VARIANT,
+                format!("{value:?} is not one of {}", listed(values)),
+                suggest(value, values, inner, ""),
+            )
+        }
+        Fact::RedundantPresenceTest { ty, .. } => (
+            DiagnosticCode::REDUNDANT_PRESENCE_TEST,
+            format!("this value is {ty}, which is never absent, so `has` is always true"),
+            Vec::new(),
+        ),
+        Fact::RedundantDefault { ty, .. } => (
+            DiagnosticCode::REDUNDANT_DEFAULT,
+            format!("the left side is {ty}, which is never absent, so the default is never used"),
+            Vec::new(),
+        ),
+        Fact::PresenceArity { found, .. } => (
+            DiagnosticCode::SYNTAX_ERROR,
+            format!("`has` takes one argument, found {found}"),
+            Vec::new(),
+        ),
         Fact::ContentNotText { ty, .. } => (
             DiagnosticCode::CONTENT_NOT_TEXT,
             format!("a value of type {ty} can't be shown as text: interpolate one of its fields, or a string, number, boolean or null"),
             Vec::new(),
         ),
     };
+    let severity = match fact {
+        Fact::RedundantPresenceTest { .. } | Fact::RedundantDefault { .. } => Severity::Warning,
+        _ => Severity::Error,
+    };
     Diagnostic {
-        severity: Severity::Error,
+        severity,
         code,
         message,
         span: fact.span(),
         suggestions,
+    }
+}
+
+/// An enum's values for a message: quoted, cut after eight.
+fn listed(values: &[String]) -> String {
+    let shown: Vec<String> = values.iter().take(8).map(|v| format!("{v:?}")).collect();
+    if values.len() > 8 {
+        format!("{}, … ({} values)", shown.join(", "), values.len())
+    } else {
+        shown.join(", ")
     }
 }
 
@@ -280,6 +330,7 @@ fn binary(operator: BinaryOperator) -> &'static str {
         BinaryOperator::Ne => "!=",
         BinaryOperator::And => "&&",
         BinaryOperator::Or => "||",
+        BinaryOperator::Coalesce => "??",
     }
 }
 

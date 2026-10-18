@@ -222,7 +222,11 @@ fn corpus() -> Vec<(String, String, String, String)> {
         example_manifest.clone(),
         "users-page".to_string(),
     ));
-    for dir in ["fixtures/check/pass", "fixtures/check/fail"] {
+    for dir in [
+        "fixtures/check/pass",
+        "fixtures/check/warn",
+        "fixtures/check/fail",
+    ] {
         let mut files: Vec<PathBuf> = fs::read_dir(examples.join(dir))
             .unwrap()
             .map(|entry| entry.unwrap().path())

@@ -52,7 +52,11 @@ fn runs() -> Vec<Run> {
     for dir in ["", "fixtures/pass", "fixtures/fail"] {
         runs.extend(files(dir, "mprx").into_iter().map(|file| (file, None)));
     }
-    for dir in ["fixtures/check/pass", "fixtures/check/fail"] {
+    for dir in [
+        "fixtures/check/pass",
+        "fixtures/check/warn",
+        "fixtures/check/fail",
+    ] {
         runs.extend(files(dir, "mprx").into_iter().map(|file| {
             let model = ("fixtures/check/components.json".into(), "template".into());
             (file, Some(model))

@@ -106,6 +106,11 @@ pub enum Expression {
     },
     /// A record literal; its field names are unique.
     Record { fields: Vec<Field>, span: Span },
+    /// `has(operand)`: whether the operand is present (not absent). Always a boolean.
+    Has {
+        operand: Box<Expression>,
+        span: Span,
+    },
     /// `$event`.
     Event { span: Span },
 }
@@ -122,6 +127,7 @@ impl Expression {
             | Expression::Conditional { span, .. }
             | Expression::List { span, .. }
             | Expression::Record { span, .. }
+            | Expression::Has { span, .. }
             | Expression::Event { span } => *span,
         }
     }
@@ -170,6 +176,8 @@ pub enum BinaryOperator {
     GreaterEqual,
     And,
     Or,
+    /// `left ?? right`: `left` if it is present, otherwise `right`.
+    Coalesce,
 }
 
 /// Where a construct was in the template's source. Nothing depends on it

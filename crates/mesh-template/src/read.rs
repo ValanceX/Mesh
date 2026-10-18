@@ -301,6 +301,9 @@ fn check_expression(
         Expression::Unary { operand, .. } => {
             check_expression(operand, &format!("{path}/operand"), in_handler, problems);
         }
+        Expression::Has { operand, .. } => {
+            check_expression(operand, &format!("{path}/operand"), in_handler, problems);
+        }
         Expression::Binary { left, right, .. } => {
             check_expression(left, &format!("{path}/left"), in_handler, problems);
             check_expression(right, &format!("{path}/right"), in_handler, problems);

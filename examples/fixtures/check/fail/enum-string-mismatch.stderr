@@ -1,0 +1,5 @@
+error[type-mismatch]: the prop "tone" of component "badge" needs Tone, found string
+ --> fixtures/check/fail/enum-string-mismatch.mprx:1:14
+  |
+1 | <badge tone={name}></badge>
+  |              ^^^^

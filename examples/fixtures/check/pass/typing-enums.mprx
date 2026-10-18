@@ -1,0 +1,9 @@
+<page title="x">
+  <badge tone="info" shade={tone}></badge>
+  <badge tone={flag ? "info" : "danger"}></badge>
+  <badge tone={maybeTone ?? "warning"}></badge>
+  <badge tone={tone}></badge>
+  <text>{tone == "warning"} {tone != "info"} {"danger" == tone} {tone} {tone == name}</text>
+  <text>{has(maybeName)} {has(maybeTone)} {has(maybeAnything)} {maybeName ?? "anonymous"} {maybeName ?? name}</text>
+  <text>{(maybeTone ?? tone) == "info"} {has(maybeUser) ? user.name : "none"}</text>
+</page>

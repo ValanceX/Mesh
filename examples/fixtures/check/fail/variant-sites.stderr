@@ -1,0 +1,13 @@
+error[unknown-variant]: "dagner" is not one of "info", "warning", "danger"
+ --> fixtures/check/fail/variant-sites.mprx:2:18
+  |
+2 |   <text>{tone == "dagner" ? 1 : 2}</text>
+  |                  ^^^^^^^^
+  = help: did you mean "danger"?
+
+error[unknown-variant]: "dangr" is not one of "info", "warning", "danger"
+ --> fixtures/check/fail/variant-sites.mprx:3:30
+  |
+3 |   <badge tone={flag ? tone : "dangr"}></badge>
+  |                              ^^^^^^^
+  = help: did you mean "danger"?

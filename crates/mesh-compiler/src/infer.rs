@@ -366,6 +366,7 @@ fn type_json(ty: &Ty) -> Value {
         Ty::Number => json!({ "kind": "number" }),
         Ty::Boolean => json!({ "kind": "boolean" }),
         Ty::Null => json!({ "kind": "null" }),
+        Ty::Enum(values) => json!({ "kind": "enum", "values": values }),
         Ty::Any | Ty::Nothing | Ty::Void => json!({ "kind": "any" }),
         Ty::List(element) => json!({ "kind": "list", "element": type_json(element) }),
         Ty::Named(name) => json!({ "kind": "named", "name": name }),

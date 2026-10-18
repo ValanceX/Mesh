@@ -84,6 +84,11 @@ pub fn is_assignable(manifest: &Manifest, actual: &Ty, expected: &Ty) -> bool {
         | (Ty::Number, Ty::Number)
         | (Ty::Boolean, Ty::Boolean)
         | (Ty::Null, Ty::Null) => true,
+        // 6b. An enum is a string, and one enum fits another that has all
+        //     its values. A `string` fits an enum only at a literal site,
+        //     which the checker decides, not this relation.
+        (Ty::Enum(_), Ty::String) => true,
+        (Ty::Enum(actual), Ty::Enum(expected)) => actual.iter().all(|v| expected.contains(v)),
         // 7. Lists are covariant: MPRX values are never mutated.
         (Ty::List(actual), Ty::List(expected)) => is_assignable(manifest, actual, expected),
         // 8. Records compare declarations, requiredness included, and are
@@ -129,6 +134,14 @@ pub fn join(manifest: &Manifest, a: &Ty, b: &Ty) -> Option<Ty> {
         (Ty::Any, _) | (_, Ty::Any) => Some(Ty::Any),
         // 5. Structurally identical types.
         _ if identical(manifest, &expanded_a, &expanded_b) => Some(a.clone()),
+        // 5b. Enums join to the enum of both sets of values, and an enum
+        //     with a string to the string.
+        (Ty::Enum(a), Ty::Enum(b)) => {
+            let mut values = a.clone();
+            values.extend(b.iter().filter(|value| !a.contains(value)).cloned());
+            Some(Ty::Enum(values))
+        }
+        (Ty::Enum(_), Ty::String) | (Ty::String, Ty::Enum(_)) => Some(Ty::String),
         // 6. Lists join element-wise.
         (Ty::List(a), Ty::List(b)) => Some(Ty::List(Box::new(join(manifest, a, b)?))),
         // 7. Anything else.
@@ -152,6 +165,7 @@ fn identical(manifest: &Manifest, a: &Ty, b: &Ty) -> bool {
                     })
                 })
         }
+        (Ty::Enum(a), Ty::Enum(b)) => a.len() == b.len() && a.iter().all(|v| b.contains(v)),
         (a, b) => a == b,
     }
 }
@@ -245,6 +259,51 @@ mod tests {
         assert_eq!(
             join(&manifest, &named("Alias"), &Ty::Nothing),
             Some(opt(Ty::String))
+        );
+    }
+
+    fn en(values: &[&str]) -> Ty {
+        Ty::Enum(values.iter().map(|v| v.to_string()).collect())
+    }
+
+    #[test]
+    fn an_enum_fits_string_and_the_enums_that_have_all_its_values() {
+        let manifest = manifest();
+        let ab = en(&["a", "b"]);
+        let abc = en(&["c", "b", "a"]);
+        assert!(is_assignable(&manifest, &ab, &Ty::String));
+        assert!(is_assignable(&manifest, &ab, &abc));
+        assert!(!is_assignable(&manifest, &abc, &ab));
+        assert!(is_assignable(&manifest, &ab, &en(&["b", "a"])));
+        assert!(is_assignable(&manifest, &ab, &Ty::Any));
+        assert!(is_assignable(&manifest, &ab, &opt(abc.clone())));
+        assert!(!is_assignable(&manifest, &Ty::String, &ab));
+        assert!(!is_assignable(&manifest, &opt(ab.clone()), &ab));
+        let list = |ty| Ty::List(Box::new(ty));
+        assert!(is_assignable(&manifest, &list(ab), &list(abc)));
+        assert!(!is_assignable(&manifest, &Ty::Number, &en(&["a"])));
+    }
+
+    #[test]
+    fn the_common_type_of_enums_is_the_union_and_with_string_is_string() {
+        let manifest = manifest();
+        let joined = join(&manifest, &en(&["a", "b"]), &en(&["b", "c"])).expect("a join");
+        let Ty::Enum(values) = joined else {
+            panic!("an enum")
+        };
+        let mut values = values;
+        values.sort();
+        assert_eq!(values, ["a", "b", "c"]);
+        assert_eq!(join(&manifest, &en(&["a"]), &Ty::String), Some(Ty::String));
+        assert_eq!(join(&manifest, &Ty::String, &en(&["a"])), Some(Ty::String));
+        assert_eq!(
+            join(&manifest, &en(&["a"]), &opt(Ty::String)),
+            Some(opt(Ty::String))
+        );
+        assert_eq!(join(&manifest, &en(&["a"]), &Ty::Number), None);
+        assert_eq!(
+            join(&manifest, &en(&["a", "b"]), &en(&["b", "a"])),
+            Some(en(&["a", "b"]))
         );
     }
 }

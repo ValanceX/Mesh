@@ -206,6 +206,8 @@ pub enum Combination {
     Elements,
     /// The operands of `==` or `!=`.
     Equality(BinaryOperator),
+    /// The value and the default of `x ?? y`.
+    Default,
 }
 
 /// A name in the template, and the manifest declaration it refers to.
@@ -368,6 +370,22 @@ pub enum Fact {
     /// or an optional of one, which has no text form. Span: the
     /// interpolated expression.
     ContentNotText { ty: Ty, span: Span },
+    /// A string literal where an enum is expected, or compared with one,
+    /// that is not one of its values. Span: the literal, quotes included.
+    /// `values` are the enum's, in the order it wrote them.
+    UnknownVariant {
+        value: String,
+        values: Vec<String>,
+        span: Span,
+    },
+    /// `has(x)` where `x` cannot be absent, so the test is always true.
+    /// Span: the whole `has(x)`.
+    RedundantPresenceTest { ty: Ty, span: Span },
+    /// `x ?? y` where `x` cannot be absent, so `y` is never used. Span:
+    /// the whole expression.
+    RedundantDefault { ty: Ty, span: Span },
+    /// `has` called with `found` arguments instead of one. Span: the call.
+    PresenceArity { found: usize, span: Span },
 }
 
 impl Fact {
@@ -393,7 +411,11 @@ impl Fact {
             | Fact::DuplicateObjectKey { span, .. }
             | Fact::UnknownField { span, .. }
             | Fact::MissingRequiredField { span, .. }
-            | Fact::ContentNotText { span, .. } => *span,
+            | Fact::ContentNotText { span, .. }
+            | Fact::UnknownVariant { span, .. }
+            | Fact::RedundantPresenceTest { span, .. }
+            | Fact::RedundantDefault { span, .. }
+            | Fact::PresenceArity { span, .. } => *span,
         }
     }
 }

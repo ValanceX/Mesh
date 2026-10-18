@@ -340,7 +340,9 @@ fn expression_names(expression: &Expression, out: &mut Vec<String>) {
         Expression::Scope { name, .. } => out.push(format!("{:?}", Target::Scope(name.clone()))),
         Expression::Literal { .. } | Expression::Event { .. } => {}
         Expression::Member { object, .. } => expression_names(object, out),
-        Expression::Unary { operand, .. } => expression_names(operand, out),
+        Expression::Unary { operand, .. } | Expression::Has { operand, .. } => {
+            expression_names(operand, out)
+        }
         Expression::Binary { left, right, .. } => {
             expression_names(left, out);
             expression_names(right, out);

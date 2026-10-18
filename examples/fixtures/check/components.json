@@ -10,6 +10,7 @@
         "active": { "type": { "kind": "boolean" }, "required": true }
       }
     },
+    "Tone": { "kind": "enum", "values": ["info", "warning", "danger"] },
     "Layout": {
       "kind": "record",
       "fields": {
@@ -78,6 +79,15 @@
       "commands": {},
       "scope": {}
     },
+    "badge": {
+      "props": {
+        "tone": { "type": { "kind": "named", "name": "Tone" }, "required": true },
+        "shade": { "type": { "kind": "enum", "values": ["info", "warning", "danger", "success"] }, "required": false }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
     "compact-strict": {
       "props": {
         "compact": { "type": { "kind": "boolean" }, "required": false }
@@ -135,6 +145,8 @@
         "name": { "kind": "string" },
         "maybeName": { "kind": "optional", "type": { "kind": "string" } },
         "count": { "kind": "number" },
+        "tone": { "kind": "named", "name": "Tone" },
+        "maybeTone": { "kind": "optional", "type": { "kind": "named", "name": "Tone" } },
         "flag": { "kind": "boolean" },
         "maybeFlag": { "kind": "optional", "type": { "kind": "boolean" } },
         "anything": { "kind": "any" },

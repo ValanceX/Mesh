@@ -214,6 +214,11 @@ fn check_pass_fixtures_check_clean_against_their_model() {
 }
 
 #[test]
+fn check_warn_fixtures_exit_zero_with_expected_warnings() {
+    assert_corpus("fixtures/check/warn", &CHECK_ARGS, 0, stderr_file);
+}
+
+#[test]
 fn check_fail_fixtures_exit_one_with_expected_diagnostics() {
     assert_corpus("fixtures/check/fail", &CHECK_ARGS, 1, stderr_file);
 }
@@ -315,6 +320,10 @@ const RETIRED_CODES: [&str; 1] = ["invalid-switch"];
 /// one past, their limits.
 const LIMIT_CODES_WITHOUT_FIXTURES: [&str; 2] = ["input-too-large", "too-many-elements"];
 
+/// Codes that are warnings: their fixture is in `fixtures/check/warn/`, and
+/// the check passes.
+const WARNING_CODES: [&str; 2] = ["redundant-presence-test", "redundant-default"];
+
 /// Every code that checking against a model can produce (every code
 /// after the `manifest-*` ones, the retired ones apart) has a fail fixture
 /// named after it, whose expected output reports that code.
@@ -334,10 +343,15 @@ fn every_model_code_has_its_own_fail_fixture() {
         .filter(|code| !RETIRED_CODES.contains(&code.as_str()))
         .filter(|code| !LIMIT_CODES_WITHOUT_FIXTURES.contains(&code.as_str()))
     {
-        let fixture = PathBuf::from(format!("fixtures/check/fail/{code}.mprx"));
+        let (dir, severity) = if WARNING_CODES.contains(&code.as_str()) {
+            ("warn", "warning")
+        } else {
+            ("fail", "error")
+        };
+        let fixture = PathBuf::from(format!("fixtures/check/{dir}/{code}.mprx"));
         if !examples_dir().join(&fixture).is_file() {
             missing.push(format!("{}: no such fixture", fixture.display()));
-        } else if !stderr_file(&fixture).contains(&format!("error[{code}]")) {
+        } else if !stderr_file(&fixture).contains(&format!("{severity}[{code}]")) {
             missing.push(format!("{}: doesn't report {code}", fixture.display()));
         }
     }
@@ -352,7 +366,11 @@ fn every_corpus_run() -> Vec<(PathBuf, Vec<String>)> {
     for dir in ["", "fixtures/pass", "fixtures/fail"] {
         runs.extend(mprx_files(dir).into_iter().map(|file| (file, Vec::new())));
     }
-    for dir in ["fixtures/check/pass", "fixtures/check/fail"] {
+    for dir in [
+        "fixtures/check/pass",
+        "fixtures/check/warn",
+        "fixtures/check/fail",
+    ] {
         runs.extend(
             mprx_files(dir)
                 .into_iter()
