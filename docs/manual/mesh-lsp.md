@@ -9,7 +9,8 @@ What it does today:
 - **Diagnostics** for `.mprx` documents, and for the component manifest itself, kept current as you type.
 - **Quick fixes** from suggestions: `did you mean "user"?` becomes a one-click replacement.
 - **Hover:** the type of the expression under the cursor, and what a name is declared as in the manifest.
-- **Go to definition:** from a tag, prop, event, command or scope name to where the manifest declares it.
+- **Go to definition:** from a tag, prop, event, command or scope name to where the manifest declares it; from a snippet's name (in a render, or as a value passed along) to the `{#snippet}` that declares it, and from a snippet given to a component to the prop it fills.
+- **Signature help** in a render tag's arguments: `{@render pair(` shows `pair(a: string, b: number)` for a snippet declared in the template (the types its renders give), `row(Person, number)` for one of the component's scope, and the argument being written is highlighted.
 - **Completion** of tags, props, events, scope names, record members and commands, from the manifest.
 - **Formatting:** Format Document, Format Selection, and the indentation of the new line after Enter, by the nesting of elements and blocks.
 
@@ -108,6 +109,10 @@ Completion offers only names the manifest declares, and each only where the comp
 - **After `.`:** the fields of the value's type, if it's a record. A value that may be absent has none (reading through it is `possibly-absent-access`), and neither does `any` or a value whose type isn't known, such as a name that isn't in scope.
 
 Everything else is in name order. It works while the file is broken, which it almost always is while you type: after `user.`, after `<avatar `, after a bare `<`. Like hover, it needs a model; without one it offers nothing. It doesn't complete other attribute values (a local snippet passed along as `row={row}` is not offered), other text inside strings, closing tags, object keys, `$event`, or argument lists. The snippets and bindings in reach are read from the syntax tree, so the file has to parse apart from the name being typed (an editor that closes `{` and `"` as you type gives it that).
+
+## Signature help
+
+Asked for (`textDocument/signatureHelp`; the server offers `(` and `,` as triggers) inside the arguments of `{@render name(…)}`, it answers one signature. For a snippet declared in the template the parameters are named and typed by what the checker found for them (a parameter with no render yet has only its name); for a snippet that is a prop or scope name of the component the manifest names no parameters, so the labels are their types, and an optional one says it may be absent. The active parameter is the number of commas before the cursor that are not inside a nested list, object or call. With more arguments than parameters nothing is highlighted. It works while the call is being typed, closed or not. It answers nothing inside a nested call or list (`{@render row(has(|)…)}`), for a name that is not a snippet, or outside a render tag. Command calls in handlers have none yet.
 
 ## Formatting
 

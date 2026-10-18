@@ -407,3 +407,83 @@ fn enum_values(
         _ => Vec::new(),
     }
 }
+
+/// What a render tag's call looks like at the cursor: the snippet's signature, and which parameter
+/// the argument being written is for.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Signature {
+    /// `name(a: T, b: U)` for a snippet declared in the template (with the types the checker found for its
+    /// parameters), `name(T, U)` for a snippet of the component's scope (the manifest names no parameters).
+    pub label: String,
+    /// The label of each parameter, as it appears in `label`.
+    pub parameters: Vec<String>,
+    /// The index of the parameter the cursor's argument is for; at or past `parameters.len()` when there
+    /// are more arguments than parameters.
+    pub active: usize,
+    /// A sentence on the snippet, if it has something to say (an optional one may be absent).
+    pub documentation: Option<String>,
+}
+
+/// The signature of the snippet whose `{@render name(` call contains byte `offset` of `source`, checked as
+/// the template of `template`. `analysis` is the canonical compile's analysis of the same `source`, if
+/// it has one; it gives the types of a declared snippet's parameters.
+pub fn signature(
+    source: &str,
+    offset: usize,
+    template: Template<'_>,
+    analysis: Option<&Analysis>,
+) -> Option<Signature> {
+    use mesh_analysis::Ty;
+
+    let call = mesh_parser::render_call_at(source, offset)?;
+    let reach = mesh_parser::reach_at(source, call.name_span.start_byte);
+    // The nearest declaration of the name is the one a render means.
+    if let Some(local) = reach
+        .snippets
+        .iter()
+        .rev()
+        .find(|local| local.name == call.name)
+    {
+        let parameters: Vec<String> = local
+            .parameters
+            .iter()
+            .zip(&local.parameter_spans)
+            .map(
+                |(name, span)| match analysis.and_then(|analysis| analysis.type_at(*span)) {
+                    Some(ty) => format!("{name}: {ty}"),
+                    None => name.clone(),
+                },
+            )
+            .collect();
+
+        return Some(Signature {
+            label: format!("{}({})", call.name, parameters.join(", ")),
+            parameters,
+            active: call.active,
+            documentation: None,
+        });
+    }
+    let declared = template.component().scope.get(&call.name)?;
+    let (types, optional) = match Ty::from(declared) {
+        Ty::Snippet(types) => (types, false),
+        Ty::Optional(inner) => match *inner {
+            Ty::Snippet(types) => (types, true),
+            _ => return None,
+        },
+        _ => return None,
+    };
+    let parameters: Vec<String> = types.iter().map(ToString::to_string).collect();
+
+    Some(Signature {
+        label: format!("{}({})", call.name, parameters.join(", ")),
+        parameters,
+        active: call.active,
+        documentation: optional.then(|| {
+            format!(
+                "May be absent: render it inside `{{#if has({})}}`.",
+                call.name
+            )
+        }),
+    })
+}

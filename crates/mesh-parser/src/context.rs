@@ -68,7 +68,19 @@ pub enum TextSite {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalSnippet {
     pub name: String,
+    pub name_span: Span,
     pub parameters: Vec<String>,
+    /// Where each parameter is declared, in order.
+    pub parameter_spans: Vec<Span>,
+}
+
+/// The `{@render name(` the cursor is inside the arguments of.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderCall {
+    pub name: String,
+    pub name_span: Span,
+    /// How many arguments are complete before the cursor: the index of the one being written.
+    pub active: usize,
 }
 
 /// What a name written at the cursor can mean beyond the template's scope.
@@ -477,13 +489,17 @@ pub fn reach_at(source: &str, offset: usize) -> Reach {
                     continue;
                 };
                 let mut parameters = Vec::new();
+                let mut parameter_spans = Vec::new();
                 let mut inner = block.walk();
                 for parameter in block.children_by_field_name("parameter", &mut inner) {
                     parameters.push(text_of(parameter, source));
+                    parameter_spans.push(span_of(parameter));
                 }
                 declared.push(LocalSnippet {
                     name: text_of(name, source),
+                    name_span: span_of(name),
                     parameters,
+                    parameter_spans,
                 });
             }
             if !declared.is_empty() {
@@ -512,4 +528,53 @@ fn after_header(node: Node, offset: usize) -> bool {
         .find(|child| child.kind() == opener);
 
     header.is_some_and(|header| header.end_byte() <= offset)
+}
+
+/// The render tag whose arguments contain byte `offset`: the unmatched `(` before it, right after
+/// `{@render name`. Read from the tokens before the cursor, so it answers while the call is being
+/// typed, closed or not.
+pub fn render_call_at(source: &str, offset: usize) -> Option<RenderCall> {
+    let offset = floor_char_boundary(source, offset);
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_mprx::language()).ok()?;
+    let tree = parser.parse(source, None)?;
+    let root = tree.root_node();
+    if nesting::check(root).is_some() {
+        return None;
+    }
+    let tokens = tokens_before(root, offset);
+    let mut depth = 0usize;
+    let mut commas = 0usize;
+    for index in (0..tokens.len()).rev() {
+        let token = tokens[index];
+        match token.kind() {
+            ")" | "]" | "}" => depth += 1,
+            "[" | "{" => {
+                // An opener of something other than the call: the cursor is not directly in its arguments.
+                if depth == 0 {
+                    return None;
+                }
+                depth -= 1;
+            }
+            "(" => {
+                if depth > 0 {
+                    depth -= 1;
+                    continue;
+                }
+                let name = *tokens.get(index.checked_sub(1)?)?;
+                let opener = *tokens.get(index.checked_sub(2)?)?;
+                if name.kind() != "identifier" || opener.kind() != "render_open" {
+                    return None;
+                }
+                return Some(RenderCall {
+                    name: text_of(name, source),
+                    name_span: span_of(name),
+                    active: commas,
+                });
+            }
+            "," if depth == 0 => commas += 1,
+            _ => {}
+        }
+    }
+    None
 }

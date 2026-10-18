@@ -23,6 +23,7 @@ use serde_json::{json, Value};
 pub(super) enum Query {
     Hover(Position),
     Definition(Position),
+    SignatureHelp(Position),
     /// Answered on the compile thread (outline D4).
     Completion(Position),
 }
@@ -178,6 +179,46 @@ impl Server {
                 })
                 .map_or(Value::Null, |hover| json!(hover)),
             Query::Completion(_) => Value::Null,
+            Query::SignatureHelp(position) => {
+                let Some((component, snapshot)) = &compiled.template else {
+                    return Value::Null;
+                };
+                let Some(template) = snapshot
+                    .loaded
+                    .as_ref()
+                    .ok()
+                    .and_then(|manifest| manifest.template(component).ok())
+                else {
+                    return Value::Null;
+                };
+                let text = Text {
+                    source: &compiled.text,
+                    map: &compiled.map,
+                    unit: self.unit,
+                };
+
+                mesh_compiler::editor::signature(
+                    &compiled.text,
+                    text.offset(position),
+                    template,
+                    compiled.result.analysis.as_ref(),
+                )
+                .map_or(Value::Null, |signature| {
+                    json!({
+                        "signatures": [{
+                            "label": signature.label,
+                            "parameters": signature
+                                .parameters
+                                .iter()
+                                .map(|label| json!({ "label": label }))
+                                .collect::<Vec<_>>(),
+                            "documentation": signature.documentation,
+                        }],
+                        "activeSignature": 0,
+                        "activeParameter": signature.active,
+                    })
+                })
+            }
             Query::Definition(position) => {
                 let Some((_, snapshot)) = &compiled.template else {
                     return Value::Null;

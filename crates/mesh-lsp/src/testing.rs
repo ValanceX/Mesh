@@ -135,6 +135,11 @@ impl Client {
         self.position_request("textDocument/definition", uri, line, character)
     }
 
+    /// The result of `textDocument/signatureHelp`, or `Value::Null`.
+    pub fn signature_help(&mut self, uri: &str, line: u32, character: u32) -> Value {
+        self.position_request("textDocument/signatureHelp", uri, line, character)
+    }
+
     /// The result of `textDocument/completion`.
     pub fn completion(&mut self, uri: &str, line: u32, character: u32) -> Value {
         self.position_request("textDocument/completion", uri, line, character)
