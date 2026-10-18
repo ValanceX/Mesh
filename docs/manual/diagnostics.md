@@ -387,14 +387,14 @@ error[manifest-missing-property]: prop "size" is missing the property "required"
 An object has a property its format doesn't allow. Points at the property's key.
 
 ```text
-error[manifest-unknown-property]: prop "size" can't have the property "default"
+error[manifest-unknown-property]: prop "size" can't have the property "placeholder"
   --> examples/fixtures/manifest/fail/unknown-property.json:15:68
    |
-15 |         "size": { "type": { "kind": "string" }, "required": false, "default": "md" }
-   |                                                                    ^^^^^^^^^
+15 |         "size": { "type": { "kind": "string" }, "required": false, "placeholder": "md" }
+   |                                                                    ^^^^^^^^^^^^^
 ```
 
-**Fix:** remove the property. The manifest describes interfaces only: there are no default values, and a type has only the properties of its kind.
+**Fix:** remove the property. A type has only the properties of its kind, and a prop has only `type`, `required` and `default` (a record field has `type` and `required`).
 
 ### `manifest-duplicate-key`
 
@@ -414,10 +414,10 @@ This covers every level: component names, props, events, commands, scope names, 
 
 ### `manifest-unknown-kind`
 
-A type's `"kind"` isn't one of `string`, `number`, `boolean`, `null`, `any`, `list`, `record`, `named` or `optional`.
+A type's `"kind"` isn't one of `string`, `number`, `boolean`, `null`, `any`, `list`, `record`, `named`, `optional` or `enum`.
 
 ```text
-error[manifest-unknown-kind]: unknown type kind "integer"; expected string, number, boolean, null, any, list, record, named or optional
+error[manifest-unknown-kind]: unknown type kind "integer"; expected string, number, boolean, null, any, list, record, named, optional or enum
   --> examples/fixtures/manifest/fail/unknown-kind.json:18:28
    |
 18 |         "count": { "kind": "integer" }
@@ -427,6 +427,8 @@ error[manifest-unknown-kind]: unknown type kind "integer"; expected string, numb
 `void` and `nothing` are types MESH uses internally, and a manifest can't write them either.
 
 **Fix:** use one of the kinds above. For a number, use `number`: there's no separate integer type.
+
+`enum` was added in 0.14. An older MESH reading a manifest that uses it reports this code with the older list of kinds; upgrade MESH, or type the value `string`.
 
 ### `manifest-invalid-name`
 
@@ -503,6 +505,36 @@ error[manifest-nested-optional]: an optional type can't wrap "MaybeName", which 
 ```
 
 **Fix:** remove one of the two. "Optional optional" means the same as "optional".
+
+### `manifest-enum-too-large`
+
+An `enum` type lists more than 256 values. Points at the `"values"` array.
+
+```text
+error[manifest-enum-too-large]: an enum has 257 values, more than the 256 MESH supports; keep a larger set as `string` and validate it in the application
+  --> examples/fixtures/manifest/fail/enum-too-large.json:10:23
+   |
+10 |             "values": [
+   |                       ^
+```
+
+The limit keeps a variant set small enough to read in a diagnostic and to check at every host boundary.
+
+**Fix:** keep a larger set as `string` and validate it in the application, or split it into several smaller enums.
+
+### `manifest-duplicate-variant`
+
+An `enum` lists the same value twice. Points at the second occurrence. An enum is a set; the order is only used to word messages.
+
+```text
+error[manifest-duplicate-variant]: the enum lists the value "a" twice
+ --> examples/fixtures/manifest/fail/duplicate-variant.json:7:66
+  |
+7 |         "tone": { "type": { "kind": "enum", "values": ["a", "b", "a"] }, "required": true }
+  |                                                                  ^^^
+```
+
+**Fix:** delete the repeat.
 
 ### `manifest-missing-component`
 
@@ -733,7 +765,7 @@ A value of type `any` has every member, and reading one gives `any`.
 
 ### `possibly-absent-access`
 
-A member access reads a field of a value that may be absent: its type is optional (`T?`), `any?` included. MPRX has no optional chaining and no presence test, so there is no way to read it safely. Points at the value.
+A member access reads a field of a value that may be absent: its type is optional (`T?`), `any?` included. MPRX has no optional chaining; test the value with `has(x)` or give it a default with `x ?? y` instead. Points at the value.
 
 ```text
 error[possibly-absent-access]: this value may be absent (its type is User?), so its member "name" can't be read; MPRX has no optional chaining
@@ -745,7 +777,7 @@ error[possibly-absent-access]: this value may be absent (its type is User?), so 
 
 Reading a field that is itself optional is fine: `user.avatar`, where `avatar` is declared `"required": false`, has type `string?`. It's reading *through* it, as in `user.avatar.length`, that fails.
 
-**Fix:** give the template a value that is always present, for example a scope name typed `User` rather than `User?`.
+**Fix:** give the template a value that is always present, for example a scope name typed `User` rather than `User?`, or give the missing case a value: `(maybeUser ?? fallbackUser).name`.
 
 ### `type-mismatch`
 
@@ -799,7 +831,7 @@ error[type-mismatch]: the condition needs boolean, found boolean?, which may be 
 
 ### `no-common-type`
 
-Two types that must have a common type don't: the operands of `==` or `!=`, the two branches of `c ? a : b`, or the elements of an array. Points at the comparison or conditional, or at the first array element that doesn't fit with the ones before it.
+Two types that must have a common type don't: the operands of `==` or `!=`, the two branches of `c ? a : b`, the elements of an array, or the two sides of `x ?? y`. Points at the comparison or conditional, or at the first array element that doesn't fit with the ones before it.
 
 ```text
 error[no-common-type]: `==` compares string with number, which have no common type
@@ -811,7 +843,7 @@ error[no-common-type]: `==` compares string with number, which have no common ty
 
 Where a type is expected, such as a prop's value, an array literal is checked against it element by element and a conditional branch by branch, so they need no common type there: `[{ name: "Ada", active: true }, { name: "Bo", active: false, avatar: "bo.png" }]` fits a `list<User>` prop, and a wrong element or branch is a `type-mismatch` at itself.
 
-Equality is strict, with no conversions: a string never equals a number, so comparing them is a mistake rather than `false`. Two types have a common type when they are the same, when one is `any`, or when one is only optional where the other isn't: `string` and `string?` have the common type `string?`. `null` is a value, not absence, so `maybeName == null` compares `string?` with `null` and has no common type. An empty array `[]` fits with any list.
+Equality is strict, with no conversions: a string never equals a number, so comparing them is a mistake rather than `false`. Two types have a common type when they are the same, when one is `any`, or when one is only optional where the other isn't: `string` and `string?` have the common type `string?`. `null` is a value, not absence, so `maybeName == null` compares `string?` with `null` and has no common type. An empty array `[]` fits with any list. Two enums have the union of their values as the common type, and an enum and `string` have `string`.
 
 **Fix:** compare or combine values of the same type.
 
@@ -860,6 +892,55 @@ error[missing-required-field]: the object is missing the field "active", which U
 As with props, a required field must be written even when its type is optional.
 
 **Fix:** add the field.
+
+### `unknown-variant`
+
+A string literal is written where an `enum` is expected, or is compared with one, but it isn't one of the enum's values. The sites are: an attribute value, `==` and `!=`, the branches of `?:`, and the elements of an array literal. Points at the literal. When a value is close in spelling, the help line suggests it. A list of values longer than eight is cut after eight.
+
+```text
+error[unknown-variant]: "dagner" is not one of "info", "warning", "danger"
+ --> examples/fixtures/check/fail/unknown-variant.mprx:1:13
+  |
+1 | <badge tone="dagner"></badge>
+  |             ^^^^^^^^
+  = help: did you mean "danger"?
+```
+
+Only a literal is checked this way. A string-typed expression doesn't fit an enum (that is a `type-mismatch`), and there is no narrowing: `if x == "info"` does not make `x` an enum.
+
+**Fix:** write one of the listed values, or add the value to the enum in the manifest.
+
+### `redundant-presence-test`
+
+*Warning.* `has(x)` tests a value that is never absent, so it is always `true`. Points at the `has(x)`.
+
+```text
+warning[redundant-presence-test]: this value is string, which is never absent, so `has` is always true
+ --> examples/fixtures/check/warn/redundant-presence-test.mprx:1:8
+  |
+1 | <text>{has(name)}</text>
+  |        ^^^^^^^^^
+```
+
+`has(x)` is `true` when `x` is present and `false` when it is absent. `null` is a value, so `has(null)` is `true`. Calling `has` with other than one argument is a `syntax-error`. `has` is not reserved: a handler's `has(...)` is still a command call.
+
+**Fix:** delete the test, or test a value whose type is optional (`T?`).
+
+### `redundant-default`
+
+*Warning.* `x ?? y` has a left side that is never absent, so `y` is never used. Points at the whole expression.
+
+```text
+warning[redundant-default]: the left side is string, which is never absent, so the default is never used
+ --> examples/fixtures/check/warn/redundant-default.mprx:1:8
+  |
+1 | <text>{name ?? "anonymous"}</text>
+  |        ^^^^^^^^^^^^^^^^^^^
+```
+
+`x ?? y` is `x` when `x` is present, otherwise `y`. `y` is evaluated only when it is needed. `y` must be present: if it may be absent that is the existing `type-mismatch` ("which may be absent"), so the result of `??` is never absent. If the two have no common type, that is `no-common-type`.
+
+**Fix:** delete the `?? y`, or apply it to an optional value.
 
 ### `content-not-text`
 
@@ -1005,7 +1086,7 @@ Location: `input`, the path of the missing value; a missing payload is `["$event
 
 ### `runtime-value-mismatch`
 
-A present value doesn't fit its type (§9.7.2). It is reported at the deepest path where it stops fitting: a list's element, a record's field.
+A present value doesn't fit its type (§9.7.2). It is reported at the deepest path where it stops fitting: a list's element, a record's field. A string that isn't one of an `enum`'s values doesn't fit it, so it is reported here too, wherever it crosses the host boundary: a snapshot field, an event payload, a value read through `any`; the message lists the enum's values. The same check reports `runtime-prop-mismatch` for a prop and `runtime-argument-mismatch` for a command argument.
 
 Location: `input`, the deepest path where the value stops fitting.
 

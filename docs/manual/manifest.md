@@ -84,7 +84,9 @@ Props, and the fields of [records](#types), are declared the same way:
 { "type": <type>, "required": true }
 ```
 
-Both properties are required: `"required"` has no default. It says whether the prop or field must be written; the type says what its value may be. They are independent:
+A **prop** (not a record field) may also have `"default": <value>`, a JSON value that fits the prop's type (inside the `optional`, if it is one): `manifest-invalid-value` if not. When a composite occurrence leaves the prop out, its scope name binds the default instead of absence; on a primitive the default is ignored. With a default, the binding rule uses the prop's type whatever its requiredness. The default is part of the model fingerprint.
+
+The type and `"required"` are both required: `"required"` has no default. It says whether the prop or field must be written; the type says what its value may be. They are independent:
 
 | Declaration | `"required"` | `"type"` | Must be written? | Its value must be |
 |---|---|---|---|---|
@@ -146,7 +148,7 @@ The runtime's tests check that such a manifest's list and record props are carri
 
 ## Types
 
-Every type is a JSON object with a `"kind"`. There are nine kinds, and no others:
+Every type is a JSON object with a `"kind"`. There are ten kinds, and no others:
 
 | `"kind"` | Other properties | The type | Written in these docs as |
 |---|---|---|---|
@@ -157,11 +159,13 @@ Every type is a JSON object with a `"kind"`. There are nine kinds, and no others
 | `"any"` | none | any value that is present | `any` |
 | `"list"` | `"element"`: a type | a list whose elements all have that type | `list<T>` |
 | `"record"` | `"fields"`: name → [field declaration](#field-declarations) | an object with exactly those fields | `{ name: string, avatar?: string }` |
+| `"enum"` | `"values"`: 1 to 256 distinct strings | a string that is one of those values | `"a" \| "b"` |
 | `"named"` | `"name"`: a key of `"types"` | the type declared under that name | `User` |
 | `"optional"` | `"type"`: a type | a value of that type, or no value at all (absent) | `T?` |
 
 - **`null` is a value, not absence.** `optional` of `string` accepts a string or absence, not `null`.
 - **`any` never includes absence.** A value that may be absent is `optional` of `any`, `any?`.
+- **An enum is a set of strings.** Its values are distinct and at most 256 (`manifest-duplicate-variant`, `manifest-enum-too-large`); an empty or non-string `"values"` is `manifest-invalid-value`. Their order is used only to word messages, and doesn't change the fingerprint. An enum fits `string`; `string` fits an enum only as a literal that is one of its values. A larger set stays `string`. A MESH from before 0.14 reports an enum as `manifest-unknown-kind`.
 - **Records are exact.** A record accepts only the fields it declares.
 - **Named types are aliases.** `{ "kind": "named", "name": "User" }` means exactly what `"types"` declares as `User`. Two named types with the same definition are the same type.
 - **Named types can't be recursive**, directly or through other named types.
@@ -187,7 +191,7 @@ Props, events, commands and scope names are separate: each is written in a diffe
 - the JSON itself: `manifest-syntax-error`, `manifest-nesting-too-deep` for arrays and objects nested more than 128 levels deep, and `manifest-duplicate-key` for a key repeated in any object, which most JSON tools would silently accept;
 - the version: `manifest-unsupported-version`;
 - the format the schema describes: `manifest-invalid-value`, `manifest-missing-property`, `manifest-unknown-property`, `manifest-unknown-kind` and `manifest-invalid-name`;
-- rules the schema can't express: `manifest-duplicate-parameter`, `manifest-unknown-type`, `manifest-recursive-type` and `manifest-nested-optional`;
+- rules the schema can't express: `manifest-enum-too-large`, `manifest-duplicate-variant`, `manifest-duplicate-parameter`, `manifest-unknown-type`, `manifest-recursive-type` and `manifest-nested-optional`;
 - and once the manifest is valid, `manifest-missing-component` if it doesn't declare the component the file is the template of.
 
 A manifest the JSON Schema accepts can still have the problems in the last two items; `mesh check` is the complete check.

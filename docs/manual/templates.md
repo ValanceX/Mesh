@@ -66,7 +66,8 @@ The format is [`schemas/template-v1.schema.json`](../../schemas/template-v1.sche
   | `scope` | `name` | a reference to a scope declaration of the template's component |
   | `member` | `object`, `field` | `object.field` |
   | `unary` | `operator` (`not`, `negate`), `operand` | `!x`, `-x` |
-  | `binary` | `operator`, `left`, `right` | `operator` is one of `add`, `subtract`, `multiply`, `divide`, `remainder`, `equal`, `not-equal`, `less`, `less-equal`, `greater`, `greater-equal`, `and`, `or` |
+  | `binary` | `operator`, `left`, `right` | `operator` is one of `add`, `subtract`, `multiply`, `divide`, `remainder`, `equal`, `not-equal`, `less`, `less-equal`, `greater`, `greater-equal`, `and`, `or`, `coalesce` (`x ?? y`; the right side is evaluated only when the left is absent) |
+  | `has` | `operand` | `has(x)`: `true` unless `x` is absent |
   | `conditional` | `condition`, `consequent`, `alternate` | `c ? a : b` |
   | `list` | `elements` | a list literal |
   | `record` | `fields`: `[{ "name", "value", "span" }]` | a record literal; shadowed keys (§9.4) are omitted. A field's `name` is any string, since an object key may be quoted (`{ "display-name": x }`), and names are unique |
@@ -326,7 +327,7 @@ The fingerprint is determined by the model's **meaning**, and by nothing else.
 
 **What counts:**
 - the set of components;
-- for each component: its props (name, type, requiredness); its events (name, and payload type or none); its commands (name, and each parameter's type, in order); and its scope (name and type);
+- for each component: its props (name, type, requiredness, and `default` if it has one); its events (name, and payload type or none); its commands (name, and each parameter's type, in order); and its scope (name and type);
 - types as their full structural expansion, since named types are structural (§9.3).
 
 **What doesn't count:**
@@ -352,13 +353,14 @@ The fingerprint is determined by the model's **meaning**, and by nothing else.
 | `list<U>` | `0x06`, `D(U)` |
 | `U?` | `0x07`, `D(U)` |
 | record | `0x08`, the count of fields, then for each field: its name (a string), its requiredness (a flag, `0x01` for required), `D(its type)` |
+| `enum` | `0x09`, the count of values, then each value (a string), in code-point order: an enum is a set |
 | a named type | nothing of its own: `D(named)` is `D(its definition)` |
 
 A digest is computed once per named type and reused, so the fingerprint costs time linear in the manifest's size, however often a named type is used, and equals what hashing the full expansion would give.
 
 **A component's digest,** `C`, is `H` of:
 1. `0x10`;
-2. the count of props, then for each prop: its name, its requiredness (a flag), `D(its type)`;
+2. the count of props, then for each prop: its name, its requiredness (a flag), `D(its type)`, then, only if it has a `default`, `0x20` and the default's bytes (null `0x00`; boolean `0x01` and a flag; number `0x02` and its binary64 value, big-endian, `-0` as `0`; string `0x03` and a string; list `0x04`, a count and each element; record `0x05`, a count, and for each field in code-point order its name and value). A prop with no default hashes exactly as before, so a manifest that uses neither enums nor defaults keeps its fingerprint;
 3. the count of events, then for each event: its name, then `0x00` if it has no payload, or `0x01` and `D(its payload)`;
 4. the count of commands, then for each command: its name, the count of its parameters, then `D(each parameter's type)`, in parameter order;
 5. the count of scope names, then for each: its name, `D(its type)`.
@@ -416,10 +418,11 @@ A composite's template reads its own scope names. Those names are bound by the c
 
 1. every scope name `s` of `C` must be bound by a prop of `C` with the same name;
 2. the binding must be sound. With the prop declared as type `P`, and `s` of type `S`:
-   - if the prop is required, `is_assignable(P, S)` must hold (§9.3);
-   - if it's optional, `is_assignable(P?, S)` must hold (or `is_assignable(P, S)`, when `P` is already optional), because an unwritten prop binds absence.
+   - if the prop declares a `default`, `is_assignable(P, S)` must hold (§9.3): an unwritten prop binds the default, which is a `P`, so this holds by construction when the scope name has the prop's own type, and rule 4b needs no `P?` for it;
+   - otherwise, if the prop is required, `is_assignable(P, S)` must hold;
+   - if it's optional and has no default, `is_assignable(P?, S)` must hold (or `is_assignable(P, S)`, when `P` is already optional), because an unwritten prop binds absence.
 
-At runtime, each written prop's value is evaluated in the enclosing template and checked against the prop's declared type (§9.7.6). An unwritten prop binds absent. A prop with no scope name of the same name is evaluated, and then not used.
+At runtime, each written prop's value is evaluated in the enclosing template and checked against the prop's declared type (§9.7.6). An unwritten prop binds its `default` if it declares one, otherwise absent. A `default` is applied only when the occurrence expands as a composite: on a primitive occurrence it is ignored, and nothing is added to the render tree for it, so a renderer sees exactly the props the template wrote. A prop with no scope name of the same name is evaluated, and then not used.
 
 Only the root template's scope comes from the snapshot. The root component's own props play no part. The root is exempt from the binding rules, unless it is also used as a composite occurrence somewhere, which is then a cycle (rule 5).
 

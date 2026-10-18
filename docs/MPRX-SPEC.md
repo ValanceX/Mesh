@@ -447,6 +447,7 @@ Everything here is an **error**, and nothing is checked more loosely to let a fi
 | `string`, `number`, `boolean` | primitive values |
 | `null` | the value `null`: an ordinary value with its own type, **not** absence |
 | `any` | any **present** value; it doesn't include absence |
+| `enum` (`"a" \| "b"`) | a string that is one of a fixed set of 1 to 256 distinct values; a set, whose order is used only to word messages |
 | `list<T>` | lists whose elements are all `T` |
 | records, `{ f: T, g?: U }` | objects with exactly the declared fields; each field has a type and its own requiredness |
 | named types | exactly their definition in the manifest's `types` (aliases: compatibility is structural, never nominal) |
@@ -454,7 +455,7 @@ Everything here is an **error**, and nothing is checked more loosely to let a fi
 
 Two more types exist only inside the checker and can't be written in a manifest: `void`, the type of a command invocation, which fits nowhere, not even `any`; and `nothing`, the element type of `[]`, which fits everywhere.
 
-**Absence** is the lack of a value. `T?` means "`T`, or absent", not "`T` or `null`". MPRX has no literal for absence and no presence test, so an absent value can only come from the manifest (a `T?` scope name, field or payload, or a field that isn't required), and can only go where `T?` (or `any?`) is accepted. Absence is never `null`: how it crosses into and out of the runtime is §9.8's.
+**Absence** is the lack of a value. `T?` means "`T`, or absent", not "`T` or `null`". MPRX has no literal for absence. It has a presence test, `has(x)`, and a default, `x ?? y` (§9.4), but no way to *make* an absent value: one can only come from the manifest (a `T?` scope name, field or payload, or a field that isn't required), and can only go where `T?` (or `any?`) is accepted, or be tested or defaulted. Absence is never `null`: how it crosses into and out of the runtime is §9.8's.
 
 **Requiredness** belongs to a prop's or field's declaration, not to its type, and is independent of absence:
 
@@ -479,6 +480,7 @@ Two more types exist only inside the checker and can't be written in a manifest:
 4. `actual` is `any`: **yes**. `any` is unchecked against the value's type, never against absence.
 5. `actual` is `nothing`: **yes**.
 6. Both are primitive (`string`, `number`, `boolean`, `null`): **yes** if they are the same type. There are no coercions.
+6a. Enums: an enum to `string`: **yes**; an enum `A` to an enum `B`: **yes** if every value of `A` is a value of `B`; `string` to an enum: **no**, except at a literal site (§9.4), where a string literal that is one of the values is the enum's type.
 7. `list<T>` to `list<U>`: `is_assignable(T, U)`. Lists are covariant, which is sound because MPRX values are never mutated.
 8. Record to record, comparing **declarations**: yes if every field `expected` declares required is declared required in `actual` with an assignable type; every field `expected` declares optional has an assignable type if `actual` declares it at all; and `actual` declares no field `expected` lacks. So `f?: T` and `f: T?` are not interchangeable, either way round.
 9. Anything else: **no**.
@@ -491,7 +493,8 @@ So `any` fits `T`, `any?` doesn't fit `T` but fits `T?`, and `T?` doesn't fit `a
 2. Optionality: `join(T?, U)`, `join(T, U?)` and `join(T?, U?)` are all `join(T, U)?`, if `join(T, U)` exists. Optionality is never discarded, so `join(any, T?)` is `any?`.
 3. `join(nothing, X)` and `join(X, nothing)` are `X`.
 4. `join(any, X)` and `join(X, any)` are `any`.
-5. Structurally identical types: that type. Records are identical only if they declare the same fields, each with the same requiredness and an identical type.
+5. Structurally identical types: that type. (Two enums are identical when they have the same set of values, in any order.)
+5a. Two enums: the enum of the union of their values. An enum and `string`: `string`. Records are identical only if they declare the same fields, each with the same requiredness and an identical type.
 6. `join(list<T>, list<U>)` is `list<join(T, U)>`.
 7. Anything else: none.
 
@@ -512,6 +515,8 @@ Every expression has a type, computed bottom-up. "Needs `T`" means `is_assignabl
 | `x + y`, `x - y`, `x * y`, `x / y`, `x % y` | both need `number`; gives `number` |
 | `x < y`, `x <= y`, `x > y`, `x >= y` | both need `number`; gives `boolean` |
 | `x && y`, `x \|\| y` | both need `boolean`; gives `boolean` |
+| `has(x)` | `x` may be of any type, optional included; gives `boolean` |
+| `x ?? y` | `y` must be present; `join(x without its optionality, y)` must exist; gives that type, never absent |
 | `x == y`, `x != y` | `join(x, y)` must exist; gives `boolean` |
 | `c ? a : b` | `c` needs `boolean`; gives `join(a, b)` |
 | `[]` | `list<nothing>` |
@@ -522,6 +527,9 @@ Every expression has a type, computed bottom-up. "Needs `T`" means `is_assignabl
 
 - **`+` is numeric only.** There is no string concatenation: text content already interleaves text and expressions.
 - **Member access `a.f`:** on a record, the field's type as read (§9.2), or `unknown-member` at `f` if there is no such field; on `any`, `any`; on `T?` (`any?` included), `possibly-absent-access` at `a`, since MPRX has no optional chaining; on anything else (primitives, lists, `null`), `unknown-member` at `f`: there are no built-in members.
+- **`has(x)`** is `true` when `x` is present and `false` when it is absent; `null` is present. It is an expression, not a command: wherever a command invocation is allowed (a handler), `has(...)` is still a command call, and `has` is not a reserved word. A `has` with other than one argument is a `syntax-error`. Testing a type that cannot be absent is the warning `redundant-presence-test`.
+- **`x ?? y`** is `x` if `x` is present, otherwise `y`; `y` is evaluated only then. Its precedence is between `?:` and `||`, and it associates to the left. If `x` cannot be absent, `y` is never used: the warning `redundant-default`. `y` must be present: an optional `y` is the existing `type-mismatch` ("which may be absent"), so the result of `??` is never absent. It does not narrow `x`.
+- **Literal sites.** A string literal is checked against an enum, not just typed `string`, in these places: an attribute value, an operand of `==` or `!=` when the other side is an enum, a branch of `?:`, an element of an array, and the right side of `??`, whenever the type expected there is an enum (or an optional one). A literal that is not one of the values is `unknown-variant` at the literal, with a help line when a value is close. Nowhere else is a string a variant: there is no narrowing, so `x == "a"` does not make a `string` an enum.
 - **Common types:** equality, a conditional's branches and an array's elements with no common type are `no-common-type`: at the whole comparison, at the whole conditional, or at the first element that has none with the elements before it.
 - **Object keys:** a repeated key is `duplicate-object-key` at each earlier occurrence, and the last occurrence counts, as for attributes (§3). An earlier occurrence's value is still typed, but isn't part of the object's type.
 
@@ -735,6 +743,8 @@ A value may cross a boundary, in either direction, only if it is one of these:
 - a string of Unicode scalar values;
 - a list of such values, with **no absent elements**;
 - a record: a set of named fields, each such a value.
+
+**An enum** is a string at the boundary: it crosses exactly as a string does, and the host's value is checked against the enum's values where it enters (a snapshot field, an event payload, a value read through `any`). A string that is not one of them is the existing `runtime-value-mismatch`, `runtime-prop-mismatch` or `runtime-argument-mismatch`; there is no enum-specific runtime code. The render tree and the patch format are unchanged by enums.
 
 **Absence** crosses only as the omission of a named entry: a scope name, a record field, a prop, or a command argument position. A record's absent field is the same as having no such field.
 
