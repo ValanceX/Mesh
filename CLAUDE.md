@@ -20,4 +20,5 @@ This repo is part of the ValanceX ecosystem (Valance, Nexus, Mesh, Port). Every 
 **Working rules**
 - A change that cannot be placed in a tier, or that matches an anti-pattern, is a finding for the owner: report it, do not ship it quietly.
 - If this and another document disagree, record the disagreement; do not resolve it silently.
-- Related: the API Design Principles v1.0 (Mesh `docs/standards/api-design-principles.md`) are the detailed rules; the first validation is Valance `docs/north-star-validation-2026-10-19.md`.
+- Score a public-API change with the Valance `docs/NORTH_STAR_SCORECARD.md` (0 to 100, 19 audits): no touched audit may regress, no new Fail ships, and the change states the audits touched with before and after. The current baseline is Valance `docs/north-star-validation-2026-10-19.md`.
+- Related: the API Design Principles v1.0 (Mesh `docs/standards/api-design-principles.md`) are the detailed rules.
