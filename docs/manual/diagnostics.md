@@ -1280,6 +1280,18 @@ Dispatch was given a handler identifier of the render's program that names no ha
 
 Location: `handler`.
 
+### `runtime-unknown-instance`
+
+`raise` was given a unit occurrence key that names no unit occurrence in the render: the occurrence is not in the tree (a conditional hid it, or its item left the list), or the key is another program's.
+
+Location: `handler` (the key stands where a handler identifier does).
+
+### `runtime-unknown-event`
+
+`raise` was given an event that the occurrence's component does not declare.
+
+Location: `handler`.
+
 ### Evaluation errors
 
 These are reported by evaluation, one per call, located at the span of the value checked (§9.7.6). A clean check guarantees none of the type checks can fail, except where a value has type `any` or `any?`.

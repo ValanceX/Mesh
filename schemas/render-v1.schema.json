@@ -201,6 +201,16 @@
               }
             ]
           }
+        },
+        "instance": {
+          "description": "For a command of a component's unit (manifest `unit`): the occurrence it is for, by the key the render gave it. The host holds the unit's state per occurrence.",
+          "type": "string"
+        },
+        "controlled": {
+          "description": "With `instance`: the unit's fields that the caller owned when the event was dispatched. The host does not apply the command's change to them.",
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
         }
       },
       "required": [

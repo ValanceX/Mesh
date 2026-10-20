@@ -10,19 +10,21 @@ use crate::program::{
     COMPOSITE, CONDITIONAL, FRAGMENT, FRAGMENT_COMPONENT, NODE, SLOT,
 };
 use crate::render::{
-    bind, is_live, render_children, snapshot_values, statics, Link, Render, RenderChild,
+    bind, is_live, render_children, snapshot_values, statics, Instance, Link, Render, RenderChild,
 };
 use crate::tree::Intent;
 use crate::types::fits;
-use crate::value::{HostRecord, HostValue, Value};
+use crate::value::{HostRecord, HostValue, Units, Value};
 use mesh_template::Element;
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 /// Where a handler is: the composite occurrences on the way to its node,
 /// each in the template it's in, then the node and the event.
 struct Site<'v> {
-    /// (the template's component, the composite occurrence in it).
-    composites: Vec<(&'v str, &'v Element)>,
+    /// (the template's component, the composite occurrence in it, and its key when its component
+    /// has a unit).
+    composites: Vec<(&'v str, &'v Element, Option<String>)>,
     /// The template the node is in.
     component: &'v str,
     node: &'v Element,
@@ -34,6 +36,8 @@ struct Site<'v> {
     /// written in, when a render recorded them (a handler that forwards an
     /// event needs them); a walk of the program derives them from `composites`.
     chain: Option<&'v [Link<'v>]>,
+    /// The unit occurrence whose template the node is in, when a render recorded it.
+    instance: Option<Rc<Instance>>,
 }
 
 /// Every handler of the program, by identifier: a walk of its structure,
@@ -66,7 +70,7 @@ fn walk<'v>(
     element: &'v Element,
     position: usize,
     path: &mut Vec<Step>,
-    composites: &mut Vec<(&'v str, &'v Element)>,
+    composites: &mut Vec<(&'v str, &'v Element, Option<String>)>,
     frames: &mut Frames<'v>,
     found: &mut BTreeMap<String, Site<'v>>,
 ) {
@@ -77,7 +81,12 @@ fn walk<'v>(
             component: element.component.clone(),
         });
         frames.push((composites.len(), component, element));
-        composites.push((component, element));
+        let instance = valid
+            .component(&element.component)
+            .unit
+            .is_some()
+            .then(|| program::key(&valid.identity, path));
+        composites.push((component, element, instance));
         walk(
             valid,
             &template.component,
@@ -110,7 +119,7 @@ fn walk<'v>(
         component: element.component.clone(),
     });
     let key = program::key(&valid.identity, path);
-    let around: Vec<(&str, &Element)> = composites.iter().map(|(c, o)| (*c, *o)).collect();
+    let around: Vec<(&str, &Element)> = composites.iter().map(|(c, o, _)| (*c, *o)).collect();
     for binding in &element.events {
         // A handler that forwards an event nothing handles has no identifier.
         if !is_live(valid, component, &binding.command, &around) {
@@ -125,6 +134,7 @@ fn walk<'v>(
                 event: &binding.event,
                 values: None,
                 chain: None,
+                instance: None,
             },
         );
     }
@@ -138,7 +148,7 @@ fn walk_children<'v>(
     component: &'v str,
     element: &'v Element,
     path: &mut Vec<Step>,
-    composites: &mut Vec<(&'v str, &'v Element)>,
+    composites: &mut Vec<(&'v str, &'v Element, Option<String>)>,
     frames: &mut Frames<'v>,
     found: &mut BTreeMap<String, Site<'v>>,
 ) {
@@ -215,13 +225,14 @@ pub fn dispatch(
     payload: Option<&HostValue>,
 ) -> Result<Intent, Vec<RuntimeDiagnostic>> {
     let (templates, root) = render.program();
-    dispatch_from(
+    dispatch_from_units(
         &Program {
             root,
             templates: &templates,
         },
         &render.model,
         &render.host_snapshot(),
+        &render.units,
         handler,
         payload,
     )
@@ -239,6 +250,26 @@ pub fn dispatch_from(
     program: &Program<'_>,
     model: &str,
     snapshot: &HostRecord,
+    handler: &str,
+    payload: Option<&HostValue>,
+) -> Result<Intent, Vec<RuntimeDiagnostic>> {
+    dispatch_from_units(
+        program,
+        model,
+        snapshot,
+        &Rc::new(Units::default()),
+        handler,
+        payload,
+    )
+}
+
+/// [`dispatch_from`], for a render made with the state of unit occurrences: they are given again, as
+/// they were, so that the handler's arguments are evaluated against what the person saw.
+pub fn dispatch_from_units(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Rc<Units>,
     handler: &str,
     payload: Option<&HostValue>,
 ) -> Result<Intent, Vec<RuntimeDiagnostic>> {
@@ -262,7 +293,7 @@ pub fn dispatch_from(
     let recorded;
     let sites;
     let site = if repeats {
-        recorded = crate::render::tree(&valid, snapshot, true, None)?.1;
+        recorded = crate::render::tree(&valid, snapshot, true, None, units)?.sites;
         recorded.get(handler).map(|found| Site {
             composites: Vec::new(),
             component: &found.component,
@@ -270,6 +301,7 @@ pub fn dispatch_from(
             event: found.event,
             values: Some(&found.values),
             chain: Some(&found.chain),
+            instance: found.instance.clone(),
         })
     } else {
         sites = self::sites(&valid);
@@ -280,6 +312,7 @@ pub fn dispatch_from(
             event: found.event,
             values: None,
             chain: None,
+            instance: None,
         })
     };
     let Some(site) = site.as_ref() else {
@@ -295,7 +328,7 @@ pub fn dispatch_from(
     // inputs can't be rendered there is no tree to check against, and step 3
     // reports what is wrong with them.
     if uses_conditional(&valid.templates) {
-        if let Ok(rendered) = crate::render::render(program, model, snapshot) {
+        if let Ok(rendered) = crate::render::render_units(program, model, snapshot, units) {
             if !handlers(&rendered.tree().root).contains(handler) {
                 return Err(vec![RuntimeDiagnostic::new(
                     RuntimeCode::UNKNOWN_HANDLER,
@@ -343,26 +376,36 @@ pub fn dispatch_from(
         let mut values = root_values;
         // The occurrences around the node, outermost first, with the scope
         // each was written in.
-        let mut around: Vec<(String, &Element, BTreeMap<String, Value>)> = Vec::new();
+        let mut around: Vec<Around<'_>> = Vec::new();
+        // The unit occurrence whose template the handler's node is in.
+        let mut owner = site.instance.clone();
         match site.chain {
             Some(recorded) => {
                 for link in recorded {
-                    around.push((link.component.clone(), link.occurrence, link.values.clone()));
+                    around.push((
+                        link.component.clone(),
+                        link.occurrence,
+                        link.values.clone(),
+                        link.instance.clone(),
+                    ));
                 }
             }
             None => {
-                for (component, occurrence) in &site.composites {
+                for (component, occurrence, key) in &site.composites {
                     let scope = Scope {
                         component,
                         values: &values,
                         payload: None,
                         statics: statics(&valid, component, None),
                     };
-                    let bound = bind(&valid, &scope, occurrence)?;
+                    let (bound, instance) =
+                        bind(&valid, &scope, occurrence, key.as_deref(), units)?;
+                    owner.clone_from(&instance);
                     around.push((
                         (*component).to_string(),
                         *occurrence,
                         std::mem::replace(&mut values, bound),
+                        instance,
                     ));
                 }
             }
@@ -384,42 +427,65 @@ pub fn dispatch_from(
             .commands
             .contains_key(&binding.command)
         {
-            return intent_of(&valid, &scope, site.component, binding);
+            return intent_of(&valid, &scope, site.component, binding, owner.as_deref());
         }
         // A forward: the event is one of the component's own. Its value is
         // the handler's argument, if the event has a payload.
-        let mut component = site.component.to_string();
-        let mut name = binding.command.as_str();
-        let mut carried = forwarded(&valid, &scope, &component, binding)?;
-        loop {
-            let (caller, occurrence, caller_values) = around
-                .pop()
-                .expect("a live forward has an occurrence that binds it");
-            let bound = occurrence
-                .events
-                .iter()
-                .find(|bound| bound.event == name)
-                .expect("a live forward's occurrence binds the event");
-            let event_type = valid.component(&component).events[name].payload.as_ref();
-            let scope = Scope {
-                component: &caller,
-                values: &caller_values,
-                payload: Some(&carried),
-                statics: statics(&valid, &caller, event_type),
-            };
-            if valid
-                .component(&caller)
-                .commands
-                .contains_key(&bound.command)
-            {
-                return intent_of(&valid, &scope, &caller, bound);
-            }
-            carried = forwarded(&valid, &scope, &caller, bound)?;
-            name = bound.command.as_str();
-            component = caller;
-        }
+        let carried = forwarded(&valid, &scope, site.component, binding)?;
+        Ok(deliver(
+            &valid,
+            &mut around,
+            site.component.to_string(),
+            &binding.command,
+            carried,
+        )?
+        .expect("a live forward has an occurrence that binds it"))
     };
     evaluate().map_err(|diagnostic| vec![diagnostic])
+}
+
+/// A composite occurrence around the place an event is raised: the component whose template it is
+/// in, the occurrence, the scope it was written in, and the occurrence of that template as a unit.
+type Around<'v> = (String, &'v Element, BTreeMap<String, Value>, Option<Rc<Instance>>);
+
+/// Delivers the event `name` of `component`, carrying `carried`, out through the occurrences in
+/// `around` (innermost last) until one binds it to a command of the template it is written in:
+/// that command's intent. `None` when an occurrence on the way does not bind the event, or there
+/// is none left: nothing handles it.
+fn deliver<'v>(
+    valid: &Valid,
+    around: &mut Vec<Around<'v>>,
+    mut component: String,
+    mut name: &'v str,
+    mut carried: Value,
+) -> Result<Option<Intent>, RuntimeDiagnostic> {
+    loop {
+        let Some((caller, occurrence, caller_values, _)) = around.pop() else {
+            return Ok(None);
+        };
+        // The template the event is forwarded into is the one around the occurrence just left.
+        let owner = around.last().and_then(|(.., instance)| instance.clone());
+        let Some(bound) = occurrence.events.iter().find(|bound| bound.event == name) else {
+            return Ok(None);
+        };
+        let event_type = valid.component(&component).events[name].payload.as_ref();
+        let scope = Scope {
+            component: &caller,
+            values: &caller_values,
+            payload: Some(&carried),
+            statics: statics(valid, &caller, event_type),
+        };
+        if valid
+            .component(&caller)
+            .commands
+            .contains_key(&bound.command)
+        {
+            return intent_of(valid, &scope, &caller, bound, owner.as_deref()).map(Some);
+        }
+        carried = forwarded(valid, &scope, &caller, bound)?;
+        name = bound.command.as_str();
+        component = caller;
+    }
 }
 
 /// The command intent of `binding`, a binding of a command of `component`, in `scope`.
@@ -428,6 +494,7 @@ fn intent_of(
     scope: &Scope<'_, '_>,
     component: &str,
     binding: &mesh_template::EventBinding,
+    owner: Option<&Instance>,
 ) -> Result<Intent, RuntimeDiagnostic> {
     let command = &valid.component(component).commands[&binding.command];
     let mut arguments = Vec::with_capacity(binding.arguments.len());
@@ -451,10 +518,19 @@ fn intent_of(
             value => Some(output(&value).map_err(|why| scope.error(why.code, why.message, span))?),
         });
     }
+    // A command of the component's unit is for the occurrence whose template this is.
+    let of_unit = valid
+        .component(component)
+        .unit
+        .as_ref()
+        .is_some_and(|unit| unit.commands.contains(&binding.command));
+    let owner = owner.filter(|_| of_unit);
     Ok(Intent {
         component: component.to_string(),
         command: binding.command.clone(),
         arguments,
+        instance: owner.map(|owner| owner.key.clone()),
+        controlled: owner.map_or_else(Vec::new, |owner| owner.controlled.clone()),
     })
 }
 
@@ -487,4 +563,98 @@ fn forwarded(
         ));
     }
     Ok(value)
+}
+
+/// [`raise_from_units`], against a [`Render`] the host holds.
+pub fn raise(
+    render: &Render,
+    instance: &str,
+    event: &str,
+    payload: Option<&HostValue>,
+) -> Result<Option<Intent>, Vec<RuntimeDiagnostic>> {
+    let (templates, root) = render.program();
+    raise_from_units(
+        &Program {
+            root,
+            templates: &templates,
+        },
+        &render.model,
+        &render.host_snapshot(),
+        &render.units,
+        instance,
+        event,
+        payload,
+    )
+}
+
+/// Raises the event `event` of the unit occurrence `instance`, carrying `payload` (absent when
+/// `None`), against the render the host holds: what the occurrence's unit announces to its caller
+/// (docs/manual/runtime.md, "Units"). The result is the intent of the handler the caller bound to
+/// the event, found as a handler is when the event is forwarded out through occurrences; `None` when
+/// the caller bound none. Nothing is rendered.
+///
+/// `Err` when the program, snapshot or units are not valid, the instance is not in the render, its
+/// component declares no such event, or the payload does not fit the event's.
+pub fn raise_from_units(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Rc<Units>,
+    instance: &str,
+    event: &str,
+    payload: Option<&HostValue>,
+) -> Result<Option<Intent>, Vec<RuntimeDiagnostic>> {
+    let valid = program::validate(program, model)?;
+    let rendered = crate::render::tree(&valid, snapshot, true, None, units)?;
+    let Some(found) = rendered.occurrences.get(instance) else {
+        return Err(vec![RuntimeDiagnostic::new(
+            RuntimeCode::UNKNOWN_INSTANCE,
+            "this key names no unit occurrence in this render",
+            Location::Handler,
+        )]);
+    };
+    let component = found.occurrence.component.as_str();
+    let Some(declared) = valid.component(component).events.get(event) else {
+        return Err(vec![RuntimeDiagnostic::new(
+            RuntimeCode::UNKNOWN_EVENT,
+            format!("`{component}` declares no event `{event}`"),
+            Location::Handler,
+        )]);
+    };
+    let mut inputs = Inputs::new(&valid.manifest);
+    let carried = match (&declared.payload, payload) {
+        (None, None) => Value::Absent,
+        (None, Some(_)) => {
+            inputs.report(
+                RuntimeCode::UNEXPECTED_PAYLOAD,
+                &[PathSegment::Name("$event".into())],
+                format!("`{component}`'s `{event}` event has no payload, but one was given"),
+            );
+            Value::Absent
+        }
+        (Some(ty), payload) => inputs.value(payload, ty, &mut vec![PathSegment::Name("$event".into())]),
+    };
+    let diagnostics = inputs.sorted();
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+    let mut around: Vec<Around<'_>> = found
+        .chain
+        .iter()
+        .map(|link| {
+            (
+                link.component.clone(),
+                link.occurrence,
+                link.values.clone(),
+                link.instance.clone(),
+            )
+        })
+        .collect();
+    around.push((
+        found.component.clone(),
+        found.occurrence,
+        found.values.clone(),
+        Some(Rc::clone(&found.instance)),
+    ));
+    deliver(&valid, &mut around, component.to_string(), event, carried).map_err(|d| vec![d])
 }

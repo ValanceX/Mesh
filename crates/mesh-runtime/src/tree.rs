@@ -5,6 +5,7 @@
 //! `serde_json::Value`s: `null`, booleans, finite numbers (never `-0`),
 //! strings, lists and records.
 
+use crate::render::Instance;
 use crate::value::Value as Scoped;
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
@@ -56,6 +57,9 @@ pub(crate) struct Memo {
     pub runs: Vec<Run>,
     /// What each repeat among this node's children was made from.
     pub repeats: Vec<RepeatMemo>,
+    /// The unit occurrences below this node, with the host state each was rendered from: a node is
+    /// not kept when one of them has other state, and keeps listing them when it is.
+    pub units: Vec<Rc<Instance>>,
 }
 
 /// A text run under a node: its key, the values it was computed from, and its text.
@@ -86,6 +90,8 @@ pub(crate) struct RepeatItem {
     pub free: Vec<(String, Scoped)>,
     /// The text runs of an item that is a fragment, so a reused item keeps them for the next update.
     pub runs: Vec<Run>,
+    /// The unit occurrences in the item, as `Memo::units` has them for a node.
+    pub units: Vec<Rc<Instance>>,
 }
 
 impl PartialEq for Memo {
@@ -148,18 +154,30 @@ pub struct Intent {
     /// One per parameter, in order: `None` is absent, distinct from
     /// `Some(null)`.
     pub arguments: Vec<Option<Value>>,
+    /// For a command of a unit: the occurrence it is for, by the key the render gave it.
+    pub instance: Option<String>,
+    /// For a command of a unit: the fields of the occurrence the caller owned when the event was
+    /// dispatched, whose change the host must not apply (docs/manual/runtime.md, "Units").
+    pub controlled: Vec<String>,
 }
 
 impl Intent {
     /// The intent in docs/manual/runtime.md's form (`$defs/intent`).
     pub fn to_json(&self) -> String {
-        json!({
+        let mut intent = json!({
             "command": { "component": self.component, "name": self.command },
             "arguments": self.arguments.iter().map(|argument| match argument {
                 Some(value) => json!({ "value": value }),
                 None => json!({ "absent": true }),
             }).collect::<Vec<_>>(),
-        })
-        .to_string()
+        });
+        // Present exactly for a command of a unit, so any other intent is written as it was.
+        if let Some(instance) = &self.instance {
+            intent["instance"] = json!(instance);
+            if !self.controlled.is_empty() {
+                intent["controlled"] = json!(self.controlled);
+            }
+        }
+        intent.to_string()
     }
 }

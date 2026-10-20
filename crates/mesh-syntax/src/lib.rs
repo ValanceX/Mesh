@@ -1172,6 +1172,7 @@ mod tests {
                 "manifest-duplicate-variant",
                 "manifest-snippet-misplaced",
                 "manifest-children-not-snippet",
+                "manifest-unit-clash",
                 "manifest-missing-component",
                 "unknown-component",
                 "unknown-prop",

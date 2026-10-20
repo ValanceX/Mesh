@@ -75,7 +75,7 @@ impl<'m> Inputs<'m> {
         }
     }
 
-    fn report(&mut self, code: RuntimeCode, path: &[PathSegment], message: String) {
+    pub(crate) fn report(&mut self, code: RuntimeCode, path: &[PathSegment], message: String) {
         self.diagnostics.push(RuntimeDiagnostic::new(
             code,
             message,
