@@ -4,6 +4,11 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Changed
+
+- **The release publishes `@valancex/mesh-conformance`.** The conformance vectors package (the renderers' test dependency; PORT depends on `^0.14.0`) was never in the release workflow, so 0.14.0 was published without it. `.github/scripts/publish.mjs` now lists it as the ninth package and the workflow packs it. Its first version is published by hand (a package that does not exist cannot have a trusted publisher): `cd packages/mesh-conformance && npm publish --access public`, at the version of the release.
+- **The runtime's WebAssembly is optimized after linking** with binaryen's `wasm-opt -O2` with inlining off (`@valancex/mesh-runtime`'s `build:wasm`): 817,965 bytes become 700,870, gzipped 248,984 become 234,818, and brotli, which is what a site ships, 181,837 become 176,389 (-3.0 percent). The flags are chosen by brotli: `-Oz` (the compiler's) makes this module's brotli 1.4 percent larger. The runtime's tests, the conformance vectors and the replay hashes are unchanged.
+
 ## [0.14.0] - 2026-10-18
 
 Prepared, not yet published. The first new types and the first new template construct since 0.10: enum types, presence tests and defaults (`template-v2` for the two expressions), snippets, and the limits and fixes of direction work package 0. In the free window: each break names its replacement in a diagnostic. A program, a manifest and a template that use none of the new constructs compile and render as they did in 0.13.0, with the same fingerprint, tree and keys (tested against the published 0.13.0).
