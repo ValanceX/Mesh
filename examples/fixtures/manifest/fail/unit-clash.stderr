@@ -1,0 +1,5 @@
+error[manifest-unit-clash]: the unit's state field `open` is also a scope name of the component
+  --> fixtures/manifest/fail/unit-clash.json:11:20
+   |
+11 |         "state": { "open": { "type": { "kind": "boolean" }, "default": false } }
+   |                    ^^^^^^

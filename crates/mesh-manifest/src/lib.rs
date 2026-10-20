@@ -137,6 +137,34 @@ pub struct Component {
     /// Every name an expression in the component's own template can
     /// reference, and its type. Nothing else is in scope.
     pub scope: BTreeMap<String, Type>,
+    /// The state and commands that belong to one occurrence of this composite, if it has any
+    /// (a *unit*, docs/manual/manifest.md). Its state names are also in `scope` and its
+    /// commands also in `commands`: the template reads and invokes them like any others, so
+    /// checking needs nothing more. The runtime needs this to tell them apart from the rest.
+    pub unit: Option<Unit>,
+}
+
+/// The state and commands of one occurrence of a composite: declared with the composite, held by
+/// the host per occurrence, and not part of the snapshot.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unit {
+    /// The state fields, each with the value an occurrence has before anything has changed it.
+    pub state: BTreeMap<String, UnitField>,
+    /// The names, among the component's `commands`, that are the unit's.
+    pub commands: std::collections::BTreeSet<String>,
+}
+
+/// One field of a unit's state.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnitField {
+    pub ty: Type,
+    /// The value of an occurrence the host has no state for.
+    pub default: Constant,
+    /// Whether the caller may own the value: a prop of the same name, when written, is the value
+    /// and the occurrence's own change to it is not applied.
+    pub controllable: bool,
 }
 
 /// A declaration a template can name, to look its span up with
@@ -268,6 +296,7 @@ fn built_in_components() -> &'static BTreeMap<String, Component> {
             events: BTreeMap::new(),
             commands: BTreeMap::new(),
             scope: BTreeMap::new(),
+            unit: None,
         };
 
         BTreeMap::from([

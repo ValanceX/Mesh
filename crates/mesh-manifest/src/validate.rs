@@ -24,7 +24,7 @@
 use crate::json::{Json, Member, Value};
 use crate::{
     Command, Component, Constant, DeclarationKey, Event, Field, Manifest, Parameter, Type,
-    MAX_ENUM_VALUES, VERSION,
+    Unit, UnitField, MAX_ENUM_VALUES, VERSION,
 };
 use mesh_syntax::{Diagnostic, DiagnosticCode, Severity, Span};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -246,7 +246,7 @@ impl Validator {
     fn component(&mut self, name: &str, json: &Json) -> Option<Component> {
         let what = format!("component {name:?}");
         let properties =
-            self.object(json, &what, &["props", "events", "commands", "scope"], &[])?;
+            self.object(json, &what, &["props", "events", "commands", "scope"], &["unit"])?;
         let owner = format!("component {name:?}");
 
         let mut props = Some(BTreeMap::new());
@@ -307,11 +307,139 @@ impl Validator {
             }
         }
 
+        let mut props = props?;
+        let mut commands = commands?;
+        let mut scope = scope?;
+        let unit = match properties.get("unit") {
+            Some(json) => self.unit(json, name, &props, &mut commands, &mut scope),
+            None => None,
+        };
+
         Some(Component {
-            props: props?,
+            props: std::mem::take(&mut props),
             events: events?,
-            commands: commands?,
-            scope: scope?,
+            commands,
+            scope,
+            unit,
+        })
+    }
+
+    /// A component's `unit`: `{ "state": { name: { "type", "default", "controllable"? } }, "commands": { name:
+    /// { "parameters": [...] } } }`. The state names join `scope`, and the commands join `commands`.
+    fn unit(
+        &mut self,
+        json: &Json,
+        component: &str,
+        props: &BTreeMap<String, Field>,
+        commands: &mut BTreeMap<String, Command>,
+        scope: &mut BTreeMap<String, Type>,
+    ) -> Option<Unit> {
+        let what = format!("the unit of component {component:?}");
+        let properties = self.object(json, &what, &[], &["state", "commands"])?;
+        let owner = what.clone();
+        let mut state = BTreeMap::new();
+        let mut names = BTreeSet::new();
+
+        if let Some(json) = properties.get("state") {
+            for member in self.names(json, "state", "state field", &owner, NameRule::Identifier) {
+                let label = format!("state field {:?}", member.key);
+                let Some(fields) =
+                    self.object(&member.value, &label, &["type", "default"], &["controllable"])
+                else {
+                    continue;
+                };
+                self.snippet_allowed = false;
+                let Some(ty) = fields.get("type").and_then(|json| self.ty(json)) else {
+                    continue;
+                };
+                let default = fields.get("default").map(|json| (json.span, constant(json)));
+                let Some((span, default)) = default else {
+                    continue;
+                };
+                self.defaults.push(PendingDefault {
+                    prop: label.clone(),
+                    span,
+                    value: default.clone(),
+                    ty: ty.clone(),
+                });
+                let controllable = match fields.get("controllable") {
+                    None => false,
+                    Some(json) => match json.value {
+                        Value::Bool(value) => value,
+                        ref other => {
+                            self.error(
+                                DiagnosticCode::MANIFEST_INVALID_VALUE,
+                                json.span,
+                                format!(
+                                    "\"controllable\" must be true or false, found {}",
+                                    other.describe()
+                                ),
+                            );
+                            continue;
+                        }
+                    },
+                };
+                let clash = if scope.contains_key(&member.key) {
+                    Some("a scope name of the component".to_string())
+                } else if let Some(prop) = props.get(&member.key) {
+                    let same = prop.ty == ty || prop.ty == Type::Optional(Box::new(ty.clone()));
+                    if controllable && !prop.required && same {
+                        None
+                    } else if controllable {
+                        Some("a prop of the component that is required or of another type".to_string())
+                    } else {
+                        Some("a prop of the component (only a `controllable` field may share a prop's name)".to_string())
+                    }
+                } else {
+                    None
+                };
+                if let Some(clash) = clash {
+                    self.error(
+                        DiagnosticCode::MANIFEST_UNIT_CLASH,
+                        member.key_span,
+                        format!("the unit's state field `{}` is also {clash}", member.key),
+                    );
+                    continue;
+                }
+                let key = DeclarationKey::Scope(component.to_string(), member.key.clone());
+                self.declare(key, member.key_span);
+                scope.insert(member.key.clone(), ty.clone());
+                state.insert(
+                    member.key.clone(),
+                    UnitField {
+                        ty,
+                        default,
+                        controllable,
+                    },
+                );
+            }
+        }
+
+        if let Some(json) = properties.get("commands") {
+            for member in self.names(json, "commands", "command", &owner, NameRule::Identifier) {
+                if commands.contains_key(&member.key) || scope.contains_key(&member.key) {
+                    self.error(
+                        DiagnosticCode::MANIFEST_UNIT_CLASH,
+                        member.key_span,
+                        format!(
+                            "the unit's command `{}` is also a command or a scope name of the component",
+                            member.key
+                        ),
+                    );
+                    continue;
+                }
+                let key = DeclarationKey::Command(component.to_string(), member.key.clone());
+                self.declare(key, member.key_span);
+                if let Some(command) = self.command(&member.value, component, &member.key) {
+                    commands.insert(member.key.clone(), command);
+                    names.insert(member.key.clone());
+                }
+            }
+        }
+
+        Some(Unit {
+            state,
+            commands: names,
         })
     }
 

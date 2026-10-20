@@ -54,9 +54,36 @@
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/identifier" },
           "additionalProperties": { "$ref": "#/$defs/type" }
-        }
+        },
+        "unit": { "$ref": "#/$defs/unit" }
       },
       "required": ["props", "events", "commands", "scope"],
+      "additionalProperties": false
+    },
+    "unit": {
+      "description": "The state and commands that belong to one occurrence of a composite, held by the host per occurrence and not part of the snapshot. Its state names join the component's scope (read-only) and its commands join the component's commands; a name that is already a scope name or a command is an error (`manifest-unit-clash`). A state field may share a prop's name only if it is `controllable` and the prop is optional and of the same type: the prop, when written, is then the value.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "type": { "$ref": "#/$defs/type" },
+              "default": {},
+              "controllable": { "type": "boolean" }
+            },
+            "required": ["type", "default"],
+            "additionalProperties": false
+          }
+        },
+        "commands": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "additionalProperties": { "$ref": "#/$defs/command" }
+        }
+      },
       "additionalProperties": false
     },
     "field": {
