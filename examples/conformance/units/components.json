@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "types": {},
+  "components": {
+    "box": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "text": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "button": {
+      "props": {},
+      "events": {
+        "click": {}
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "mesh-if": {
+      "props": {
+        "when": {
+          "type": {
+            "kind": "boolean"
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "mesh-each": {
+      "props": {
+        "items": {
+          "type": {
+            "kind": "list",
+            "element": {
+              "kind": "any"
+            }
+          },
+          "required": true
+        },
+        "as": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "key": {
+          "type": {
+            "kind": "any"
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "disclosure": {
+      "props": {
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "label": {
+          "kind": "string"
+        }
+      },
+      "unit": {
+        "state": {
+          "open": {
+            "type": {
+              "kind": "boolean"
+            },
+            "default": false
+          }
+        },
+        "commands": {
+          "toggle": {
+            "parameters": []
+          }
+        }
+      }
+    },
+    "tabs": {
+      "props": {
+        "at": {
+          "type": {
+            "kind": "number"
+          },
+          "required": false
+        }
+      },
+      "events": {
+        "change": {
+          "payload": {
+            "kind": "number"
+          }
+        }
+      },
+      "commands": {},
+      "scope": {},
+      "unit": {
+        "state": {
+          "at": {
+            "type": {
+              "kind": "number"
+            },
+            "default": 0,
+            "controllable": true
+          }
+        },
+        "commands": {
+          "select": {
+            "parameters": [
+              {
+                "name": "n",
+                "type": {
+                  "kind": "number"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "page": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "chose": {
+          "parameters": [
+            {
+              "name": "n",
+              "type": {
+                "kind": "number"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "tab": {
+          "kind": "number"
+        },
+        "items": {
+          "kind": "list",
+          "element": {
+            "kind": "record",
+            "fields": {
+              "id": {
+                "type": {
+                  "kind": "string"
+                },
+                "required": true
+              },
+              "label": {
+                "type": {
+                  "kind": "string"
+                },
+                "required": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

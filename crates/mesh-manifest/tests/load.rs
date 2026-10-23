@@ -1104,3 +1104,119 @@ fn the_prop_children_is_a_snippet_with_no_parameters() {
         assert_eq!(found[0].0, DiagnosticCode::MANIFEST_CHILDREN_NOT_SNIPPET);
     }
 }
+
+/// A manifest with one component, `c`, whose unit is this JSON text and whose props are these.
+fn with_unit(props: &str, scope: &str, commands: &str, unit: &str) -> String {
+    manifest(
+        "{}",
+        &format!(
+            r#"{{ "c": {{ "props": {props}, "events": {{}}, "commands": {commands}, "scope": {scope}, "unit": {unit} }} }}"#
+        ),
+    )
+}
+
+#[test]
+fn a_unit_s_state_joins_the_scope_and_its_commands_join_the_commands() {
+    let loaded = load(&with_unit(
+        "{}",
+        "{}",
+        "{}",
+        r#"{ "state": { "open": { "type": { "kind": "boolean" }, "default": false },
+                         "at": { "type": { "kind": "number" }, "default": 0, "controllable": true } },
+             "commands": { "toggle": { "parameters": [] }, "to": { "parameters": [{ "name": "n", "type": { "kind": "number" } }] } } }"#,
+    ))
+    .expect("a unit loads");
+    let (_, declared) = loaded.component("c").unwrap();
+
+    assert_eq!(declared.scope["open"], Type::Boolean);
+    assert_eq!(declared.scope["at"], Type::Number);
+    assert!(declared.commands.contains_key("toggle") && declared.commands.contains_key("to"));
+
+    let unit = declared.unit.as_ref().expect("the component has a unit");
+
+    assert!(!unit.state["open"].controllable && unit.state["at"].controllable);
+    assert_eq!(unit.commands.len(), 2);
+    assert!(load(&component("{}", "{}", "{}", "{}"))
+        .unwrap()
+        .component("c")
+        .unwrap()
+        .1
+        .unit
+        .is_none());
+}
+
+#[test]
+fn a_unit_name_that_is_already_taken_is_refused_where_it_is_written() {
+    let state = |name: &str| {
+        format!(
+            r#"{{ "state": {{ "{name}": {{ "type": {{ "kind": "string" }}, "default": "" }} }} }}"#
+        )
+    };
+    let controllable = r#"{ "state": { "v": { "type": { "kind": "string" }, "default": "", "controllable": true } } }"#;
+    let prop = |required: bool, ty: &str| {
+        format!(r#"{{ "v": {{ "type": {ty}, "required": {required} }} }}"#)
+    };
+    let string = r#"{ "kind": "string" }"#;
+    let number = r#"{ "kind": "number" }"#;
+
+    // A scope name, a command, and a prop of the same name (not controllable).
+    for (what, source) in [
+        (
+            "a scope name",
+            with_unit("{}", r#"{ "v": { "kind": "string" } }"#, "{}", &state("v")),
+        ),
+        (
+            "a prop",
+            with_unit(&prop(false, string), "{}", "{}", &state("v")),
+        ),
+        (
+            "a command",
+            with_unit(
+                "{}",
+                "{}",
+                r#"{ "go": { "parameters": [] } }"#,
+                r#"{ "commands": { "go": { "parameters": [] } } }"#,
+            ),
+        ),
+        (
+            "a required prop",
+            with_unit(&prop(true, string), "{}", "{}", controllable),
+        ),
+        (
+            "a prop of another type",
+            with_unit(&prop(false, number), "{}", "{}", controllable),
+        ),
+    ] {
+        let found = errors(&source);
+
+        assert_eq!(found.len(), 1, "{what}: {found:?}");
+        assert_eq!(found[0].0, DiagnosticCode::MANIFEST_UNIT_CLASH, "{what}");
+    }
+
+    // A controllable field may share the name of an optional prop of its own type.
+    load(&with_unit(&prop(false, string), "{}", "{}", controllable))
+        .expect("a controllable field may share an optional prop's name");
+}
+
+#[test]
+fn a_unit_s_default_must_fit_its_type_and_a_snippet_is_not_state() {
+    let wrong = with_unit(
+        "{}",
+        "{}",
+        "{}",
+        r#"{ "state": { "open": { "type": { "kind": "boolean" }, "default": "no" } } }"#,
+    );
+    let found = errors(&wrong);
+
+    assert_eq!(found[0].0, DiagnosticCode::MANIFEST_INVALID_VALUE);
+
+    let snippet = with_unit(
+        "{}",
+        "{}",
+        "{}",
+        r#"{ "state": { "body": { "type": { "kind": "snippet", "params": [] }, "default": null } } }"#,
+    );
+    let found = errors(&snippet);
+
+    assert_eq!(found[0].0, DiagnosticCode::MANIFEST_SNIPPET_MISPLACED);
+}

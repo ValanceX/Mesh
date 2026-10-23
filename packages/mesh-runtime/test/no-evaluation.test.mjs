@@ -130,6 +130,7 @@ test("the only code that walks host values is the encoder", () => {
     { file: "changes.ts", text: "", reason: "diff walks host values to compare them, as the encoder does to encode them; the only other place" },
     { file: "engine.ts", text: "Array.isArray(program.templates)", reason: "the host's template list, checked to be an array" },
     { file: "engine.ts", text: "Array.isArray((value as", reason: "the module's result envelope has a diagnostics array" },
+    { file: "engine.ts", text: "Array.isArray(result.instances)", reason: "the module's result envelope has an instances array" },
     { file: "engine.ts", text: "Array.isArray(result.events)", reason: "the module's result envelope has an events array" },
     { file: "engine.ts", text: "Array.isArray(value)) {", reason: "the module's result document is an object" },
   ];

@@ -536,6 +536,20 @@ error[manifest-duplicate-variant]: the enum lists the value "a" twice
 
 **Fix:** delete the repeat.
 
+### `manifest-unit-clash`
+
+A component's `unit` names a state field or a command that the component already has. A state name must not be a scope name of the component, and must not be a prop's unless the field is `controllable` and the prop is optional and of the same type; a unit command must not be a command or a scope name. Points at the unit's name.
+
+```text
+error[manifest-unit-clash]: the unit's state field `open` is also a scope name of the component
+  --> examples/fixtures/manifest/fail/unit-clash.json:11:20
+   |
+11 |         "state": { "open": { "type": { "kind": "boolean" }, "default": false } }
+   |                    ^^^^^^
+```
+
+**Fix:** delete the name from `scope` (a unit's state names join the scope by themselves), or rename the unit's.
+
 ### `manifest-snippet-misplaced`
 
 A `snippet` type is somewhere but a component's prop or scope name (or an `optional` of one there). A snippet is never stored, returned or sent, so it isn't a record's field, a list's element, a named type, an event's payload, a command's parameter, or another snippet's parameter. Points at the `"snippet"`.
@@ -1263,6 +1277,18 @@ Location: `handler`.
 ### `runtime-unknown-handler`
 
 Dispatch was given a handler identifier of the render's program that names no handler in it or, in a program with a conditional, whose node isn't in the render (spec §9.10.7).
+
+Location: `handler`.
+
+### `runtime-unknown-instance`
+
+`raise` was given a unit occurrence key that names no unit occurrence in the render: the occurrence is not in the tree (a conditional hid it, or its item left the list), or the key is another program's.
+
+Location: `handler` (the key stands where a handler identifier does).
+
+### `runtime-unknown-event`
+
+`raise` was given an event that the occurrence's component does not declare.
 
 Location: `handler`.
 

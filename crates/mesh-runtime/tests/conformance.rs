@@ -678,3 +678,111 @@ macro_rules! snippet_vectors {
 snippet_vectors!(snippets, "snippets");
 snippet_vectors!(forwarder, "forwarder");
 snippet_vectors!(passing, "passing");
+
+/// `units/`: a component's state for one occurrence, which a render takes beside the snapshot (docs/manual/runtime.md, "Units").
+/// `steps.json` is a list of `{ case, snapshot, units }`; each step's committed outputs are `step-N.expected.tree.json` and
+/// `step-N.expected.instances.json` (the occurrences the render lists). An update from a step to the next, given the next's units,
+/// is the render of the next.
+mod units {
+    use super::*;
+    use mesh_runtime::Units;
+
+    fn steps() -> Vec<Value> {
+        json(&dir().join("units/steps.json"))
+            .as_array()
+            .unwrap()
+            .clone()
+    }
+
+    fn compiled() -> (String, String, Vec<String>) {
+        let here = dir().join("units");
+        let model = read(&here.join("components.json"));
+        let program = json(&here.join("program.json"));
+        let templates = program["templates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|component| {
+                let component = component.as_str().unwrap();
+                let loaded = check::Model::load(&model, component).expect("the manifest loads");
+                let compiled =
+                    check::template(&read(&here.join(format!("{component}.mprx"))), &loaded);
+                assert!(
+                    compiled.diagnostics.is_empty(),
+                    "{component}: {:#?}",
+                    compiled.diagnostics
+                );
+                mesh_template::to_json(&compiled.template.expect("it compiles"))
+            })
+            .collect();
+        (
+            program["root"].as_str().unwrap().to_string(),
+            model,
+            templates,
+        )
+    }
+
+    fn render_step(step: &Value) -> Render {
+        let (root, model, templates) = compiled();
+        let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+        let snapshot = HostRecord::from_json(&step["snapshot"].to_string()).unwrap();
+        let units = Units::from_json(&step["units"].to_string()).unwrap();
+        mesh_runtime::render_units(
+            &Program {
+                root: &root,
+                templates: &texts,
+            },
+            &model,
+            &snapshot,
+            &units,
+        )
+        .unwrap_or_else(|d| panic!("{} renders: {d:#?}", step["case"]))
+    }
+
+    fn committed(at: usize, what: &str, text: &str) {
+        let file = dir().join(format!("units/step-{at}.expected.{what}.json"));
+        if std::env::var_os("MESH_BLESS").is_some() {
+            fs::write(&file, text).unwrap();
+        } else {
+            assert_eq!(
+                read(&file),
+                text,
+                "step {at}'s {what} are the committed ones"
+            );
+        }
+    }
+
+    #[test]
+    fn every_step_renders_its_committed_tree_and_lists_its_committed_occurrences() {
+        for (at, step) in steps().iter().enumerate() {
+            let render = render_step(step);
+            committed(at, "tree", &(render.tree().to_json() + "\n"));
+            committed(at, "instances", &(render.instances_to_json() + "\n"));
+        }
+    }
+
+    #[test]
+    fn updating_from_each_step_to_the_next_with_its_units_is_the_render_of_the_next() {
+        let all = steps();
+        let mut previous = render_step(&all[0]);
+        for step in &all[1..] {
+            let record = HostRecord::from_json(&step["snapshot"].to_string()).unwrap();
+            let units = Units::from_json(&step["units"].to_string()).unwrap();
+            let updated = mesh_runtime::update_with_units(&previous, record, Some(&units))
+                .unwrap_or_else(|d| panic!("{} updates: {d:#?}", step["case"]));
+            let fresh = render_step(step);
+            assert_eq!(
+                updated.render.tree(),
+                fresh.tree(),
+                "an update to {} is its render",
+                step["case"]
+            );
+            assert_eq!(
+                updated.render.instances_to_json(),
+                fresh.instances_to_json(),
+                "and lists what it lists"
+            );
+            previous = updated.render;
+        }
+    }
+}

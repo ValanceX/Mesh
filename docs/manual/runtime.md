@@ -16,6 +16,9 @@ host ◀── command intent ◀── dispatch ◀── the render, handler i
 - **dispatch:** a render, a handler identifier and a payload in. Out: a **command intent**, or diagnostics.
 - **update:** a render and a new snapshot of the same program in. Out: the new **render** and the **patches** from the previous tree to its tree, or diagnostics ([Update](#update)).
 - **updateChanges:** a render and edits to its snapshot in. Out: as update ([Changes](#changes)).
+- **raise:** a render, a unit occurrence's key, an event and a payload in. Out: the command intent of the handler the caller bound to the event, or nothing ([Units](#units)).
+
+Render, update, updateChanges and dispatch also take the state of the component's **units**, beside the snapshot ([Units](#units)); without it, every occurrence has its defaults.
 
 Render and dispatch are the two the lifecycle below is about; `declaredEvents` (a program's declared events, below) is another, and takes no snapshot.
 
@@ -52,6 +55,7 @@ A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any p
 
 **From JavaScript,** `@valancex/mesh-runtime` has the same operations (`render`, `dispatch` and `update`, and `declaredEvents`, below): `render({ program: { root, templates }, model, snapshot })` resolves to `{ render }` or `{ diagnostics }`, and `dispatch(render, handler, payload?)` to `{ intent }` or `{ diagnostics }`. `update(render, snapshot)` resolves to `{ render, patches }` or `{ diagnostics }` (see [Update](#update)), and `declaredEvents({ program, model })` resolves to a program's [declared events](#the-declared-events) or `{ diagnostics }`. `render.tree` is the render tree, frozen. Its [README](../../packages/mesh-runtime/README.md) has the details. What a JavaScript host needs to know about its values (§9.8.6):
 - The package **encodes, and never judges.** (The one tree it reads is `update`'s: it applies the patches the module returns to the previous render's tree, as a renderer would, moving parts by key and reading no value, so that an update costs what changed and not the size of the tree. The package's review test names that file, and `changes.ts` (the host-side `diff`, which compares two host snapshots for sameness and is on no path of render, update or dispatch), as its only exceptions.) Every value reaches the runtime, which reports what it can't accept: NaN, the infinities, a hole or `undefined` in an array, an unpaired surrogate, a `Map`, a `Date`, a class instance, a function, a `bigint` or a value that contains itself. So a JavaScript host gets exactly the diagnostics a native host gets for the same values.
+- **Units** are an object of objects, the occurrence's key and its state: `render({ program, model, snapshot, units })`, `update(previous, snapshot, units)` and `updateChanges(previous, changes, { units })`. An update without them keeps the previous render's. `render.instances` lists the occurrences (`{ instance, component, state, controlled? }`), and `raise(render, instance, event, payload)` resolves to `{ intent }` (`intent` is `undefined` when the caller bound no handler to the event) or `{ diagnostics }`. See [Units](#units).
 - A missing property and a property that is `undefined` are both absent. A payload that isn't given is absent too.
 - `-0` crosses in as `-0`, and never comes out (§9.8.2).
 - A render keeps its snapshot as it was encoded when `render` was called, so changing the host's objects afterwards changes nothing.
@@ -285,6 +289,26 @@ Which binding one interaction reaches is MESH's rule (§9.9), the same on every 
 So one interaction gives at most one handler identifier, one dispatch and one intent. This is **event resolution, not DOM bubbling**: there are no phases, no event reaches a second binding, and MPRX has no syntax to change any of it.
 
 A renderer implements the rule for its target, and checks itself against `examples/conformance/events/`: real programs and trees, interactions (a node key, and the applicable event per primitive), and the handler identifier and intent each resolves to, or none. From Rust, `mesh_runtime::resolve(&tree, &Interaction { target, applicable })` is the reference implementation: it returns the `Resolved` binding (its node's key, the event and the handler identifier) or `None`, and refuses a target key that isn't in the tree. It evaluates nothing and needs no program, so a renderer needs none of MESH's code to do the same.
+
+## Units
+
+A component whose manifest entry has a [`unit`](./manifest.md#units) has state and commands that belong to **one occurrence** of it: a disclosure's open or closed, a tab strip's selection. Neither the snapshot nor the runtime holds that state. The host does, and gives it to each operation as an input beside the snapshot, so that a render is still a function of its inputs and the equivalence law of [Update](#update) holds with units in it.
+
+**The input.** `units` is, for each occurrence the host has changed, its key and a record of the unit's fields: `[ { "instance": "<key>", "state": { "open": true } } ]`. An occurrence with no entry has its unit's defaults, which is also what the first render, on a server or a client, uses. An entry is validated as any input is, against the types of the manifest's `unit.state` (`runtime-value-mismatch`, `runtime-unknown-field`, at a path that begins `$units`). An entry whose key is not in the render is ignored; the host lets it go.
+
+**The key** is the occurrence's identity: the key of its place in the program, composite step included (spec §9.10). It is not a node's key, and nothing else has it. A reorder inside a keyed `{#each}` keeps it, hiding the occurrence under an `{#if}` and showing it again does not (the node leaves the render, so the occurrence ends and the next is new, §9.10.6), and a changed item key is a different occurrence.
+
+**What a render says.** Its `instances` list each unit occurrence in the tree, in the order met, with its component, the key, the state the template saw (`state`: the caller's prop for a controlled field, else the host's value, else the default) and `controlled`. The host keeps the state of the occurrences it has changed and lets go of those a later render does not list.
+
+**A kept part is not kept stale.** An update reuses every part whose inputs are as they were. The state of the units below a part is one of its inputs, so it is rebuilt when one of them has changed, and the occurrences below a part that is reused are still listed.
+
+**Commands.** A unit's commands are invoked like any command of a template. The intent names the component whose unit declares it, as usual, and gains `instance` (the occurrence it is for) and, if the caller owned any field, `controlled`. The handler's arguments are evaluated against the state the person saw: the render's units are kept with it and dispatch evaluates against them. The runtime does not apply the command: the host runs the unit's transition on the occurrence's state, leaves out the fields in `controlled`, and renders again with the new `units`.
+
+**Controlled fields.** A field declared `controllable` is owned by the caller when the occurrence writes a prop of the same name with a value: the prop is then the value of the scope name, and the host's state for the field is not read. This is the rule the ecosystem already states for controls: the component reports, the application owns the value.
+
+**Raising.** A transition may announce something to the caller (a controlled tab strip tells its caller what the person chose). `raise(render, instance, event, payload)` takes an event the occurrence's component declares and resolves it as an event forwarded out of the component is (§9.9): the result is the intent of the handler the caller bound to it, found through the occurrences around, or nothing when the caller bound none. It renders nothing and changes nothing. An instance not in the render is `runtime-unknown-instance`, an event the component does not declare is `runtime-unknown-event`, and a payload that does not fit the event's is the usual input diagnostics (the key stands where a handler identifier does, location `handler`).
+
+**What does not change.** `render-v1` and the patches are as they were: no renderer needs to know units exist. Units are not persisted by the runtime; state that must outlive a reload is the application's. Changing the program resets them, since keys are not stable across programs.
 
 ## Updates
 

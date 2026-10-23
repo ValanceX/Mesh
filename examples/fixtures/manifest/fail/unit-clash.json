@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "types": {},
+  "components": {
+    "disclosure": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": { "open": { "kind": "boolean" } },
+      "unit": {
+        "state": { "open": { "type": { "kind": "boolean" }, "default": false } }
+      }
+    },
+    "template": { "props": {}, "events": {}, "commands": {}, "scope": {} }
+  }
+}

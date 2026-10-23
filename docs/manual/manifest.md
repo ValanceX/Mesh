@@ -65,7 +65,7 @@ No other property is allowed, here or in any object below.
 
 A component's name is its tag: `"user-card"` is the component `<user-card>` is an instance of. MESH has no built-in elements, so every tag a file uses, `page` and `text` included, must be declared here.
 
-Each component has exactly these four properties. All four are required, even when empty:
+Each component has exactly these four properties, all required even when empty, and optionally a fifth, [`"unit"`](#units):
 
 | Property | Value | Used when |
 |---|---|---|
@@ -122,6 +122,23 @@ A command returns nothing. It may be invoked only as the whole handler of an `on
 ```
 
 The scope is every name the component's template may read, and nothing else is: a prop isn't in scope unless the scope lists it too, and there are no global names. The manifest doesn't say where a scope name's value comes from, whether a prop, state or anything else; that's for the runtime.
+
+### Units
+
+```json
+"unit": {
+  "state": { "open": { "type": { "kind": "boolean" }, "default": false } },
+  "commands": { "toggle": { "parameters": [] } }
+}
+```
+
+A **unit** is state and commands that belong to one occurrence of a composite: what a disclosure needs to know whether it is open, which the application has no reason to hold. Both parts are optional.
+
+- Each `"state"` field has a `"type"` and a `"default"` that fits it (both required): the value an occurrence has before anything has changed it. A snippet is not a state type. `"controllable": true` lets the caller own the value: if the occurrence writes a prop of the same name, the prop is the value and the occurrence's own change to the field is not applied. The prop must then be optional and of the field's type.
+- The state names join the component's `scope` and the commands join its `commands`, so the template reads and invokes them like any others, and checking needs no more than that. They are not declared again there: a state name that is already a scope name, a command that is already a command or a scope name, or a state name that is a prop's without being `controllable`, is `manifest-unit-clash`.
+- A scope name that comes from a unit is bound by the host's state for the occurrence, not by a prop, so the rule that every scope name of a composite has a prop to bind it does not apply to it.
+
+The values are not part of the snapshot. How a host keeps them, and how a render takes them as an input beside the snapshot, is in the [runtime reference](./runtime.md#units).
 
 ### Custom elements
 
@@ -193,7 +210,7 @@ Props, events, commands and scope names are separate: each is written in a diffe
 - the JSON itself: `manifest-syntax-error`, `manifest-nesting-too-deep` for arrays and objects nested more than 128 levels deep, and `manifest-duplicate-key` for a key repeated in any object, which most JSON tools would silently accept;
 - the version: `manifest-unsupported-version`;
 - the format the schema describes: `manifest-invalid-value`, `manifest-missing-property`, `manifest-unknown-property`, `manifest-unknown-kind` and `manifest-invalid-name`;
-- rules the schema can't express: `manifest-enum-too-large`, `manifest-duplicate-variant`, `manifest-duplicate-parameter`, `manifest-unknown-type`, `manifest-recursive-type` and `manifest-nested-optional`;
+- rules the schema can't express: `manifest-enum-too-large`, `manifest-duplicate-variant`, `manifest-duplicate-parameter`, `manifest-unknown-type`, `manifest-recursive-type`, `manifest-nested-optional` and `manifest-unit-clash`;
 - and once the manifest is valid, `manifest-missing-component` if it doesn't declare the component the file is the template of.
 
 A manifest the JSON Schema accepts can still have the problems in the last two items; `mesh check` is the complete check.

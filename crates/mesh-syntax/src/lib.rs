@@ -122,6 +122,10 @@ impl DiagnosticCode {
     /// A manifest prop named `children` that is not a `snippet` with no parameters.
     pub const MANIFEST_CHILDREN_NOT_SNIPPET: DiagnosticCode =
         DiagnosticCode("manifest-children-not-snippet");
+    /// A unit's state name or command that is also a scope name, a command or a prop of its
+    /// component (a prop only if the field is not `controllable`, and then it must be of the
+    /// same type).
+    pub const MANIFEST_UNIT_CLASH: DiagnosticCode = DiagnosticCode("manifest-unit-clash");
     /// A manifest `enum` that lists a value twice.
     pub const MANIFEST_DUPLICATE_VARIANT: DiagnosticCode =
         DiagnosticCode("manifest-duplicate-variant");
@@ -254,6 +258,7 @@ impl DiagnosticCode {
         DiagnosticCode::MANIFEST_DUPLICATE_VARIANT,
         DiagnosticCode::MANIFEST_SNIPPET_MISPLACED,
         DiagnosticCode::MANIFEST_CHILDREN_NOT_SNIPPET,
+        DiagnosticCode::MANIFEST_UNIT_CLASH,
         DiagnosticCode::MANIFEST_MISSING_COMPONENT,
         DiagnosticCode::UNKNOWN_COMPONENT,
         DiagnosticCode::UNKNOWN_PROP,
@@ -1167,6 +1172,7 @@ mod tests {
                 "manifest-duplicate-variant",
                 "manifest-snippet-misplaced",
                 "manifest-children-not-snippet",
+                "manifest-unit-clash",
                 "manifest-missing-component",
                 "unknown-component",
                 "unknown-prop",

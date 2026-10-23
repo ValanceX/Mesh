@@ -678,6 +678,15 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
             let composite = &components[name];
             // Rules 4a, 4b: every scope name bound, soundly.
             for (scope_name, scope_type) in &composite.scope {
+                // A unit's state names are bound by the host's state for the occurrence (or by the
+                // prop of a controllable field, when written), not by a prop alone.
+                if composite
+                    .unit
+                    .as_ref()
+                    .is_some_and(|unit| unit.state.contains_key(scope_name))
+                {
+                    continue;
+                }
                 match composite.props.get(scope_name) {
                     None => diagnostics.push(RuntimeDiagnostic::new(
                         RuntimeCode::UNBOUND_SCOPE_NAME,

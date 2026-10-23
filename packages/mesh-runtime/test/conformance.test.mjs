@@ -25,7 +25,7 @@ const shared = read("components.json");
 // A program's own manifest if its directory has one (`enums/` does), else the shared one.
 const modelOf = (name) => (existsSync(join(conformance, name, "components.json")) ? read(name, "components.json") : shared);
 
-async function build(name, snapshot = JSON.parse(read(name, "snapshot.json"))) {
+async function build(name, snapshot = JSON.parse(read(name, "snapshot.json")), units = undefined) {
   const model = modelOf(name);
   const program = JSON.parse(read(name, "program.json"));
   const templates = [];
@@ -42,6 +42,7 @@ async function build(name, snapshot = JSON.parse(read(name, "snapshot.json"))) {
     program: { root: program.root, templates },
     model,
     snapshot,
+    ...(units === undefined ? {} : { units }),
   });
   return result;
 }
@@ -258,3 +259,26 @@ test(`${dir}: an event in a snippet's body is the declaring template's, and disp
   assert.deepEqual(intent, { command: { component: "screen", name: "select" }, arguments: [{ value: 2 }] });
 });
 }
+
+// `units/`: a component's state for one occurrence, which a render takes beside the snapshot. Each step of `steps.json` is rendered with its
+// units against the committed tree and the committed list of occurrences, and updating from a step to the next with the next's units is the
+// render of the next. The units are the vectors' `[ { instance, state } ]`, given to the package as an object of states by occurrence.
+const unitStates = (units) => Object.fromEntries(units.map((each) => [each.instance, each.state]));
+const unitSteps = () => JSON.parse(read("units", "steps.json"));
+
+test("units: every step renders its committed tree and lists its committed occurrences, and an update with the next units is a render", async () => {
+  let previous;
+  for (const [at, step] of unitSteps().entries()) {
+    const result = await build("units", step.snapshot, unitStates(step.units));
+    assert.ok(result.render, JSON.stringify(result.diagnostics));
+    assert.deepEqual(result.render.tree, JSON.parse(read("units", `step-${at}.expected.tree.json`)), step.case);
+    assert.deepEqual(result.render.instances, JSON.parse(read("units", `step-${at}.expected.instances.json`)), step.case);
+    if (previous !== undefined) {
+      const updated = await update(previous, step.snapshot, unitStates(step.units));
+      assert.ok(updated.render, JSON.stringify(updated.diagnostics));
+      assert.deepEqual(updated.render.tree, result.render.tree, `an update to step ${at} is its render`);
+      assert.deepEqual(updated.render.instances, result.render.instances, `and lists what it lists`);
+    }
+    previous = result.render;
+  }
+});

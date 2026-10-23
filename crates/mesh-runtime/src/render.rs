@@ -14,11 +14,32 @@ use crate::program::{
 };
 use crate::tree::{Memo, Node, RepeatItem, RepeatMemo, Run, Tree, TreeChild};
 use crate::types::{fits, Statics};
-use crate::value::{HostKey, HostRecord, HostValue, SnippetValue, Value};
+use crate::value::{HostKey, HostRecord, HostValue, SnippetValue, Units, Value};
 use mesh_template as mpl;
 use mesh_template::{Child, Element, Expression};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
+
+/// A composite occurrence's scope, and the occurrence as a unit when its component has one.
+pub(crate) type Bound = (BTreeMap<String, Value>, Option<Rc<Instance>>);
+
+/// A unit occurrence a render met (docs/manual/runtime.md, "Units"): where it is, whose unit it is,
+/// and the state it was rendered with. A host keeps the state of the occurrences it has changed, and
+/// lets go of those a later render no longer lists.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Instance {
+    /// The occurrence's identity: the key of its place in the program, as spec §9.10 defines it.
+    pub key: String,
+    /// The composite whose unit it is.
+    pub component: String,
+    /// The state the render used, each field as the template saw it: the caller's prop for a
+    /// controlled field, else the host's value, else the unit's default.
+    pub state: BTreeMap<String, serde_json::Value>,
+    /// The fields the caller owned in this render (a `controllable` field whose prop was written).
+    pub controlled: Vec<String>,
+    /// The host's entry this was rendered from, so an update can tell that it is as it was.
+    pub(crate) entry: Option<HostRecord>,
+}
 
 /// One successful render: its tree, and the program, model and snapshot
 /// it came from. It owns copies of all of them, so nothing a host does
@@ -33,6 +54,11 @@ pub struct Render {
     /// has it. Shared (`Rc`) with the renders made from it by changes.
     pub(crate) values: BTreeMap<String, Value>,
     tree: Tree,
+    /// The units this render was given, so that dispatch evaluates against exactly the state the
+    /// person saw, and an update without new ones keeps these.
+    pub(crate) units: Rc<Units>,
+    /// The unit occurrences in the tree, in the order they were met.
+    instances: Vec<Rc<Instance>>,
     /// This render's version in this thread: no two renders have the same
     /// one. Changes name the version they were computed against.
     id: u64,
@@ -54,6 +80,39 @@ impl Render {
     /// The render tree, for a renderer.
     pub fn tree(&self) -> &Tree {
         &self.tree
+    }
+
+    /// The units this render was made with.
+    pub fn units(&self) -> &Units {
+        &self.units
+    }
+
+    /// The unit occurrences in this render, in the order they were met: the host's registry lets go
+    /// of the state of any occurrence that is not here.
+    pub fn instances(&self) -> impl Iterator<Item = &Instance> {
+        self.instances.iter().map(|instance| &**instance)
+    }
+
+    /// The unit occurrences as a JSON array, for a host that cannot hold them as Rust values:
+    /// `[ { "instance", "component", "state", "controlled" } ]`.
+    pub fn instances_to_json(&self) -> String {
+        serde_json::Value::Array(
+            self.instances
+                .iter()
+                .map(|instance| {
+                    let mut item = serde_json::json!({
+                        "instance": instance.key,
+                        "component": instance.component,
+                        "state": instance.state,
+                    });
+                    if !instance.controlled.is_empty() {
+                        item["controlled"] = serde_json::json!(instance.controlled);
+                    }
+                    item
+                })
+                .collect(),
+        )
+        .to_string()
     }
 
     /// This render's version: unique among the renders made in this thread.
@@ -129,9 +188,23 @@ pub fn render(
     model: &str,
     snapshot: &HostRecord,
 ) -> Result<Render, Vec<RuntimeDiagnostic>> {
+    render_units(program, model, snapshot, &Units::default())
+}
+
+/// [`render`], with the state of the unit occurrences the host holds (docs/manual/runtime.md,
+/// "Units"). An occurrence with no entry in `units` has its unit's defaults.
+pub fn render_units(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Units,
+) -> Result<Render, Vec<RuntimeDiagnostic>> {
     let valid = program::validate(program, model)?;
     let values = validated_values(&valid, snapshot)?;
-    let (tree, _) = tree_of(&valid, &values, false, None)?;
+    let units = Rc::new(units.clone());
+    let Rendered {
+        tree, instances, ..
+    } = tree_of(&valid, &values, false, None, &units)?;
     Ok(Render {
         root: program.root.to_string(),
         templates: program
@@ -142,6 +215,8 @@ pub fn render(
         model: model.to_string(),
         values,
         tree,
+        units,
+        instances,
         id: next_version(),
     })
 }
@@ -170,6 +245,20 @@ pub fn update_with(
     previous: &Render,
     snapshot: HostRecord,
 ) -> Result<Update, Vec<RuntimeDiagnostic>> {
+    update_with_units(previous, snapshot, None)
+}
+
+/// [`update_with`], and the state of the unit occurrences the host holds now: `None` keeps the
+/// previous render's. An occurrence whose state is as it was is reused with the rest.
+pub fn update_with_units(
+    previous: &Render,
+    snapshot: HostRecord,
+    units: Option<&Units>,
+) -> Result<Update, Vec<RuntimeDiagnostic>> {
+    let units = units.map_or_else(
+        || Rc::clone(&previous.units),
+        |units| Rc::new(units.clone()),
+    );
     let templates: Vec<&str> = previous.templates.iter().map(String::as_str).collect();
     let valid = program::validate(
         &Program {
@@ -179,7 +268,9 @@ pub fn update_with(
         &previous.model,
     )?;
     let values = validated_values(&valid, &snapshot)?;
-    let (tree, _) = tree_of(&valid, &values, false, Some(&previous.tree.root))?;
+    let Rendered {
+        tree, instances, ..
+    } = tree_of(&valid, &values, false, Some(&previous.tree.root), &units)?;
     let patches = crate::patch::diff(&previous.tree, &tree);
     Ok(Update {
         render: Render {
@@ -188,6 +279,8 @@ pub fn update_with(
             model: previous.model.clone(),
             values,
             tree,
+            units,
+            instances,
             id: next_version(),
         },
         patches,
@@ -214,6 +307,21 @@ pub fn update_changes(
     changes: &crate::changes::Changes,
     verify: Option<&HostRecord>,
 ) -> Result<Update, Vec<RuntimeDiagnostic>> {
+    update_changes_units(previous, changes, verify, None)
+}
+
+/// [`update_changes`], and the state of the unit occurrences the host holds now: `None` keeps the
+/// previous render's.
+pub fn update_changes_units(
+    previous: &Render,
+    changes: &crate::changes::Changes,
+    verify: Option<&HostRecord>,
+    units: Option<&Units>,
+) -> Result<Update, Vec<RuntimeDiagnostic>> {
+    let units = units.map_or_else(
+        || Rc::clone(&previous.units),
+        |units| Rc::new(units.clone()),
+    );
     if changes.base != previous.id {
         return Err(vec![RuntimeDiagnostic::new(
             RuntimeCode::CHANGES_BASE_MISMATCH,
@@ -247,7 +355,9 @@ pub fn update_changes(
             )]);
         }
     }
-    let (tree, _) = tree_of(&valid, &values, false, Some(&previous.tree.root))?;
+    let Rendered {
+        tree, instances, ..
+    } = tree_of(&valid, &values, false, Some(&previous.tree.root), &units)?;
     let patches = crate::patch::diff(&previous.tree, &tree);
     Ok(Update {
         render: Render {
@@ -256,6 +366,8 @@ pub fn update_changes(
             model: previous.model.clone(),
             values,
             tree,
+            units,
+            instances,
             id: next_version(),
         },
         patches,
@@ -403,6 +515,8 @@ pub(crate) struct Link<'v> {
     pub component: String,
     pub occurrence: &'v Element,
     pub values: BTreeMap<String, Value>,
+    /// The occurrence as a unit, if its component has one.
+    pub instance: Option<Rc<Instance>>,
 }
 
 /// A composite occurrence being rendered: whose children a `mesh-slot` in
@@ -413,6 +527,8 @@ struct Frame<'v> {
     component: String,
     /// The caller's scope at the occurrence; only kept when the occurrence has children.
     values: Option<BTreeMap<String, Value>>,
+    /// The occurrence as a unit, if its component has one.
+    instance: Option<Rc<Instance>>,
 }
 
 /// What rendering a list of children gives.
@@ -487,10 +603,34 @@ pub(crate) struct Recorded<'v> {
     /// scopes they were written in, when the handler forwards an event: where
     /// it goes next. Empty otherwise.
     pub chain: Vec<Link<'v>>,
+    /// The innermost composite occurrence around the node as a unit, if it is one: the one whose
+    /// template the node is in, and so the owner of the commands it invokes.
+    pub instance: Option<Rc<Instance>>,
 }
 
 /// Every handler of a render, by identifier.
 pub(crate) type Sites<'v> = BTreeMap<String, Recorded<'v>>;
+
+/// A unit occurrence as a render found it: the occurrence in the template of `component`, the scope it
+/// was written in, and the occurrences around it. Only a render that was asked to record has them.
+pub(crate) struct Occurrence<'v> {
+    pub component: String,
+    pub occurrence: &'v Element,
+    pub values: BTreeMap<String, Value>,
+    pub chain: Vec<Link<'v>>,
+    pub instance: Rc<Instance>,
+}
+
+/// What a render of a validated program gives: its tree, and the parts a host and a dispatch need.
+pub(crate) struct Rendered<'v> {
+    pub tree: Tree,
+    /// The handlers, when the render recorded.
+    pub sites: Sites<'v>,
+    /// The unit occurrences in the tree, in the order they were met.
+    pub instances: Vec<Rc<Instance>>,
+    /// The unit occurrences by key, when the render recorded.
+    pub occurrences: BTreeMap<String, Occurrence<'v>>,
+}
 
 /// The render tree of a validated program, and, when `record`, the sites of
 /// its handlers.
@@ -499,9 +639,10 @@ pub(crate) fn tree<'v>(
     snapshot: &HostRecord,
     record: bool,
     previous: Option<&Rc<Node>>,
-) -> Result<(Tree, Sites<'v>), Vec<RuntimeDiagnostic>> {
+    units: &Rc<Units>,
+) -> Result<Rendered<'v>, Vec<RuntimeDiagnostic>> {
     let scope = validated_values(valid, snapshot)?;
-    tree_of(valid, &scope, record, previous)
+    tree_of(valid, &scope, record, previous, units)
 }
 
 /// The root scope's values from a snapshot, validated (§9.8.4): every
@@ -526,11 +667,15 @@ pub(crate) fn tree_of<'v>(
     scope: &BTreeMap<String, Value>,
     record: bool,
     previous: Option<&Rc<Node>>,
-) -> Result<(Tree, Sites<'v>), Vec<RuntimeDiagnostic>> {
+    units: &Rc<Units>,
+) -> Result<Rendered<'v>, Vec<RuntimeDiagnostic>> {
     let mut renderer = Renderer {
         valid,
+        units: Rc::clone(units),
+        instances: Vec::new(),
         keys: HashSet::new(),
         sites: record.then(BTreeMap::new),
+        occurrences: record.then(BTreeMap::new),
         free: HashMap::new(),
         prefixes: Vec::new(),
         frames: Vec::new(),
@@ -548,7 +693,12 @@ pub(crate) fn tree_of<'v>(
             .occurrence(&valid.root, &root.root, 0, &mut Vec::new(), scope, &old)
             .map_err(|diagnostic| vec![diagnostic])?,
     };
-    Ok((tree, renderer.sites.unwrap_or_default()))
+    Ok(Rendered {
+        tree,
+        sites: renderer.sites.unwrap_or_default(),
+        instances: renderer.instances,
+        occurrences: renderer.occurrences.unwrap_or_default(),
+    })
 }
 
 /// The root template's scope from the snapshot (§9.8.4): each name the
@@ -632,7 +782,9 @@ pub(crate) fn bind(
     valid: &Valid,
     scope: &Scope<'_, '_>,
     element: &Element,
-) -> Result<BTreeMap<String, Value>, RuntimeDiagnostic> {
+    key: Option<&str>,
+    units: &Units,
+) -> Result<Bound, RuntimeDiagnostic> {
     let composite = valid.component(&element.component);
     let mut written = BTreeMap::new();
     for prop in &element.props {
@@ -652,7 +804,7 @@ pub(crate) fn bind(
         }
         written.insert(prop.prop.clone(), value);
     }
-    Ok(composite
+    let mut values: BTreeMap<String, Value> = composite
         .scope
         .keys()
         .map(|name| {
@@ -671,7 +823,80 @@ pub(crate) fn bind(
                     .unwrap_or(Value::Absent),
             )
         })
-        .collect())
+        .collect();
+    let (Some(unit), Some(key)) = (&composite.unit, key) else {
+        return Ok((values, None));
+    };
+    // The unit's state names: the caller's prop for a controllable field that the caller wrote, else
+    // the host's value for this occurrence (checked against the field's type, as any input is), else
+    // the unit's default.
+    let entry = units.0.get(key);
+    let mut inputs = Inputs::new(&valid.manifest);
+    let mut state = BTreeMap::new();
+    let mut controlled = Vec::new();
+    for (name, field) in &unit.state {
+        let used = match written.get(name) {
+            Some(prop) if field.controllable && !matches!(prop, Value::Absent) => {
+                controlled.push(name.clone());
+                prop.clone()
+            }
+            _ => match entry.and_then(|entry| entry.get(name)) {
+                Some(host) => inputs.value(
+                    Some(host),
+                    &field.ty,
+                    &mut vec![
+                        PathSegment::Name("$units".to_string()),
+                        PathSegment::Name(key.to_string()),
+                        PathSegment::Name(name.clone()),
+                    ],
+                ),
+                None => Value::from_constant(&field.default),
+            },
+        };
+        values.insert(name.clone(), used.clone());
+        state.insert(name.clone(), used);
+    }
+    if let Some(entry) = entry {
+        for (field, _) in &entry.0 {
+            let name = match field {
+                HostKey::Text(name) => name.clone(),
+                HostKey::Utf16(_) => "(a name that is not Unicode)".to_string(),
+            };
+            if !unit.state.contains_key(&name) {
+                inputs.report(
+                    RuntimeCode::UNKNOWN_FIELD,
+                    &[
+                        PathSegment::Name("$units".to_string()),
+                        PathSegment::Name(key.to_string()),
+                        PathSegment::Name(name.clone()),
+                    ],
+                    format!("`{}` has no unit state field `{name}`", element.component),
+                );
+            }
+        }
+    }
+    if let Some(diagnostic) = inputs.sorted().into_iter().next() {
+        return Err(diagnostic);
+    }
+    let state = state
+        .iter()
+        .map(|(name, value)| {
+            (
+                name.clone(),
+                output(value).unwrap_or(serde_json::Value::Null),
+            )
+        })
+        .collect();
+    Ok((
+        values,
+        Some(Rc::new(Instance {
+            key: key.to_string(),
+            component: element.component.clone(),
+            state,
+            controlled,
+            entry: entry.cloned(),
+        })),
+    ))
 }
 
 /// A statics context for the template of `component`.
@@ -698,8 +923,14 @@ const MAX_RENDER_NESTING: usize = 512;
 
 struct Renderer<'v> {
     valid: &'v Valid,
+    /// The state the host holds for the unit occurrences.
+    units: Rc<Units>,
+    /// The unit occurrences met so far, in order: those a kept part holds are added back from its memo.
+    instances: Vec<Rc<Instance>>,
     keys: HashSet<String>,
     sites: Option<Sites<'v>>,
+    /// The unit occurrences by key, when recording.
+    occurrences: Option<BTreeMap<String, Occurrence<'v>>>,
     /// The scope names read from outside each element's subtree, by element.
     free: HashMap<*const Element, Rc<Vec<String>>>,
     /// For the repeats being rendered, innermost last: the hash of the path
@@ -802,8 +1033,53 @@ impl<'v> Renderer<'v> {
         &mut self,
         scope: &Scope<'_, '_>,
         element: &'v Element,
-    ) -> Result<BTreeMap<String, Value>, RuntimeDiagnostic> {
-        let mut bound = bind(self.valid, scope, element)?;
+        position: usize,
+        path: &mut Vec<Step>,
+    ) -> Result<Bound, RuntimeDiagnostic> {
+        // An occurrence of a component with a unit is a place of its own: its key is the key of the
+        // path to it, composite step included.
+        let key = self
+            .valid
+            .component(&element.component)
+            .unit
+            .is_some()
+            .then(|| {
+                path.push(Step {
+                    position,
+                    kind: COMPOSITE,
+                    component: element.component.clone(),
+                });
+                let key = self.peek(path);
+                path.pop();
+                key
+            });
+        let units = Rc::clone(&self.units);
+        let (mut bound, instance) = bind(self.valid, scope, element, key.as_deref(), &units)?;
+        if let Some(instance) = &instance {
+            self.instances.push(Rc::clone(instance));
+            if self.occurrences.is_some() {
+                let chain = self
+                    .frames
+                    .iter()
+                    .map(|frame| Link {
+                        component: frame.component.clone(),
+                        occurrence: frame.occurrence,
+                        values: frame.values.clone().unwrap_or_default(),
+                        instance: frame.instance.clone(),
+                    })
+                    .collect();
+                let found = Occurrence {
+                    component: scope.component.to_string(),
+                    occurrence: element,
+                    values: scope.values.clone(),
+                    chain,
+                    instance: Rc::clone(instance),
+                };
+                if let Some(occurrences) = &mut self.occurrences {
+                    occurrences.insert(instance.key.clone(), found);
+                }
+            }
+        }
         let composite = self.valid.component(&element.component);
         let mut base = None;
         for child in &element.children {
@@ -836,7 +1112,7 @@ impl<'v> Renderer<'v> {
             let value = self.snippet(scope.component, element, base);
             bound.insert("children".to_string(), value);
         }
-        Ok(bound)
+        Ok((bound, instance))
     }
 
     /// Renders the snippet the render site `site` names, here: its body, in the scope it was declared
@@ -924,6 +1200,12 @@ impl<'v> Renderer<'v> {
         }))
     }
 
+    /// Whether every unit occurrence in `kept` has the host state it was rendered with.
+    fn units_unchanged(&self, kept: &[Rc<Instance>]) -> bool {
+        kept.iter()
+            .all(|instance| self.units.0.get(&instance.key) == instance.entry.as_ref())
+    }
+
     fn has_slot(&mut self, element: &'v Element) -> bool {
         *self
             .slots
@@ -996,7 +1278,7 @@ impl<'v> Renderer<'v> {
         };
         self.within_limit(&scope, path, element.span)?;
         if self.valid.is_composite(&element.component) {
-            let bound = self.bind(&scope, element)?;
+            let (bound, instance) = self.bind(&scope, element, position, path)?;
             let template = &self.valid.templates[&element.component];
             path.push(Step {
                 position,
@@ -1010,6 +1292,7 @@ impl<'v> Renderer<'v> {
                 component: component.to_string(),
                 values: (!element.children.is_empty() || !element.events.is_empty())
                     .then(|| values.clone()),
+                instance,
             });
             let rendered =
                 self.occurrence(&template.component, &template.root, 0, path, &bound, old);
@@ -1045,10 +1328,15 @@ impl<'v> Renderer<'v> {
         if let Some(previous) = previous.filter(|_| !hosts_slot) {
             if unchanged(&previous.memo.free, scope.values)
                 && previous.memo.free.len() == free.len()
+                && self.units_unchanged(&previous.memo.units)
             {
+                self.instances.extend(previous.memo.units.iter().cloned());
                 return Ok(Rc::clone(previous));
             }
         }
+        // The unit occurrences below this node are the ones met from here on: a part that is kept
+        // holds them, so that a later update still lists them.
+        let mark = self.instances.len();
         // A part that is rendered claims its key; a part kept doesn't
         // need to, since the tree it is kept from is already known to have it once.
         if !self.keys.insert(key.clone()) {
@@ -1146,11 +1434,13 @@ impl<'v> Renderer<'v> {
                                     component: frame.component.clone(),
                                     occurrence: frame.occurrence,
                                     values: frame.values.clone().unwrap_or_default(),
+                                    instance: frame.instance.clone(),
                                 })
                                 .collect()
                         } else {
                             Vec::new()
                         },
+                        instance: self.frames.last().and_then(|frame| frame.instance.clone()),
                     },
                 );
             }
@@ -1181,6 +1471,7 @@ impl<'v> Renderer<'v> {
                 own: inputs_of(&read, scope.values),
                 runs,
                 repeats,
+                units: self.instances[mark..].to_vec(),
             },
         }))
     }
@@ -1344,10 +1635,10 @@ impl<'v> Renderer<'v> {
             path.pop();
             listed
         } else {
-            let bound = self.bind(scope, element);
+            let bound = self.bind(scope, element, position, path);
             match bound {
                 Err(diagnostic) => Err(diagnostic),
-                Ok(bound) => {
+                Ok((bound, instance)) => {
                     let template = &self.valid.templates[&element.component];
                     path.push(Step {
                         position,
@@ -1359,6 +1650,7 @@ impl<'v> Renderer<'v> {
                         component: scope.component.to_string(),
                         values: (!element.children.is_empty() || !element.events.is_empty())
                             .then(|| scope.values.clone()),
+                        instance,
                     });
                     let inner = Scope {
                         component: &template.component,
@@ -1505,7 +1797,11 @@ impl<'v> Renderer<'v> {
             // its node was made from is as it was, is the item's node again.
             if let Some(kept) = before
                 .and_then(|memo| memo.items.get(index))
-                .filter(|kept| kept.item.identical(item) && unchanged(&kept.free, &values))
+                .filter(|kept| {
+                    kept.item.identical(item)
+                        && unchanged(&kept.free, &values)
+                        && self.units_unchanged(&kept.units)
+                })
             {
                 if !seen.insert(Rc::clone(&kept.canonical)) {
                     return Err(scope.error(
@@ -1516,6 +1812,7 @@ impl<'v> Renderer<'v> {
                 }
                 built.children.extend(kept.children.iter().cloned());
                 built.runs.extend(kept.runs.iter().cloned());
+                self.instances.extend(kept.units.iter().cloned());
                 made.push(kept.clone());
                 continue;
             }
@@ -1562,6 +1859,7 @@ impl<'v> Renderer<'v> {
                 kind: REPEAT,
                 component: canonical.to_string(),
             });
+            let mark = self.instances.len();
             let made_item = if program::is_inline(self.valid, child) {
                 // An item that is a fragment places its content: what it made is its children, which it keeps as the node would be kept. A repeat inside it is
                 // not remembered (the items share a template position, so they would share a site): it is made again.
@@ -1577,6 +1875,7 @@ impl<'v> Renderer<'v> {
                     children: inner_built.children,
                     free,
                     runs: inner_built.runs,
+                    units: self.instances[mark..].to_vec(),
                 }
             } else {
                 let rendered = self.occurrence(scope.component, child, 0, path, &values, old);
@@ -1588,6 +1887,7 @@ impl<'v> Renderer<'v> {
                     free: rendered.memo.free.clone(),
                     children: vec![TreeChild::Node(rendered)],
                     runs: Vec::new(),
+                    units: self.instances[mark..].to_vec(),
                 }
             };
             built.children.extend(made_item.children.iter().cloned());
