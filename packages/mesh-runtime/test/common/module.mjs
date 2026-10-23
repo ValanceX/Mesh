@@ -38,6 +38,7 @@ export class Module {
       bytes(request.templates),
       utf8.encode(request.model),
       bytes(request.snapshot),
+      new Uint8Array(0), // no units
     ];
     if (request.op === "render") {
       return this.#call("mesh_render", common);

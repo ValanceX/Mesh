@@ -446,7 +446,12 @@ pub fn dispatch_from_units(
 
 /// A composite occurrence around the place an event is raised: the component whose template it is
 /// in, the occurrence, the scope it was written in, and the occurrence of that template as a unit.
-type Around<'v> = (String, &'v Element, BTreeMap<String, Value>, Option<Rc<Instance>>);
+type Around<'v> = (
+    String,
+    &'v Element,
+    BTreeMap<String, Value>,
+    Option<Rc<Instance>>,
+);
 
 /// Delivers the event `name` of `component`, carrying `carried`, out through the occurrences in
 /// `around` (innermost last) until one binds it to a command of the template it is written in:
@@ -632,7 +637,9 @@ pub fn raise_from_units(
             );
             Value::Absent
         }
-        (Some(ty), payload) => inputs.value(payload, ty, &mut vec![PathSegment::Name("$event".into())]),
+        (Some(ty), payload) => {
+            inputs.value(payload, ty, &mut vec![PathSegment::Name("$event".into())])
+        }
     };
     let diagnostics = inputs.sorted();
     if !diagnostics.is_empty() {

@@ -23,8 +23,8 @@
 
 use crate::json::{Json, Member, Value};
 use crate::{
-    Command, Component, Constant, DeclarationKey, Event, Field, Manifest, Parameter, Type,
-    Unit, UnitField, MAX_ENUM_VALUES, VERSION,
+    Command, Component, Constant, DeclarationKey, Event, Field, Manifest, Parameter, Type, Unit,
+    UnitField, MAX_ENUM_VALUES, VERSION,
 };
 use mesh_syntax::{Diagnostic, DiagnosticCode, Severity, Span};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -245,8 +245,12 @@ impl Validator {
 
     fn component(&mut self, name: &str, json: &Json) -> Option<Component> {
         let what = format!("component {name:?}");
-        let properties =
-            self.object(json, &what, &["props", "events", "commands", "scope"], &["unit"])?;
+        let properties = self.object(
+            json,
+            &what,
+            &["props", "events", "commands", "scope"],
+            &["unit"],
+        )?;
         let owner = format!("component {name:?}");
 
         let mut props = Some(BTreeMap::new());
@@ -343,16 +347,21 @@ impl Validator {
         if let Some(json) = properties.get("state") {
             for member in self.names(json, "state", "state field", &owner, NameRule::Identifier) {
                 let label = format!("state field {:?}", member.key);
-                let Some(fields) =
-                    self.object(&member.value, &label, &["type", "default"], &["controllable"])
-                else {
+                let Some(fields) = self.object(
+                    &member.value,
+                    &label,
+                    &["type", "default"],
+                    &["controllable"],
+                ) else {
                     continue;
                 };
                 self.snippet_allowed = false;
                 let Some(ty) = fields.get("type").and_then(|json| self.ty(json)) else {
                     continue;
                 };
-                let default = fields.get("default").map(|json| (json.span, constant(json)));
+                let default = fields
+                    .get("default")
+                    .map(|json| (json.span, constant(json)));
                 let Some((span, default)) = default else {
                     continue;
                 };
@@ -386,7 +395,10 @@ impl Validator {
                     if controllable && !prop.required && same {
                         None
                     } else if controllable {
-                        Some("a prop of the component that is required or of another type".to_string())
+                        Some(
+                            "a prop of the component that is required or of another type"
+                                .to_string(),
+                        )
                     } else {
                         Some("a prop of the component (only a `controllable` field may share a prop's name)".to_string())
                     }

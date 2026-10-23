@@ -4,6 +4,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Added
+
+- **Units: state that belongs to one occurrence of a composite** (direction Bet 8, WP5). A component's manifest entry may have a `unit`: state fields with defaults, and commands. The state names join the component's scope and the commands its commands, so a template reads and invokes them like any others and checking needs nothing new. The runtime takes the state the host holds as an input beside the snapshot (`render`, `update`, `updateChanges`, and the Rust `render_units`, `update_with_units`, `update_changes_units`, `dispatch_from_units`); an occurrence with no entry has the defaults. A render lists the unit occurrences it met (`instances`), an intent for a unit's command names its occurrence (`instance`, and `controlled`), a `controllable` field takes the caller's prop when it is written, and `raise` resolves an event a unit announces to the handler its caller bound. A part of the tree that an update reuses is rebuilt when the state of a unit below it has changed. `render-v1` and the patches are unchanged. New codes: `manifest-unit-clash`, `runtime-unknown-instance`, `runtime-unknown-event`. A manifest with a `unit` is refused by an older MESH (`manifest-unknown-property`); one without is read as before. The WebAssembly module's exports changed (internal).
+
 ### Changed
 
 - **The release publishes `@valancex/mesh-conformance`.** The conformance vectors package (the renderers' test dependency; PORT depends on `^0.14.0`) was never in the release workflow, so 0.14.0 was published without it. `.github/scripts/publish.mjs` now lists it as the ninth package and the workflow packs it. Its first version is published by hand (a package that does not exist cannot have a trusted publisher): `cd packages/mesh-conformance && npm publish --access public`, at the version of the release.

@@ -33,9 +33,7 @@ mod value;
 
 pub use changes::{Change, Changes};
 pub use diagnostic::{to_json, Form, Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
-pub use dispatch::{
-    dispatch, dispatch_from, dispatch_from_units, raise, raise_from_units,
-};
+pub use dispatch::{dispatch, dispatch_from, dispatch_from_units, raise, raise_from_units};
 #[doc(hidden)]
 pub use eval::evaluations;
 pub use number::number_to_text;

@@ -14,11 +14,11 @@ test("the shipped module is within its gzipped size budget", () => {
   assert.ok(size <= BUDGET, `${size} bytes gzipped, over the ${BUDGET}-byte budget`);
 });
 
-// The linker's output is 248,984 gzipped and the optimized build 234,818: a module over this was not run through
+// The linker's output is about 257,000 gzipped and the optimized build about 243,000 (units added about 3.5 percent to both; before them 248,984 and 234,818): a module over this was not run through
 // wasm-opt (`MESH_NO_WASM_OPT` is for a build that must be the linker's output, and is not what ships).
 test("the shipped module is the optimized build", () => {
   const size = gzipSync(readFileSync(shippedModule), { level: 9 }).length;
-  assert.ok(size <= 240_000, `${size} bytes gzipped: it looks like the linker's output, not the optimized module`);
+  assert.ok(size <= 250_000, `${size} bytes gzipped: it looks like the linker's output, not the optimized module`);
 });
 
 test("the module imports nothing", async () => {

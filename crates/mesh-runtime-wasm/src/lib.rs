@@ -31,7 +31,7 @@
 //! never calls that instance again.
 
 use mesh_runtime::encoding::{decode_snapshot, decode_texts, decode_value, EncodingError};
-use mesh_runtime::Program;
+use mesh_runtime::{HostKey, HostValue, Program, Units};
 
 /// Why a call gave no result document.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,8 +53,40 @@ impl From<EncodingError> for Refusal {
     }
 }
 
+/// The state of unit occurrences the host holds, encoded as a record of records (the occurrence's
+/// key, then its state): none at all when `bytes` is empty.
+fn decode_units(bytes: &[u8]) -> Result<Units, Refusal> {
+    if bytes.is_empty() {
+        return Ok(Units::default());
+    }
+    let record = decode_snapshot(bytes)?;
+    let mut units = std::collections::BTreeMap::new();
+    for (key, value) in record.0 {
+        let (HostKey::Text(key), HostValue::Record(state)) = (key, value) else {
+            return Err(Refusal::Input(
+                "units are an object of objects: an occurrence's key, then its state".to_string(),
+            ));
+        };
+        units.insert(key, state);
+    }
+    Ok(Units(units))
+}
+
+/// The result document of a render's tree, and its unit occurrences when it has any.
+fn tree_document(render: &mesh_runtime::Render) -> String {
+    let tree = render.tree().to_json();
+    if render.instances().next().is_none() {
+        return format!("{{\"tree\":{tree}}}");
+    }
+    format!(
+        "{{\"tree\":{tree},\"instances\":{}}}",
+        render.instances_to_json()
+    )
+}
+
 /// Renders the program of `root` and the encoded `templates` against
-/// `model` and the encoded `snapshot`: `{"tree": <render-v1>}`, or
+/// `model`, the encoded `snapshot` and the encoded `units` (empty for none): `{"tree": <render-v1>,
+/// "instances": [...]}` (`instances` only when the tree has unit occurrences), or
 /// `{"diagnostics": <runtime-diagnostics-v1>}`. The module keeps nothing, and
 /// the same inputs give the same bytes (a render's version is the wrapper's
 /// to give, never part of a render's result).
@@ -63,21 +95,25 @@ pub fn respond_render(
     templates: &[u8],
     model: &str,
     snapshot_bytes: &[u8],
+    units_bytes: &[u8],
 ) -> Result<String, Refusal> {
     let templates = decode_texts(templates)?;
     let snapshot = decode_snapshot(snapshot_bytes)?;
+    let units = decode_units(units_bytes)?;
     let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
     let program = Program {
         root,
         templates: &texts,
     };
-    Ok(match mesh_runtime::render(&program, model, &snapshot) {
-        Ok(render) => format!("{{\"tree\":{}}}", render.tree().to_json()),
-        Err(diagnostics) => format!(
-            "{{\"diagnostics\":{}}}",
-            mesh_runtime::to_json(&diagnostics, model)
-        ),
-    })
+    Ok(
+        match mesh_runtime::render_units(&program, model, &snapshot, &units) {
+            Ok(render) => tree_document(&render),
+            Err(diagnostics) => format!(
+                "{{\"diagnostics\":{}}}",
+                mesh_runtime::to_json(&diagnostics, model)
+            ),
+        },
+    )
 }
 
 /// Renders the module holds for `update`, by handle. This is the module's
@@ -147,22 +183,30 @@ pub fn retained_renders() -> usize {
 /// the caller releases; the previous render stays kept (and valid) until the
 /// caller releases its handle, so a host can still dispatch with it until its
 /// renderer has applied the patches. A refused update keeps nothing.
+#[allow(clippy::too_many_arguments)]
 pub fn respond_update(
     root: &str,
     templates: &[u8],
     model: &str,
     previous_handle: Option<u32>,
     previous_bytes: &[u8],
+    previous_units_bytes: &[u8],
     snapshot_bytes: &[u8],
+    units_bytes: &[u8],
     new_version: u64,
 ) -> Result<String, Refusal> {
     let templates = decode_texts(templates)?;
     let snapshot = decode_snapshot(snapshot_bytes)?;
+    let units = decode_units(units_bytes)?;
     // The snapshot goes to whichever update uses it, and is copied by neither.
     let mut owned = Some(snapshot);
     let kept = previous_handle.and_then(|handle| {
         retained::with(handle, |previous| {
-            mesh_runtime::update_with(previous, owned.take().expect("not yet taken"))
+            mesh_runtime::update_with_units(
+                previous,
+                owned.take().expect("not yet taken"),
+                Some(&units),
+            )
         })
     });
     let result = match kept {
@@ -170,26 +214,37 @@ pub fn respond_update(
         None => {
             let snapshot = owned.take().expect("not taken: no render was kept");
             let previous_snapshot = decode_snapshot(previous_bytes)?;
+            let previous_units = decode_units(previous_units_bytes)?;
             let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
             let program = Program {
                 root,
                 templates: &texts,
             };
-            mesh_runtime::render(&program, model, &previous_snapshot)
-                .and_then(|previous| mesh_runtime::update_with(&previous, snapshot))
+            mesh_runtime::render_units(&program, model, &previous_snapshot, &previous_units)
+                .and_then(|previous| {
+                    mesh_runtime::update_with_units(&previous, snapshot, Some(&units))
+                })
         }
     };
     Ok(match result {
-        Ok(updated) => {
-            let patches = mesh_runtime::patches_to_json(&updated.patches);
-            let handle = retained::keep(updated.render.with_version(new_version));
-            format!("{{\"handle\":{handle},\"patches\":{patches}}}")
-        }
+        Ok(updated) => updated_document(updated, new_version),
         Err(diagnostics) => format!(
             "{{\"diagnostics\":{}}}",
             mesh_runtime::to_json(&diagnostics, model)
         ),
     })
+}
+
+/// The result document of an update: the new render is kept under `new_version`.
+fn updated_document(updated: mesh_runtime::Update, new_version: u64) -> String {
+    let patches = mesh_runtime::patches_to_json(&updated.patches);
+    let instances = if updated.render.instances().next().is_none() {
+        String::new()
+    } else {
+        format!(",\"instances\":{}", updated.render.instances_to_json())
+    };
+    let handle = retained::keep(updated.render.with_version(new_version));
+    format!("{{\"handle\":{handle},\"patches\":{patches}{instances}}}")
 }
 
 /// Updates a render by the encoded `changes` (`mesh_runtime::update_changes`):
@@ -210,40 +265,51 @@ pub fn respond_update_changes(
     model: &str,
     previous_handle: Option<u32>,
     previous_bytes: &[u8],
+    previous_units_bytes: &[u8],
     version: u64,
     new_version: u64,
     changes_bytes: &[u8],
     verify_bytes: Option<&[u8]>,
+    units_bytes: &[u8],
 ) -> Result<String, Refusal> {
     use mesh_runtime::{Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
 
     let templates = decode_texts(templates)?;
     let changes = decode_value(changes_bytes)?;
     let verify = verify_bytes.map(decode_snapshot).transpose()?;
+    let units = decode_units(units_bytes)?;
     let result = match mesh_runtime::Changes::from_host(&changes) {
         Err(diagnostics) => Err(diagnostics),
         Ok(changes) => {
             let held = previous_handle.and_then(|handle| {
                 retained::with(handle, |previous| {
-                    mesh_runtime::update_changes(previous, &changes, verify.as_ref())
+                    mesh_runtime::update_changes_units(
+                        previous,
+                        &changes,
+                        verify.as_ref(),
+                        Some(&units),
+                    )
                 })
             });
             match held {
                 Some(result) => result,
                 None if !previous_bytes.is_empty() => {
                     let previous_snapshot = decode_snapshot(previous_bytes)?;
+                    let previous_units = decode_units(previous_units_bytes)?;
                     let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
                     let program = Program {
                         root,
                         templates: &texts,
                     };
-                    mesh_runtime::render(&program, model, &previous_snapshot).and_then(|previous| {
-                        mesh_runtime::update_changes(
-                            &previous.with_version(version),
-                            &changes,
-                            verify.as_ref(),
-                        )
-                    })
+                    mesh_runtime::render_units(&program, model, &previous_snapshot, &previous_units)
+                        .and_then(|previous| {
+                            mesh_runtime::update_changes_units(
+                                &previous.with_version(version),
+                                &changes,
+                                verify.as_ref(),
+                                Some(&units),
+                            )
+                        })
                 }
                 None => Err(vec![RuntimeDiagnostic::new(
                     RuntimeCode::CHANGES_BASE_MISMATCH,
@@ -254,11 +320,7 @@ pub fn respond_update_changes(
         }
     };
     Ok(match result {
-        Ok(updated) => {
-            let patches = mesh_runtime::patches_to_json(&updated.patches);
-            let handle = retained::keep(updated.render.with_version(new_version));
-            format!("{{\"handle\":{handle},\"patches\":{patches}}}")
-        }
+        Ok(updated) => updated_document(updated, new_version),
         Err(diagnostics) => format!(
             "{{\"diagnostics\":{}}}",
             mesh_runtime::to_json(&diagnostics, model)
@@ -298,11 +360,13 @@ pub fn respond_dispatch(
     templates: &[u8],
     model: &str,
     snapshot_bytes: &[u8],
+    units_bytes: &[u8],
     handler: &str,
     payload_bytes: Option<&[u8]>,
 ) -> Result<String, Refusal> {
     let templates = decode_texts(templates)?;
     let snapshot = decode_snapshot(snapshot_bytes)?;
+    let units = std::rc::Rc::new(decode_units(units_bytes)?);
     let payload = payload_bytes.map(decode_value).transpose()?;
     let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
     let program = Program {
@@ -310,7 +374,14 @@ pub fn respond_dispatch(
         templates: &texts,
     };
     Ok(
-        match mesh_runtime::dispatch_from(&program, model, &snapshot, handler, payload.as_ref()) {
+        match mesh_runtime::dispatch_from_units(
+            &program,
+            model,
+            &snapshot,
+            &units,
+            handler,
+            payload.as_ref(),
+        ) {
             Ok(intent) => format!("{{\"intent\":{}}}", intent.to_json()),
             Err(diagnostics) => format!(
                 "{{\"diagnostics\":{}}}",
@@ -318,6 +389,74 @@ pub fn respond_dispatch(
             ),
         },
     )
+}
+
+/// The result document of a raise: the intent of the handler the caller bound, or that there was none.
+fn raised_document(
+    result: Result<Option<mesh_runtime::Intent>, Vec<mesh_runtime::RuntimeDiagnostic>>,
+    model: &str,
+) -> String {
+    match result {
+        Ok(Some(intent)) => format!("{{\"intent\":{}}}", intent.to_json()),
+        Ok(None) => "{\"nothing\":true}".to_string(),
+        Err(diagnostics) => format!(
+            "{{\"diagnostics\":{}}}",
+            mesh_runtime::to_json(&diagnostics, model)
+        ),
+    }
+}
+
+/// Raises `event` of the unit occurrence `instance` of the kept render `handle` names, with the encoded
+/// `payload` (absent when `None`): `{"intent": <intent>}`, `{"nothing": true}` when the caller bound
+/// no handler to it, or `{"diagnostics": ...}`. A handle the module doesn't hold is a refusal.
+pub fn respond_raise_kept(
+    model: &str,
+    handle: u32,
+    instance: &str,
+    event: &str,
+    payload_bytes: Option<&[u8]>,
+) -> Result<String, Refusal> {
+    let payload = payload_bytes.map(decode_value).transpose()?;
+    let result = retained::with(handle, |render| {
+        mesh_runtime::raise(render, instance, event, payload.as_ref())
+    })
+    .ok_or_else(|| Refusal::Input("the module holds no such render".to_string()))?;
+    Ok(raised_document(result, model))
+}
+
+/// [`respond_raise_kept`], against a render's inputs as the wrapper kept them.
+#[allow(clippy::too_many_arguments)]
+pub fn respond_raise(
+    root: &str,
+    templates: &[u8],
+    model: &str,
+    snapshot_bytes: &[u8],
+    units_bytes: &[u8],
+    instance: &str,
+    event: &str,
+    payload_bytes: Option<&[u8]>,
+) -> Result<String, Refusal> {
+    let templates = decode_texts(templates)?;
+    let snapshot = decode_snapshot(snapshot_bytes)?;
+    let units = std::rc::Rc::new(decode_units(units_bytes)?);
+    let payload = payload_bytes.map(decode_value).transpose()?;
+    let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+    let program = Program {
+        root,
+        templates: &texts,
+    };
+    Ok(raised_document(
+        mesh_runtime::raise_from_units(
+            &program,
+            model,
+            &snapshot,
+            &units,
+            instance,
+            event,
+            payload.as_ref(),
+        ),
+        model,
+    ))
 }
 
 /// The events declared by the program of `root` and the encoded

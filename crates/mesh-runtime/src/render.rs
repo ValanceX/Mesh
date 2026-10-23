@@ -20,6 +20,9 @@ use mesh_template::{Child, Element, Expression};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
+/// A composite occurrence's scope, and the occurrence as a unit when its component has one.
+pub(crate) type Bound = (BTreeMap<String, Value>, Option<Rc<Instance>>);
+
 /// A unit occurrence a render met (docs/manual/runtime.md, "Units"): where it is, whose unit it is,
 /// and the state it was rendered with. A host keeps the state of the occurrences it has changed, and
 /// lets go of those a later render no longer lists.
@@ -88,6 +91,28 @@ impl Render {
     /// of the state of any occurrence that is not here.
     pub fn instances(&self) -> impl Iterator<Item = &Instance> {
         self.instances.iter().map(|instance| &**instance)
+    }
+
+    /// The unit occurrences as a JSON array, for a host that cannot hold them as Rust values:
+    /// `[ { "instance", "component", "state", "controlled" } ]`.
+    pub fn instances_to_json(&self) -> String {
+        serde_json::Value::Array(
+            self.instances
+                .iter()
+                .map(|instance| {
+                    let mut item = serde_json::json!({
+                        "instance": instance.key,
+                        "component": instance.component,
+                        "state": instance.state,
+                    });
+                    if !instance.controlled.is_empty() {
+                        item["controlled"] = serde_json::json!(instance.controlled);
+                    }
+                    item
+                })
+                .collect(),
+        )
+        .to_string()
     }
 
     /// This render's version: unique among the renders made in this thread.
@@ -177,7 +202,9 @@ pub fn render_units(
     let valid = program::validate(program, model)?;
     let values = validated_values(&valid, snapshot)?;
     let units = Rc::new(units.clone());
-    let Rendered { tree, instances, .. } = tree_of(&valid, &values, false, None, &units)?;
+    let Rendered {
+        tree, instances, ..
+    } = tree_of(&valid, &values, false, None, &units)?;
     Ok(Render {
         root: program.root.to_string(),
         templates: program
@@ -228,7 +255,10 @@ pub fn update_with_units(
     snapshot: HostRecord,
     units: Option<&Units>,
 ) -> Result<Update, Vec<RuntimeDiagnostic>> {
-    let units = units.map_or_else(|| Rc::clone(&previous.units), |units| Rc::new(units.clone()));
+    let units = units.map_or_else(
+        || Rc::clone(&previous.units),
+        |units| Rc::new(units.clone()),
+    );
     let templates: Vec<&str> = previous.templates.iter().map(String::as_str).collect();
     let valid = program::validate(
         &Program {
@@ -238,13 +268,9 @@ pub fn update_with_units(
         &previous.model,
     )?;
     let values = validated_values(&valid, &snapshot)?;
-    let Rendered { tree, instances, .. } = tree_of(
-        &valid,
-        &values,
-        false,
-        Some(&previous.tree.root),
-        &units,
-    )?;
+    let Rendered {
+        tree, instances, ..
+    } = tree_of(&valid, &values, false, Some(&previous.tree.root), &units)?;
     let patches = crate::patch::diff(&previous.tree, &tree);
     Ok(Update {
         render: Render {
@@ -292,7 +318,10 @@ pub fn update_changes_units(
     verify: Option<&HostRecord>,
     units: Option<&Units>,
 ) -> Result<Update, Vec<RuntimeDiagnostic>> {
-    let units = units.map_or_else(|| Rc::clone(&previous.units), |units| Rc::new(units.clone()));
+    let units = units.map_or_else(
+        || Rc::clone(&previous.units),
+        |units| Rc::new(units.clone()),
+    );
     if changes.base != previous.id {
         return Err(vec![RuntimeDiagnostic::new(
             RuntimeCode::CHANGES_BASE_MISMATCH,
@@ -326,8 +355,9 @@ pub fn update_changes_units(
             )]);
         }
     }
-    let Rendered { tree, instances, .. } =
-        tree_of(&valid, &values, false, Some(&previous.tree.root), &units)?;
+    let Rendered {
+        tree, instances, ..
+    } = tree_of(&valid, &values, false, Some(&previous.tree.root), &units)?;
     let patches = crate::patch::diff(&previous.tree, &tree);
     Ok(Update {
         render: Render {
@@ -754,7 +784,7 @@ pub(crate) fn bind(
     element: &Element,
     key: Option<&str>,
     units: &Units,
-) -> Result<(BTreeMap<String, Value>, Option<Rc<Instance>>), RuntimeDiagnostic> {
+) -> Result<Bound, RuntimeDiagnostic> {
     let composite = valid.component(&element.component);
     let mut written = BTreeMap::new();
     for prop in &element.props {
@@ -840,10 +870,7 @@ pub(crate) fn bind(
                         PathSegment::Name(key.to_string()),
                         PathSegment::Name(name.clone()),
                     ],
-                    format!(
-                        "`{}` has no unit state field `{name}`",
-                        element.component
-                    ),
+                    format!("`{}` has no unit state field `{name}`", element.component),
                 );
             }
         }
@@ -853,7 +880,12 @@ pub(crate) fn bind(
     }
     let state = state
         .iter()
-        .map(|(name, value)| (name.clone(), output(value).unwrap_or(serde_json::Value::Null)))
+        .map(|(name, value)| {
+            (
+                name.clone(),
+                output(value).unwrap_or(serde_json::Value::Null),
+            )
+        })
         .collect();
     Ok((
         values,
@@ -1003,7 +1035,7 @@ impl<'v> Renderer<'v> {
         element: &'v Element,
         position: usize,
         path: &mut Vec<Step>,
-    ) -> Result<(BTreeMap<String, Value>, Option<Rc<Instance>>), RuntimeDiagnostic> {
+    ) -> Result<Bound, RuntimeDiagnostic> {
         // An occurrence of a component with a unit is a place of its own: its key is the key of the
         // path to it, composite step included.
         let key = self
@@ -1408,10 +1440,7 @@ impl<'v> Renderer<'v> {
                         } else {
                             Vec::new()
                         },
-                        instance: self
-                            .frames
-                            .last()
-                            .and_then(|frame| frame.instance.clone()),
+                        instance: self.frames.last().and_then(|frame| frame.instance.clone()),
                     },
                 );
             }

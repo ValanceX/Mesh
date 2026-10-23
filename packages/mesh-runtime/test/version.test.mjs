@@ -39,6 +39,8 @@ const RENDER_EXPORTS = [
   "mesh_update",
   "mesh_update_changes",
   "mesh_dispatch_kept",
+  "mesh_raise_kept",
+  "mesh_raise",
   "mesh_release",
   "mesh_dispatch",
   "mesh_declared_events",

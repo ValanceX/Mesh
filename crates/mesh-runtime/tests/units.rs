@@ -107,15 +107,26 @@ fn tree_json(render: &Render) -> Value {
 
 /// The key of the occurrence whose `label` is `label`, in a render of `LIST`.
 fn instance_of(render: &Render, label: &str) -> String {
-    let keys: Vec<&str> = render.instances().map(|instance| instance.key.as_str()).collect();
-    let labels: Vec<String> = serde_json::from_str::<Value>(&render.tree().to_json())
-        .unwrap()["root"]["children"][1]["children"]
+    let keys: Vec<&str> = render
+        .instances()
+        .map(|instance| instance.key.as_str())
+        .collect();
+    let labels: Vec<String> = serde_json::from_str::<Value>(&render.tree().to_json()).unwrap()
+        ["root"]["children"][1]["children"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|node| node["children"][0]["children"][0]["text"].as_str().unwrap().to_string())
+        .map(|node| {
+            node["children"][0]["children"][0]["text"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
         .collect();
-    let at = labels.iter().position(|each| each == label).expect("a row with the label");
+    let at = labels
+        .iter()
+        .position(|each| each == label)
+        .expect("a row with the label");
     keys[at].to_string()
 }
 
@@ -139,8 +150,12 @@ fn an_occurrence_with_no_entry_has_the_defaults_and_is_listed() {
     let listed: Vec<_> = render.instances().collect();
 
     assert_eq!(listed.len(), 3);
-    assert!(listed.iter().all(|instance| instance.component == "disclosure"));
-    assert!(listed.iter().all(|instance| instance.state["open"] == json!(false)));
+    assert!(listed
+        .iter()
+        .all(|instance| instance.component == "disclosure"));
+    assert!(listed
+        .iter()
+        .all(|instance| instance.state["open"] == json!(false)));
     assert!(listed.iter().all(|instance| instance.controlled.is_empty()));
     assert_eq!(texts_of(&render), ["top", "a", "b", "c"]);
 }
@@ -149,10 +164,19 @@ fn an_occurrence_with_no_entry_has_the_defaults_and_is_listed() {
 fn the_host_s_state_for_an_occurrence_is_what_the_template_sees() {
     let plain = ok(LIST, SNAPSHOT, &Units::default());
     let b = instance_of(&plain, "b");
-    let render = ok(LIST, SNAPSHOT, &units(&format!(r#"[{{ "instance": "{b}", "state": {{ "open": true }} }}]"#)));
+    let render = ok(
+        LIST,
+        SNAPSHOT,
+        &units(&format!(
+            r#"[{{ "instance": "{b}", "state": {{ "open": true }} }}]"#
+        )),
+    );
 
     assert_eq!(texts_of(&render), ["top", "a", "b", "open b", "c"]);
-    assert_eq!(render.instances().find(|i| i.key == b).unwrap().state["open"], json!(true));
+    assert_eq!(
+        render.instances().find(|i| i.key == b).unwrap().state["open"],
+        json!(true)
+    );
 }
 
 #[test]
@@ -180,12 +204,17 @@ fn a_reorder_keeps_the_state_with_the_row_and_an_unlisted_key_is_ignored() {
 fn a_part_the_update_keeps_is_not_kept_when_a_unit_under_it_has_changed() {
     let (before, texts) = made(LIST, SNAPSHOT, &Units::default()).unwrap();
     let b = instance_of(&before, "b");
-    let given = units(&format!(r#"[{{ "instance": "{b}", "state": {{ "open": true }} }}]"#));
+    let given = units(&format!(
+        r#"[{{ "instance": "{b}", "state": {{ "open": true }} }}]"#
+    ));
     // The same snapshot, other units: nothing the snapshot says has changed.
     let updated = update_with_units(&before, snapshot(SNAPSHOT), Some(&given)).unwrap();
     let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
     let fresh = render_units(
-        &Program { root: "page", templates: &refs },
+        &Program {
+            root: "page",
+            templates: &refs,
+        },
         MODEL,
         &snapshot(SNAPSHOT),
         &given,
@@ -194,12 +223,17 @@ fn a_part_the_update_keeps_is_not_kept_when_a_unit_under_it_has_changed() {
 
     assert_eq!(tree_json(&updated.render), tree_json(&fresh));
     assert_eq!(texts_of(&updated.render), ["top", "a", "b", "open b", "c"]);
-    assert!(!updated.patches.is_empty(), "{}", patches_to_json(&updated.patches));
+    assert!(
+        !updated.patches.is_empty(),
+        "{}",
+        patches_to_json(&updated.patches)
+    );
     // The occurrences are listed again, though most of the tree was kept.
     assert_eq!(updated.render.instances().count(), 3);
 
     // And back to the defaults.
-    let back = update_with_units(&updated.render, snapshot(SNAPSHOT), Some(&Units::default())).unwrap();
+    let back =
+        update_with_units(&updated.render, snapshot(SNAPSHOT), Some(&Units::default())).unwrap();
 
     assert_eq!(texts_of(&back.render), ["top", "a", "b", "c"]);
     // With none given, an update keeps the units the render had.
@@ -229,7 +263,9 @@ fn a_command_of_the_unit_names_the_occurrence_it_is_for() {
 fn a_handler_s_arguments_are_evaluated_against_the_state_the_person_saw() {
     let plain = ok(CONTROLLED_FREE, SNAPSHOT, &Units::default());
     let tabs = plain.instances().next().unwrap().key.clone();
-    let given = units(&format!(r#"[{{ "instance": "{tabs}", "state": {{ "at": 4 }} }}]"#));
+    let given = units(&format!(
+        r#"[{{ "instance": "{tabs}", "state": {{ "at": 4 }} }}]"#
+    ));
     let render = ok(CONTROLLED_FREE, SNAPSHOT, &given);
     let intent = dispatch(&render, &common::handler(&render, "click"), None).unwrap();
 
@@ -252,7 +288,9 @@ fn a_controllable_field_takes_the_callers_prop_and_the_intent_says_so() {
     assert_eq!(owned.instances().next().unwrap().controlled, ["at"]);
     assert!(free.instances().next().unwrap().controlled.is_empty());
 
-    let given = units(&format!(r#"[{{ "instance": "{key}", "state": {{ "at": 7 }} }}]"#));
+    let given = units(&format!(
+        r#"[{{ "instance": "{key}", "state": {{ "at": 7 }} }}]"#
+    ));
     let still = ok(CONTROLLED, SNAPSHOT, &given);
 
     assert_eq!(texts_of(&still), ["at 2"]);
@@ -271,11 +309,17 @@ fn a_host_state_the_manifest_forbids_is_refused_at_its_path() {
     let key = plain.instances().next().unwrap().key.clone();
     let texts = templates(ONE);
     let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
-    let program = Program { root: "page", templates: &refs };
+    let program = Program {
+        root: "page",
+        templates: &refs,
+    };
 
     for (state, code) in [
         (r#"{ "open": "yes" }"#, "runtime-value-mismatch"),
-        (r#"{ "open": true, "shut": false }"#, "runtime-unknown-field"),
+        (
+            r#"{ "open": true, "shut": false }"#,
+            "runtime-unknown-field",
+        ),
     ] {
         let given = units(&format!(r#"[{{ "instance": "{key}", "state": {state} }}]"#));
         let refused = render_units(&program, MODEL, &snapshot(SNAPSHOT), &given).unwrap_err();
@@ -285,13 +329,22 @@ fn a_host_state_the_manifest_forbids_is_refused_at_its_path() {
 
     // A render without the units is not affected by them.
     assert!(render(&program, MODEL, &snapshot(SNAPSHOT)).is_ok());
-    assert!(matches!(HostValue::from_json("1").unwrap(), HostValue::Number(_)));
+    assert!(matches!(
+        HostValue::from_json("1").unwrap(),
+        HostValue::Number(_)
+    ));
 }
 
 #[test]
 fn units_are_read_from_json_or_refused() {
     assert!(Units::from_json("[]").unwrap().0.is_empty());
-    for bad in ["{}", "[1]", r#"[{ "instance": 1, "state": {} }]"#, r#"[{ "instance": "a" }]"#, r#"[{ "instance": "a", "state": {} }, { "instance": "a", "state": {} }]"#] {
+    for bad in [
+        "{}",
+        "[1]",
+        r#"[{ "instance": 1, "state": {} }]"#,
+        r#"[{ "instance": "a" }]"#,
+        r#"[{ "instance": "a", "state": {} }, { "instance": "a", "state": {} }]"#,
+    ] {
         assert!(Units::from_json(bad).is_err(), "{bad}");
     }
 }
@@ -301,9 +354,14 @@ fn a_unit_raises_an_event_to_the_handler_its_caller_bound() {
     let bound = ok(UNCONTROLLED, SNAPSHOT, &Units::default());
     let key = bound.instances().next().unwrap().key.clone();
     let five = HostValue::from_json("5").unwrap();
-    let intent = mesh_runtime::raise(&bound, &key, "change", Some(&five)).unwrap().expect("the caller bound the event");
+    let intent = mesh_runtime::raise(&bound, &key, "change", Some(&five))
+        .unwrap()
+        .expect("the caller bound the event");
 
-    assert_eq!((intent.component.as_str(), intent.command.as_str()), ("page", "chose"));
+    assert_eq!(
+        (intent.component.as_str(), intent.command.as_str()),
+        ("page", "chose")
+    );
     assert_eq!(intent.arguments, [Some(json!(5))]);
     // A command of the page, not of the unit: no occurrence is named.
     assert_eq!(intent.instance, None);
@@ -312,7 +370,10 @@ fn a_unit_raises_an_event_to_the_handler_its_caller_bound() {
     let quiet = ok("<box><tabs count={3} /></box>", SNAPSHOT, &Units::default());
     let key = quiet.instances().next().unwrap().key.clone();
 
-    assert_eq!(mesh_runtime::raise(&quiet, &key, "change", Some(&five)).unwrap(), None);
+    assert_eq!(
+        mesh_runtime::raise(&quiet, &key, "change", Some(&five)).unwrap(),
+        None
+    );
 }
 
 #[test]
@@ -322,8 +383,20 @@ fn raising_what_does_not_exist_is_refused() {
     let five = HostValue::from_json("5").unwrap();
     let text = HostValue::from_json("\"five\"").unwrap();
 
-    assert_eq!(codes(&mesh_runtime::raise(&render, "k-nowhere", "change", Some(&five)).unwrap_err()), ["runtime-unknown-instance"]);
-    assert_eq!(codes(&mesh_runtime::raise(&render, &key, "shout", Some(&five)).unwrap_err()), ["runtime-unknown-event"]);
-    assert_eq!(codes(&mesh_runtime::raise(&render, &key, "change", Some(&text)).unwrap_err()), ["runtime-value-mismatch"]);
-    assert_eq!(codes(&mesh_runtime::raise(&render, &key, "change", None).unwrap_err()), ["runtime-missing-value"]);
+    assert_eq!(
+        codes(&mesh_runtime::raise(&render, "k-nowhere", "change", Some(&five)).unwrap_err()),
+        ["runtime-unknown-instance"]
+    );
+    assert_eq!(
+        codes(&mesh_runtime::raise(&render, &key, "shout", Some(&five)).unwrap_err()),
+        ["runtime-unknown-event"]
+    );
+    assert_eq!(
+        codes(&mesh_runtime::raise(&render, &key, "change", Some(&text)).unwrap_err()),
+        ["runtime-value-mismatch"]
+    );
+    assert_eq!(
+        codes(&mesh_runtime::raise(&render, &key, "change", None).unwrap_err()),
+        ["runtime-missing-value"]
+    );
 }

@@ -109,7 +109,37 @@ export interface CommandIntent {
   };
   /** One entry per parameter, in order. */
   readonly arguments: readonly IntentArgument[];
+  /**
+   * For a command of a component's unit: the occurrence it is for, by the key the render gave it
+   * (`Render.instances`). The host holds the unit's state per occurrence.
+   */
+  readonly instance?: string;
+  /** With `instance`: the unit's fields the caller owned when the event was dispatched, whose change the host does not apply. */
+  readonly controlled?: readonly string[];
 }
+
+/**
+ * One occurrence of a component with a unit (docs/manual/runtime.md, "Units") in a render's tree.
+ * The host keeps the state of the occurrences it has changed and lets go of those a later render
+ * does not list.
+ */
+export interface UnitOccurrence {
+  /** The occurrence's identity: the key of its place in the program. */
+  readonly instance: string;
+  /** The composite whose unit it is. */
+  readonly component: string;
+  /** The state the render used, each field as the template saw it. */
+  readonly state: Readonly<Record<string, BoundaryValue>>;
+  /** The fields the caller owned in this render (a `controllable` field whose prop was written). Absent when none. */
+  readonly controlled?: readonly string[];
+}
+
+/**
+ * The state of unit occurrences the host holds, by the occurrence's key: for each, the fields of its
+ * unit that differ from the defaults, or all of them. An occurrence with no entry has the defaults;
+ * an entry for an occurrence the render does not contain is ignored.
+ */
+export type UnitStates = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
 /** A present argument, or an absent one (where the parameter is optional), which isn't `null`. */
 export type IntentArgument = { readonly value: BoundaryValue } | { readonly absent: true };

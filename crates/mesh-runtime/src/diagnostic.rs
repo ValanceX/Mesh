@@ -83,7 +83,8 @@ impl RuntimeCode {
         RuntimeCode("runtime-handler-other-program", Form::Handler);
     pub const UNKNOWN_HANDLER: RuntimeCode = RuntimeCode("runtime-unknown-handler", Form::Handler);
     // Raising an event of a unit occurrence.
-    pub const UNKNOWN_INSTANCE: RuntimeCode = RuntimeCode("runtime-unknown-instance", Form::Handler);
+    pub const UNKNOWN_INSTANCE: RuntimeCode =
+        RuntimeCode("runtime-unknown-instance", Form::Handler);
     pub const UNKNOWN_EVENT: RuntimeCode = RuntimeCode("runtime-unknown-event", Form::Handler);
     // Changes to a render's snapshot (`update_changes`).
     pub const CHANGES_BASE_MISMATCH: RuntimeCode =

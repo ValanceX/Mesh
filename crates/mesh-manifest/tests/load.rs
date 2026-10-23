@@ -1136,21 +1136,39 @@ fn a_unit_s_state_joins_the_scope_and_its_commands_join_the_commands() {
 
     assert!(!unit.state["open"].controllable && unit.state["at"].controllable);
     assert_eq!(unit.commands.len(), 2);
-    assert!(load(&component("{}", "{}", "{}", "{}")).unwrap().component("c").unwrap().1.unit.is_none());
+    assert!(load(&component("{}", "{}", "{}", "{}"))
+        .unwrap()
+        .component("c")
+        .unwrap()
+        .1
+        .unit
+        .is_none());
 }
 
 #[test]
 fn a_unit_name_that_is_already_taken_is_refused_where_it_is_written() {
-    let state = |name: &str| format!(r#"{{ "state": {{ "{name}": {{ "type": {{ "kind": "string" }}, "default": "" }} }} }}"#);
+    let state = |name: &str| {
+        format!(
+            r#"{{ "state": {{ "{name}": {{ "type": {{ "kind": "string" }}, "default": "" }} }} }}"#
+        )
+    };
     let controllable = r#"{ "state": { "v": { "type": { "kind": "string" }, "default": "", "controllable": true } } }"#;
-    let prop = |required: bool, ty: &str| format!(r#"{{ "v": {{ "type": {ty}, "required": {required} }} }}"#);
+    let prop = |required: bool, ty: &str| {
+        format!(r#"{{ "v": {{ "type": {ty}, "required": {required} }} }}"#)
+    };
     let string = r#"{ "kind": "string" }"#;
     let number = r#"{ "kind": "number" }"#;
 
     // A scope name, a command, and a prop of the same name (not controllable).
     for (what, source) in [
-        ("a scope name", with_unit("{}", r#"{ "v": { "kind": "string" } }"#, "{}", &state("v"))),
-        ("a prop", with_unit(&prop(false, string), "{}", "{}", &state("v"))),
+        (
+            "a scope name",
+            with_unit("{}", r#"{ "v": { "kind": "string" } }"#, "{}", &state("v")),
+        ),
+        (
+            "a prop",
+            with_unit(&prop(false, string), "{}", "{}", &state("v")),
+        ),
         (
             "a command",
             with_unit(
@@ -1160,8 +1178,14 @@ fn a_unit_name_that_is_already_taken_is_refused_where_it_is_written() {
                 r#"{ "commands": { "go": { "parameters": [] } } }"#,
             ),
         ),
-        ("a required prop", with_unit(&prop(true, string), "{}", "{}", controllable)),
-        ("a prop of another type", with_unit(&prop(false, number), "{}", "{}", controllable)),
+        (
+            "a required prop",
+            with_unit(&prop(true, string), "{}", "{}", controllable),
+        ),
+        (
+            "a prop of another type",
+            with_unit(&prop(false, number), "{}", "{}", controllable),
+        ),
     ] {
         let found = errors(&source);
 
@@ -1170,7 +1194,8 @@ fn a_unit_name_that_is_already_taken_is_refused_where_it_is_written() {
     }
 
     // A controllable field may share the name of an optional prop of its own type.
-    load(&with_unit(&prop(false, string), "{}", "{}", controllable)).expect("a controllable field may share an optional prop's name");
+    load(&with_unit(&prop(false, string), "{}", "{}", controllable))
+        .expect("a controllable field may share an optional prop's name");
 }
 
 #[test]

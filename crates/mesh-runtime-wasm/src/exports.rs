@@ -92,7 +92,8 @@ fn keep(result: Option<Result<String, Refusal>>) -> u32 {
 }
 
 /// Renders (`crate::respond_render`): the root's name, the templates as a
-/// text list, the manifest, and the snapshot, encoded.
+/// text list, the manifest, the snapshot, encoded, and the units, encoded
+/// (empty for none).
 ///
 /// # Safety
 ///
@@ -109,6 +110,8 @@ pub unsafe extern "C" fn mesh_render(
     model_len: usize,
     snapshot: *const u8,
     snapshot_len: usize,
+    units: *const u8,
+    units_len: usize,
 ) -> u32 {
     // SAFETY: the caller's guarantee, passed on for each input.
     let result = unsafe {
@@ -118,6 +121,7 @@ pub unsafe extern "C" fn mesh_render(
                 bytes(templates, templates_len),
                 model,
                 bytes(snapshot, snapshot_len),
+                bytes(units, units_len),
             )),
             _ => None,
         }
@@ -126,8 +130,8 @@ pub unsafe extern "C" fn mesh_render(
 }
 
 /// Updates (`crate::respond_update`): a render's inputs, as
-/// [`mesh_render`] took them, with the render's snapshot, then the new
-/// snapshot, encoded, then the new render's version and the previous render's
+/// [`mesh_render`] took them, with the render's snapshot and its units, then
+/// the new snapshot and the new units, encoded, then the new render's version and the previous render's
 /// handle, which is used when `has_handle` is not 0 and the module still
 /// holds it.
 ///
@@ -146,8 +150,12 @@ pub unsafe extern "C" fn mesh_update(
     model_len: usize,
     previous: *const u8,
     previous_len: usize,
+    previous_units: *const u8,
+    previous_units_len: usize,
     snapshot: *const u8,
     snapshot_len: usize,
+    units: *const u8,
+    units_len: usize,
     new_version: f64,
     handle: u32,
     has_handle: u32,
@@ -161,7 +169,9 @@ pub unsafe extern "C" fn mesh_update(
                 model,
                 (has_handle != 0).then_some(handle),
                 bytes(previous, previous_len),
+                bytes(previous_units, previous_units_len),
                 bytes(snapshot, snapshot_len),
+                bytes(units, units_len),
                 new_version as u64,
             )),
             _ => None,
@@ -199,10 +209,14 @@ pub unsafe extern "C" fn mesh_update_changes(
     model_len: usize,
     previous: *const u8,
     previous_len: usize,
+    previous_units: *const u8,
+    previous_units_len: usize,
     changes: *const u8,
     changes_len: usize,
     verify: *const u8,
     verify_len: usize,
+    units: *const u8,
+    units_len: usize,
     has_verify: u32,
     version: f64,
     new_version: f64,
@@ -218,10 +232,12 @@ pub unsafe extern "C" fn mesh_update_changes(
                 model,
                 (has_handle != 0).then_some(handle),
                 bytes(previous, previous_len),
+                bytes(previous_units, previous_units_len),
                 version as u64,
                 new_version as u64,
                 bytes(changes, changes_len),
                 (has_verify != 0).then(|| bytes(verify, verify_len)),
+                bytes(units, units_len),
             )),
             _ => None,
         }
@@ -283,6 +299,8 @@ pub unsafe extern "C" fn mesh_dispatch(
     model_len: usize,
     snapshot: *const u8,
     snapshot_len: usize,
+    units: *const u8,
+    units_len: usize,
     handler: *const u8,
     handler_len: usize,
     payload: *const u8,
@@ -301,7 +319,103 @@ pub unsafe extern "C" fn mesh_dispatch(
                 bytes(templates, templates_len),
                 model,
                 bytes(snapshot, snapshot_len),
+                bytes(units, units_len),
                 handler,
+                (has_payload != 0).then(|| bytes(payload, payload_len)),
+            )),
+            _ => None,
+        }
+    };
+    keep(result)
+}
+
+/// Raises an event of a unit occurrence against a kept render (`crate::respond_raise_kept`): the
+/// model's text, the occurrence's key, the event's name and the payload, encoded (absent when
+/// `has_payload` is 0); then the render's handle.
+///
+/// # Safety
+///
+/// Each pointer must point to its length's initialized bytes, unless that
+/// length is 0.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mesh_raise_kept(
+    model: *const u8,
+    model_len: usize,
+    instance: *const u8,
+    instance_len: usize,
+    event: *const u8,
+    event_len: usize,
+    payload: *const u8,
+    payload_len: usize,
+    has_payload: u32,
+    handle: u32,
+) -> u32 {
+    // SAFETY: the caller's guarantee, passed on for each input.
+    let result = unsafe {
+        match (
+            text(model, model_len),
+            text(instance, instance_len),
+            text(event, event_len),
+        ) {
+            (Some(model), Some(instance), Some(event)) => Some(crate::respond_raise_kept(
+                model,
+                handle,
+                instance,
+                event,
+                (has_payload != 0).then(|| bytes(payload, payload_len)),
+            )),
+            _ => None,
+        }
+    };
+    keep(result)
+}
+
+/// Raises an event of a unit occurrence (`crate::respond_raise`): a render's inputs, as
+/// [`mesh_render`] took them, then the occurrence's key, the event's name and the payload, encoded,
+/// which is absent when `has_payload` is 0.
+///
+/// # Safety
+///
+/// Each pointer must point to its length's initialized bytes, unless that
+/// length is 0.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mesh_raise(
+    root: *const u8,
+    root_len: usize,
+    templates: *const u8,
+    templates_len: usize,
+    model: *const u8,
+    model_len: usize,
+    snapshot: *const u8,
+    snapshot_len: usize,
+    units: *const u8,
+    units_len: usize,
+    instance: *const u8,
+    instance_len: usize,
+    event: *const u8,
+    event_len: usize,
+    payload: *const u8,
+    payload_len: usize,
+    has_payload: u32,
+) -> u32 {
+    // SAFETY: the caller's guarantee, passed on for each input.
+    let result = unsafe {
+        match (
+            text(root, root_len),
+            text(model, model_len),
+            text(instance, instance_len),
+            text(event, event_len),
+        ) {
+            (Some(root), Some(model), Some(instance), Some(event)) => Some(crate::respond_raise(
+                root,
+                bytes(templates, templates_len),
+                model,
+                bytes(snapshot, snapshot_len),
+                bytes(units, units_len),
+                instance,
+                event,
                 (has_payload != 0).then(|| bytes(payload, payload_len)),
             )),
             _ => None,

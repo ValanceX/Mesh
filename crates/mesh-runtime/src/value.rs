@@ -63,7 +63,10 @@ impl Units {
             let (Some(HostValue::String(instance)), Some(HostValue::Record(state))) =
                 (entry.get("instance"), entry.get("state"))
             else {
-                return Err("each of the units has an \"instance\" (text) and a \"state\" (an object)".to_string());
+                return Err(
+                    "each of the units has an \"instance\" (text) and a \"state\" (an object)"
+                        .to_string(),
+                );
             };
             if units.insert(instance.clone(), state.clone()).is_some() {
                 return Err(format!("the unit {instance:?} is given twice"));

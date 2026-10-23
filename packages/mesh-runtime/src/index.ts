@@ -29,6 +29,7 @@ import {
   declaredEvents as declaredEventsWith,
   dispatch as dispatchWith,
   init as initWith,
+  raise as raiseWith,
   render as renderWith,
   update as updateWith,
   updateChanges as updateChangesWith,
@@ -40,10 +41,12 @@ import type {
   DeclaredEventsResult,
   DispatchResult,
   ModuleSource,
+  RaiseResult,
   RenderInput,
   RenderResult,
   UpdateResult,
 } from "./engine.js";
+import type { UnitStates } from "./types.js";
 
 export type {
   Change,
@@ -55,6 +58,7 @@ export type {
   DispatchResult,
   ModuleSource,
   ProgramInput,
+  RaiseResult,
   RenderInput,
   RenderResult,
   UpdateResult,
@@ -77,6 +81,8 @@ export type {
   SourceOffset,
   SourceSpan,
   TextRun,
+  UnitOccurrence,
+  UnitStates,
 } from "./types.js";
 export { MeshInternalError, MeshUsageError, MeshVersionError, Render } from "./engine.js";
 export type { MeshUsageCode } from "./engine.js";
@@ -122,10 +128,14 @@ export function render(input: RenderInput): Promise<RenderResult> {
  * hold (one `render()` made, or one released) is derived again by the update,
  * which then costs a render more.
  *
+ * `units` is the state of the unit occurrences the host holds now (see {@link RenderInput.units}).
+ * Without it the new render is made with the previous render's, which is also what
+ * `updateChanges` does unless `options.units` gives others.
+ *
  * It rejects as {@link render} does.
  */
-export function update(previous: Render, snapshot: Record<string, unknown>): Promise<UpdateResult> {
-  return updateWith(previous, snapshot);
+export function update(previous: Render, snapshot: Record<string, unknown>, units?: UnitStates): Promise<UpdateResult> {
+  return updateWith(previous, snapshot, units);
 }
 
 /**
@@ -166,7 +176,7 @@ export function update(previous: Render, snapshot: Record<string, unknown>): Pro
 export function updateChanges(
   previous: Render,
   changes: Changes,
-  options?: { readonly verify?: Record<string, unknown> },
+  options?: { readonly verify?: Record<string, unknown>; readonly units?: UnitStates },
 ): Promise<UpdateResult> {
   return updateChangesWith(previous, changes, options);
 }
@@ -186,6 +196,22 @@ export function updateChanges(
  */
 export function dispatch(render: Render, handler: string, payload?: unknown): Promise<DispatchResult> {
   return dispatchWith(render, handler, payload);
+}
+
+/**
+ * Raises an event of a unit occurrence, which a unit's transition does to tell its caller
+ * something (docs/manual/runtime.md, "Units"): `instance` is a key from `render.instances`,
+ * `event` one the occurrence's component declares, and `payload` what it carries. Returns
+ * `{ intent }`, the intent of the handler the caller bound to the event (found as an event
+ * forwarded out of a component is), `{ intent: undefined }` when the caller bound none, or
+ * `{ diagnostics }` for an occurrence that is not in the render, an event the component does not
+ * declare, or a payload that does not fit. It renders nothing and changes nothing, and evaluates
+ * against the snapshot and units `render` was made with.
+ *
+ * It rejects as {@link dispatch} does.
+ */
+export function raise(render: Render, instance: string, event: string, payload?: unknown): Promise<RaiseResult> {
+  return raiseWith(render, instance, event, payload);
 }
 
 /**
