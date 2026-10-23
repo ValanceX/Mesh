@@ -1,0 +1,1 @@
+<box><button on.click={toggle()}>{label}</button>{#if open}<text>open {label}</text>{/if}</box>

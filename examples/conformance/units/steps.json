@@ -1,0 +1,137 @@
+[
+  {
+    "case": "the defaults: no state is held for any occurrence",
+    "snapshot": {
+      "tab": 2,
+      "items": [
+        {
+          "id": "a",
+          "label": "a"
+        },
+        {
+          "id": "b",
+          "label": "b"
+        },
+        {
+          "id": "c",
+          "label": "c"
+        }
+      ]
+    },
+    "units": []
+  },
+  {
+    "case": "the host holds state for the occurrence of b: it is open, and only it",
+    "snapshot": {
+      "tab": 2,
+      "items": [
+        {
+          "id": "a",
+          "label": "a"
+        },
+        {
+          "id": "b",
+          "label": "b"
+        },
+        {
+          "id": "c",
+          "label": "c"
+        }
+      ]
+    },
+    "units": [
+      {
+        "instance": "kPmybk0Dh91yPH-SaJ1K3cw",
+        "state": {
+          "open": true
+        }
+      }
+    ]
+  },
+  {
+    "case": "the list is re-sorted: the state is the row's, so b is still the open one",
+    "snapshot": {
+      "tab": 2,
+      "items": [
+        {
+          "id": "c",
+          "label": "c"
+        },
+        {
+          "id": "b",
+          "label": "b"
+        },
+        {
+          "id": "a",
+          "label": "a"
+        }
+      ]
+    },
+    "units": [
+      {
+        "instance": "kPmybk0Dh91yPH-SaJ1K3cw",
+        "state": {
+          "open": true
+        }
+      }
+    ]
+  },
+  {
+    "case": "a row leaves: the state held for it is not used, and the occurrence is not listed",
+    "snapshot": {
+      "tab": 2,
+      "items": [
+        {
+          "id": "a",
+          "label": "a"
+        },
+        {
+          "id": "c",
+          "label": "c"
+        }
+      ]
+    },
+    "units": [
+      {
+        "instance": "kPmybk0Dh91yPH-SaJ1K3cw",
+        "state": {
+          "open": true
+        }
+      }
+    ]
+  },
+  {
+    "case": "a controllable field the caller owns is the caller's value, whatever the host holds",
+    "snapshot": {
+      "tab": 3,
+      "items": [
+        {
+          "id": "a",
+          "label": "a"
+        },
+        {
+          "id": "b",
+          "label": "b"
+        },
+        {
+          "id": "c",
+          "label": "c"
+        }
+      ]
+    },
+    "units": [
+      {
+        "instance": "kPmybk0Dh91yPH-SaJ1K3cw",
+        "state": {
+          "open": true
+        }
+      },
+      {
+        "instance": "kKrBO-ssz_4-3EUoUbt1xPg",
+        "state": {
+          "at": 9
+        }
+      }
+    ]
+  }
+]

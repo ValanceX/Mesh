@@ -1,0 +1,1 @@
+<box><box>{#each items as item (item.id)}<disclosure label={item.label} />{/each}</box><tabs at={tab} on.change={chose($event)} /></box>
