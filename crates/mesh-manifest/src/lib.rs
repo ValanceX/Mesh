@@ -114,6 +114,34 @@ pub struct Event {
 pub struct Command {
     /// The parameters in order. Every one is required.
     pub parameters: Vec<Parameter>,
+    /// What the command does to the application's data, if the manifest says: the host reads it to decide whether to ask a person before it runs a command a
+    /// generated screen asked for (decision G13). It is an annotation: it changes nothing in how a template is checked, compiled or rendered, and is not part
+    /// of a template's fingerprint.
+    pub effect: Option<Effect>,
+    /// What to call the command to a person, in the prompt a host shows before it runs one that changes data. Never taken from text a model wrote.
+    pub title: Option<String>,
+}
+
+/// What a command does to the application's data (decision G13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Effect {
+    /// It changes nothing.
+    Read,
+    /// It changes data and can be changed back.
+    Write,
+    /// It changes data and cannot be changed back.
+    Destructive,
+}
+
+impl Effect {
+    /// The name the manifest writes.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Effect::Read => "read",
+            Effect::Write => "write",
+            Effect::Destructive => "destructive",
+        }
+    }
 }
 
 /// One command parameter.

@@ -128,6 +128,15 @@
             "required": ["name", "type"],
             "additionalProperties": false
           }
+        },
+        "effect": {
+          "enum": ["read", "write", "destructive"],
+          "description": "What the command does to the application's data (decision G13): a host reads it to decide whether to ask a person before it runs a command a generated screen asked for. An annotation: it changes nothing in how a template is checked or rendered."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What to call the command to a person, in the prompt a host shows before a command that changes data."
         }
       },
       "required": ["parameters"],

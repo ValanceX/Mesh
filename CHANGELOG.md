@@ -4,9 +4,24 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-24
+
+Prepared, not yet published. Streaming: checking a source while it arrives (direction Bet 13, WP9). No behavior changes for a source that is checked whole: `check`, `compile` and `checkProgram` give what they gave in 0.16.0.
+
+### Added
+
+- **`openSession` in `@valancex/mesh-compiler`, and `mesh_compiler::stream` in Rust** (`repair`, `step`, `Session`): a stream session over a component model. `push` a chunk and get the diagnostics that are new (a mistake is reported once, at the first prefix that holds it), the diagnostics standing, what is open (`pending`), and, while no error stands, a **preview**: the part that has arrived, checked and compiled to a `template-v1`, to draw as a fresh render. `close` is exactly the batch check of the whole text, however it was cut (property-tested over 100,000 random prefixes and mutations in Rust and 3,000 through WebAssembly). The check is of the **repaired prefix**: the text cut back to its last complete token, with what is open closed, by the module and not by the host. Nothing is kept that was cut inside a start tag, an attribute string, an expression or a block header; a trailing run of text is kept and grows; an open `{#each}` is withheld until it closes; a start tag still being written is checked as far as it has got for what is final about it (a wrong prop is heard when its attribute is complete). A push has a budget of 50 ms of checker time (`budgetMs`): over it, the session ends with `check-budget-exceeded`. See `docs/manual/streaming.md`.
+- **`mesh_stream`** in the WebAssembly module: one stateless export, the check of a repaired prefix.
+- **`effect` and `title` on a command in the manifest** (`"read"`, `"write"` or `"destructive"`; a name for a person): annotations a host reads to ask before it runs a command a generated screen asked for. They change nothing in how a template is checked, compiled or rendered and are not part of a template's fingerprint. `mesh_manifest::{Effect, Command::effect, Command::title}`; the schema `manifest-v1` has both.
+- **`generated/` in `@valancex/mesh-conformance`** (`examples/conformance/generated/`): six pages, eight planted mistakes and the digests of what a session reports at every prefix of each, recorded by the native runtime and reproduced through WebAssembly.
+
+### Changed
+
+- The manifest crate's `Command` has two new public fields (`effect`, `title`); it is `#[non_exhaustive]`, so a reader of it is unaffected.
+
 ## [0.16.0] - 2026-10-24
 
-Prepared, not yet published. Replay: the session log and the conformance logs (direction Bet 15, WP7). No runtime behavior changes: a program, a manifest and a snapshot render as they did in 0.15.0.
+Published. Replay: the session log and the conformance logs (direction Bet 15, WP7). No runtime behavior changes: a program, a manifest and a snapshot render as they did in 0.15.0.
 
 ### Added
 

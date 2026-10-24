@@ -150,6 +150,48 @@ pub unsafe extern "C" fn mesh_compile(
     0
 }
 
+/// Runs one stream step (`crate::respond_stream`) and keeps its result for
+/// [`mesh_result_ptr`]: the same buffers as [`mesh_compile`], always with a
+/// model. Returns 0; or 1, keeping nothing, if an input isn't UTF-8.
+///
+/// # Safety
+///
+/// Each pointer must point to its length's initialized bytes, unless that
+/// length is 0.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mesh_stream(
+    source: *const u8,
+    source_len: usize,
+    path: *const u8,
+    path_len: usize,
+    manifest: *const u8,
+    manifest_len: usize,
+    manifest_path: *const u8,
+    manifest_path_len: usize,
+    component: *const u8,
+    component_len: usize,
+) -> u32 {
+    // SAFETY: the caller's guarantee, passed on for each input.
+    let inputs = unsafe {
+        (
+            text(source, source_len),
+            text(path, path_len),
+            text(manifest, manifest_len),
+            text(manifest_path, manifest_path_len),
+            text(component, component_len),
+        )
+    };
+    let (Some(source), Some(path), Some(manifest), Some(manifest_path), Some(component)) = inputs
+    else {
+        mesh_result_clear();
+        return 1;
+    };
+    let result = crate::respond_stream(source, path, manifest, manifest_path, component);
+    RESULT.with(|kept| *kept.borrow_mut() = result.into_bytes());
+    0
+}
+
 /// Runs one program check (`crate::respond_check_program`) and keeps its
 /// document for [`mesh_result_ptr`]. `templates` is a text list
 /// (`mesh_runtime::encoding`). Returns 0; or 1, keeping nothing, if an

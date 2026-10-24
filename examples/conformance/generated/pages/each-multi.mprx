@@ -1,0 +1,7 @@
+<stack>
+  {#each items as item (item.id)}
+    <text>{item.label}</text>
+    <text>{item.id}</text>
+  {/each}
+  <text>after</text>
+</stack>

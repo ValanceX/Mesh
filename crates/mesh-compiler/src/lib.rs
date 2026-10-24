@@ -15,6 +15,7 @@ pub mod infer;
 mod json;
 mod position;
 mod render;
+pub mod stream;
 /// Positions in a source: [`mesh_syntax::source_map`], re-exported here
 /// where it has always been.
 pub use mesh_syntax::source_map;

@@ -1,0 +1,15 @@
+<stack>
+  {#if showAll}
+    {#each items as item (item.id)}
+      <card title={item.label}>
+        {#if item.done}
+          <text>Done ✓</text>
+        {:else}
+          <button on.click={remove(item.id)}>Delete {item.label}</button>
+        {/if}
+      </card>
+    {/each}
+  {:else}
+    <text>Hidden: {count} items, in the {mode} layout. Café ☕ 🎉</text>
+  {/if}
+</stack>
