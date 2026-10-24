@@ -1,0 +1,1 @@
+<page>{#each items as item (item.id)}<entry label={item.label} />{/each}</page>

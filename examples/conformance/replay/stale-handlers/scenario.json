@@ -1,0 +1,105 @@
+{
+ "snapshot": {
+  "items": [
+   {
+    "id": 0,
+    "label": "item 0"
+   },
+   {
+    "id": 1,
+    "label": "item 1"
+   },
+   {
+    "id": 2,
+    "label": "item 2"
+   },
+   {
+    "id": 3,
+    "label": "item 3"
+   }
+  ]
+ },
+ "steps": [
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 1,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  },
+  {
+   "changes": [
+    {
+     "op": "remove",
+     "path": [
+      "items",
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 1,
+     "tree": 0
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 1,
+     "tree": 0
+    },
+    "name": "press",
+    "on": 0
+   }
+  },
+  {
+   "changes": [
+    {
+     "op": "insert",
+     "path": [
+      "items",
+      1
+     ],
+     "value": {
+      "id": 1,
+      "label": "item 1"
+     }
+    }
+   ]
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 1,
+     "tree": 0
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 1,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  }
+ ]
+}

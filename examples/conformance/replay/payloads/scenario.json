@@ -1,0 +1,68 @@
+{
+ "snapshot": {
+  "items": [
+   {
+    "id": 0,
+    "label": "item 0"
+   },
+   {
+    "id": 1,
+    "label": "item 1"
+   }
+  ]
+ },
+ "steps": [
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 0,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 0,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest",
+    "payload": "surprise"
+   }
+  },
+  {
+   "event": {
+    "handler": "not-a-handler",
+    "on": "latest"
+   }
+  },
+  {
+   "event": {
+    "handler": "",
+    "on": "latest"
+   }
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 1,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest",
+    "payload": {
+     "a": [
+      1,
+      2
+     ]
+    }
+   }
+  }
+ ]
+}

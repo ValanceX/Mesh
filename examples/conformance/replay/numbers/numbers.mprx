@@ -1,0 +1,1 @@
+<page><text>{n}</text>{#each items as x (x)}<text>{x}</text>{/each}</page>

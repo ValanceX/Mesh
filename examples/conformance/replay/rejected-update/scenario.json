@@ -1,0 +1,98 @@
+{
+ "snapshot": {
+  "items": [
+   {
+    "id": 0,
+    "label": "item 0"
+   },
+   {
+    "id": 1,
+    "label": "item 1"
+   },
+   {
+    "id": 2,
+    "label": "item 2"
+   }
+  ]
+ },
+ "steps": [
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      0,
+      "label"
+     ],
+     "value": "fine"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      1,
+      "label"
+     ],
+     "value": 7
+    }
+   ],
+   "rejects": true
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 1,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  },
+  {
+   "changes": [
+    {
+     "op": "insert",
+     "path": [
+      "items",
+      1
+     ],
+     "value": {
+      "id": "nope",
+      "label": "x"
+     }
+    }
+   ],
+   "rejects": true
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      2,
+      "label"
+     ],
+     "value": "after the rejections"
+    }
+   ]
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 2,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  }
+ ]
+}

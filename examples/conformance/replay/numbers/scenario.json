@@ -1,0 +1,232 @@
+{
+ "snapshot": {
+  "n": 0,
+  "items": []
+ },
+ "steps": [
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 0.1
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 0.30000000000000004
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 1e+21
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 123456789012345680000
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 1e-07
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 1e-06
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 5e-324
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 1.7976931348623157e+308
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": -1.5e-10
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 100
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 4294967296.5
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 9007199254740993
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": -0.0
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 2.5
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "n"
+     ],
+     "value": 1.0000000000000002
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "insert",
+     "path": [
+      "items",
+      0
+     ],
+     "value": 3
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "insert",
+     "path": [
+      "items",
+      0
+     ],
+     "value": 1e+21
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "insert",
+     "path": [
+      "items",
+      0
+     ],
+     "value": -0.0
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "insert",
+     "path": [
+      "items",
+      0
+     ],
+     "value": 0.5
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "remove",
+     "path": [
+      "items",
+      1
+     ]
+    }
+   ]
+  }
+ ]
+}

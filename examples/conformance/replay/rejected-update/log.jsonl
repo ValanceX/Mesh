@@ -1,0 +1,13 @@
+{"line":"header","format":1,"manifest":"bf95ad9f4742a7c7b22d44ea6a31f3d85356352229dcd0b8ff9df87ed5032717","program":"5cc69dd02c6c080bf3d651b1f8ec9ab4f7d13a4b1b2164b6f0fd0aa222cd8429","runtime":"0.15.0","snapshot":{"items":[{"id":0,"label":"item 0"},{"id":1,"label":"item 1"},{"id":2,"label":"item 2"}]}}
+{"line":"tree","sha256":"52a1a0ddd3e61a45c254117cbc0f94a93e8dd4884ae18df991b9e97ef0ae39c2"}
+{"line":"changes","changes":[{"op":"set","path":["items",0,"label"],"value":"fine"}]}
+{"line":"tree","sha256":"36149971cf4a1c136e5875ecff6f24a691cce165c696af012ce026a08c9c872c"}
+{"line":"changes","changes":[{"op":"set","path":["items",1,"label"],"value":7}],"rejects":"runtime-value-mismatch"}
+{"line":"tree","sha256":"36149971cf4a1c136e5875ecff6f24a691cce165c696af012ce026a08c9c872c"}
+{"line":"event","handler":"him6ldigu3kw.0zXBVJIHNPVLfW2vRUCnhA","n":1,"on":1,"out":{"intent":{"arguments":[],"command":{"component":"listview","name":"pick"}}}}
+{"line":"changes","changes":[{"op":"insert","path":["items",1],"value":{"id":"nope","label":"x"}}],"rejects":"runtime-value-mismatch"}
+{"line":"tree","sha256":"36149971cf4a1c136e5875ecff6f24a691cce165c696af012ce026a08c9c872c"}
+{"line":"changes","changes":[{"op":"set","path":["items",2,"label"],"value":"after the rejections"}]}
+{"line":"tree","sha256":"b869bdc9c0985421b39e49fc97cfb3e2f3c76659302f27e7739764b0ac436923"}
+{"line":"event","handler":"him6ldigu3kw.WQ0LUoxNTkaKFjHEY8MdgA","n":2,"on":2,"out":{"intent":{"arguments":[],"command":{"component":"listview","name":"pick"}}}}
+{"line":"tree","sha256":"b869bdc9c0985421b39e49fc97cfb3e2f3c76659302f27e7739764b0ac436923","tree":{"format":"mesh-render","root":{"children":[{"children":[{"key":"kutu2pqRxAmCr31TqRl2dAw","text":"fine","type":"text"}],"component":"row","events":{"press":"him6ldigu3kw.zCXUPNmXxYwbzC6IHZIm9w"},"key":"ksfd14j-ID22l00IjXq6fLg","props":{"title":"fine"},"type":"node"},{"children":[{"key":"kkpbTFkzE1-X2Cj3iEbKxcg","text":"item 1","type":"text"}],"component":"row","events":{"press":"him6ldigu3kw.0zXBVJIHNPVLfW2vRUCnhA"},"key":"kdjTx-99jE_8fZAJsLQcJ4Q","props":{"title":"item 1"},"type":"node"},{"children":[{"key":"kMpJJk1ZsZn3SIUiNGk4uTA","text":"after the rejections","type":"text"}],"component":"row","events":{"press":"him6ldigu3kw.WQ0LUoxNTkaKFjHEY8MdgA"},"key":"kzieNHgdreqTVhTbs5Gg80w","props":{"title":"after the rejections"},"type":"node"}],"component":"page","events":{},"key":"kvfKOB2ZKXtJviy9u42UXnQ","props":{},"type":"node"},"version":1}}
