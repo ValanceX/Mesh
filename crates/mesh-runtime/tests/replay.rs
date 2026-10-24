@@ -60,8 +60,14 @@ fn load(name: &str) -> Loaded {
         let loaded = check::Model::load(&model, component).expect("the manifest loads");
         let compiled = check::template(&source, &loaded);
 
-        assert!(compiled.diagnostics.is_empty(), "{name}/{component}: {:#?}", compiled.diagnostics);
-        templates.push(mesh_template::to_json(&compiled.template.expect("it compiles")));
+        assert!(
+            compiled.diagnostics.is_empty(),
+            "{name}/{component}: {:#?}",
+            compiled.diagnostics
+        );
+        templates.push(mesh_template::to_json(
+            &compiled.template.expect("it compiles"),
+        ));
         sources.push_str(&source);
         sources.push('\0');
     }
@@ -127,7 +133,9 @@ fn apply(snapshot: &mut Value, changes: &[Value]) {
                 at.as_object_mut().unwrap().remove(name.as_str());
             }
             ("remove", index) => {
-                at.as_array_mut().unwrap().remove(index.as_u64().unwrap() as usize);
+                at.as_array_mut()
+                    .unwrap()
+                    .remove(index.as_u64().unwrap() as usize);
             }
             (other, _) => panic!("the change {other}"),
         }
@@ -146,7 +154,9 @@ fn outcome(render: &Render, handler: &str, payload: Option<&Value>) -> Value {
     let payload = payload.map(|value| HostValue::from_json(&value.to_string()).unwrap());
 
     match dispatch(render, handler, payload.as_ref()) {
-        Ok(intent) => json!({ "intent": serde_json::from_str::<Value>(&intent.to_json()).unwrap() }),
+        Ok(intent) => {
+            json!({ "intent": serde_json::from_str::<Value>(&intent.to_json()).unwrap() })
+        }
         Err(diagnostics) => json!({ "diag": diagnostics[0].code }),
     }
 }
@@ -180,7 +190,7 @@ const CHECKPOINT: usize = 50;
 fn tree_line(render: &Render, lines: usize, last: bool) -> Value {
     let mut line = json!({ "line": "tree", "sha256": hash(render) });
 
-    if last || lines % CHECKPOINT == 0 {
+    if last || lines.is_multiple_of(CHECKPOINT) {
         line["tree"] = tree_value(render);
     }
 
@@ -190,7 +200,8 @@ fn tree_line(render: &Render, lines: usize, last: bool) -> Value {
 /// Records `scenario.json` of `name` as the lines of its log, by the `update_changes` route.
 fn record(name: &str) -> Vec<Value> {
     let loaded = load(name);
-    let scenario: Value = serde_json::from_str(&read(&dir().join(name).join("scenario.json"))).unwrap();
+    let scenario: Value =
+        serde_json::from_str(&read(&dir().join(name).join("scenario.json"))).unwrap();
     let mut snapshot = scenario["snapshot"].clone();
     let mut current = start(&loaded, &snapshot);
     let mut renders = vec![current.clone()];
@@ -293,7 +304,10 @@ fn line_text(line: &Value) -> String {
 }
 
 fn log_text(lines: &[Value]) -> String {
-    lines.iter().map(|line| format!("{}\n", line_text(line))).collect()
+    lines
+        .iter()
+        .map(|line| format!("{}\n", line_text(line)))
+        .collect()
 }
 
 /// Plays `lines` by one route; returns the tree hashes it gave, in order. `route` is `changes`, `update` or `render`.
@@ -301,8 +315,14 @@ fn play(name: &str, lines: &[Value], route: &str) -> Vec<String> {
     let loaded = load(name);
     let header = &lines[0];
 
-    assert_eq!(header["program"], loaded.program_hash, "{name}: the program is the one recorded");
-    assert_eq!(header["manifest"], loaded.manifest_hash, "{name}: the manifest is the one recorded");
+    assert_eq!(
+        header["program"], loaded.program_hash,
+        "{name}: the program is the one recorded"
+    );
+    assert_eq!(
+        header["manifest"], loaded.manifest_hash,
+        "{name}: the manifest is the one recorded"
+    );
 
     let mut snapshot = header["snapshot"].clone();
     let mut current = start(&loaded, &snapshot);
@@ -319,16 +339,25 @@ fn play(name: &str, lines: &[Value], route: &str) -> Vec<String> {
 
                 let result = match route {
                     "changes" => update_changes(&current, &changes_of(&current, changes), None),
-                    "update" => update(&current, &HostRecord::from_json(&next_snapshot.to_string()).unwrap()),
+                    "update" => update(
+                        &current,
+                        &HostRecord::from_json(&next_snapshot.to_string()).unwrap(),
+                    ),
                     _ => {
                         let texts = texts(&loaded);
 
                         render(
-                            &Program { root: &loaded.root, templates: &texts },
+                            &Program {
+                                root: &loaded.root,
+                                templates: &texts,
+                            },
                             &loaded.model,
                             &HostRecord::from_json(&next_snapshot.to_string()).unwrap(),
                         )
-                        .map(|render| mesh_runtime::Update { render, patches: Vec::new() })
+                        .map(|render| mesh_runtime::Update {
+                            render,
+                            patches: Vec::new(),
+                        })
                     }
                 };
 
@@ -339,23 +368,53 @@ fn play(name: &str, lines: &[Value], route: &str) -> Vec<String> {
                         renders.push(current.clone());
                     }
                     (Err(diagnostics), Some(code)) => {
-                        assert_eq!(diagnostics[0].code, code.as_str().unwrap(), "{name} line {}: {route}", index + 1);
+                        assert_eq!(
+                            diagnostics[0].code,
+                            code.as_str().unwrap(),
+                            "{name} line {}: {route}",
+                            index + 1
+                        );
                     }
-                    (Ok(_), Some(code)) => panic!("{name} line {}: {route} accepted changes to be rejected with {code}", index + 1),
-                    (Err(diagnostics), None) => panic!("{name} line {}: {route} rejected: {diagnostics:#?}", index + 1),
+                    (Ok(_), Some(code)) => panic!(
+                        "{name} line {}: {route} accepted changes to be rejected with {code}",
+                        index + 1
+                    ),
+                    (Err(diagnostics), None) => panic!(
+                        "{name} line {}: {route} rejected: {diagnostics:#?}",
+                        index + 1
+                    ),
                 }
             }
             "event" => {
                 let on = line["on"].as_u64().unwrap() as usize;
-                let out = outcome(&renders[on], line["handler"].as_str().unwrap(), line.get("payload"));
+                let out = outcome(
+                    &renders[on],
+                    line["handler"].as_str().unwrap(),
+                    line.get("payload"),
+                );
 
-                assert_eq!(out, line["out"], "{name} line {}: {route} dispatches as recorded", index + 1);
+                assert_eq!(
+                    out,
+                    line["out"],
+                    "{name} line {}: {route} dispatches as recorded",
+                    index + 1
+                );
             }
             "tree" => {
-                assert_eq!(hash(&current), line["sha256"], "{name} line {}: {route} gives the recorded tree", index + 1);
+                assert_eq!(
+                    hash(&current),
+                    line["sha256"],
+                    "{name} line {}: {route} gives the recorded tree",
+                    index + 1
+                );
 
                 if let Some(tree) = line.get("tree") {
-                    assert_eq!(tree_value(&current), *tree, "{name} line {}: {route}'s checkpoint", index + 1);
+                    assert_eq!(
+                        tree_value(&current),
+                        *tree,
+                        "{name} line {}: {route}'s checkpoint",
+                        index + 1
+                    );
                 }
 
                 hashes.push(hash(&current));
@@ -380,7 +439,9 @@ fn names() -> Vec<String> {
 }
 
 fn lines_of(text: &str) -> Vec<Value> {
-    text.lines().map(|line| serde_json::from_str(line).expect("a line of JSON")).collect()
+    text.lines()
+        .map(|line| serde_json::from_str(line).expect("a line of JSON"))
+        .collect()
 }
 
 #[test]
@@ -391,13 +452,24 @@ fn there_are_at_least_six_logs() {
 #[test]
 fn every_log_is_what_its_scenario_records() {
     for name in names() {
-        let recorded = log_text(&record(&name));
         let path = dir().join(&name).join("log.jsonl");
+        let mut lines = record(&name);
+
+        // `runtime` says which version recorded the log; it is information, and a release does not rewrite every log
+        if let (false, Ok(old)) = (blessing(), fs::read_to_string(&path)) {
+            lines[0]["runtime"] = lines_of(&old)[0]["runtime"].clone();
+        }
+
+        let recorded = log_text(&lines);
 
         if blessing() {
             fs::write(&path, &recorded).unwrap();
         } else {
-            assert_eq!(read(&path), recorded, "{name}: log.jsonl is what scenario.json records (MESH_BLESS=1 rewrites it)");
+            assert_eq!(
+                read(&path),
+                recorded,
+                "{name}: log.jsonl is what scenario.json records (MESH_BLESS=1 rewrites it)"
+            );
         }
     }
 }
@@ -408,8 +480,16 @@ fn every_log_replays_by_all_three_routes_to_the_recorded_hashes_and_outcomes() {
         let lines = lines_of(&read(&dir().join(&name).join("log.jsonl")));
         let by_changes = play(&name, &lines, "changes");
 
-        assert_eq!(play(&name, &lines, "update"), by_changes, "{name}: update chain");
-        assert_eq!(play(&name, &lines, "render"), by_changes, "{name}: render of each snapshot");
+        assert_eq!(
+            play(&name, &lines, "update"),
+            by_changes,
+            "{name}: update chain"
+        );
+        assert_eq!(
+            play(&name, &lines, "render"),
+            by_changes,
+            "{name}: render of each snapshot"
+        );
         assert!(by_changes.len() >= 2, "{name} has trees");
     }
 }
@@ -468,7 +548,13 @@ fn session(index: usize) -> (Value, Vec<Vec<Value>>) {
     let mut steps = Vec::new();
 
     for _ in 0..STEPS {
-        let kind = if items.is_empty() { 1 } else if items.len() > 10 { 2 } else { random.below(5) };
+        let kind = if items.is_empty() {
+            1
+        } else if items.len() > 10 {
+            2
+        } else {
+            random.below(5)
+        };
         let changes = match kind {
             0 => {
                 let at = random.below(items.len());
@@ -530,8 +616,19 @@ fn digest(index: usize, route: &str, loaded: &Loaded) -> String {
         apply(&mut snapshot, &changes);
 
         current = match route {
-            "changes" => update_changes(&current, &changes_of(&current, &changes), None).expect("changes apply").render,
-            "update" => update(&current, &HostRecord::from_json(&snapshot.to_string()).unwrap()).expect("update").render,
+            "changes" => {
+                update_changes(&current, &changes_of(&current, &changes), None)
+                    .expect("changes apply")
+                    .render
+            }
+            "update" => {
+                update(
+                    &current,
+                    &HostRecord::from_json(&snapshot.to_string()).unwrap(),
+                )
+                .expect("update")
+                .render
+            }
             _ => start(loaded, &snapshot),
         };
         hashes.push(hash(&current));
@@ -547,8 +644,16 @@ fn a_thousand_random_sessions_agree_by_the_three_routes_and_with_the_committed_d
         .map(|index| {
             let by_changes = digest(index, "changes", &loaded);
 
-            assert_eq!(digest(index, "update", &loaded), by_changes, "session {index}: update chain");
-            assert_eq!(digest(index, "render", &loaded), by_changes, "session {index}: render of each snapshot");
+            assert_eq!(
+                digest(index, "update", &loaded),
+                by_changes,
+                "session {index}: update chain"
+            );
+            assert_eq!(
+                digest(index, "render", &loaded),
+                by_changes,
+                "session {index}: render of each snapshot"
+            );
 
             by_changes
         })
@@ -567,6 +672,10 @@ fn a_thousand_random_sessions_agree_by_the_three_routes_and_with_the_committed_d
     if blessing() {
         fs::write(&path, &text).unwrap();
     } else {
-        assert_eq!(read(&path), text, "the random sessions give the committed digests (MESH_BLESS=1 rewrites them)");
+        assert_eq!(
+            read(&path),
+            text,
+            "the random sessions give the committed digests (MESH_BLESS=1 rewrites them)"
+        );
     }
 }

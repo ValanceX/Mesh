@@ -4,6 +4,14 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-24
+
+Prepared, not yet published. Replay: the session log and the conformance logs (direction Bet 15, WP7). No runtime behavior changes: a program, a manifest and a snapshot render as they did in 0.15.0.
+
+### Added
+
+- **`replay/` in `@valancex/mesh-conformance`** (`examples/conformance/replay/`): the session-log format (`format` 1: line-JSON of `header`, `changes`, `event`, `tree` and `result` lines), seven recorded logs (a keyed list, nested composites, an `{#if}`/`{:else}`, rejected updates that leave the old render valid, number text, stale handlers, payloads and foreign handlers), and 1,000 random sessions of the keyed list with their digests. Every runtime must replay them exactly, by three routes: an `update_changes` chain, an `update` chain over whole snapshots, and a `render` of each snapshot. The native runtime (`crates/mesh-runtime/tests/replay.rs`) records and replays; the WebAssembly package (`packages/mesh-runtime/test/replay.test.mjs`) replays the same logs and gives the same digests for the random sessions, so the two runtimes agree on every session, not only on the routes within each.
+
 ## [0.15.0] - 2026-10-23
 
 Prepared, not yet published. Units: the first state a component holds for itself (direction Bet 8, WP5). A manifest and a program that use none of it compile and render as in 0.14.0; one that has a `unit` is refused by an older MESH.

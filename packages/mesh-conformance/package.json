@@ -1,6 +1,6 @@
 {
   "name": "@valancex/mesh-conformance",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "MESH's conformance vectors, as data: real programs with their expected render trees, event resolution, and node-identity cases. A renderer checks itself against them; it never copies them.",
   "type": "module",
   "license": "MIT",
