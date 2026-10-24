@@ -1,0 +1,85 @@
+{
+ "snapshot": {
+  "open": false,
+  "title": "Hello"
+ },
+ "steps": [
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "open"
+     ],
+     "value": true
+    }
+   ]
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 0,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "title"
+     ],
+     "value": "Changed"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "open"
+     ],
+     "value": false
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "title"
+     ],
+     "value": "While closed"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "open"
+     ],
+     "value": true
+    }
+   ]
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 0,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  }
+ ]
+}

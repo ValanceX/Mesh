@@ -1,0 +1,15 @@
+{"line":"header","format":1,"manifest":"bf95ad9f4742a7c7b22d44ea6a31f3d85356352229dcd0b8ff9df87ed5032717","program":"1218ea2adc978613a60522c3c638ea703c15dc5bd3cd830a9867f93d27240ca1","runtime":"0.15.0","snapshot":{"open":false,"title":"Hello"}}
+{"line":"tree","sha256":"86ee307b563dfdcd1e5048ab85266d457592c13220f5f8e5ef345f8ead5d1f78"}
+{"line":"changes","changes":[{"op":"set","path":["open"],"value":true}]}
+{"line":"tree","sha256":"0eacf5a9e8185d104c4ec1e773a8ba716551fb127ce01a490db3fdf01f9c0864"}
+{"line":"event","handler":"hIsZVqdAFlRk.yieXroACTBNQFNBlrBQaeA","n":1,"on":1,"out":{"intent":{"arguments":[],"command":{"component":"branch","name":"flip"}}}}
+{"line":"changes","changes":[{"op":"set","path":["title"],"value":"Changed"}]}
+{"line":"tree","sha256":"50e299c2539e7b91e26d18f59cbbd4f58174dc0a691feafbebc72980868c7fdb"}
+{"line":"changes","changes":[{"op":"set","path":["open"],"value":false}]}
+{"line":"tree","sha256":"86ee307b563dfdcd1e5048ab85266d457592c13220f5f8e5ef345f8ead5d1f78"}
+{"line":"changes","changes":[{"op":"set","path":["title"],"value":"While closed"}]}
+{"line":"tree","sha256":"86ee307b563dfdcd1e5048ab85266d457592c13220f5f8e5ef345f8ead5d1f78"}
+{"line":"changes","changes":[{"op":"set","path":["open"],"value":true}]}
+{"line":"tree","sha256":"10664686b6ea55fc873d04692518b30227dbb83659603063856386674907b8f6"}
+{"line":"event","handler":"hIsZVqdAFlRk.yieXroACTBNQFNBlrBQaeA","n":2,"on":5,"out":{"intent":{"arguments":[],"command":{"component":"branch","name":"flip"}}}}
+{"line":"tree","sha256":"10664686b6ea55fc873d04692518b30227dbb83659603063856386674907b8f6","tree":{"format":"mesh-render","root":{"children":[{"children":[{"key":"kEM6FaeWV6n7nXVnEl_3xAQ","text":"While closed","type":"text"}],"component":"row","events":{"press":"hIsZVqdAFlRk.yieXroACTBNQFNBlrBQaeA"},"key":"k8KkRfKU9ItXEkTMct16Ujg","props":{"title":"While closed"},"type":"node"}],"component":"page","events":{},"key":"k0Ss2bFcN8XDBnLK-kDcS2w","props":{},"type":"node"},"version":1}}

@@ -1,0 +1,1 @@
+<page>{#if open}<row title={title} on.press={flip()}>{title}</row>{:else}<text>closed</text>{/if}</page>

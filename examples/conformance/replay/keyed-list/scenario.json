@@ -1,0 +1,775 @@
+{
+ "snapshot": {
+  "items": [
+   {
+    "id": 0,
+    "label": "item 0"
+   },
+   {
+    "id": 1,
+    "label": "item 1"
+   },
+   {
+    "id": 2,
+    "label": "item 2"
+   },
+   {
+    "id": 3,
+    "label": "item 3"
+   },
+   {
+    "id": 4,
+    "label": "item 4"
+   },
+   {
+    "id": 5,
+    "label": "item 5"
+   }
+  ]
+ },
+ "steps": [
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      1,
+      "label"
+     ],
+     "value": "edited"
+    }
+   ]
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 1,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  },
+  {
+   "changes": [
+    {
+     "op": "insert",
+     "path": [
+      "items",
+      0
+     ],
+     "value": {
+      "id": 100,
+      "label": "new"
+     }
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "remove",
+     "path": [
+      "items",
+      3
+     ]
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "insert",
+     "path": [
+      "items",
+      2
+     ],
+     "value": {
+      "id": 101,
+      "label": "mid"
+     }
+    },
+    {
+     "op": "set",
+     "path": [
+      "items",
+      0,
+      "label"
+     ],
+     "value": "again"
+    }
+   ]
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 2,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  },
+  {
+   "changes": [
+    {
+     "op": "remove",
+     "path": [
+      "items",
+      0
+     ]
+    },
+    {
+     "op": "remove",
+     "path": [
+      "items",
+      0
+     ]
+    },
+    {
+     "op": "remove",
+     "path": [
+      "items",
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items"
+     ],
+     "value": []
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items"
+     ],
+     "value": [
+      {
+       "id": 0,
+       "label": "item 0"
+      },
+      {
+       "id": 1,
+       "label": "item 1"
+      },
+      {
+       "id": 2,
+       "label": "item 2"
+      },
+      {
+       "id": 3,
+       "label": "item 3"
+      },
+      {
+       "id": 4,
+       "label": "item 4"
+      },
+      {
+       "id": 5,
+       "label": "item 5"
+      },
+      {
+       "id": 6,
+       "label": "item 6"
+      },
+      {
+       "id": 7,
+       "label": "item 7"
+      },
+      {
+       "id": 8,
+       "label": "item 8"
+      },
+      {
+       "id": 9,
+       "label": "item 9"
+      },
+      {
+       "id": 10,
+       "label": "item 10"
+      },
+      {
+       "id": 11,
+       "label": "item 11"
+      },
+      {
+       "id": 12,
+       "label": "item 12"
+      },
+      {
+       "id": 13,
+       "label": "item 13"
+      },
+      {
+       "id": 14,
+       "label": "item 14"
+      },
+      {
+       "id": 15,
+       "label": "item 15"
+      },
+      {
+       "id": 16,
+       "label": "item 16"
+      },
+      {
+       "id": 17,
+       "label": "item 17"
+      },
+      {
+       "id": 18,
+       "label": "item 18"
+      },
+      {
+       "id": 19,
+       "label": "item 19"
+      },
+      {
+       "id": 20,
+       "label": "item 20"
+      },
+      {
+       "id": 21,
+       "label": "item 21"
+      },
+      {
+       "id": 22,
+       "label": "item 22"
+      },
+      {
+       "id": 23,
+       "label": "item 23"
+      },
+      {
+       "id": 24,
+       "label": "item 24"
+      },
+      {
+       "id": 25,
+       "label": "item 25"
+      },
+      {
+       "id": 26,
+       "label": "item 26"
+      },
+      {
+       "id": 27,
+       "label": "item 27"
+      },
+      {
+       "id": 28,
+       "label": "item 28"
+      },
+      {
+       "id": 29,
+       "label": "item 29"
+      },
+      {
+       "id": 30,
+       "label": "item 30"
+      },
+      {
+       "id": 31,
+       "label": "item 31"
+      },
+      {
+       "id": 32,
+       "label": "item 32"
+      },
+      {
+       "id": 33,
+       "label": "item 33"
+      },
+      {
+       "id": 34,
+       "label": "item 34"
+      },
+      {
+       "id": 35,
+       "label": "item 35"
+      },
+      {
+       "id": 36,
+       "label": "item 36"
+      },
+      {
+       "id": 37,
+       "label": "item 37"
+      },
+      {
+       "id": 38,
+       "label": "item 38"
+      },
+      {
+       "id": 39,
+       "label": "item 39"
+      },
+      {
+       "id": 40,
+       "label": "item 40"
+      },
+      {
+       "id": 41,
+       "label": "item 41"
+      },
+      {
+       "id": 42,
+       "label": "item 42"
+      },
+      {
+       "id": 43,
+       "label": "item 43"
+      },
+      {
+       "id": 44,
+       "label": "item 44"
+      },
+      {
+       "id": 45,
+       "label": "item 45"
+      },
+      {
+       "id": 46,
+       "label": "item 46"
+      },
+      {
+       "id": 47,
+       "label": "item 47"
+      },
+      {
+       "id": 48,
+       "label": "item 48"
+      },
+      {
+       "id": 49,
+       "label": "item 49"
+      },
+      {
+       "id": 50,
+       "label": "item 50"
+      },
+      {
+       "id": 51,
+       "label": "item 51"
+      },
+      {
+       "id": 52,
+       "label": "item 52"
+      },
+      {
+       "id": 53,
+       "label": "item 53"
+      },
+      {
+       "id": 54,
+       "label": "item 54"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      0,
+      "label"
+     ],
+     "value": "relabel 0"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      1,
+      "label"
+     ],
+     "value": "relabel 1"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      2,
+      "label"
+     ],
+     "value": "relabel 2"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      3,
+      "label"
+     ],
+     "value": "relabel 3"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      4,
+      "label"
+     ],
+     "value": "relabel 4"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      5,
+      "label"
+     ],
+     "value": "relabel 5"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      6,
+      "label"
+     ],
+     "value": "relabel 6"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      7,
+      "label"
+     ],
+     "value": "relabel 7"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      8,
+      "label"
+     ],
+     "value": "relabel 8"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      9,
+      "label"
+     ],
+     "value": "relabel 9"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      10,
+      "label"
+     ],
+     "value": "relabel 10"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      11,
+      "label"
+     ],
+     "value": "relabel 11"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      12,
+      "label"
+     ],
+     "value": "relabel 12"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      13,
+      "label"
+     ],
+     "value": "relabel 13"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      14,
+      "label"
+     ],
+     "value": "relabel 14"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      15,
+      "label"
+     ],
+     "value": "relabel 15"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      16,
+      "label"
+     ],
+     "value": "relabel 16"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      17,
+      "label"
+     ],
+     "value": "relabel 17"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      18,
+      "label"
+     ],
+     "value": "relabel 18"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      19,
+      "label"
+     ],
+     "value": "relabel 19"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      20,
+      "label"
+     ],
+     "value": "relabel 20"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      21,
+      "label"
+     ],
+     "value": "relabel 21"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      22,
+      "label"
+     ],
+     "value": "relabel 22"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      23,
+      "label"
+     ],
+     "value": "relabel 23"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      24,
+      "label"
+     ],
+     "value": "relabel 24"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      25,
+      "label"
+     ],
+     "value": "relabel 25"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      26,
+      "label"
+     ],
+     "value": "relabel 26"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      27,
+      "label"
+     ],
+     "value": "relabel 27"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      28,
+      "label"
+     ],
+     "value": "relabel 28"
+    }
+   ]
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      29,
+      "label"
+     ],
+     "value": "relabel 29"
+    }
+   ]
+  }
+ ]
+}

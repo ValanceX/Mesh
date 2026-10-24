@@ -115,7 +115,9 @@ mesh/
 
 ## Status
 
-**v0.15.0 prepared** (2026-10-23; not yet published: v0.14.0 is the latest release): *units*, state that belongs to one occurrence of a component. A component's manifest entry may have a `unit` (state fields with defaults, and commands); the runtime takes the state a host holds as an input beside the snapshot, lists the occurrences a render met, names the occurrence in the intent of a unit's command, lets a caller own a `controllable` field with a prop, and resolves an event a unit announces (`raise`). See the [release notes](./docs/releases/v0.15.md).
+**v0.16.0 prepared** (2026-10-24; not yet published: v0.15.0 is the latest release): *replay*. `@valancex/mesh-conformance` gains `replay/`, the session-log format, seven recorded logs and 1,000 random sessions that every runtime must replay exactly, by three routes. No behavior changes. See the [v0.16 release notes](docs/releases/v0.16.md).
+
+**v0.15.0 (released)**: *units*, state that belongs to one occurrence of a component. A component's manifest entry may have a `unit` (state fields with defaults, and commands); the runtime takes the state a host holds as an input beside the snapshot, lists the occurrences a render met, names the occurrence in the intent of a unit's command, lets a caller own a `controllable` field with a prop, and resolves an event a unit announces (`raise`). See the [release notes](./docs/releases/v0.15.md).
 
 **v0.14.0** (released 2026-10-20): enum types, `has(x)` and `x ?? y`, defaults for props, and snippets (`{#snippet}` and `{@render}`), with the language server completing and signing them. A program that uses none of it is unchanged. See the [release notes](./docs/releases/v0.14.md), the [v0.13 notes](./docs/releases/v0.13.md) (released 2026-10-17), the [v0.12 notes](./docs/releases/v0.12.md) (the editor formats and indents MPRX; released 2026-10-13), the [v0.11 notes](./docs/releases/v0.11.md) and [CHANGELOG](./CHANGELOG.md). What works today:
 

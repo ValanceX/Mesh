@@ -1,0 +1,1 @@
+<page>{#each items as item (item.id)}<row title={item.label} on.press={pick()}>{item.label}</row>{/each}</page>
