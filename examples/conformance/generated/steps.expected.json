@@ -1,0 +1,58 @@
+{
+  "branches": {
+    "prefixes": 350,
+    "sha256": "f05e9e8be1602789b1171aa62e349371a345f8ad650b9f3c0b519e4e4533de18"
+  },
+  "card": {
+    "prefixes": 167,
+    "sha256": "a7380e363aef4b02d29a25a8dabd44d28f79463d96498aeb6b05aac986937b3f"
+  },
+  "each-multi": {
+    "prefixes": 140,
+    "sha256": "36905aea38d97b57d4e91fd3ec23241982624c92d0e52142b0fc2466b63652e9"
+  },
+  "list": {
+    "prefixes": 284,
+    "sha256": "1785d66fc553ad9c68d65e785d16d7d4483540c26a8a2a1873b73fc63e3ad557"
+  },
+  "long": {
+    "prefixes": 568,
+    "sha256": "d7b23e06f8590bcb92d61e3c5949c01f1df54313ca19dba2f35bda275b99e2a8"
+  },
+  "mistake-type-mismatch": {
+    "prefixes": 174,
+    "sha256": "7982321cb84e76bc28b3067a3b3dd4ac51f0bfce59fa5415c890190186fc6507"
+  },
+  "mistake-unknown-command-in-a-start-tag": {
+    "prefixes": 191,
+    "sha256": "c8c454b317d3681c992ffa7b8ee9d06e54d75e7555108ea68d353f84b23721e2"
+  },
+  "mistake-unknown-component": {
+    "prefixes": 185,
+    "sha256": "da4a2a4bf1847d3ddac569581a09b1630129cf17e3ee06a0edfe2a13ffd1fd90"
+  },
+  "mistake-unknown-event": {
+    "prefixes": 153,
+    "sha256": "e4fa3d13409d79cb582a313c25e97b631929ea18de3f18feb82dcad42565b8d0"
+  },
+  "mistake-unknown-prop": {
+    "prefixes": 181,
+    "sha256": "957904a90d3aad8df0b09a5e53038f7454e990b9957f60ba2191630a306f91c0"
+  },
+  "mistake-unknown-reference": {
+    "prefixes": 181,
+    "sha256": "1e76c6111e43e4ef6197017261ca33f330b52484b59697e35e79c8783ab6b4ec"
+  },
+  "mistake-unknown-reference-in-a-block": {
+    "prefixes": 138,
+    "sha256": "25cb56da3d15ab72dbeb080f595d3ee6c9c437a1c1930bbaa2cd175ced4cb687"
+  },
+  "mistake-unknown-variant": {
+    "prefixes": 181,
+    "sha256": "81288d85b2cb3ab3817d1e213e23b99d76a0dc01f5041a4659a626c0f6be1e26"
+  },
+  "nested": {
+    "prefixes": 375,
+    "sha256": "c0e52b7a38c8abbaeab345758f30cfe9fb776c2cc38c95f8b1a2fa1409f969bd"
+  }
+}

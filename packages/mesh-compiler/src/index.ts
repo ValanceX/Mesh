@@ -62,6 +62,8 @@ export type {
   TemplateExpression,
   TemplateSpan,
 } from "./template.js";
+export { openSession } from "./session.js";
+export type { Pending, Session, SessionInput, StreamStep } from "./session.js";
 export { MeshInternalError, MeshUsageError, MeshVersionError } from "./engine.js";
 export type { MeshUsageCode } from "./engine.js";
 export { version } from "./version.js";

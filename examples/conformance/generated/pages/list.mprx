@@ -1,0 +1,10 @@
+<stack>
+  <text>{title}</text>
+  {#each items as item (item.id)}
+    <row>
+      <text>{item.label} {item.done ? "(done)" : ""}</text>
+      <button on.click={remove(item.id)}>Delete</button>
+    </row>
+  {/each}
+  <field value="" label="New item" on.input={add($event)} />
+</stack>

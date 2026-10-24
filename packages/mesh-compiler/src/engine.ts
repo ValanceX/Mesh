@@ -128,6 +128,7 @@ interface Exports {
   mesh_free(ptr: number, len: number): void;
   mesh_check(...args: number[]): number;
   mesh_compile(...args: number[]): number;
+  mesh_stream(...args: number[]): number;
   mesh_check_program(...args: number[]): number;
   mesh_infer(...args: number[]): number;
   mesh_result_ptr(): number;
@@ -140,6 +141,7 @@ const CHECK_EXPORTS = [
   "mesh_free",
   "mesh_check",
   "mesh_compile",
+  "mesh_stream",
   "mesh_check_program",
   "mesh_infer",
   "mesh_result_ptr",
@@ -482,6 +484,67 @@ export function compile(input: CompileInput): Promise<CompileResult> {
       (exports, pointers) => exports.mesh_compile(...pointers),
       compileResult,
     );
+  });
+}
+
+/** What one stream step found: see {@link StreamStep}. The module's own document. */
+export interface StreamDocument {
+  /** The source made whole: what it was cut back to, and what was closed. */
+  repaired: {
+    /** `source[..cut]` and the closers of what is open. Empty when nothing is complete. */
+    text: string;
+    /** How many UTF-8 bytes of the source `text` begins with. */
+    cut: number;
+    /** Whether an open `{#each}` was cut away (it is shown when its `{/each}` arrives). */
+    withheld: boolean;
+    /** What is open in the source that arrived, outermost first. */
+    pending: ReadonlyArray<{ kind: "element" | "if" | "each" | "snippet"; name: string | null; start: number }>;
+  };
+  /** Every diagnostic standing against the repaired prefix, positions in the source that arrived. */
+  diagnostics: DiagnosticsDocument;
+  /** The template of the repaired prefix, only when no error stands. */
+  template: Template | null;
+}
+
+/** The result of {@link stream}: a document, or the diagnostics of a manifest that did not load. */
+export type StreamResult = StreamDocument | { manifest: DiagnosticsDocument };
+
+function isStreamResult(value: unknown): value is StreamResult {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  if ("manifest" in value) {
+    return isDocument((value as { manifest?: unknown }).manifest);
+  }
+
+  const { repaired, diagnostics, template } = value as { repaired?: unknown; diagnostics?: unknown; template?: unknown };
+
+  return typeof repaired === "object" && repaired !== null && isDocument(diagnostics) && (template === null || typeof template === "object");
+}
+
+/** Checks the repaired prefix of `input.source`: see the package's `openSession`. Stateless: the whole text so far is the input. */
+export function stream(input: CompileInput): Promise<{ result: StreamResult; elapsedMs: number }> {
+  return enqueue(async () => {
+    validate(input, true);
+
+    // The time the checker took, not the time the call waited in the queue behind another.
+    const instanceReady = await current();
+    const started = performance.now();
+    const result = await runNow(
+      checkInputs(input),
+      (exports, pointers) => exports.mesh_stream(...pointers),
+      (value) => {
+        if (!isStreamResult(value)) {
+          throw new MeshInternalError("the compiler's result isn't a stream step");
+        }
+        return value;
+      },
+    );
+
+    void instanceReady;
+
+    return { result, elapsedMs: performance.now() - started };
   });
 }
 

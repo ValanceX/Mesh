@@ -36,6 +36,7 @@ const CHECK_EXPORTS = [
   "mesh_free",
   "mesh_check",
   "mesh_compile",
+  "mesh_stream",
   "mesh_result_ptr",
   "mesh_result_len",
   "mesh_result_clear",

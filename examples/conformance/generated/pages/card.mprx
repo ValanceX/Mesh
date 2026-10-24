@@ -1,0 +1,6 @@
+<stack>
+  <card title={title} tone="info">
+    <text>There are {count} items. Total: {count + 1}</text>
+    <link href="/items">All items →</link>
+  </card>
+</stack>

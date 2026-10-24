@@ -243,8 +243,11 @@ $ mesh check --format json --model components.json generated.mprx
 
 The [CLI manual](../manual/mesh-cli.md#json-output) describes the document exactly.
 
+That is a loop for a **finished** file. For a file that is still arriving (a model streaming its output), check it as it comes with a [stream session](../manual/streaming.md): the first mistake is heard a few bytes after it is written, not at the end, and what has arrived can be shown as a checked preview meanwhile.
+
 ## Where next
 
+- [Streaming](../manual/streaming.md): checking a source while it arrives, and drawing what has arrived.
 - [Manifest reference](../manual/manifest.md): the manifest's exact format and validation.
 - [Diagnostics reference](../manual/diagnostics.md#model-errors): every error `--model` can report, and how to fix it.
 - [MPRX Language Spec](../MPRX-SPEC.md#9-checking-against-a-component-model): the exact typing and compatibility rules.

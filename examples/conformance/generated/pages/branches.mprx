@@ -1,0 +1,14 @@
+<stack>
+  {#if count == 0}
+    <text>Nothing here yet, add the first one.</text>
+  {:else if count < 5}
+    <card title="A few">
+      <text>{count} so far.</text>
+    </card>
+  {:else}
+    <card title="Many" tone="warn">
+      <text>{count} is a lot. Mode: {mode}</text>
+    </card>
+  {/if}
+  <button on.click={refresh()}>Refresh</button>
+</stack>

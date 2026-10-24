@@ -1,0 +1,11 @@
+<stack>
+  <card title="Welcome back" tone="info">
+    <text>A longer paragraph of plain text that streams in a few words at a time, because a model writes text as it goes and the page should grow with it, not wait for the end.</text>
+    <text>Second paragraph, with a number {count} and a mode {mode} and a string "quoted \"inside\" an expression": {"a}b{c"}</text>
+  </card>
+  <row>
+    <button on.click={add("one")}>Add one</button>
+    <button on.click={add("two")}>Add two</button>
+    <link href="https://example.com/help?a=1&b=2">Help</link>
+  </row>
+</stack>

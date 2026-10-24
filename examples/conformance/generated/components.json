@@ -1,0 +1,173 @@
+{
+  "$schema": "../../../schemas/manifest-v1.schema.json",
+  "version": 1,
+  "types": {},
+  "components": {
+    "page": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "add": {
+          "parameters": [
+            {
+              "name": "label",
+              "type": {
+                "kind": "string"
+              }
+            }
+          ],
+          "effect": "write",
+          "title": "Add an item"
+        },
+        "remove": {
+          "parameters": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "number"
+              }
+            }
+          ],
+          "effect": "destructive",
+          "title": "Delete an item"
+        },
+        "refresh": {
+          "parameters": [],
+          "effect": "read",
+          "title": "Refresh the list"
+        }
+      },
+      "scope": {
+        "title": {
+          "kind": "string"
+        },
+        "count": {
+          "kind": "number"
+        },
+        "items": {
+          "kind": "list",
+          "element": {
+            "kind": "record",
+            "fields": {
+              "id": {
+                "type": {
+                  "kind": "number"
+                },
+                "required": true
+              },
+              "label": {
+                "type": {
+                  "kind": "string"
+                },
+                "required": true
+              },
+              "done": {
+                "type": {
+                  "kind": "boolean"
+                },
+                "required": true
+              }
+            }
+          }
+        },
+        "showAll": {
+          "kind": "boolean"
+        },
+        "mode": {
+          "kind": "enum",
+          "values": [
+            "compact",
+            "roomy"
+          ]
+        }
+      }
+    },
+    "card": {
+      "props": {
+        "title": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "tone": {
+          "type": {
+            "kind": "enum",
+            "values": [
+              "info",
+              "warn"
+            ]
+          },
+          "required": false
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "text": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "row": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "stack": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "link": {
+      "props": {
+        "href": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "button": {
+      "props": {},
+      "events": {
+        "click": {}
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "field": {
+      "props": {
+        "value": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": false
+        }
+      },
+      "events": {
+        "input": {
+          "payload": {
+            "kind": "string"
+          }
+        }
+      },
+      "commands": {},
+      "scope": {}
+    }
+  }
+}

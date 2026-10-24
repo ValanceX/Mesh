@@ -1220,3 +1220,51 @@ fn a_unit_s_default_must_fit_its_type_and_a_snippet_is_not_state() {
 
     assert_eq!(found[0].0, DiagnosticCode::MANIFEST_SNIPPET_MISPLACED);
 }
+
+#[test]
+fn a_command_may_say_what_it_does_and_what_to_call_it() {
+    use mesh_manifest::Effect;
+
+    let source = component(
+        "{}",
+        "{}",
+        r#"{
+            "add": { "parameters": [], "effect": "write", "title": "Add an item" },
+            "wipe": { "parameters": [], "effect": "destructive" },
+            "look": { "parameters": [], "effect": "read" },
+            "plain": { "parameters": [] }
+        }"#,
+        "{}",
+    );
+    let manifest = load(&source).expect("the manifest loads");
+    let commands = &manifest.component("c").expect("c").1.commands;
+
+    assert_eq!(commands["add"].effect, Some(Effect::Write));
+    assert_eq!(commands["add"].title.as_deref(), Some("Add an item"));
+    assert_eq!(commands["wipe"].effect, Some(Effect::Destructive));
+    assert_eq!(commands["look"].effect, Some(Effect::Read));
+    assert_eq!(
+        (commands["plain"].effect, commands["plain"].title.clone()),
+        (None, None)
+    );
+}
+
+#[test]
+fn an_effect_that_is_not_one_of_the_three_is_an_invalid_value_and_a_title_must_be_text() {
+    let source = component(
+        "{}",
+        "{}",
+        r#"{ "go": { "parameters": [], "effect": "sometimes", "title": 3 } }"#,
+        "{}",
+    );
+    let found = errors(&source);
+
+    assert_eq!(found.len(), 2, "{found:?}");
+    assert!(
+        found
+            .iter()
+            .all(|(code, _)| *code == DiagnosticCode::MANIFEST_INVALID_VALUE),
+        "{found:?}"
+    );
+    assert_eq!(found[0].1, "\"sometimes\"");
+}

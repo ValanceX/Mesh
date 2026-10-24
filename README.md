@@ -115,7 +115,9 @@ mesh/
 
 ## Status
 
-**v0.16.0 prepared** (2026-10-24; not yet published: v0.15.0 is the latest release): *replay*. `@valancex/mesh-conformance` gains `replay/`, the session-log format, seven recorded logs and 1,000 random sessions that every runtime must replay exactly, by three routes. No behavior changes. See the [v0.16 release notes](docs/releases/v0.16.md).
+**v0.17.0 prepared** (2026-10-24; not yet published: v0.16.0 is the latest release): *streaming*. `openSession` (`@valancex/mesh-compiler`) and `mesh_compiler::stream` check a source while it arrives: the diagnostics that are new, what is open, and a checked preview while nothing is wrong; `close()` is exactly the batch check. A command in the manifest may carry an `effect` and a `title` for a host that asks before it runs one. `generated/` joins `@valancex/mesh-conformance`. A source checked whole is checked as before. See the [v0.17 release notes](docs/releases/v0.17.md).
+
+**v0.16.0 (released)**: *replay*. `@valancex/mesh-conformance` gains `replay/`, the session-log format, seven recorded logs and 1,000 random sessions that every runtime must replay exactly, by three routes. No behavior changes. See the [v0.16 release notes](docs/releases/v0.16.md).
 
 **v0.15.0 (released)**: *units*, state that belongs to one occurrence of a component. A component's manifest entry may have a `unit` (state fields with defaults, and commands); the runtime takes the state a host holds as an input beside the snapshot, lists the occurrences a render met, names the occurrence in the intent of a unit's command, lets a caller own a `controllable` field with a prop, and resolves an event a unit announces (`raise`). See the [release notes](./docs/releases/v0.15.md).
 

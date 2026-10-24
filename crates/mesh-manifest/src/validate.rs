@@ -23,8 +23,8 @@
 
 use crate::json::{Json, Member, Value};
 use crate::{
-    Command, Component, Constant, DeclarationKey, Event, Field, Manifest, Parameter, Type, Unit,
-    UnitField, MAX_ENUM_VALUES, VERSION,
+    Command, Component, Constant, DeclarationKey, Effect, Event, Field, Manifest, Parameter, Type,
+    Unit, UnitField, MAX_ENUM_VALUES, VERSION,
 };
 use mesh_syntax::{Diagnostic, DiagnosticCode, Severity, Span};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -465,7 +465,31 @@ impl Validator {
     }
 
     fn command(&mut self, json: &Json, component: &str, name: &str) -> Option<Command> {
-        let properties = self.object(json, &format!("command {name:?}"), &["parameters"], &[])?;
+        let properties = self.object(
+            json,
+            &format!("command {name:?}"),
+            &["parameters"],
+            &["effect", "title"],
+        )?;
+        let effect = properties.get("effect").and_then(|json| {
+            let text = self.string(json, "a command's \"effect\"")?;
+            match text.as_str() {
+                "read" => Some(Effect::Read),
+                "write" => Some(Effect::Write),
+                "destructive" => Some(Effect::Destructive),
+                other => {
+                    self.error(
+                        DiagnosticCode::MANIFEST_INVALID_VALUE,
+                        json.span,
+                        format!("a command's \"effect\" is \"read\", \"write\" or \"destructive\", found {other:?}"),
+                    );
+                    None
+                }
+            }
+        });
+        let title = properties
+            .get("title")
+            .and_then(|json| self.string(json, "a command's \"title\""));
         let json = properties.get("parameters")?;
         let Value::Array(items) = &json.value else {
             self.error(
@@ -494,6 +518,8 @@ impl Validator {
         }
         Some(Command {
             parameters: parameters?,
+            effect,
+            title,
         })
     }
 

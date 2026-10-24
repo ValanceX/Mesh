@@ -299,3 +299,29 @@ fn a_snippet_is_its_ordered_parameters() {
         of_value(&with_scope(snippet(json!([s])))),
     );
 }
+
+#[test]
+fn a_commands_effect_and_title_are_not_part_of_a_fingerprint() {
+    // They annotate a command for a host that asks a person before running it (decision G13); a template compiled before they were written is still valid after.
+    let mut annotated = example();
+    let mut commands_seen = 0;
+
+    for component in annotated["components"]
+        .as_object_mut()
+        .expect("components")
+        .values_mut()
+    {
+        for command in component["commands"]
+            .as_object_mut()
+            .expect("commands")
+            .values_mut()
+        {
+            command["effect"] = json!("destructive");
+            command["title"] = json!("Do it");
+            commands_seen += 1;
+        }
+    }
+
+    assert!(commands_seen > 0, "the example declares commands");
+    assert_eq!(of_value(&annotated), of(EXAMPLE));
+}

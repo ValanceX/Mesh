@@ -1,0 +1,42 @@
+[
+ {
+  "name": "unknown-prop",
+  "code": "unknown-prop",
+  "source": "<stack>\n  <card titel=\"Welcome back\" tone=\"info\">\n    <text>{count} items in the {mode} layout, and more text after the mistake so that the file goes on.</text>\n  </card>\n</stack>\n"
+ },
+ {
+  "name": "unknown-component",
+  "code": "unknown-component",
+  "source": "<stack>\n  <widget title=\"Welcome back\" tone=\"info\">\n    <text>{count} items in the {mode} layout, and more text after the mistake so that the file goes on.</text>\n  </widget>\n</stack>\n"
+ },
+ {
+  "name": "unknown-reference",
+  "code": "unknown-reference",
+  "source": "<stack>\n  <card title=\"Welcome back\" tone=\"info\">\n    <text>{coutn} items in the {mode} layout, and more text after the mistake so that the file goes on.</text>\n  </card>\n</stack>\n"
+ },
+ {
+  "name": "unknown-command-in-a-start-tag",
+  "code": "unknown-command",
+  "source": "<stack>\n  <card title=\"Welcome back\">\n    <button on.click={erase(count)}>Erase</button>\n    <text>and more text after the mistake so that the file goes on and on.</text>\n  </card>\n</stack>\n"
+ },
+ {
+  "name": "type-mismatch",
+  "code": "type-mismatch",
+  "source": "<stack>\n  <card title={count} tone=\"info\">\n    <text>{count} items in the {mode} layout, and more text after the mistake so that the file goes on.</text>\n  </card>\n</stack>\n"
+ },
+ {
+  "name": "unknown-event",
+  "code": "unknown-event",
+  "source": "<stack>\n  <button on.press={refresh()}>Refresh</button>\n  <text>and more text after the mistake so that the file goes on and on and on.</text>\n</stack>\n"
+ },
+ {
+  "name": "unknown-variant",
+  "code": "unknown-variant",
+  "source": "<stack>\n  <card title=\"Welcome back\" tone=\"loud\">\n    <text>{count} items in the {mode} layout, and more text after the mistake so that the file goes on.</text>\n  </card>\n</stack>\n"
+ },
+ {
+  "name": "unknown-reference-in-a-block",
+  "code": "unknown-reference",
+  "source": "<stack>\n  {#if showAl}\n    <text>{count} items, and more text after the mistake so that the file goes on and on.</text>\n  {/if}\n</stack>\n"
+ }
+]

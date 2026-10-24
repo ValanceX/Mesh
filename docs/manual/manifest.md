@@ -115,6 +115,14 @@ An event with a `"payload"` carries a value of that type, which its handler can 
 
 A command returns nothing. It may be invoked only as the whole handler of an `on.` binding, never as a value.
 
+A command may also say what it does to the application's data, for a host that shows a person a prompt before it runs a command that a generated screen asked for (decision G13):
+
+```json
+{ "parameters": [{ "name": "id", "type": { "kind": "number" } }], "effect": "destructive", "title": "Delete an item" }
+```
+
+`"effect"` is `"read"` (it changes nothing), `"write"` (it changes data and can be changed back) or `"destructive"` (it cannot). `"title"` is what to call the command to a person. Both are optional **annotations**: they change nothing in how a template is checked, compiled or rendered, they are not part of a template's fingerprint, and MESH asks for neither. A host that builds a profile for generation (`@valancex/valance/generate`) requires them of the commands it offers, and builds the prompt from them and the typed arguments, never from text a model wrote. Another value of `"effect"` is `manifest-invalid-value`.
+
 ### Scope
 
 ```json

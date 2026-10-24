@@ -86,3 +86,7 @@ What the steps pin: with no state held an occurrence has the defaults; the state
 ## `replay/`: session logs (Bet 15)
 
 Recorded sessions: the inputs a host gave the runtime and the hashes of the trees it got, as line-JSON, and 1,000 random sessions with their digests. Any runtime must replay them exactly, by three routes (an `update_changes` chain, an `update` chain, a `render` of each snapshot). The format and the files are in [`replay/README.md`](./replay/README.md); the checks are `crates/mesh-runtime/tests/replay.rs` and `packages/mesh-runtime/test/replay.test.mjs`.
+
+## `generated/`: checking a source while it arrives (decisions G1 to G14)
+
+Six pages, eight planted mistakes and the digests of every prefix's step, for the stream session (`docs/manual/streaming.md`). It has its own `components.json`. See [`generated/README.md`](./generated/README.md).

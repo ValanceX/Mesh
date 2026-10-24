@@ -72,6 +72,51 @@ pub fn respond_compile(
     format!("{{\"diagnostics\":{document},\"template\":{template}}}")
 }
 
+/// Checks the repaired prefix of `source` as the template of `component` in `manifest` (`mesh_compiler::stream::step`) and renders what it found as
+/// `{"repaired": {"text", "cut", "withheld", "pending": [...]}, "diagnostics": <document>, "template": <template-v1> | null}`. The document is rendered against
+/// `source`, the text that arrived, so every position is one in it. A manifest that doesn't load is reported against the manifest, as `respond_compile`
+/// reports it: `{"manifest": <document>}`.
+pub fn respond_stream(
+    source: &str,
+    path: &str,
+    manifest: &str,
+    manifest_path: &str,
+    component: &str,
+) -> String {
+    let model = match check::Model::load(manifest, component) {
+        Err(diagnostics) => {
+            let document = mesh_compiler::render_json(manifest, manifest_path, &diagnostics);
+            return format!("{{\"manifest\":{document}}}");
+        }
+        Ok(model) => model,
+    };
+    let step = mesh_compiler::stream::step(&model, source);
+    let document = mesh_compiler::render_json(source, path, &step.diagnostics);
+    let template = step
+        .template
+        .as_ref()
+        .map_or_else(|| "null".to_string(), mesh_template::to_json);
+    let pending: Vec<serde_json::Value> = step
+        .repaired
+        .pending
+        .iter()
+        .map(|open| {
+            serde_json::json!({
+                "kind": open.kind.as_str(),
+                "name": open.name,
+                "start": open.start,
+            })
+        })
+        .collect();
+    let repaired = serde_json::json!({
+        "text": step.repaired.text,
+        "cut": step.repaired.cut,
+        "withheld": step.repaired.withheld,
+        "pending": pending,
+    });
+    format!("{{\"repaired\":{repaired},\"diagnostics\":{document},\"template\":{template}}}")
+}
+
 /// Infers the contracts of the composites a program leaves undeclared
 /// (`mesh_compiler::infer`), for the manifest `manifest`, the root `root`
 /// and the sources `sources` encodes (a text list of component, source
