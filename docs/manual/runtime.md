@@ -346,6 +346,8 @@ A component whose manifest entry has a [`unit`](./manifest.md#units) has state a
 - **The module returns the patches, not the new tree.** The caller already has the previous tree, and applying the patches to it gives the new one (the law above), so what crosses the boundary on an update is what changed. The JavaScript package applies them (`src/patches.ts`) as a renderer would, over immutable data: the new tree is frozen and shares with the previous tree every part the patches didn't reach, so a part that didn't change is the very same object. The package's review test names that file as the one place it reads a tree, and checks that it makes no text and no number.
 - **The module's calls are one at a time,** so retention adds no ordering of its own: a `release` is queued behind the calls already made.
 
+Keeping a render, its version, calling `release()` and holding unit state are Tier 2 host duties: they belong to the code that embeds the runtime. A Tier 1 author never meets them; Valance does them on the author's behalf.
+
 Measured on one machine, a keyed list of 10,000 items with one changed (the least of 15 runs; `cargo test -p mesh-runtime --release --test update_baseline full_render -- --ignored --nocapture` in Rust, `node scripts/bench-update.mjs` in the package):
 
 | | full render | update, one item changed | update, nothing changed |
