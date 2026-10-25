@@ -17,8 +17,8 @@ mesh-template.workspace = true
 mesh-analysis.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "raw_value"] }
-sha2 = { version = "0.10", default-features = false }
+sha2 = { version = "0.11", default-features = false }
 
 [dev-dependencies]
 mesh-compiler.workspace = true
-jsonschema = { version = "0.57", default-features = false }
+jsonschema = { version = "0.60", default-features = false }
