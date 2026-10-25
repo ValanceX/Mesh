@@ -16,4 +16,4 @@ serde = "1"
 serde_json = { version = "1", features = ["raw_value"] }
 
 [dev-dependencies]
-jsonschema = { version = "0.57", default-features = false }
+jsonschema = { version = "0.60", default-features = false }

@@ -19,7 +19,7 @@ serde = { version = "1", features = ["derive"] }
 # nested elements, since an element is three levels; `from_json` checks the
 # depth itself, against `MAX_JSON_DEPTH`, before parsing.
 serde_json = { version = "1", features = ["float_roundtrip", "unbounded_depth"] }
-sha2 = { version = "0.10", default-features = false }
+sha2 = { version = "0.11", default-features = false }
 
 [dev-dependencies]
-jsonschema = { version = "0.57", default-features = false }
+jsonschema = { version = "0.60", default-features = false }
