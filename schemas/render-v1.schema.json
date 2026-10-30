@@ -210,12 +210,17 @@
             ]
           }
         },
-        "instance": {
+        "occurrence": {
           "description": "For a command of a component's unit (manifest `unit`): the occurrence it is for, by the key the render gave it. The host holds the unit's state per occurrence.",
           "type": "string"
         },
+        "instance": {
+          "description": "Deprecated in 0.18.0, removed after it: the old name of `occurrence`. The runtime no longer writes it.",
+          "type": "string",
+          "deprecated": true
+        },
         "controlled": {
-          "description": "With `instance`: the unit's fields that the caller owned when the event was dispatched. The host does not apply the command's change to them.",
+          "description": "With `occurrence`: the unit's fields that the caller owned when the event was dispatched. The host does not apply the command's change to them.",
           "type": "array",
           "items": { "type": "string" },
           "uniqueItems": true

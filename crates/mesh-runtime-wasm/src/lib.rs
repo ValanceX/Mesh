@@ -86,7 +86,7 @@ fn tree_document(render: &mesh_runtime::Render) -> String {
 
 /// Renders the program of `root` and the encoded `templates` against
 /// `model`, the encoded `snapshot` and the encoded `units` (empty for none): `{"tree": <render-v1>,
-/// "instances": [...]}` (`instances` only when the tree has unit occurrences), or
+/// "occurrences": [...]}` (`occurrences` only when the tree has unit occurrences), or
 /// `{"diagnostics": <runtime-diagnostics-v1>}`. The module keeps nothing, and
 /// the same inputs give the same bytes (a render's version is the wrapper's
 /// to give, never part of a render's result).

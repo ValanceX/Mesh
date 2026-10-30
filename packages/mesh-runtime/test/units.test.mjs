@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { dispatch, raise, render, update, updateChanges, diff } from "../dist/index.js";
-import { template } from "./common.mjs";
+import { template, validateIntent } from "./common.mjs";
 
 const MODEL = JSON.stringify({
   version: 1,
@@ -194,6 +194,7 @@ test("the old names still read, and say what the new ones do", async () => {
 
   assert.equal(made.instances, made.occurrences);
   for (const each of made.occurrences) {
+    assert.ok(Object.isFrozen(each));
     assert.equal(each.instance, each.occurrence);
     assert.ok(!Object.keys(each).includes("instance"));
     assert.ok(!JSON.stringify(each).includes('"instance"'));
@@ -204,6 +205,8 @@ test("the old names still read, and say what the new ones do", async () => {
   assert.equal(typeof intent.occurrence, "string");
   assert.equal(intent.instance, intent.occurrence);
   assert.ok(!Object.keys(intent).includes("instance"));
+  assert.ok(Object.isFrozen(intent));
+  assert.ok(validateIntent(intent), JSON.stringify(validateIntent.errors));
 
   // The retired diagnostic code is gone: an unknown key is the new code.
   const { diagnostics } = await raise(made, "k-nowhere", "change", 2);

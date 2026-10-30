@@ -645,13 +645,13 @@ pub fn raise_named(
     )
 }
 
-/// Raises the event `event` of the unit occurrence `instance`, carrying `payload` (absent when
+/// Raises the event `event` of the unit occurrence `occurrence`, carrying `payload` (absent when
 /// `None`), against the render the host holds: what the occurrence's unit announces to its caller
 /// (docs/manual/runtime.md, "Units"). The result is the intent of the handler the caller bound to
 /// the event, found as a handler is when the event is forwarded out through occurrences; `None` when
 /// the caller bound none. Nothing is rendered.
 ///
-/// `Err` when the program, snapshot or units are not valid, the instance is not in the render, its
+/// `Err` when the program, snapshot or units are not valid, the occurrence is not in the render, its
 /// component declares no such event, or the payload does not fit the event's.
 pub fn raise_from_units(
     program: &Program<'_>,
