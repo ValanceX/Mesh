@@ -136,6 +136,13 @@ fn a_change_reaches_the_context_only_from_its_root_and_only_a_declared_name() {
     );
     let refused = Changes::from_host(&HostValue::from_json(&text).unwrap()).unwrap_err();
     assert_eq!(codes(&refused), ["runtime-invalid-change"]);
+    // `{ "context": name }` is the only spelling of the root: the string `$context` is refused.
+    let text = format!(
+        r#"{{ "base": {}, "changes": [{{ "op": "set", "path": ["$context", "theme"], "value": "dark" }}] }}"#,
+        first.version()
+    );
+    let refused = Changes::from_host(&HostValue::from_json(&text).unwrap()).unwrap_err();
+    assert_eq!(codes(&refused), ["runtime-invalid-change"]);
 }
 
 #[test]

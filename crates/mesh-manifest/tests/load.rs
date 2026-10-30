@@ -1335,6 +1335,16 @@ fn a_context_name_that_is_unknown_or_already_taken_is_refused_where_uses_writes_
             DiagnosticCode::MANIFEST_CONTEXT_CLASH,
         ),
         (
+            "a unit's state name",
+            with_context(
+                theme,
+                "{}",
+                "{}",
+                r#"["theme"], "unit": { "state": { "theme": { "type": { "kind": "string" }, "default": "" } }, "commands": {} }"#,
+            ),
+            DiagnosticCode::MANIFEST_CONTEXT_CLASH,
+        ),
+        (
             "twice",
             with_context(theme, "{}", "{}", r#"["theme", "theme"]"#),
             DiagnosticCode::MANIFEST_CONTEXT_CLASH,

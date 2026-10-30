@@ -4,7 +4,7 @@
 // is the package's own: the argument, and that a render keeps the context it was made with, however it was made.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MeshUsageError, dispatch, render, update, updateChanges } from "../dist/index.js";
+import { MeshUsageError, dispatch, openScreen, render, update, updateChanges } from "../dist/index.js";
 import { template } from "./common.mjs";
 
 const MODEL = JSON.stringify({
@@ -55,4 +55,27 @@ test("context is an object of values; the runtime judges them", async () => {
   const missing = await render({ program: await program(), model: MODEL, snapshot: { title: "a" } });
   assert.equal(missing.diagnostics.diagnostics[0].code, "runtime-missing-value");
   assert.deepEqual(missing.diagnostics.diagnostics[0].location, { kind: "input", path: ["$context", "theme"] });
+});
+
+test("a screen shows with context: the first tree reads it, and a new context between shows gives patches", async () => {
+  // The badge shows the theme, so a theme change is visible in the tree.
+  const shown = {
+    root: "page",
+    templates: [await template("page", "<box tone={title}><badge /></box>", MODEL), await template("badge", "<box tone={theme} />", MODEL)],
+  };
+  const screen = openScreen({ program: shown, model: MODEL });
+  const first = await screen.show({ title: "a" }, { theme: "dark" });
+  assert.ok(first.tree, JSON.stringify(first.diagnostics));
+  assert.ok(JSON.stringify(first.tree).includes('"dark"'));
+  // The snapshot is the same; only the context changed, so the patches carry the new theme.
+  const changed = await screen.show({ title: "a" }, { theme: "light" });
+  assert.ok(changed.patches, JSON.stringify(changed.diagnostics));
+  assert.ok(JSON.stringify(changed.patches).includes('"light"'), JSON.stringify(changed.patches));
+  // Shown without context, the screen keeps the values last shown: only the title changes.
+  const kept = await screen.show({ title: "b" });
+  assert.ok(kept.patches, JSON.stringify(kept.diagnostics));
+  assert.ok(!JSON.stringify(kept.patches).includes('"light"') && !JSON.stringify(kept.patches).includes('"dark"'), JSON.stringify(kept.patches));
+  screen.close();
+  // A required context type with no value is a diagnostic, as render gives.
+  assert.equal((await screen.show({ title: "a" })).diagnostics.diagnostics[0].code, "runtime-missing-value");
 });

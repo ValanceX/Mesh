@@ -115,7 +115,13 @@ impl Changes {
                     let mut path = Vec::with_capacity(segments.len());
                     for (position, segment) in segments.iter().enumerate() {
                         let segment = match segment {
-                            Some(HostValue::String(text)) => PathSegment::Name(text.clone()),
+                            // `{ "context": name }` is the one spelling of a context root: the
+                            // segment `$context` is how `Change` holds it, not a name a host writes.
+                            Some(HostValue::String(text))
+                                if !(position == 0 && text == CONTEXT_ROOT) =>
+                            {
+                                PathSegment::Name(text.clone())
+                            }
                             Some(HostValue::Number(number)) if integer(*number) => {
                                 PathSegment::Index(*number as usize)
                             }

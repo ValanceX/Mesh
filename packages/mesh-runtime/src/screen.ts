@@ -99,20 +99,23 @@ export class Screen {
    * Shows `snapshot`: the first time (or after `close()`), the tree to draw; after that, the patches that turn the
    * tree drawn into this snapshot's. On diagnostics nothing changes, and the tree drawn still dispatches. It rejects
    * as `render` and `update` do. Don't change a snapshot after showing it: a unit's change renders it again.
+   *
+   * `context` is the context values the host holds now (the manifest's `context`; see `RenderInput.context`).
+   * Without it, the values last shown are kept (none, the first time).
    */
-  show(snapshot: Record<string, unknown>): Promise<ShowResult> {
+  show(snapshot: Record<string, unknown>, context?: Record<string, unknown>): Promise<ShowResult> {
     const epoch = this.#epoch;
     return this.#run(async (): Promise<ShowResult> => {
       const current = this.#current;
       if (current === undefined) {
-        const made = await renderWith({ ...this.#program(), snapshot, units: this.#occurrences });
+        const made = await renderWith({ ...this.#program(), snapshot, units: this.#occurrences, context });
         if (made.diagnostics) {
           return { diagnostics: made.diagnostics };
         }
         this.#keep(made.render, snapshot, epoch);
         return { tree: made.render.tree };
       }
-      const updated = await updateWith(current, snapshot, this.#occurrences);
+      const updated = await updateWith(current, snapshot, this.#occurrences, context);
       return updated.diagnostics ? { diagnostics: updated.diagnostics } : { patches: this.#replace(current, updated, snapshot, epoch) };
     });
   }
