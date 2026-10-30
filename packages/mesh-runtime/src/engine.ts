@@ -172,7 +172,7 @@ export class Render {
   /** The render tree, for a renderer. Frozen. */
   readonly tree: RenderTree;
   /** The unit occurrences in the tree, in the order the runtime met them. Frozen; empty when no component has a unit. */
-  readonly instances: readonly UnitOccurrence[];
+  readonly occurrences: readonly UnitOccurrence[];
   readonly #root: string;
   readonly #templates: Uint8Array;
   readonly #model: string;
@@ -185,6 +185,14 @@ export class Render {
   /** The module's copy of this render, if it has one: its handle, and the module it is in. */
   #kept: Kept | undefined;
 
+  /**
+   * The old name of {@link Render.occurrences}.
+   * @deprecated Use `occurrences` (refinements C-4). Removed after 0.18.
+   */
+  get instances(): readonly UnitOccurrence[] {
+    return this.occurrences;
+  }
+
   /** Not public: renders come from {@link render} and {@link update}. */
   constructor(
     token: symbol,
@@ -195,14 +203,14 @@ export class Render {
     snapshot: Uint8Array | undefined,
     version: RenderVersion,
     units: Uint8Array,
-    instances: readonly UnitOccurrence[],
+    occurrences: readonly UnitOccurrence[],
     kept?: Kept,
   ) {
     if (token !== MAKING) {
       throw new MeshUsageError("a Render comes from render(), update() or updateChanges()", "not-a-render");
     }
     this.tree = tree;
-    this.instances = instances;
+    this.occurrences = occurrences;
     this.#units = units;
     this.#root = root;
     this.#templates = templates;
@@ -618,18 +626,35 @@ function encodeUnits(units: UnitStates | undefined): Uint8Array {
   return encodeValue(units as Record<string, unknown>);
 }
 
-/** The unit occurrences a result lists, frozen. */
-function instancesOf(result: Record<string, unknown>): readonly UnitOccurrence[] {
-  if (result.instances === undefined) {
-    return emptyInstances;
-  }
-  if (!Array.isArray(result.instances)) {
-    throw new MeshInternalError("the runtime's unit occurrences aren't a list");
-  }
-  return Object.freeze(result.instances as UnitOccurrence[]);
+/**
+ * Gives `target` the deprecated name `instance` for its `occurrence`, for one release (refinements C-4).
+ * It is not enumerable, so the value is what it is without it: it does not appear in a comparison, a
+ * spread or `JSON.stringify`. Drop this and its two callers when the alias is removed.
+ */
+function withInstanceAlias<T extends { readonly occurrence?: string }>(target: T): T {
+  // The runtime's result arrives frozen, so the alias goes on a frozen copy (its nested values are shared, and frozen).
+  const copy = { ...target };
+  Object.defineProperty(copy, "instance", { get: () => copy.occurrence, enumerable: false });
+  return Object.freeze(copy);
 }
 
-const emptyInstances: readonly UnitOccurrence[] = Object.freeze([]);
+/** The intent of a result, with the deprecated alias. */
+function intentOf(value: object): CommandIntent {
+  return withInstanceAlias(value as CommandIntent);
+}
+
+/** The unit occurrences a result lists, frozen. */
+function occurrencesOf(result: Record<string, unknown>): readonly UnitOccurrence[] {
+  if (result.occurrences === undefined) {
+    return emptyOccurrences;
+  }
+  if (!Array.isArray(result.occurrences)) {
+    throw new MeshInternalError("the runtime's unit occurrences aren't a list");
+  }
+  return Object.freeze((result.occurrences as UnitOccurrence[]).map(withInstanceAlias));
+}
+
+const emptyOccurrences: readonly UnitOccurrence[] = Object.freeze([]);
 
 /** Renders. See the package's `render`. */
 export function render(input: RenderInput): Promise<RenderResult> {
@@ -652,7 +677,7 @@ export function render(input: RenderInput): Promise<RenderResult> {
           throw new MeshInternalError("the runtime's result is neither a tree nor diagnostics");
         }
         const tree = result.tree as RenderTree;
-        return Object.freeze({ render: new Render(MAKING, tree, root, templates, model, snapshot, version, units, instancesOf(result)) });
+        return Object.freeze({ render: new Render(MAKING, tree, root, templates, model, snapshot, version, units, occurrencesOf(result)) });
       },
     );
   });
@@ -718,7 +743,7 @@ export function update(previous: Render, snapshotInput: Record<string, unknown>,
         // The module returns what changed; the new tree is the previous one with it applied.
         const patches = result.patches as RenderPatches;
         return Object.freeze({
-          render: new Render(MAKING, applyPatches(previous.tree, patches), root, templates, model, snapshot, version, units, instancesOf(result), keptFrom(result)),
+          render: new Render(MAKING, applyPatches(previous.tree, patches), root, templates, model, snapshot, version, units, occurrencesOf(result), keptFrom(result)),
           patches,
         });
       },
@@ -772,7 +797,7 @@ export function updateChanges(
         const patches = result.patches as RenderPatches;
         // No snapshot is kept outside the module: the new render is the module's.
         return Object.freeze({
-          render: new Render(MAKING, applyPatches(previous.tree, patches), root, templates, model, undefined, version, units, instancesOf(result), keptFrom(result)),
+          render: new Render(MAKING, applyPatches(previous.tree, patches), root, templates, model, undefined, version, units, occurrencesOf(result), keptFrom(result)),
           patches,
         });
       },
@@ -849,18 +874,18 @@ export function dispatch(render: Render, handler: string, payload?: unknown): Pr
         if (typeof result.intent !== "object" || result.intent === null) {
           throw new MeshInternalError("the runtime's result is neither an intent nor diagnostics");
         }
-        return Object.freeze({ intent: result.intent as CommandIntent });
+        return Object.freeze({ intent: intentOf(result.intent) });
       },
     );
   });
 }
 
 /** Raises an event of a unit occurrence. See the package's `raise`. */
-export function raise(render: Render, instance: string, event: string, payload?: unknown): Promise<RaiseResult> {
+export function raise(render: Render, occurrence: string, event: string, payload?: unknown): Promise<RaiseResult> {
   return enqueue(async () => {
     const [root, templates, model, snapshot, units] = Render.inputsOf(render, "raise");
     const kept = Render.keptOf(render, "raise");
-    if (typeof instance !== "string" || typeof event !== "string") {
+    if (typeof occurrence !== "string" || typeof event !== "string") {
       throw new MeshUsageError("raise() takes the occurrence's key and the event's name, both strings");
     }
     const absent = payload === undefined;
@@ -871,8 +896,8 @@ export function raise(render: Render, instance: string, event: string, payload?:
     }
     return runNow(
       inModule
-        ? [encoder.encode(model), encoder.encode(instance), encoder.encode(event), encoded]
-        : [encoder.encode(root), templates, encoder.encode(model), snapshot as Uint8Array, units, encoder.encode(instance), encoder.encode(event), encoded],
+        ? [encoder.encode(model), encoder.encode(occurrence), encoder.encode(event), encoded]
+        : [encoder.encode(root), templates, encoder.encode(model), snapshot as Uint8Array, units, encoder.encode(occurrence), encoder.encode(event), encoded],
       (exports, pointers) =>
         inModule
           ? exports.mesh_raise_kept(...pointers, absent ? 0 : 1, kept.handle)
@@ -887,7 +912,7 @@ export function raise(render: Render, instance: string, event: string, payload?:
         if (typeof result.intent !== "object" || result.intent === null) {
           throw new MeshInternalError("the runtime's result is neither an intent, nothing, nor diagnostics");
         }
-        return Object.freeze({ intent: result.intent as CommandIntent });
+        return Object.freeze({ intent: intentOf(result.intent) });
       },
     );
   });

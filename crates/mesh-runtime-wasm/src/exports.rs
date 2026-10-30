@@ -342,8 +342,8 @@ pub unsafe extern "C" fn mesh_dispatch(
 pub unsafe extern "C" fn mesh_raise_kept(
     model: *const u8,
     model_len: usize,
-    instance: *const u8,
-    instance_len: usize,
+    occurrence: *const u8,
+    occurrence_len: usize,
     event: *const u8,
     event_len: usize,
     payload: *const u8,
@@ -355,13 +355,13 @@ pub unsafe extern "C" fn mesh_raise_kept(
     let result = unsafe {
         match (
             text(model, model_len),
-            text(instance, instance_len),
+            text(occurrence, occurrence_len),
             text(event, event_len),
         ) {
-            (Some(model), Some(instance), Some(event)) => Some(crate::respond_raise_kept(
+            (Some(model), Some(occurrence), Some(event)) => Some(crate::respond_raise_kept(
                 model,
                 handle,
-                instance,
+                occurrence,
                 event,
                 (has_payload != 0).then(|| bytes(payload, payload_len)),
             )),
@@ -392,8 +392,8 @@ pub unsafe extern "C" fn mesh_raise(
     snapshot_len: usize,
     units: *const u8,
     units_len: usize,
-    instance: *const u8,
-    instance_len: usize,
+    occurrence: *const u8,
+    occurrence_len: usize,
     event: *const u8,
     event_len: usize,
     payload: *const u8,
@@ -405,16 +405,16 @@ pub unsafe extern "C" fn mesh_raise(
         match (
             text(root, root_len),
             text(model, model_len),
-            text(instance, instance_len),
+            text(occurrence, occurrence_len),
             text(event, event_len),
         ) {
-            (Some(root), Some(model), Some(instance), Some(event)) => Some(crate::respond_raise(
+            (Some(root), Some(model), Some(occurrence), Some(event)) => Some(crate::respond_raise(
                 root,
                 bytes(templates, templates_len),
                 model,
                 bytes(snapshot, snapshot_len),
                 bytes(units, units_len),
-                instance,
+                occurrence,
                 event,
                 (has_payload != 0).then(|| bytes(payload, payload_len)),
             )),

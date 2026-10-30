@@ -238,7 +238,7 @@ test("a unit's command with no transition comes back as its intent, for the host
   const { intent } = await screen.dispatch(button(tree, 1));
 
   assert.equal(intent.command.name, "toggle");
-  assert.equal(typeof intent.instance, "string");
+  assert.equal(typeof intent.occurrence, "string");
   screen.close();
 });
 

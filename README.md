@@ -115,7 +115,9 @@ mesh/
 
 ## Status
 
-**v0.17.0 prepared** (2026-10-24; not yet published: v0.16.0 is the latest release): *streaming*. `openSession` (`@valancex/mesh-compiler`) and `mesh_compiler::stream` check a source while it arrives: the diagnostics that are new, what is open, and a checked preview while nothing is wrong; `close()` is exactly the batch check. A command in the manifest may carry an `effect` and a `title` for a host that asks before it runs one. `generated/` joins `@valancex/mesh-conformance`. A source checked whole is checked as before. See the [v0.17 release notes](docs/releases/v0.17.md).
+**v0.18.0 prepared** (2026-10-30; not yet published: v0.17.0 is prepared and v0.16.0 is the latest release): *occurrence*. The unit sense of "instance" is renamed "occurrence" (refinements C-4): `Render.occurrences`, `intent.occurrence`, `runtime-unknown-occurrence`, in the specification, the manuals, both runtimes and the conformance vectors. The old names still work for one release, deprecated; the old diagnostic code is retired. "Instance" keeps its other meanings. See the [v0.18 release notes](docs/releases/v0.18.md).
+
+**v0.17.0 prepared** (2026-10-24): *streaming*. `openSession` (`@valancex/mesh-compiler`) and `mesh_compiler::stream` check a source while it arrives: the diagnostics that are new, what is open, and a checked preview while nothing is wrong; `close()` is exactly the batch check. A command in the manifest may carry an `effect` and a `title` for a host that asks before it runs one. `generated/` joins `@valancex/mesh-conformance`. A source checked whole is checked as before. See the [v0.17 release notes](docs/releases/v0.17.md).
 
 **v0.16.0 (released)**: *replay*. `@valancex/mesh-conformance` gains `replay/`, the session-log format, seven recorded logs and 1,000 random sessions that every runtime must replay exactly, by three routes. No behavior changes. See the [v0.16 release notes](docs/releases/v0.16.md).
 

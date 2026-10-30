@@ -75,12 +75,12 @@ fn decode_units(bytes: &[u8]) -> Result<Units, Refusal> {
 /// The result document of a render's tree, and its unit occurrences when it has any.
 fn tree_document(render: &mesh_runtime::Render) -> String {
     let tree = render.tree().to_json();
-    if render.instances().next().is_none() {
+    if render.occurrences().next().is_none() {
         return format!("{{\"tree\":{tree}}}");
     }
     format!(
-        "{{\"tree\":{tree},\"instances\":{}}}",
-        render.instances_to_json()
+        "{{\"tree\":{tree},\"occurrences\":{}}}",
+        render.occurrences_to_json()
     )
 }
 
@@ -238,13 +238,13 @@ pub fn respond_update(
 /// The result document of an update: the new render is kept under `new_version`.
 fn updated_document(updated: mesh_runtime::Update, new_version: u64) -> String {
     let patches = mesh_runtime::patches_to_json(&updated.patches);
-    let instances = if updated.render.instances().next().is_none() {
+    let occurrences = if updated.render.occurrences().next().is_none() {
         String::new()
     } else {
-        format!(",\"instances\":{}", updated.render.instances_to_json())
+        format!(",\"occurrences\":{}", updated.render.occurrences_to_json())
     };
     let handle = retained::keep(updated.render.with_version(new_version));
-    format!("{{\"handle\":{handle},\"patches\":{patches}{instances}}}")
+    format!("{{\"handle\":{handle},\"patches\":{patches}{occurrences}}}")
 }
 
 /// Updates a render by the encoded `changes` (`mesh_runtime::update_changes`):
@@ -406,19 +406,19 @@ fn raised_document(
     }
 }
 
-/// Raises `event` of the unit occurrence `instance` of the kept render `handle` names, with the encoded
+/// Raises `event` of the unit occurrence `occurrence` of the kept render `handle` names, with the encoded
 /// `payload` (absent when `None`): `{"intent": <intent>}`, `{"nothing": true}` when the caller bound
 /// no handler to it, or `{"diagnostics": ...}`. A handle the module doesn't hold is a refusal.
 pub fn respond_raise_kept(
     model: &str,
     handle: u32,
-    instance: &str,
+    occurrence: &str,
     event: &str,
     payload_bytes: Option<&[u8]>,
 ) -> Result<String, Refusal> {
     let payload = payload_bytes.map(decode_value).transpose()?;
     let result = retained::with(handle, |render| {
-        mesh_runtime::raise_named(render, instance, event, payload.as_ref())
+        mesh_runtime::raise_named(render, occurrence, event, payload.as_ref())
     })
     .ok_or_else(|| Refusal::Input("the module holds no such render".to_string()))?;
     Ok(raised_document(result, model))
@@ -432,7 +432,7 @@ pub fn respond_raise(
     model: &str,
     snapshot_bytes: &[u8],
     units_bytes: &[u8],
-    instance: &str,
+    occurrence: &str,
     event: &str,
     payload_bytes: Option<&[u8]>,
 ) -> Result<String, Refusal> {
@@ -451,7 +451,7 @@ pub fn respond_raise(
             model,
             &snapshot,
             &units,
-            instance,
+            occurrence,
             event,
             payload.as_ref(),
         ),

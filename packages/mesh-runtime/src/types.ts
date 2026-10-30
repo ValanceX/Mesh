@@ -111,10 +111,16 @@ export interface CommandIntent {
   readonly arguments: readonly IntentArgument[];
   /**
    * For a command of a component's unit: the occurrence it is for, by the key the render gave it
-   * (`Render.instances`). The host holds the unit's state per occurrence.
+   * (`Render.occurrences`). The host holds the unit's state per occurrence.
+   */
+  readonly occurrence?: string;
+  /**
+   * The old name of `occurrence`: the same value, on the object but not enumerable (so it is not in a
+   * comparison or `JSON.stringify`).
+   * @deprecated Read `occurrence` (refinements C-4). Removed after 0.18.
    */
   readonly instance?: string;
-  /** With `instance`: the unit's fields the caller owned when the event was dispatched, whose change the host does not apply. */
+  /** With `occurrence`: the unit's fields the caller owned when the event was dispatched, whose change the host does not apply. */
   readonly controlled?: readonly string[];
 }
 
@@ -125,6 +131,11 @@ export interface CommandIntent {
  */
 export interface UnitOccurrence {
   /** The occurrence's identity: the key of its place in the program. */
+  readonly occurrence: string;
+  /**
+   * The old name of `occurrence`: the same value, not enumerable.
+   * @deprecated Read `occurrence` (refinements C-4). Removed after 0.18.
+   */
   readonly instance: string;
   /** The composite whose unit it is. */
   readonly component: string;

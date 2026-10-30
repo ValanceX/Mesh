@@ -72,13 +72,13 @@ function texts(tree) {
 test("an occurrence is listed with its defaults, and the host's state for it is what the template sees", async () => {
   const { render: plain } = await render({ program, model: MODEL, snapshot: items(1, 2) });
 
-  assert.equal(plain.instances.length, 3);
-  assert.deepEqual(plain.instances.map((each) => each.component), ["disclosure", "disclosure", "tabs"]);
-  assert.deepEqual(plain.instances[0].state, { open: false });
-  assert.ok(Object.isFrozen(plain.instances));
+  assert.equal(plain.occurrences.length, 3);
+  assert.deepEqual(plain.occurrences.map((each) => each.component), ["disclosure", "disclosure", "tabs"]);
+  assert.deepEqual(plain.occurrences[0].state, { open: false });
+  assert.ok(Object.isFrozen(plain.occurrences));
   assert.deepEqual(texts(plain.tree), ["a", "b", "at 0"]);
 
-  const second = plain.instances[1].instance;
+  const second = plain.occurrences[1].occurrence;
   const { render: open } = await render({ program, model: MODEL, snapshot: items(1, 2), units: { [second]: { open: true } } });
 
   assert.deepEqual(texts(open.tree), ["a", "b", "open b", "at 0"]);
@@ -88,24 +88,24 @@ test("a render with no unit has none listed", async () => {
   const bare = { root: "page", templates: [await template("page", "<box><text>x</text></box>", MODEL)] };
   const { render: made } = await render({ program: bare, model: MODEL, snapshot: items() });
 
-  assert.deepEqual(made.instances, []);
+  assert.deepEqual(made.occurrences, []);
 });
 
 test("a reorder keeps the state with the row, and an update rebuilds a part the unit state changed under", async () => {
   const { render: first } = await render({ program, model: MODEL, snapshot: items(1, 2, 3) });
-  const b = first.instances[1].instance;
+  const b = first.occurrences[1].occurrence;
   const units = { [b]: { open: true } };
   const { render: second, patches } = await update(first, items(1, 2, 3), units);
 
   assert.deepEqual(texts(second.tree), ["a", "b", "open b", "c", "at 0"]);
   assert.ok(patches.patches.length > 0);
-  assert.equal(second.instances.length, 4);
+  assert.equal(second.occurrences.length, 4);
 
   const { render: sorted } = await update(second, items(3, 2, 1));
 
   // No units given: the render's own are kept, and the row's state moved with it.
   assert.deepEqual(texts(sorted.tree), ["c", "b", "open b", "a", "at 0"]);
-  assert.equal(sorted.instances.find((each) => each.state.open === true).instance, b);
+  assert.equal(sorted.occurrences.find((each) => each.state.open === true).occurrence, b);
 
   const fresh = await render({ program, model: MODEL, snapshot: items(3, 2, 1), units });
 
@@ -122,7 +122,7 @@ test("a command of a unit names its occurrence, and so does the same dispatch of
 
   assert.equal(intent.command.component, "disclosure");
   assert.equal(intent.command.name, "toggle");
-  assert.equal(intent.instance, held.instances[1].instance);
+  assert.equal(intent.occurrence, held.occurrences[1].occurrence);
   assert.equal(intent.controlled, undefined);
   held.release();
 
@@ -137,26 +137,26 @@ test("a controlled field takes the caller's prop, and raise gives the handler th
     templates: [await template("page", "<box><tabs at={4} on.change={chose($event)} /></box>", MODEL), await template("tabs", TABS, MODEL)],
   };
   const { render: made } = await render({ program: controlled, model: MODEL, snapshot: items() });
-  const [tabs] = made.instances;
+  const [tabs] = made.occurrences;
 
   assert.deepEqual(tabs.controlled, ["at"]);
   assert.deepEqual(texts(made.tree), ["at 4"]);
 
-  const { intent } = await raise(made, tabs.instance, "change", 2);
+  const { intent } = await raise(made, tabs.occurrence, "change", 2);
 
   assert.equal(intent.command.name, "chose");
   assert.deepEqual(intent.arguments, [{ value: 2 }]);
 
   const { diagnostics } = await raise(made, "k-nowhere", "change", 2);
 
-  assert.equal(diagnostics.diagnostics[0].code, "runtime-unknown-instance");
+  assert.equal(diagnostics.diagnostics[0].code, "runtime-unknown-occurrence");
 
   const quiet = {
     root: "page",
     templates: [await template("page", "<box><tabs /></box>", MODEL), await template("tabs", TABS, MODEL)],
   };
   const { render: unbound } = await render({ program: quiet, model: MODEL, snapshot: items() });
-  const { intent: nothing, diagnostics: none } = await raise(unbound, unbound.instances[0].instance, "change", 2);
+  const { intent: nothing, diagnostics: none } = await raise(unbound, unbound.occurrences[0].occurrence, "change", 2);
 
   assert.equal(none, undefined);
   assert.equal(nothing, undefined);
@@ -164,7 +164,7 @@ test("a controlled field takes the caller's prop, and raise gives the handler th
 
 test("a state the manifest forbids is a diagnostic, and units of the wrong shape are a usage error", async () => {
   const { render: plain } = await render({ program, model: MODEL, snapshot: items(1) });
-  const key = plain.instances[0].instance;
+  const key = plain.occurrences[0].occurrence;
   const { diagnostics } = await render({ program, model: MODEL, snapshot: items(1), units: { [key]: { open: "yes" } } });
 
   assert.equal(diagnostics.diagnostics[0].code, "runtime-value-mismatch");
@@ -174,7 +174,7 @@ test("a state the manifest forbids is a diagnostic, and units of the wrong shape
 
 test("updateChanges keeps the units, or takes others", async () => {
   const { render: first } = await render({ program, model: MODEL, snapshot: items(1, 2) });
-  const key = first.instances[0].instance;
+  const key = first.occurrences[0].occurrence;
   const { render: opened } = await update(first, items(1, 2), { [key]: { open: true } });
   const changes = { base: opened.version, changes: diff(items(1, 2), items(1, 2, 3)) };
   const { render: grown } = await updateChanges(opened, changes);
@@ -185,4 +185,28 @@ test("updateChanges keeps the units, or takes others", async () => {
   const { render: closed } = await updateChanges(grown, back, { units: {} });
 
   assert.deepEqual(texts(closed.tree), ["a", "b", "c", "at 0"]);
+});
+
+// The old names, deprecated in 0.18.0 for one release (refinements C-4): the same values under the
+// old spellings, not enumerable, so the new shape is what a comparison or JSON.stringify sees.
+test("the old names still read, and say what the new ones do", async () => {
+  const { render: made } = await render({ program, model: MODEL, snapshot: items(1, 2) });
+
+  assert.equal(made.instances, made.occurrences);
+  for (const each of made.occurrences) {
+    assert.equal(each.instance, each.occurrence);
+    assert.ok(!Object.keys(each).includes("instance"));
+    assert.ok(!JSON.stringify(each).includes('"instance"'));
+  }
+
+  const handler = made.tree.root.children[0].children[1].children[0].events.click;
+  const { intent } = await dispatch(made, handler);
+  assert.equal(typeof intent.occurrence, "string");
+  assert.equal(intent.instance, intent.occurrence);
+  assert.ok(!Object.keys(intent).includes("instance"));
+
+  // The retired diagnostic code is gone: an unknown key is the new code.
+  const { diagnostics } = await raise(made, "k-nowhere", "change", 2);
+  assert.deepEqual(diagnostics.diagnostics.map((each) => each.code), ["runtime-unknown-occurrence"]);
+  made.release();
 });

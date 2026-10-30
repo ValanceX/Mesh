@@ -1280,11 +1280,17 @@ Dispatch was given a handler identifier of the render's program that names no ha
 
 Location: `handler`.
 
-### `runtime-unknown-instance`
+### `runtime-unknown-occurrence`
 
 `raise` was given a unit occurrence key that names no unit occurrence in the render: the occurrence is not in the tree (a conditional hid it, or its item left the list), or the key is another program's.
 
 Location: `handler` (the key stands where a handler identifier does).
+
+### `runtime-unknown-instance`
+
+**Retired** in 0.18.0. Nothing reports this code any more: it was `raise`'s code for a key that names no unit occurrence, and the unit sense of "instance" is now "occurrence" (see [`runtime-unknown-occurrence`](#runtime-unknown-occurrence)). The code stays in the catalogue because a code is never reused for a different meaning.
+
+Location: `handler`.
 
 ### `runtime-unknown-event`
 

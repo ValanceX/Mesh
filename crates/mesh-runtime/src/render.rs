@@ -21,13 +21,13 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
 /// A composite occurrence's scope, and the occurrence as a unit when its component has one.
-pub(crate) type Bound = (BTreeMap<String, Value>, Option<Rc<Instance>>);
+pub(crate) type Bound = (BTreeMap<String, Value>, Option<Rc<Occurrence>>);
 
 /// A unit occurrence a render met (docs/manual/runtime.md, "Units"): where it is, whose unit it is,
 /// and the state it was rendered with. A host keeps the state of the occurrences it has changed, and
 /// lets go of those a later render no longer lists.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Instance {
+pub struct Occurrence {
     /// The occurrence's identity: the key of its place in the program, as spec §9.10 defines it.
     pub key: String,
     /// The composite whose unit it is.
@@ -40,6 +40,10 @@ pub struct Instance {
     /// The host's entry this was rendered from, so an update can tell that it is as it was.
     pub(crate) entry: Option<HostRecord>,
 }
+
+/// The old name of [`Occurrence`] (refinements C-4).
+#[deprecated(since = "0.18.0", note = "renamed `Occurrence`; removed after 0.18")]
+pub type Instance = Occurrence;
 
 /// One successful render: its tree, and the program, model and snapshot
 /// it came from. It owns copies of all of them, so nothing a host does
@@ -58,7 +62,7 @@ pub struct Render {
     /// person saw, and an update without new ones keeps these.
     pub(crate) units: Rc<Units>,
     /// The unit occurrences in the tree, in the order they were met.
-    instances: Vec<Rc<Instance>>,
+    instances: Vec<Rc<Occurrence>>,
     /// This render's version in this thread: no two renders have the same
     /// one. Changes name the version they were computed against.
     id: u64,
@@ -89,19 +93,28 @@ impl Render {
 
     /// The unit occurrences in this render, in the order they were met: the host's registry lets go
     /// of the state of any occurrence that is not here.
-    pub fn instances(&self) -> impl Iterator<Item = &Instance> {
-        self.instances.iter().map(|instance| &**instance)
+    pub fn occurrences(&self) -> impl Iterator<Item = &Occurrence> {
+        self.instances.iter().map(|occurrence| &**occurrence)
+    }
+
+    /// The old name of [`Render::occurrences`].
+    #[deprecated(
+        since = "0.18.0",
+        note = "renamed `occurrences` (refinements C-4); removed after 0.18"
+    )]
+    pub fn instances(&self) -> impl Iterator<Item = &Occurrence> {
+        self.occurrences()
     }
 
     /// The unit occurrences as a JSON array, for a host that cannot hold them as Rust values:
-    /// `[ { "instance", "component", "state", "controlled" } ]`.
-    pub fn instances_to_json(&self) -> String {
+    /// `[ { "occurrence", "component", "state", "controlled" } ]`.
+    pub fn occurrences_to_json(&self) -> String {
         serde_json::Value::Array(
             self.instances
                 .iter()
                 .map(|instance| {
                     let mut item = serde_json::json!({
-                        "instance": instance.key,
+                        "occurrence": instance.key,
                         "component": instance.component,
                         "state": instance.state,
                     });
@@ -113,6 +126,15 @@ impl Render {
                 .collect(),
         )
         .to_string()
+    }
+
+    /// The old name of [`Render::occurrences_to_json`]; it now writes `"occurrence"`, not `"instance"`.
+    #[deprecated(
+        since = "0.18.0",
+        note = "renamed `occurrences_to_json` (refinements C-4); removed after 0.18"
+    )]
+    pub fn instances_to_json(&self) -> String {
+        self.occurrences_to_json()
     }
 
     /// This render's version: unique among the renders made in this thread.
@@ -516,7 +538,7 @@ pub(crate) struct Link<'v> {
     pub occurrence: &'v Element,
     pub values: BTreeMap<String, Value>,
     /// The occurrence as a unit, if its component has one.
-    pub instance: Option<Rc<Instance>>,
+    pub instance: Option<Rc<Occurrence>>,
 }
 
 /// A composite occurrence being rendered: whose children a `mesh-slot` in
@@ -528,7 +550,7 @@ struct Frame<'v> {
     /// The caller's scope at the occurrence; only kept when the occurrence has children.
     values: Option<BTreeMap<String, Value>>,
     /// The occurrence as a unit, if its component has one.
-    instance: Option<Rc<Instance>>,
+    instance: Option<Rc<Occurrence>>,
 }
 
 /// What rendering a list of children gives.
@@ -605,7 +627,7 @@ pub(crate) struct Recorded<'v> {
     pub chain: Vec<Link<'v>>,
     /// The innermost composite occurrence around the node as a unit, if it is one: the one whose
     /// template the node is in, and so the owner of the commands it invokes.
-    pub instance: Option<Rc<Instance>>,
+    pub instance: Option<Rc<Occurrence>>,
 }
 
 /// Every handler of a render, by identifier.
@@ -613,12 +635,12 @@ pub(crate) type Sites<'v> = BTreeMap<String, Recorded<'v>>;
 
 /// A unit occurrence as a render found it: the occurrence in the template of `component`, the scope it
 /// was written in, and the occurrences around it. Only a render that was asked to record has them.
-pub(crate) struct Occurrence<'v> {
+pub(crate) struct Found<'v> {
     pub component: String,
     pub occurrence: &'v Element,
     pub values: BTreeMap<String, Value>,
     pub chain: Vec<Link<'v>>,
-    pub instance: Rc<Instance>,
+    pub instance: Rc<Occurrence>,
 }
 
 /// What a render of a validated program gives: its tree, and the parts a host and a dispatch need.
@@ -627,9 +649,9 @@ pub(crate) struct Rendered<'v> {
     /// The handlers, when the render recorded.
     pub sites: Sites<'v>,
     /// The unit occurrences in the tree, in the order they were met.
-    pub instances: Vec<Rc<Instance>>,
+    pub instances: Vec<Rc<Occurrence>>,
     /// The unit occurrences by key, when the render recorded.
-    pub occurrences: BTreeMap<String, Occurrence<'v>>,
+    pub occurrences: BTreeMap<String, Found<'v>>,
 }
 
 /// The render tree of a validated program, and, when `record`, the sites of
@@ -889,7 +911,7 @@ pub(crate) fn bind(
         .collect();
     Ok((
         values,
-        Some(Rc::new(Instance {
+        Some(Rc::new(Occurrence {
             key: key.to_string(),
             component: element.component.clone(),
             state,
@@ -926,11 +948,11 @@ struct Renderer<'v> {
     /// The state the host holds for the unit occurrences.
     units: Rc<Units>,
     /// The unit occurrences met so far, in order: those a kept part holds are added back from its memo.
-    instances: Vec<Rc<Instance>>,
+    instances: Vec<Rc<Occurrence>>,
     keys: HashSet<String>,
     sites: Option<Sites<'v>>,
     /// The unit occurrences by key, when recording.
-    occurrences: Option<BTreeMap<String, Occurrence<'v>>>,
+    occurrences: Option<BTreeMap<String, Found<'v>>>,
     /// The scope names read from outside each element's subtree, by element.
     free: HashMap<*const Element, Rc<Vec<String>>>,
     /// For the repeats being rendered, innermost last: the hash of the path
@@ -1068,7 +1090,7 @@ impl<'v> Renderer<'v> {
                         instance: frame.instance.clone(),
                     })
                     .collect();
-                let found = Occurrence {
+                let found = Found {
                     component: scope.component.to_string(),
                     occurrence: element,
                     values: scope.values.clone(),
@@ -1201,7 +1223,7 @@ impl<'v> Renderer<'v> {
     }
 
     /// Whether every unit occurrence in `kept` has the host state it was rendered with.
-    fn units_unchanged(&self, kept: &[Rc<Instance>]) -> bool {
+    fn units_unchanged(&self, kept: &[Rc<Occurrence>]) -> bool {
         kept.iter()
             .all(|instance| self.units.0.get(&instance.key) == instance.entry.as_ref())
     }

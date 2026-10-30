@@ -141,7 +141,7 @@ test("the only code that walks host values is the encoder", () => {
     { file: "screen.ts", text: "Array.isArray(raise)", reason: "a transition's `raise` is a pair: its shape, checked; the event and payload go to the runtime" },
     { file: "engine.ts", text: "Array.isArray(program.templates)", reason: "the host's template list, checked to be an array" },
     { file: "engine.ts", text: "Array.isArray((value as", reason: "the module's result envelope has a diagnostics array" },
-    { file: "engine.ts", text: "Array.isArray(result.instances)", reason: "the module's result envelope has an instances array" },
+    { file: "engine.ts", text: "Array.isArray(result.occurrences)", reason: "the module's result envelope has an occurrences array" },
     { file: "engine.ts", text: "Array.isArray(result.events)", reason: "the module's result envelope has an events array" },
     { file: "engine.ts", text: "Array.isArray(value)) {", reason: "the module's result document is an object" },
   ];

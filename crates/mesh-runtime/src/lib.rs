@@ -42,9 +42,11 @@ pub use eval::evaluations;
 pub use number::number_to_text;
 pub use patch::{diff, patches_to_json, Patch};
 pub use program::{declared_events_to_json, DeclaredEvent, Program};
+#[allow(deprecated)]
+pub use render::Instance;
 pub use render::{
     render, render_units, update, update_changes, update_changes_units, update_with,
-    update_with_units, Instance, Render, Update,
+    update_with_units, Occurrence, Render, Update,
 };
 pub use resolve::{resolve, Interaction, ResolveError, Resolved};
 pub use tree::{Intent, NamedIntent, Node, Tree, TreeChild};

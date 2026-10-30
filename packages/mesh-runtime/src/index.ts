@@ -205,7 +205,7 @@ export function dispatch(render: Render, handler: string, payload?: unknown): Pr
 
 /**
  * Raises an event of a unit occurrence, which a unit's transition does to tell its caller
- * something (docs/manual/runtime.md, "Units"): `instance` is a key from `render.instances`,
+ * something (docs/manual/runtime.md, "Units"): `occurrence` is a key from `render.occurrences`,
  * `event` one the occurrence's component declares, and `payload` what it carries. Returns
  * `{ intent }`, the intent of the handler the caller bound to the event (found as an event
  * forwarded out of a component is), `{ intent: undefined }` when the caller bound none, or
@@ -215,8 +215,8 @@ export function dispatch(render: Render, handler: string, payload?: unknown): Pr
  *
  * It rejects as {@link dispatch} does.
  */
-export function raise(render: Render, instance: string, event: string, payload?: unknown): Promise<RaiseResult> {
-  return raiseWith(render, instance, event, payload);
+export function raise(render: Render, occurrence: string, event: string, payload?: unknown): Promise<RaiseResult> {
+  return raiseWith(render, occurrence, event, payload);
 }
 
 /**

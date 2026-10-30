@@ -140,13 +140,13 @@ export class Screen {
         return { diagnostics: dispatched.diagnostics };
       }
       const { intent } = dispatched;
-      const occurrence = intent.instance;
+      const occurrence = intent.occurrence;
       const transition = occurrence === undefined ? undefined : this.#transition(intent.command.component, intent.command.name);
       if (occurrence === undefined || transition === undefined) {
         return { intent };
       }
       // The state the person saw: the render's, which has the caller's value for a field the caller owns.
-      const seen = current.instances.find((each) => each.instance === occurrence);
+      const seen = current.occurrences.find((each) => each.occurrence === occurrence);
       const args = intent.arguments.map((each) => ("value" in each ? each.value : undefined));
       const result: unknown = transition(seen === undefined ? {} : seen.state, ...args);
       if (!isTransitionResult(result)) {
@@ -228,7 +228,7 @@ export class Screen {
     }
     this.#current = render;
     this.#snapshot = snapshot;
-    const listed = new Set(render.instances.map((each) => each.instance));
+    const listed = new Set(render.occurrences.map((each) => each.occurrence));
     this.#occurrences = Object.fromEntries(Object.entries(this.#occurrences).filter(([occurrence]) => listed.has(occurrence)));
   }
 

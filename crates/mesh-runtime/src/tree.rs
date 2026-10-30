@@ -5,7 +5,7 @@
 //! `serde_json::Value`s: `null`, booleans, finite numbers (never `-0`),
 //! strings, lists and records.
 
-use crate::render::Instance;
+use crate::render::Occurrence;
 use crate::value::Value as Scoped;
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
@@ -59,7 +59,7 @@ pub(crate) struct Memo {
     pub repeats: Vec<RepeatMemo>,
     /// The unit occurrences below this node, with the host state each was rendered from: a node is
     /// not kept when one of them has other state, and keeps listing them when it is.
-    pub units: Vec<Rc<Instance>>,
+    pub units: Vec<Rc<Occurrence>>,
 }
 
 /// A text run under a node: its key, the values it was computed from, and its text.
@@ -91,7 +91,7 @@ pub(crate) struct RepeatItem {
     /// The text runs of an item that is a fragment, so a reused item keeps them for the next update.
     pub runs: Vec<Run>,
     /// The unit occurrences in the item, as `Memo::units` has them for a node.
-    pub units: Vec<Rc<Instance>>,
+    pub units: Vec<Rc<Occurrence>>,
 }
 
 impl PartialEq for Memo {
@@ -154,7 +154,14 @@ pub struct Intent {
     /// One per parameter, in order: `None` is absent, distinct from
     /// `Some(null)`.
     pub arguments: Vec<Option<Value>>,
-    /// For a command of a unit: the occurrence it is for, by the key the render gave it.
+    /// For a command of a unit: the occurrence it is for, by the key the render gave it. Read it
+    /// with [`Intent::occurrence`]. (`Intent` is Stable and has public fields, so this field keeps
+    /// its old name for one release, deprecated, rather than being renamed or joined by a second
+    /// field, either of which would break code that builds an `Intent`.)
+    #[deprecated(
+        since = "0.18.0",
+        note = "read `Intent::occurrence()` (refinements C-4); the field is renamed after 0.18"
+    )]
     pub instance: Option<String>,
     /// For a command of a unit: the fields of the occurrence the caller owned when the event was
     /// dispatched, whose change the host must not apply (docs/manual/runtime.md, "Units").
@@ -162,6 +169,12 @@ pub struct Intent {
 }
 
 impl Intent {
+    /// For a command of a unit: the occurrence it is for, by the key the render gave it.
+    #[allow(deprecated)]
+    pub fn occurrence(&self) -> Option<&str> {
+        self.instance.as_deref()
+    }
+
     /// The intent in docs/manual/runtime.md's form (`$defs/intent`).
     pub fn to_json(&self) -> String {
         let mut intent = json!({
@@ -172,8 +185,8 @@ impl Intent {
             }).collect::<Vec<_>>(),
         });
         // Present exactly for a command of a unit, so any other intent is written as it was.
-        if let Some(instance) = &self.instance {
-            intent["instance"] = json!(instance);
+        if let Some(occurrence) = self.occurrence() {
+            intent["occurrence"] = json!(occurrence);
             if !self.controlled.is_empty() {
                 intent["controlled"] = json!(self.controlled);
             }

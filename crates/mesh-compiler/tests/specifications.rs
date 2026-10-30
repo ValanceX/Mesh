@@ -183,7 +183,7 @@ fn the_runtime_manuals_diagnostics_match_runtime_diagnostics_v1() {
 
 /// Every code v0.5 adds (Pass 0, Decision 27), by family.
 const CHECK_CODES: [&str; 2] = ["content-not-text", "number-literal-out-of-range"];
-const RUNTIME_CODES: [&str; 38] = [
+const RUNTIME_CODES: [&str; 39] = [
     "assembly-malformed-template",
     "assembly-unsupported-format-version",
     "assembly-fingerprint-mismatch",
@@ -206,6 +206,7 @@ const RUNTIME_CODES: [&str; 38] = [
     "runtime-handler-other-program",
     "runtime-unknown-handler",
     "runtime-unknown-instance",
+    "runtime-unknown-occurrence",
     "runtime-unknown-event",
     "runtime-operand-mismatch",
     "runtime-not-a-record",

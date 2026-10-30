@@ -708,7 +708,7 @@ snippet_vectors!(passing, "passing");
 
 /// `units/`: a component's state for one occurrence, which a render takes beside the snapshot (docs/manual/runtime.md, "Units").
 /// `steps.json` is a list of `{ case, snapshot, units }`; each step's committed outputs are `step-N.expected.tree.json` and
-/// `step-N.expected.instances.json` (the occurrences the render lists). An update from a step to the next, given the next's units,
+/// `step-N.expected.occurrences.json` (the occurrences the render lists). An update from a step to the next, given the next's units,
 /// is the render of the next.
 mod units {
     use super::*;
@@ -784,7 +784,7 @@ mod units {
         for (at, step) in steps().iter().enumerate() {
             let render = render_step(step);
             committed(at, "tree", &(render.tree().to_json() + "\n"));
-            committed(at, "instances", &(render.instances_to_json() + "\n"));
+            committed(at, "occurrences", &(render.occurrences_to_json() + "\n"));
         }
     }
 
@@ -805,8 +805,8 @@ mod units {
                 step["case"]
             );
             assert_eq!(
-                updated.render.instances_to_json(),
-                fresh.instances_to_json(),
+                updated.render.occurrences_to_json(),
+                fresh.occurrences_to_json(),
                 "and lists what it lists"
             );
             previous = updated.render;

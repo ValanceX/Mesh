@@ -10,7 +10,7 @@ use crate::program::{
     COMPOSITE, CONDITIONAL, FRAGMENT, FRAGMENT_COMPONENT, NODE, SLOT,
 };
 use crate::render::{
-    bind, is_live, render_children, snapshot_values, statics, Instance, Link, Render, RenderChild,
+    bind, is_live, render_children, snapshot_values, statics, Link, Occurrence, Render, RenderChild,
 };
 use crate::tree::{Intent, NamedIntent};
 use crate::types::fits;
@@ -37,7 +37,7 @@ struct Site<'v> {
     /// event needs them); a walk of the program derives them from `composites`.
     chain: Option<&'v [Link<'v>]>,
     /// The unit occurrence whose template the node is in, when a render recorded it.
-    instance: Option<Rc<Instance>>,
+    instance: Option<Rc<Occurrence>>,
 }
 
 /// Every handler of the program, by identifier: a walk of its structure,
@@ -472,7 +472,7 @@ type Around<'v> = (
     String,
     &'v Element,
     BTreeMap<String, Value>,
-    Option<Rc<Instance>>,
+    Option<Rc<Occurrence>>,
 );
 
 /// Delivers the event `name` of `component`, carrying `carried`, out through the occurrences in
@@ -521,7 +521,7 @@ fn intent_of(
     scope: &Scope<'_, '_>,
     component: &str,
     binding: &mesh_template::EventBinding,
-    owner: Option<&Instance>,
+    owner: Option<&Occurrence>,
 ) -> Result<NamedIntent, RuntimeDiagnostic> {
     let command = &valid.component(component).commands[&binding.command];
     let mut arguments = Vec::with_capacity(binding.arguments.len());
@@ -557,6 +557,7 @@ fn intent_of(
             component: component.to_string(),
             command: binding.command.clone(),
             arguments,
+            #[allow(deprecated)]
             instance: owner.map(|owner| owner.key.clone()),
             controlled: owner.map_or_else(Vec::new, |owner| owner.controlled.clone()),
         },
@@ -615,17 +616,17 @@ fn forwarded(
 /// [`raise_from_units`], against a [`Render`] the host holds.
 pub fn raise(
     render: &Render,
-    instance: &str,
+    occurrence: &str,
     event: &str,
     payload: Option<&HostValue>,
 ) -> Result<Option<Intent>, Vec<RuntimeDiagnostic>> {
-    raise_named(render, instance, event, payload).map(|named| named.map(|named| named.intent))
+    raise_named(render, occurrence, event, payload).map(|named| named.map(|named| named.intent))
 }
 
 /// [`raise`], with the name of each argument written as a plain path.
 pub fn raise_named(
     render: &Render,
-    instance: &str,
+    occurrence: &str,
     event: &str,
     payload: Option<&HostValue>,
 ) -> Result<Option<NamedIntent>, Vec<RuntimeDiagnostic>> {
@@ -638,7 +639,7 @@ pub fn raise_named(
         &render.model,
         &render.host_snapshot(),
         &render.units,
-        instance,
+        occurrence,
         event,
         payload,
     )
@@ -657,11 +658,11 @@ pub fn raise_from_units(
     model: &str,
     snapshot: &HostRecord,
     units: &Rc<Units>,
-    instance: &str,
+    occurrence: &str,
     event: &str,
     payload: Option<&HostValue>,
 ) -> Result<Option<Intent>, Vec<RuntimeDiagnostic>> {
-    raise_named_from_units(program, model, snapshot, units, instance, event, payload)
+    raise_named_from_units(program, model, snapshot, units, occurrence, event, payload)
         .map(|named| named.map(|named| named.intent))
 }
 
@@ -671,15 +672,15 @@ pub fn raise_named_from_units(
     model: &str,
     snapshot: &HostRecord,
     units: &Rc<Units>,
-    instance: &str,
+    occurrence: &str,
     event: &str,
     payload: Option<&HostValue>,
 ) -> Result<Option<NamedIntent>, Vec<RuntimeDiagnostic>> {
     let valid = program::validate(program, model)?;
     let rendered = crate::render::tree(&valid, snapshot, true, None, units)?;
-    let Some(found) = rendered.occurrences.get(instance) else {
+    let Some(found) = rendered.occurrences.get(occurrence) else {
         return Err(vec![RuntimeDiagnostic::new(
-            RuntimeCode::UNKNOWN_INSTANCE,
+            RuntimeCode::UNKNOWN_OCCURRENCE,
             "this key names no unit occurrence in this render",
             Location::Handler,
         )]);
