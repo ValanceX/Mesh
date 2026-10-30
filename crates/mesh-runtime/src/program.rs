@@ -687,6 +687,10 @@ fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<
                 {
                     continue;
                 }
+                // A context name the component uses is bound by the host's context values.
+                if composite.uses.contains(scope_name) {
+                    continue;
+                }
                 match composite.props.get(scope_name) {
                     None => diagnostics.push(RuntimeDiagnostic::new(
                         RuntimeCode::UNBOUND_SCOPE_NAME,

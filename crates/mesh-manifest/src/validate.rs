@@ -93,6 +93,11 @@ struct Validator {
     /// Where each declaration's key is. Only complete if nothing was
     /// reported, which is the only case a `Manifest` is built in.
     spans: BTreeMap<DeclarationKey, Span>,
+    /// Every name the manifest's `context` declares, so that a `uses` of one whose type has
+    /// errors isn't also reported as unknown.
+    declared_context: BTreeSet<String>,
+    /// The context names whose types are valid, with their types.
+    context: BTreeMap<String, Type>,
 }
 
 /// An object's properties by key, first occurrence only.
@@ -181,7 +186,7 @@ impl Validator {
             json,
             "the manifest",
             &["version", "types", "components"],
-            &["$schema"],
+            &["$schema", "context"],
         )?;
         if let Some(schema) = properties.get("$schema") {
             self.string(schema, "\"$schema\"");
@@ -207,6 +212,25 @@ impl Validator {
                     self.types.insert(member.key.clone(), ty);
                 }
                 self.in_definition = None;
+            }
+        }
+
+        // The context channel: names a host supplies beside the snapshot, each with its type. Read
+        // before the components, whose `uses` name them.
+        if let Some(json) = properties.get("context") {
+            for member in self.names(
+                json,
+                "context",
+                "context name",
+                "the manifest's \"context\"",
+                NameRule::Identifier,
+            ) {
+                self.declared_context.insert(member.key.clone());
+                self.declare(DeclarationKey::Context(member.key.clone()), member.key_span);
+                self.snippet_allowed = false;
+                if let Some(ty) = self.ty(&member.value) {
+                    self.context.insert(member.key.clone(), ty);
+                }
             }
         }
 
@@ -237,6 +261,7 @@ impl Validator {
             .map(|member| member.key_span)?;
         Some(Manifest {
             types: std::mem::take(&mut self.types),
+            context: std::mem::take(&mut self.context),
             components: components?,
             components_span,
             spans: std::mem::take(&mut self.spans),
@@ -249,7 +274,7 @@ impl Validator {
             json,
             &what,
             &["props", "events", "commands", "scope"],
-            &["unit"],
+            &["unit", "uses"],
         )?;
         let owner = format!("component {name:?}");
 
@@ -318,6 +343,10 @@ impl Validator {
             Some(json) => self.unit(json, name, &props, &mut commands, &mut scope),
             None => None,
         };
+        let uses = match properties.get("uses") {
+            Some(json) => self.uses(json, name, &props, &mut scope),
+            None => BTreeSet::new(),
+        };
 
         Some(Component {
             props: std::mem::take(&mut props),
@@ -325,7 +354,75 @@ impl Validator {
             commands,
             scope,
             unit,
+            uses,
         })
+    }
+
+    /// A component's `uses`: an array of names the manifest's `context` declares. Each joins
+    /// `scope` with the context's type, read-only (MPRX has no assignment), so a template reads
+    /// it like any scope name and is type-checked the same way before it runs.
+    fn uses(
+        &mut self,
+        json: &Json,
+        component: &str,
+        props: &BTreeMap<String, Field>,
+        scope: &mut BTreeMap<String, Type>,
+    ) -> BTreeSet<String> {
+        let mut uses = BTreeSet::new();
+        let Value::Array(items) = &json.value else {
+            self.error(
+                DiagnosticCode::MANIFEST_INVALID_VALUE,
+                json.span,
+                format!(
+                    "\"uses\" must be an array of context names, found {}",
+                    json.value.describe()
+                ),
+            );
+            return uses;
+        };
+        for item in items {
+            let Some(name) = self.string(item, "a name in \"uses\"") else {
+                continue;
+            };
+            if !self.declared_context.contains(&name) {
+                self.error(
+                    DiagnosticCode::MANIFEST_UNKNOWN_CONTEXT,
+                    item.span,
+                    format!(
+                        "component {component:?} uses `{name}`, which the manifest's \"context\" doesn't declare"
+                    ),
+                );
+                continue;
+            }
+            let clash = if uses.contains(&name) {
+                Some("already in its `uses`")
+            } else if scope.contains_key(&name) {
+                Some("a scope name of the component")
+            } else if props.contains_key(&name) {
+                Some("a prop of the component")
+            } else {
+                None
+            };
+            if let Some(clash) = clash {
+                self.error(
+                    DiagnosticCode::MANIFEST_CONTEXT_CLASH,
+                    item.span,
+                    format!("the context name `{name}` is {clash}"),
+                );
+                continue;
+            }
+            // A context name whose type has errors was reported where it is declared.
+            let Some(ty) = self.context.get(&name).cloned() else {
+                continue;
+            };
+            self.declare(
+                DeclarationKey::Scope(component.to_string(), name.clone()),
+                item.span,
+            );
+            scope.insert(name.clone(), ty);
+            uses.insert(name);
+        }
+        uses
     }
 
     /// A component's `unit`: `{ "state": { name: { "type", "default", "controllable"? } }, "commands": { name:

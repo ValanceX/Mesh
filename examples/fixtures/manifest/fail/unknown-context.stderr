@@ -1,0 +1,5 @@
+error[manifest-unknown-context]: component "badge" uses `locale`, which the manifest's "context" doesn't declare
+ --> fixtures/manifest/fail/unknown-context.json:6:81
+  |
+6 |     "badge": { "props": {}, "events": {}, "commands": {}, "scope": {}, "uses": ["locale"] },
+  |                                                                                 ^^^^^^^^

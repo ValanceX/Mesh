@@ -1,0 +1,202 @@
+{
+  "checks": [
+    {
+      "case": "a component that doesn't list a context name in its `uses` can't read it: there are no implicit names",
+      "component": "frame",
+      "source": "<box>{theme}</box>",
+      "code": "unknown-reference"
+    },
+    {
+      "case": "a context name has its declared type: an optional one can't go where a value is needed",
+      "component": "badge",
+      "source": "<box tone={user}><text>{label}</text></box>",
+      "code": "type-mismatch"
+    },
+    {
+      "case": "a context name has its declared type: an enum has no fields",
+      "component": "badge",
+      "source": "<box tone={theme.name}><text>{label}</text></box>",
+      "code": "unknown-member"
+    }
+  ],
+  "manifests": [
+    {
+      "case": "a name in `uses` that the context doesn't declare",
+      "code": "manifest-unknown-context",
+      "manifest": {
+        "version": 1,
+        "types": {},
+        "context": {
+          "theme": {
+            "kind": "string"
+          }
+        },
+        "components": {
+          "badge": {
+            "props": {},
+            "events": {},
+            "commands": {},
+            "scope": {},
+            "uses": [
+              "locale"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "case": "a name in `uses` that is also a prop of the component",
+      "code": "manifest-context-clash",
+      "manifest": {
+        "version": 1,
+        "types": {},
+        "context": {
+          "theme": {
+            "kind": "string"
+          }
+        },
+        "components": {
+          "badge": {
+            "props": {
+              "theme": {
+                "type": {
+                  "kind": "string"
+                },
+                "required": false
+              }
+            },
+            "events": {},
+            "commands": {},
+            "scope": {},
+            "uses": [
+              "theme"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "case": "a name in `uses` that is also a scope name of the component",
+      "code": "manifest-context-clash",
+      "manifest": {
+        "version": 1,
+        "types": {},
+        "context": {
+          "theme": {
+            "kind": "string"
+          }
+        },
+        "components": {
+          "badge": {
+            "props": {},
+            "events": {},
+            "commands": {},
+            "scope": {
+              "theme": {
+                "kind": "string"
+              }
+            },
+            "uses": [
+              "theme"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "case": "a name listed twice in `uses`",
+      "code": "manifest-context-clash",
+      "manifest": {
+        "version": 1,
+        "types": {},
+        "context": {
+          "theme": {
+            "kind": "string"
+          }
+        },
+        "components": {
+          "badge": {
+            "props": {},
+            "events": {},
+            "commands": {},
+            "scope": {},
+            "uses": [
+              "theme",
+              "theme"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "rejects": [
+    {
+      "case": "a context value that isn't one of its enum's values",
+      "snapshot": {
+        "title": "Hi"
+      },
+      "context": {
+        "theme": "blue"
+      },
+      "code": "runtime-value-mismatch",
+      "location": {
+        "kind": "input",
+        "path": [
+          "$context",
+          "theme"
+        ]
+      }
+    },
+    {
+      "case": "a context value whose type isn't optional must be given",
+      "snapshot": {
+        "title": "Hi"
+      },
+      "context": {},
+      "code": "runtime-missing-value",
+      "location": {
+        "kind": "input",
+        "path": [
+          "$context",
+          "theme"
+        ]
+      }
+    },
+    {
+      "case": "the snapshot doesn't carry a context value: the root's `theme` is the context's, not a scope name the snapshot gives",
+      "snapshot": {
+        "title": "Hi",
+        "theme": "dark"
+      },
+      "context": {},
+      "code": "runtime-missing-value",
+      "location": {
+        "kind": "input",
+        "path": [
+          "$context",
+          "theme"
+        ]
+      }
+    }
+  ],
+  "dispatches": [
+    {
+      "case": "a handler's argument that reads a context name is its value in the render",
+      "step": 1,
+      "component": "button",
+      "event": "click",
+      "intent": {
+        "command": {
+          "component": "page",
+          "name": "greet"
+        },
+        "arguments": [
+          {
+            "value": "dark",
+            "name": "theme"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -61,6 +61,9 @@ pub struct Render {
     /// The units this render was given, so that dispatch evaluates against exactly the state the
     /// person saw, and an update without new ones keeps these.
     pub(crate) units: Rc<Units>,
+    /// The context values this render was given, validated (docs/manual/runtime.md, "Context"): for
+    /// dispatch, and for an update that gives none, which keeps these.
+    pub(crate) context: Rc<BTreeMap<String, Value>>,
     /// The unit occurrences in the tree, in the order they were met.
     instances: Vec<Rc<Occurrence>>,
     /// This render's version in this thread: no two renders have the same
@@ -137,6 +140,25 @@ impl Render {
         self.occurrences_to_json()
     }
 
+    /// The context values this render was made with (docs/manual/runtime.md, "Context"), as a JSON
+    /// object of each name that has a value: what an update by changes that edited them made, for a
+    /// host that keeps a render's inputs itself. `{}` when the manifest declares no context.
+    pub fn context_to_json(&self) -> String {
+        serde_json::Value::Object(
+            self.context
+                .iter()
+                .filter(|(_, value)| !matches!(value, Value::Absent))
+                .map(|(name, value)| {
+                    (
+                        name.clone(),
+                        output(value).unwrap_or(serde_json::Value::Null),
+                    )
+                })
+                .collect(),
+        )
+        .to_string()
+    }
+
     /// This render's version: unique among the renders made in this thread.
     /// Changes to apply to it (`update_changes`) name it as their `base`, so
     /// that they can't be applied to any other render.
@@ -160,6 +182,17 @@ impl Render {
     pub(crate) fn host_snapshot(&self) -> HostRecord {
         HostRecord(
             self.values
+                .iter()
+                .filter(|(_, value)| !matches!(value, Value::Absent))
+                .map(|(name, value)| (HostKey::Text(name.clone()), to_host(value)))
+                .collect(),
+        )
+    }
+
+    /// The context values this render has, as a host would give them: for a dispatch.
+    pub(crate) fn host_context(&self) -> HostRecord {
+        HostRecord(
+            self.context
                 .iter()
                 .filter(|(_, value)| !matches!(value, Value::Absent))
                 .map(|(name, value)| (HostKey::Text(name.clone()), to_host(value)))
@@ -221,12 +254,27 @@ pub fn render_units(
     snapshot: &HostRecord,
     units: &Units,
 ) -> Result<Render, Vec<RuntimeDiagnostic>> {
+    render_context(program, model, snapshot, units, &HostRecord::default())
+}
+
+/// [`render_units`], with the values of the manifest's context channel (docs/manual/runtime.md,
+/// "Context"): a record of each context name's value, validated against its declared type as a
+/// snapshot's scope names are (a name of an optional type may be left out; a name the manifest
+/// doesn't declare is ignored). A component reads only the names its `uses` lists.
+pub fn render_context(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Units,
+    context: &HostRecord,
+) -> Result<Render, Vec<RuntimeDiagnostic>> {
     let valid = program::validate(program, model)?;
-    let values = validated_values(&valid, snapshot)?;
+    let (values, context) = validated_inputs(&valid, snapshot, context)?;
     let units = Rc::new(units.clone());
+    let context = Rc::new(context);
     let Rendered {
         tree, instances, ..
-    } = tree_of(&valid, &values, false, None, &units)?;
+    } = tree_of(&valid, &values, &context, false, None, &units)?;
     Ok(Render {
         root: program.root.to_string(),
         templates: program
@@ -238,6 +286,7 @@ pub fn render_units(
         values,
         tree,
         units,
+        context,
         instances,
         id: next_version(),
     })
@@ -277,6 +326,18 @@ pub fn update_with_units(
     snapshot: HostRecord,
     units: Option<&Units>,
 ) -> Result<Update, Vec<RuntimeDiagnostic>> {
+    update_with_context(previous, snapshot, units, None)
+}
+
+/// [`update_with_units`], and the context values the host holds now (see [`render_context`]):
+/// `None` keeps the previous render's. A part that reads a context name whose value changed is
+/// rendered again.
+pub fn update_with_context(
+    previous: &Render,
+    snapshot: HostRecord,
+    units: Option<&Units>,
+    context: Option<&HostRecord>,
+) -> Result<Update, Vec<RuntimeDiagnostic>> {
     let units = units.map_or_else(
         || Rc::clone(&previous.units),
         |units| Rc::new(units.clone()),
@@ -289,10 +350,26 @@ pub fn update_with_units(
         },
         &previous.model,
     )?;
-    let values = validated_values(&valid, &snapshot)?;
+    let (values, context) = match context {
+        Some(context) => {
+            let (values, context) = validated_inputs(&valid, &snapshot, context)?;
+            (values, Rc::new(context))
+        }
+        None => (
+            validated_values(&valid, &snapshot)?,
+            Rc::clone(&previous.context),
+        ),
+    };
     let Rendered {
         tree, instances, ..
-    } = tree_of(&valid, &values, false, Some(&previous.tree.root), &units)?;
+    } = tree_of(
+        &valid,
+        &values,
+        &context,
+        false,
+        reusable(previous, &context),
+        &units,
+    )?;
     let patches = crate::patch::diff(&previous.tree, &tree);
     Ok(Update {
         render: Render {
@@ -302,6 +379,7 @@ pub fn update_with_units(
             values,
             tree,
             units,
+            context,
             instances,
             id: next_version(),
         },
@@ -363,7 +441,13 @@ pub fn update_changes_units(
         &previous.model,
     )?;
     let mut values = previous.values.clone();
-    crate::changes::apply(&valid, &mut values, &changes.changes)?;
+    let mut context = (*previous.context).clone();
+    crate::changes::apply(&valid, &mut values, &mut context, &changes.changes)?;
+    let context = if same_values(&context, &previous.context) {
+        Rc::clone(&previous.context)
+    } else {
+        Rc::new(context)
+    };
     if let Some(whole) = verify {
         let believed = validated_values(&valid, whole)?;
         if let Some(path) = crate::changes::first_difference(&values, &believed) {
@@ -379,7 +463,14 @@ pub fn update_changes_units(
     }
     let Rendered {
         tree, instances, ..
-    } = tree_of(&valid, &values, false, Some(&previous.tree.root), &units)?;
+    } = tree_of(
+        &valid,
+        &values,
+        &context,
+        false,
+        reusable(previous, &context),
+        &units,
+    )?;
     let patches = crate::patch::diff(&previous.tree, &tree);
     Ok(Update {
         render: Render {
@@ -389,11 +480,33 @@ pub fn update_changes_units(
             values,
             tree,
             units,
+            context,
             instances,
             id: next_version(),
         },
         patches,
     })
+}
+
+/// The previous tree, for an update to reuse its parts, when the context is as it was; `None`
+/// otherwise, so that everything is rendered again (the patches are still from the previous tree).
+// ponytail: a context change renders the whole tree again (context is for values that change
+// rarely: a theme, a locale, the current user); per-part tracking of the names read below a node,
+// as units have, if that ever measurably costs.
+fn reusable<'p>(
+    previous: &'p Render,
+    context: &Rc<BTreeMap<String, Value>>,
+) -> Option<&'p Rc<Node>> {
+    (Rc::ptr_eq(&previous.context, context) || same_values(&previous.context, context))
+        .then_some(&previous.tree.root)
+}
+
+/// Whether two sets of named values are the same, by bits (`0` and `-0` differ).
+fn same_values(a: &BTreeMap<String, Value>, b: &BTreeMap<String, Value>) -> bool {
+    a.len() == b.len()
+        && a.iter()
+            .zip(b)
+            .all(|((x, v), (y, w))| x == y && v.identical(w))
 }
 
 /// The scope names an expression reads. An expression is a pure function
@@ -659,12 +772,72 @@ pub(crate) struct Rendered<'v> {
 pub(crate) fn tree<'v>(
     valid: &'v Valid,
     snapshot: &HostRecord,
+    context: &HostRecord,
     record: bool,
     previous: Option<&Rc<Node>>,
     units: &Rc<Units>,
 ) -> Result<Rendered<'v>, Vec<RuntimeDiagnostic>> {
-    let scope = validated_values(valid, snapshot)?;
-    tree_of(valid, &scope, record, previous, units)
+    let (scope, context) = validated_inputs(valid, snapshot, context)?;
+    tree_of(valid, &scope, &Rc::new(context), record, previous, units)
+}
+
+/// Named values: a scope's, or the context's.
+type Values = BTreeMap<String, Value>;
+
+/// The root scope's values from a snapshot and the context values, validated together: every
+/// mismatch in either is reported, at its path (a context value's is `$context.<name>`).
+pub(crate) fn validated_inputs(
+    valid: &Valid,
+    snapshot: &HostRecord,
+    context: &HostRecord,
+) -> Result<(Values, Values), Vec<RuntimeDiagnostic>> {
+    let mut inputs = Inputs::new(&valid.manifest);
+    let scope = snapshot_values(valid, snapshot, &mut inputs);
+    let context = context_values(valid, context, &mut inputs);
+    let diagnostics = inputs.sorted();
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+    Ok((scope, context))
+}
+
+/// The context values (docs/manual/runtime.md, "Context"): each name the manifest's `context`
+/// declares, checked against its type as a snapshot's scope name is; names it doesn't declare are
+/// never looked at.
+pub(crate) fn context_values(
+    valid: &Valid,
+    context: &HostRecord,
+    inputs: &mut Inputs<'_>,
+) -> BTreeMap<String, Value> {
+    valid
+        .manifest
+        .context()
+        .iter()
+        .map(|(name, ty)| {
+            let mut path = vec![
+                PathSegment::Name(CONTEXT_ROOT.to_string()),
+                PathSegment::Name(name.clone()),
+            ];
+            (name.clone(), inputs.value(context.get(name), ty, &mut path))
+        })
+        .collect()
+}
+
+/// The first segment of a path into the context values, in a change and in a diagnostic's
+/// location: a name no scope name can be, as `$event` and `$units` are.
+pub(crate) const CONTEXT_ROOT: &str = "$context";
+
+/// `values`, the scope of the template of `component`, with the context names its component uses.
+pub(crate) fn with_context(
+    valid: &Valid,
+    component: &str,
+    values: &mut BTreeMap<String, Value>,
+    context: &BTreeMap<String, Value>,
+) {
+    for name in &valid.component(component).uses {
+        let value = context.get(name).cloned().unwrap_or(Value::Absent);
+        values.insert(name.clone(), value);
+    }
 }
 
 /// The root scope's values from a snapshot, validated (§9.8.4): every
@@ -687,13 +860,25 @@ pub(crate) fn validated_values(
 pub(crate) fn tree_of<'v>(
     valid: &'v Valid,
     scope: &BTreeMap<String, Value>,
+    context: &Rc<BTreeMap<String, Value>>,
     record: bool,
     previous: Option<&Rc<Node>>,
     units: &Rc<Units>,
 ) -> Result<Rendered<'v>, Vec<RuntimeDiagnostic>> {
+    // The root's own context names join its scope; the snapshot's are never copied otherwise.
+    let rooted;
+    let scope = if valid.component(&valid.root).uses.is_empty() {
+        scope
+    } else {
+        let mut values = scope.clone();
+        with_context(valid, &valid.root, &mut values, context);
+        rooted = values;
+        &rooted
+    };
     let mut renderer = Renderer {
         valid,
         units: Rc::clone(units),
+        context: Rc::clone(context),
         instances: Vec::new(),
         keys: HashSet::new(),
         sites: record.then(BTreeMap::new),
@@ -732,7 +917,12 @@ pub(crate) fn snapshot_values(
     inputs: &mut Inputs<'_>,
 ) -> BTreeMap<String, Value> {
     let mut values = BTreeMap::new();
-    for (name, ty) in &valid.component(&valid.root).scope {
+    let root = valid.component(&valid.root);
+    for (name, ty) in &root.scope {
+        // A context name is the context's, not the snapshot's.
+        if root.uses.contains(name) {
+            continue;
+        }
         let mut path = vec![PathSegment::Name(name.clone())];
         let value = inputs.value(snapshot.get(name), ty, &mut path);
         values.insert(name.clone(), value);
@@ -806,6 +996,7 @@ pub(crate) fn bind(
     element: &Element,
     key: Option<&str>,
     units: &Units,
+    context: &BTreeMap<String, Value>,
 ) -> Result<Bound, RuntimeDiagnostic> {
     let composite = valid.component(&element.component);
     let mut written = BTreeMap::new();
@@ -846,6 +1037,8 @@ pub(crate) fn bind(
             )
         })
         .collect();
+    // The context names it uses are the host's context values, never a prop.
+    with_context(valid, &element.component, &mut values, context);
     let (Some(unit), Some(key)) = (&composite.unit, key) else {
         return Ok((values, None));
     };
@@ -947,6 +1140,8 @@ struct Renderer<'v> {
     valid: &'v Valid,
     /// The state the host holds for the unit occurrences.
     units: Rc<Units>,
+    /// The context values, validated.
+    context: Rc<BTreeMap<String, Value>>,
     /// The unit occurrences met so far, in order: those a kept part holds are added back from its memo.
     instances: Vec<Rc<Occurrence>>,
     keys: HashSet<String>,
@@ -1076,7 +1271,9 @@ impl<'v> Renderer<'v> {
                 key
             });
         let units = Rc::clone(&self.units);
-        let (mut bound, instance) = bind(self.valid, scope, element, key.as_deref(), &units)?;
+        let context = Rc::clone(&self.context);
+        let (mut bound, instance) =
+            bind(self.valid, scope, element, key.as_deref(), &units, &context)?;
         if let Some(instance) = &instance {
             self.instances.push(Rc::clone(instance));
             if self.occurrences.is_some() {

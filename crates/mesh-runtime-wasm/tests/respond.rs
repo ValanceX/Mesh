@@ -58,7 +58,7 @@ fn render_and_dispatch_give_the_runtimes_results() {
         &snapshot,
     )
     .unwrap();
-    let rendered = respond_render("view", &encoded, &model, &snapshot_bytes, &[]).unwrap();
+    let rendered = respond_render("view", &encoded, &model, &snapshot_bytes, &[], &[]).unwrap();
     assert_eq!(
         rendered,
         format!("{{\"tree\":{}}}", native.tree().to_json())
@@ -75,6 +75,7 @@ fn render_and_dispatch_give_the_runtimes_results() {
         &encoded,
         &model,
         &snapshot_bytes,
+        &[],
         &[],
         &handler,
         None,
@@ -97,6 +98,7 @@ fn render_and_dispatch_give_the_runtimes_results() {
         &model,
         &snapshot_bytes,
         &[],
+        &[],
         &handler,
         Some(&encode_value(&HostValue::Null)),
     )
@@ -110,11 +112,11 @@ fn inputs_that_cant_be_taken_are_refused() {
     let templates = encode_texts(&[&compile(&model, "card", CARD)]);
     let snapshot = encode_value(&HostValue::Record(snapshot("Ada")));
     assert!(matches!(
-        respond_render("card", &[1, 2], &model, &snapshot, &[]),
+        respond_render("card", &[1, 2], &model, &snapshot, &[], &[]),
         Err(Refusal::Encoding(_))
     ));
     assert!(matches!(
-        respond_render("card", &templates, &model, &[9], &[]),
+        respond_render("card", &templates, &model, &[9], &[], &[]),
         Err(Refusal::Encoding(_))
     ));
     assert_eq!(
@@ -123,6 +125,7 @@ fn inputs_that_cant_be_taken_are_refused() {
             &templates,
             &model,
             &encode_value(&HostValue::Null),
+            &[],
             &[]
         ),
         Err(Refusal::Input("a snapshot is a record".into()))
@@ -133,7 +136,7 @@ fn inputs_that_cant_be_taken_are_refused() {
     }
     let deep = HostValue::Record(HostRecord(vec![(HostKey::Text("user".into()), deep)]));
     assert!(matches!(
-        respond_render("card", &templates, &model, &encode_value(&deep), &[]),
+        respond_render("card", &templates, &model, &encode_value(&deep), &[], &[]),
         Err(Refusal::Input(_))
     ));
 }

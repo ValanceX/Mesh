@@ -1,0 +1,136 @@
+{
+  "$schema": "../../../schemas/manifest-v1.schema.json",
+  "version": 1,
+  "types": {},
+  "context": {
+    "theme": {
+      "kind": "enum",
+      "values": [
+        "light",
+        "dark"
+      ]
+    },
+    "user": {
+      "kind": "optional",
+      "type": {
+        "kind": "string"
+      }
+    }
+  },
+  "components": {
+    "box": {
+      "props": {
+        "tone": {
+          "type": {
+            "kind": "string"
+          },
+          "required": false
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "text": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "button": {
+      "props": {},
+      "events": {
+        "click": {}
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "page": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "greet": {
+          "parameters": [
+            {
+              "name": "theme",
+              "type": {
+                "kind": "string"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "title": {
+          "kind": "string"
+        }
+      },
+      "uses": [
+        "theme"
+      ]
+    },
+    "badge": {
+      "props": {
+        "label": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "label": {
+          "kind": "string"
+        }
+      },
+      "uses": [
+        "theme",
+        "user"
+      ]
+    },
+    "frame": {
+      "props": {
+        "header": {
+          "type": {
+            "kind": "optional",
+            "type": {
+              "kind": "snippet",
+              "params": []
+            }
+          },
+          "required": false
+        },
+        "children": {
+          "type": {
+            "kind": "optional",
+            "type": {
+              "kind": "snippet",
+              "params": []
+            }
+          },
+          "required": false
+        }
+      },
+      "events": {},
+      "commands": {},
+      "scope": {
+        "header": {
+          "kind": "optional",
+          "type": {
+            "kind": "snippet",
+            "params": []
+          }
+        },
+        "children": {
+          "kind": "optional",
+          "type": {
+            "kind": "snippet",
+            "params": []
+          }
+        }
+      }
+    }
+  }
+}

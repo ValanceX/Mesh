@@ -1,0 +1,8 @@
+<box tone={theme}>
+  <badge label={title} />
+  <frame>
+    {#snippet header()}<text>header {theme}</text>{/snippet}
+    <text>body {theme}</text>
+  </frame>
+  <button on.click={greet(theme)}><text>{title}</text></button>
+</box>

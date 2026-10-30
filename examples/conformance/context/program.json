@@ -1,0 +1,8 @@
+{
+  "root": "page",
+  "templates": [
+    "page",
+    "badge",
+    "frame"
+  ]
+}

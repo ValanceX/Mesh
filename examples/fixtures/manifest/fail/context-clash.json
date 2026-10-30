@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "types": {},
+  "context": { "theme": { "kind": "string" } },
+  "components": {
+    "badge": {
+      "props": { "theme": { "type": { "kind": "string" }, "required": false } },
+      "events": {},
+      "commands": {},
+      "scope": {},
+      "uses": ["theme"]
+    },
+    "template": { "props": {}, "events": {}, "commands": {}, "scope": {} }
+  }
+}

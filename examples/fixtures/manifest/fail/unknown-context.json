@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "types": {},
+  "context": { "theme": { "kind": "string" } },
+  "components": {
+    "badge": { "props": {}, "events": {}, "commands": {}, "scope": {}, "uses": ["locale"] },
+    "template": { "props": {}, "events": {}, "commands": {}, "scope": {} }
+  }
+}

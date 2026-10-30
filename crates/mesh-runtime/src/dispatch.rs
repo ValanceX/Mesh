@@ -10,7 +10,8 @@ use crate::program::{
     COMPOSITE, CONDITIONAL, FRAGMENT, FRAGMENT_COMPONENT, NODE, SLOT,
 };
 use crate::render::{
-    bind, is_live, render_children, snapshot_values, statics, Link, Occurrence, Render, RenderChild,
+    bind, context_values, is_live, render_children, snapshot_values, statics, with_context, Link,
+    Occurrence, Render, RenderChild,
 };
 use crate::tree::{Intent, NamedIntent};
 use crate::types::fits;
@@ -234,7 +235,7 @@ pub fn dispatch_named(
     payload: Option<&HostValue>,
 ) -> Result<NamedIntent, Vec<RuntimeDiagnostic>> {
     let (templates, root) = render.program();
-    dispatch_named_from_units(
+    dispatch_named_from_context(
         &Program {
             root,
             templates: &templates,
@@ -242,6 +243,7 @@ pub fn dispatch_named(
         &render.model,
         &render.host_snapshot(),
         &render.units,
+        &render.host_context(),
         handler,
         payload,
     )
@@ -295,6 +297,28 @@ pub fn dispatch_named_from_units(
     handler: &str,
     payload: Option<&HostValue>,
 ) -> Result<NamedIntent, Vec<RuntimeDiagnostic>> {
+    dispatch_named_from_context(
+        program,
+        model,
+        snapshot,
+        units,
+        &HostRecord::default(),
+        handler,
+        payload,
+    )
+}
+
+/// [`dispatch_named_from_units`], for a render made with context values (`render_context`): they
+/// are given again, as they were.
+pub fn dispatch_named_from_context(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Rc<Units>,
+    context: &HostRecord,
+    handler: &str,
+    payload: Option<&HostValue>,
+) -> Result<NamedIntent, Vec<RuntimeDiagnostic>> {
     // 1. Program validation, of the render's own copies (I14).
     let valid = program::validate(program, model)?;
 
@@ -315,7 +339,7 @@ pub fn dispatch_named_from_units(
     let recorded;
     let sites;
     let site = if repeats {
-        recorded = crate::render::tree(&valid, snapshot, true, None, units)?.sites;
+        recorded = crate::render::tree(&valid, snapshot, context, true, None, units)?.sites;
         recorded.get(handler).map(|found| Site {
             composites: Vec::new(),
             component: &found.component,
@@ -350,7 +374,9 @@ pub fn dispatch_named_from_units(
     // inputs can't be rendered there is no tree to check against, and step 3
     // reports what is wrong with them.
     if uses_conditional(&valid.templates) {
-        if let Ok(rendered) = crate::render::render_units(program, model, snapshot, units) {
+        if let Ok(rendered) =
+            crate::render::render_context(program, model, snapshot, units, context)
+        {
             if !handlers(&rendered.tree().root).contains(handler) {
                 return Err(vec![RuntimeDiagnostic::new(
                     RuntimeCode::UNKNOWN_HANDLER,
@@ -364,6 +390,8 @@ pub fn dispatch_named_from_units(
     // 3. The render's snapshot and the payload, together.
     let mut inputs = Inputs::new(&valid.manifest);
     let mut root_values = snapshot_values(&valid, snapshot, &mut inputs);
+    let context = context_values(&valid, context, &mut inputs);
+    with_context(&valid, &valid.root, &mut root_values, &context);
     if let Some(values) = site.values {
         root_values = values.clone();
     }
@@ -421,7 +449,7 @@ pub fn dispatch_named_from_units(
                         statics: statics(&valid, component, None),
                     };
                     let (bound, instance) =
-                        bind(&valid, &scope, occurrence, key.as_deref(), units)?;
+                        bind(&valid, &scope, occurrence, key.as_deref(), units, &context)?;
                     owner.clone_from(&instance);
                     around.push((
                         (*component).to_string(),
@@ -631,7 +659,7 @@ pub fn raise_named(
     payload: Option<&HostValue>,
 ) -> Result<Option<NamedIntent>, Vec<RuntimeDiagnostic>> {
     let (templates, root) = render.program();
-    raise_named_from_units(
+    raise_named_from_context(
         &Program {
             root,
             templates: &templates,
@@ -639,6 +667,7 @@ pub fn raise_named(
         &render.model,
         &render.host_snapshot(),
         &render.units,
+        &render.host_context(),
         occurrence,
         event,
         payload,
@@ -676,8 +705,33 @@ pub fn raise_named_from_units(
     event: &str,
     payload: Option<&HostValue>,
 ) -> Result<Option<NamedIntent>, Vec<RuntimeDiagnostic>> {
+    raise_named_from_context(
+        program,
+        model,
+        snapshot,
+        units,
+        &HostRecord::default(),
+        occurrence,
+        event,
+        payload,
+    )
+}
+
+/// [`raise_named_from_units`], for a render made with context values (`render_context`): they are
+/// given again, as they were.
+#[allow(clippy::too_many_arguments)]
+pub fn raise_named_from_context(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Rc<Units>,
+    context: &HostRecord,
+    occurrence: &str,
+    event: &str,
+    payload: Option<&HostValue>,
+) -> Result<Option<NamedIntent>, Vec<RuntimeDiagnostic>> {
     let valid = program::validate(program, model)?;
-    let rendered = crate::render::tree(&valid, snapshot, true, None, units)?;
+    let rendered = crate::render::tree(&valid, snapshot, context, true, None, units)?;
     let Some(found) = rendered.occurrences.get(occurrence) else {
         return Err(vec![RuntimeDiagnostic::new(
             RuntimeCode::UNKNOWN_OCCURRENCE,

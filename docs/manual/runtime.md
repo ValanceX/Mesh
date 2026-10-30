@@ -49,7 +49,7 @@ The screen is JavaScript only: in Rust a render is a value that `update` borrows
 - **updateChanges:** a render and edits to its snapshot in. Out: as update ([Changes](#changes)).
 - **raise:** a render, a unit occurrence's key, an event and a payload in. Out: the command intent of the handler the caller bound to the event, or nothing ([Units](#units)).
 
-Render, update, updateChanges and dispatch also take the state of the component's **units**, beside the snapshot ([Units](#units)); without it, every occurrence has its defaults.
+Render, update, updateChanges and dispatch also take the state of the component's **units**, beside the snapshot ([Units](#units)); without it, every occurrence has its defaults. Render and update also take the **context** values, beside the snapshot ([Context](#context)).
 
 Render and dispatch are the two the lifecycle below is about; `declaredEvents` (a program's declared events, below) is another, and takes no snapshot.
 
@@ -356,6 +356,22 @@ A component whose manifest entry has a [`unit`](./manifest.md#units) has state a
 
 **What does not change.** `render-v1` and the patches are as they were: no renderer needs to know units exist. Units are not persisted by the runtime; state that must outlive a reload is the application's. Changing the program resets them, since keys are not stable across programs.
 
+## Context
+
+A manifest may declare a [context channel](./manifest.md#context): names a host gives values for beside the snapshot, each with its type, which a component reads only if its manifest entry `uses` it. *Provisional, since 0.18.0 (refinements C-1, decision K27).* It is for values that many distant components need (a theme, a locale, the current user). Pass props or children first: a value one or two levels down is a prop.
+
+**The input.** `context` is a record of each context name's value: `render({ program, model, snapshot, context })` in JavaScript, `mesh_runtime::render_context(program, model, snapshot, units, context)` in Rust. Each declared name is validated as a snapshot's scope name is (§9.8.4), at a path that begins `$context`: a value that doesn't fit its type is `runtime-value-mismatch` at `$context.theme`, and one that is missing, when its type isn't optional, is `runtime-missing-value` there. A name the manifest doesn't declare is ignored. Without `context`, no name has a value, which is valid only when every context type is optional; `render`, `render_units` and the other entry points without it are the same operations with none.
+
+**Where a value is read.** In the template of each component that uses the name, and nowhere else: the root's too, whose `uses` names are read from the context, never from the snapshot. A snippet or a slot's content reads the context of the template it was declared in, like every name it reads ([templates](./templates.md#snippets)). The runtime stays stateless: the values are an input like the snapshot, so a server and a client given the same ones render the same tree.
+
+**A render keeps its context,** as it keeps its snapshot and units: `dispatch` evaluates a handler's arguments against the values the person saw, and an `update` given no `context` (Rust: `update_with_context(previous, snapshot, units, None)`; JavaScript: `update(render, snapshot)`) keeps the previous render's. `update(render, snapshot, units, context)` gives new ones.
+
+**Changes.** An edit of [Changes](#changes) whose path starts `{ "context": name }` edits that context value instead of the snapshot, as a snapshot path edits a scope name: `{ "op": "set", "path": [{ "context": "theme" }], "value": "dark" }`, or below it into a record or list. In Rust's `Change` the root is the two segments `$context` and the name. A name the context doesn't declare is `runtime-invalid-change`. `Render::context_to_json()` gives the values a render has, which is how a host that keeps a render's inputs itself learns what changes made them; the JavaScript package does that for its renders.
+
+**What an update re-evaluates.** Every node that reads a context name whose value changed is rendered again, with the new value; the conformance vectors (`examples/conformance/context/`) pin it. In this implementation a change of any context value renders the whole tree again (the patches are still from the previous tree, and a part that comes out the same has no patch); an update that changes no context value reuses parts as before.
+
+**What does not change.** `render-v1`, the patches and the intent are as they were: no renderer needs to know the context exists. The values cross to a client with the snapshot, so whatever a host would not put in a snapshot does not belong in the context either.
+
 ## Updates
 
 - **A change of values is a new render,** or an *update*, which gives the same tree and says what changed. `render` evaluates the whole program again and gives a complete new tree; `update` (below) does that for a render's program and a new snapshot, and also returns the patches from the previous tree to the new one.
@@ -421,7 +437,7 @@ At 1,000 items the update is 1.6 ms in Rust against 6.2 ms to render, and about 
 ```
 
 - **`op`.** `set` makes the value at `path` the given one (a scope name's, a record field's, made if the record lacks it and the type allows, or a list element's; a list's length appends one). `insert` puts a value at a list index, and the elements from there on are one later. `remove` takes a record field (which the type lets be absent) or a list element (the later ones are one earlier) away.
-- **`path`.** A non-empty list: a scope name first, then record field names (strings) and list indices (non-negative integers). Edits apply in order, each seeing those before it.
+- **`path`.** A non-empty list: a scope name first, then record field names (strings) and list indices (non-negative integers). The first segment may instead be `{ "context": name }`, which edits a [context](#context) value. Edits apply in order, each seeing those before it.
 - **`base`.** The `version` of the render the changes were computed against: a number each render has for life (`render.version`; `Render::version()` in Rust), different for every render the package or thread makes; the JavaScript package gives them, so a render's result never depends on how many came before it. Changes for any other render are refused (`runtime-changes-base-mismatch`), so changes made against a snapshot the runtime no longer holds are never applied to another. The version stands in for a digest of the snapshot: it costs nothing, and it detects the same mistake (changes for the wrong snapshot) without reading the snapshot.
 - **All or none.** Every edit is checked, with the document, before anything is done: a path that leads nowhere the type allows, a value that doesn't fit its type, a malformed edit. The first is `runtime-invalid-change`; a value's mismatch is reported by the input codes, at its path. On diagnostics `previous` is untouched and still dispatches.
 - **`verify`.** With the whole snapshot the host believes it now has, the runtime validates it, compares it with what the edits make, and refuses with `runtime-changes-disagree` at the first path that differs. It costs a whole validation, so it is for tests and development: the package's own tests run every chain with it.

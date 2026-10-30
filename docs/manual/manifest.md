@@ -58,6 +58,7 @@ A file checked as the template of `users-page` may read `user` and `compact`, an
 | `"version"` | yes | `1`. It's the version of this format, not of MESH, NEXUS or any component library. A manifest with any other version is rejected before anything else in it is read. |
 | `"types"` | yes | Named types shared by every component: name → [type](#types). May be `{}`. |
 | `"components"` | yes | name → [component](#components). |
+| `"context"` | no | The [context channel](#context): name → [type](#types). Since 0.18.0. |
 
 No other property is allowed, here or in any object below.
 
@@ -65,7 +66,7 @@ No other property is allowed, here or in any object below.
 
 A component's name is its tag: `"user-card"` is the component `<user-card>` is an instance of. MESH has no built-in elements, so every tag a file uses, `page` and `text` included, must be declared here.
 
-Each component has exactly these four properties, all required even when empty, and optionally a fifth, [`"unit"`](#units):
+Each component has exactly these four properties, all required even when empty, and optionally [`"unit"`](#units) and [`"uses"`](#context):
 
 | Property | Value | Used when |
 |---|---|---|
@@ -129,7 +130,7 @@ A command may also say what it does to the application's data, for a host that s
 { "user": <type>, "compact": <type> }
 ```
 
-The scope is every name the component's template may read, and nothing else is: a prop isn't in scope unless the scope lists it too, and there are no global names. The manifest doesn't say where a scope name's value comes from, whether a prop, state or anything else; that's for the runtime.
+The scope is every name the component's template may read, and nothing else is: a prop isn't in scope unless the scope lists it too, and there are no implicit names (a [context](#context) name is in scope only where the component's `uses` lists it). The manifest doesn't say where a scope name's value comes from, whether a prop, state or anything else; that's for the runtime.
 
 ### Units
 
@@ -147,6 +148,26 @@ A **unit** is state and commands that belong to one occurrence of a composite: w
 - A scope name that comes from a unit is bound by the host's state for the occurrence, not by a prop, so the rule that every scope name of a composite has a prop to bind it does not apply to it.
 
 The values are not part of the snapshot. How a host keeps them, and how a render takes them as an input beside the snapshot, is in the [runtime reference](./runtime.md#units).
+
+### Context
+
+```json
+"context": { "theme": { "kind": "enum", "values": ["light", "dark"] } },
+"components": {
+  "badge": { "props": {}, "events": {}, "commands": {}, "scope": {}, "uses": ["theme"] }
+}
+```
+
+The **context channel** carries a value to a component deep in a program without threading it through every component on the way: a theme, a locale, the current user. It is **declared and type-checked**, never ambient. *Provisional, since 0.18.0 (refinements C-1, decision K27).*
+
+- The manifest's top-level `"context"` declares each name once, with its [type](#types) (never a snippet). It is optional.
+- A component opts in with `"uses"`: an array of context names. Each joins its `scope` with the context's type, read-only (MPRX has no assignment), so its template reads it like any scope name and `mesh check` type-checks every read before anything runs. A component that doesn't list a name can't read it (`unknown-reference`): there is no inheritance and no lookup.
+- A name in `"uses"` that `"context"` doesn't declare is `manifest-unknown-context`. One that is also a prop or a scope name of the component (a unit's state names included), or that is listed twice, is `manifest-context-clash`.
+- A context name is bound by the host's context values, not by a prop, so the rule that every scope name of a composite has a prop to bind it does not apply to it. On the root, it is not read from the snapshot.
+- A snippet or a slot's content reads the context of the template it was **declared** in, like any other name it reads ([templates](./templates.md#snippets)).
+- Commands are not context: a template invokes only its own component's commands, by name.
+
+Pass props or children first. Context is for values that many distant components need; a value one or two levels down is a prop. How a host gives the values, and changes them, is in the [runtime reference](./runtime.md#context). An older MESH refuses a manifest with `"context"` or `"uses"` (`manifest-unknown-property`).
 
 ### Custom elements
 
@@ -218,7 +239,7 @@ Props, events, commands and scope names are separate: each is written in a diffe
 - the JSON itself: `manifest-syntax-error`, `manifest-nesting-too-deep` for arrays and objects nested more than 128 levels deep, and `manifest-duplicate-key` for a key repeated in any object, which most JSON tools would silently accept;
 - the version: `manifest-unsupported-version`;
 - the format the schema describes: `manifest-invalid-value`, `manifest-missing-property`, `manifest-unknown-property`, `manifest-unknown-kind` and `manifest-invalid-name`;
-- rules the schema can't express: `manifest-enum-too-large`, `manifest-duplicate-variant`, `manifest-duplicate-parameter`, `manifest-unknown-type`, `manifest-recursive-type`, `manifest-nested-optional` and `manifest-unit-clash`;
+- rules the schema can't express: `manifest-enum-too-large`, `manifest-duplicate-variant`, `manifest-duplicate-parameter`, `manifest-unknown-type`, `manifest-recursive-type`, `manifest-nested-optional`, `manifest-unit-clash`, `manifest-context-clash` and `manifest-unknown-context`;
 - and once the manifest is valid, `manifest-missing-component` if it doesn't declare the component the file is the template of.
 
 A manifest the JSON Schema accepts can still have the problems in the last two items; `mesh check` is the complete check.

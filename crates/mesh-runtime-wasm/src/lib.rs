@@ -31,7 +31,7 @@
 //! never calls that instance again.
 
 use mesh_runtime::encoding::{decode_snapshot, decode_texts, decode_value, EncodingError};
-use mesh_runtime::{HostKey, HostValue, Program, Units};
+use mesh_runtime::{HostKey, HostRecord, HostValue, Program, Units};
 
 /// Why a call gave no result document.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,6 +72,16 @@ fn decode_units(bytes: &[u8]) -> Result<Units, Refusal> {
     Ok(Units(units))
 }
 
+/// The context values the host gives, encoded as a record (docs/manual/runtime.md, "Context"):
+/// `None` when `bytes` is empty, which a render reads as no values and an update as the previous
+/// render's.
+fn decode_context(bytes: &[u8]) -> Result<Option<HostRecord>, Refusal> {
+    if bytes.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(decode_snapshot(bytes)?))
+}
+
 /// The result document of a render's tree, and its unit occurrences when it has any.
 fn tree_document(render: &mesh_runtime::Render) -> String {
     let tree = render.tree().to_json();
@@ -85,7 +95,8 @@ fn tree_document(render: &mesh_runtime::Render) -> String {
 }
 
 /// Renders the program of `root` and the encoded `templates` against
-/// `model`, the encoded `snapshot` and the encoded `units` (empty for none): `{"tree": <render-v1>,
+/// `model`, the encoded `snapshot`, the encoded `units` (empty for none) and the encoded `context`
+/// values (empty for none): `{"tree": <render-v1>,
 /// "occurrences": [...]}` (`occurrences` only when the tree has unit occurrences), or
 /// `{"diagnostics": <runtime-diagnostics-v1>}`. The module keeps nothing, and
 /// the same inputs give the same bytes (a render's version is the wrapper's
@@ -96,17 +107,19 @@ pub fn respond_render(
     model: &str,
     snapshot_bytes: &[u8],
     units_bytes: &[u8],
+    context_bytes: &[u8],
 ) -> Result<String, Refusal> {
     let templates = decode_texts(templates)?;
     let snapshot = decode_snapshot(snapshot_bytes)?;
     let units = decode_units(units_bytes)?;
+    let context = decode_context(context_bytes)?.unwrap_or_default();
     let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
     let program = Program {
         root,
         templates: &texts,
     };
     Ok(
-        match mesh_runtime::render_units(&program, model, &snapshot, &units) {
+        match mesh_runtime::render_context(&program, model, &snapshot, &units, &context) {
             Ok(render) => tree_document(&render),
             Err(diagnostics) => format!(
                 "{{\"diagnostics\":{}}}",
@@ -191,21 +204,25 @@ pub fn respond_update(
     previous_handle: Option<u32>,
     previous_bytes: &[u8],
     previous_units_bytes: &[u8],
+    previous_context_bytes: &[u8],
     snapshot_bytes: &[u8],
     units_bytes: &[u8],
+    context_bytes: &[u8],
     new_version: u64,
 ) -> Result<String, Refusal> {
     let templates = decode_texts(templates)?;
     let snapshot = decode_snapshot(snapshot_bytes)?;
     let units = decode_units(units_bytes)?;
+    let context = decode_context(context_bytes)?;
     // The snapshot goes to whichever update uses it, and is copied by neither.
     let mut owned = Some(snapshot);
     let kept = previous_handle.and_then(|handle| {
         retained::with(handle, |previous| {
-            mesh_runtime::update_with_units(
+            mesh_runtime::update_with_context(
                 previous,
                 owned.take().expect("not yet taken"),
                 Some(&units),
+                context.as_ref(),
             )
         })
     });
@@ -215,15 +232,27 @@ pub fn respond_update(
             let snapshot = owned.take().expect("not taken: no render was kept");
             let previous_snapshot = decode_snapshot(previous_bytes)?;
             let previous_units = decode_units(previous_units_bytes)?;
+            let previous_context = decode_context(previous_context_bytes)?.unwrap_or_default();
             let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
             let program = Program {
                 root,
                 templates: &texts,
             };
-            mesh_runtime::render_units(&program, model, &previous_snapshot, &previous_units)
-                .and_then(|previous| {
-                    mesh_runtime::update_with_units(&previous, snapshot, Some(&units))
-                })
+            mesh_runtime::render_context(
+                &program,
+                model,
+                &previous_snapshot,
+                &previous_units,
+                &previous_context,
+            )
+            .and_then(|previous| {
+                mesh_runtime::update_with_context(
+                    &previous,
+                    snapshot,
+                    Some(&units),
+                    context.as_ref(),
+                )
+            })
         }
     };
     Ok(match result {
@@ -243,8 +272,16 @@ fn updated_document(updated: mesh_runtime::Update, new_version: u64) -> String {
     } else {
         format!(",\"occurrences\":{}", updated.render.occurrences_to_json())
     };
+    // The context the new render has, which changes may have edited: the wrapper keeps it with the
+    // render's other inputs. Only when there is one, so a program without context pays nothing.
+    let context = updated.render.context_to_json();
+    let context = if context == "{}" {
+        String::new()
+    } else {
+        format!(",\"context\":{context}")
+    };
     let handle = retained::keep(updated.render.with_version(new_version));
-    format!("{{\"handle\":{handle},\"patches\":{patches}{occurrences}}}")
+    format!("{{\"handle\":{handle},\"patches\":{patches}{occurrences}{context}}}")
 }
 
 /// Updates a render by the encoded `changes` (`mesh_runtime::update_changes`):
@@ -266,6 +303,7 @@ pub fn respond_update_changes(
     previous_handle: Option<u32>,
     previous_bytes: &[u8],
     previous_units_bytes: &[u8],
+    previous_context_bytes: &[u8],
     version: u64,
     new_version: u64,
     changes_bytes: &[u8],
@@ -296,12 +334,20 @@ pub fn respond_update_changes(
                 None if !previous_bytes.is_empty() => {
                     let previous_snapshot = decode_snapshot(previous_bytes)?;
                     let previous_units = decode_units(previous_units_bytes)?;
+                    let previous_context =
+                        decode_context(previous_context_bytes)?.unwrap_or_default();
                     let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
                     let program = Program {
                         root,
                         templates: &texts,
                     };
-                    mesh_runtime::render_units(&program, model, &previous_snapshot, &previous_units)
+                    mesh_runtime::render_context(
+                        &program,
+                        model,
+                        &previous_snapshot,
+                        &previous_units,
+                        &previous_context,
+                    )
                         .and_then(|previous| {
                             mesh_runtime::update_changes_units(
                                 &previous.with_version(version),
@@ -355,18 +401,21 @@ pub fn respond_dispatch_kept(
 /// Dispatches `handler` with the encoded `payload` (absent when `None`)
 /// against a render's inputs, as the wrapper kept them: `{"intent":
 /// <intent>}`, or `{"diagnostics": <runtime-diagnostics-v1>}`.
+#[allow(clippy::too_many_arguments)]
 pub fn respond_dispatch(
     root: &str,
     templates: &[u8],
     model: &str,
     snapshot_bytes: &[u8],
     units_bytes: &[u8],
+    context_bytes: &[u8],
     handler: &str,
     payload_bytes: Option<&[u8]>,
 ) -> Result<String, Refusal> {
     let templates = decode_texts(templates)?;
     let snapshot = decode_snapshot(snapshot_bytes)?;
     let units = std::rc::Rc::new(decode_units(units_bytes)?);
+    let context = decode_context(context_bytes)?.unwrap_or_default();
     let payload = payload_bytes.map(decode_value).transpose()?;
     let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
     let program = Program {
@@ -374,11 +423,12 @@ pub fn respond_dispatch(
         templates: &texts,
     };
     Ok(
-        match mesh_runtime::dispatch_named_from_units(
+        match mesh_runtime::dispatch_named_from_context(
             &program,
             model,
             &snapshot,
             &units,
+            &context,
             handler,
             payload.as_ref(),
         ) {
@@ -432,6 +482,7 @@ pub fn respond_raise(
     model: &str,
     snapshot_bytes: &[u8],
     units_bytes: &[u8],
+    context_bytes: &[u8],
     occurrence: &str,
     event: &str,
     payload_bytes: Option<&[u8]>,
@@ -439,6 +490,7 @@ pub fn respond_raise(
     let templates = decode_texts(templates)?;
     let snapshot = decode_snapshot(snapshot_bytes)?;
     let units = std::rc::Rc::new(decode_units(units_bytes)?);
+    let context = decode_context(context_bytes)?.unwrap_or_default();
     let payload = payload_bytes.map(decode_value).transpose()?;
     let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
     let program = Program {
@@ -446,11 +498,12 @@ pub fn respond_raise(
         templates: &texts,
     };
     Ok(raised_document(
-        mesh_runtime::raise_named_from_units(
+        mesh_runtime::raise_named_from_context(
             &program,
             model,
             &snapshot,
             &units,
+            &context,
             occurrence,
             event,
             payload.as_ref(),

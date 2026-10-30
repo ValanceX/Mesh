@@ -1268,3 +1268,112 @@ fn an_effect_that_is_not_one_of_the_three_is_an_invalid_value_and_a_title_must_b
     );
     assert_eq!(found[0].1, "\"sometimes\"");
 }
+
+/// A manifest with this `context` and one component, `c`, with these props and scope and this `uses`.
+fn with_context(context: &str, props: &str, scope: &str, uses: &str) -> String {
+    format!(
+        r#"{{ "version": 1, "types": {{ "Theme": {{ "kind": "enum", "values": ["light", "dark"] }} }}, "context": {context},
+             "components": {{ "c": {{ "props": {props}, "events": {{}}, "commands": {{}}, "scope": {scope}, "uses": {uses} }} }} }}"#
+    )
+}
+
+#[test]
+fn a_context_name_a_component_uses_joins_its_scope_with_the_context_s_type() {
+    let source = with_context(
+        r#"{ "theme": { "kind": "named", "name": "Theme" }, "user": { "kind": "optional", "type": { "kind": "string" } } }"#,
+        "{}",
+        r#"{ "title": { "kind": "string" } }"#,
+        r#"["theme"]"#,
+    );
+    let loaded = load(&source).expect("a context loads");
+    let (_, declared) = loaded.component("c").unwrap();
+
+    assert_eq!(declared.scope["theme"], Type::Named("Theme".into()));
+    assert!(declared.uses.contains("theme") && !declared.uses.contains("user"));
+    // Only what `uses` lists: the other context name is not in scope.
+    assert!(!declared.scope.contains_key("user"));
+    assert_eq!(loaded.context().len(), 2);
+    // Go to definition: the context name, and the scope name at its place in `uses`.
+    let at = |span: Span| &source[span.start_byte..span.end_byte];
+    assert_eq!(
+        at(loaded
+            .span_of(mesh_manifest::Declaration::Context("theme"))
+            .unwrap()),
+        "\"theme\""
+    );
+    let used = loaded
+        .span_of(mesh_manifest::Declaration::Scope {
+            component: "c",
+            name: "theme",
+        })
+        .unwrap();
+    assert!(source[..used.start_byte].ends_with("\"uses\": ["));
+    // A manifest without a context has none, and a component without `uses` uses nothing.
+    let plain = load(&component("{}", "{}", "{}", "{}")).unwrap();
+    assert!(plain.context().is_empty() && plain.component("c").unwrap().1.uses.is_empty());
+}
+
+#[test]
+fn a_context_name_that_is_unknown_or_already_taken_is_refused_where_uses_writes_it() {
+    let theme = r#"{ "theme": { "kind": "string" } }"#;
+    let prop = r#"{ "theme": { "type": { "kind": "string" }, "required": false } }"#;
+    let scope = r#"{ "theme": { "kind": "string" } }"#;
+    for (what, source, code) in [
+        (
+            "unknown",
+            with_context(theme, "{}", "{}", r#"["locale"]"#),
+            DiagnosticCode::MANIFEST_UNKNOWN_CONTEXT,
+        ),
+        (
+            "a prop",
+            with_context(theme, prop, "{}", r#"["theme"]"#),
+            DiagnosticCode::MANIFEST_CONTEXT_CLASH,
+        ),
+        (
+            "a scope name",
+            with_context(theme, "{}", scope, r#"["theme"]"#),
+            DiagnosticCode::MANIFEST_CONTEXT_CLASH,
+        ),
+        (
+            "twice",
+            with_context(theme, "{}", "{}", r#"["theme", "theme"]"#),
+            DiagnosticCode::MANIFEST_CONTEXT_CLASH,
+        ),
+        (
+            "not an array",
+            with_context(theme, "{}", "{}", r#""theme""#),
+            DiagnosticCode::MANIFEST_INVALID_VALUE,
+        ),
+        (
+            "not a name",
+            with_context(theme, "{}", "{}", "[1]"),
+            DiagnosticCode::MANIFEST_INVALID_VALUE,
+        ),
+    ] {
+        let found = errors(&source);
+
+        assert_eq!(found.len(), 1, "{what}: {found:?}");
+        assert_eq!(found[0].0, code, "{what}");
+    }
+    // A context type is checked as any type is, and is never a snippet.
+    let snippet = with_context(
+        r#"{ "s": { "kind": "snippet", "params": [] } }"#,
+        "{}",
+        "{}",
+        "[]",
+    );
+    assert_eq!(
+        errors(&snippet)[0].0,
+        DiagnosticCode::MANIFEST_SNIPPET_MISPLACED
+    );
+    // A `uses` of a name whose type has errors is not also reported as unknown.
+    let broken = with_context(
+        r#"{ "theme": { "kind": "named", "name": "Nope" } }"#,
+        "{}",
+        "{}",
+        r#"["theme"]"#,
+    );
+    let found = errors(&broken);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].0, DiagnosticCode::MANIFEST_UNKNOWN_TYPE);
+}

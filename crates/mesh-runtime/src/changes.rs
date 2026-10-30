@@ -1,8 +1,8 @@
 //! Changes (docs/manual/runtime.md, "Changes"): an update from a render and
 //! the changes to its snapshot, not a whole new snapshot.
 //!
-//! The changes are an ordered list of edits at paths into the snapshot
-//! (`set`, `insert`, `remove`), and they **define** the new snapshot: the
+//! The changes are an ordered list of edits at paths into the snapshot, or into
+//! the context values from `$context` (`set`, `insert`, `remove`), and they **define** the new snapshot: the
 //! runtime applies them to the values of the render they name, so the new
 //! snapshot is never a second copy that could disagree with them. What they
 //! don't touch is shared with the previous render (the values are `Rc`s), so
@@ -19,13 +19,16 @@
 use crate::boundary::{display, Inputs};
 use crate::diagnostic::{Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
 use crate::program::Valid;
+use crate::render::CONTEXT_ROOT;
 use crate::types::reads_as_optional;
 use crate::value::{HostValue, Value};
 use mesh_manifest::{Manifest, Type};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-/// One edit of a snapshot.
+/// One edit of a snapshot, or of the context values: a path whose first
+/// segment is `$context` goes on with a context name (the changes document
+/// writes that root `{ "context": name }`).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Change {
     /// The value at `path` is now `value`: a scope name's, a record field's
@@ -72,7 +75,9 @@ impl Changes {
     /// Reads the changes document the host gave, as a boundary value (§9.8):
     /// `{ base, changes: [{ op, path, value? }] }`, where `op` is `"set"`,
     /// `"insert"` or `"remove"`, `path` is a non-empty list of record field
-    /// names (strings) and list indices (non-negative integers), and `value`
+    /// names (strings) and list indices (non-negative integers), whose first
+    /// segment may instead be `{ "context": name }`, a context name (read as
+    /// the two segments `$context` and the name), and `value`
     /// is there for `set` and `insert`, and not for `remove`.
     pub fn from_host(document: &HostValue) -> Result<Changes, Vec<RuntimeDiagnostic>> {
         let HostValue::Record(record) = document else {
@@ -109,20 +114,36 @@ impl Changes {
                 Some(HostValue::List(segments)) if !segments.is_empty() => {
                     let mut path = Vec::with_capacity(segments.len());
                     for (position, segment) in segments.iter().enumerate() {
-                        path.push(match segment {
+                        let segment = match segment {
                             Some(HostValue::String(text)) => PathSegment::Name(text.clone()),
                             Some(HostValue::Number(number)) if integer(*number) => {
                                 PathSegment::Index(*number as usize)
+                            }
+                            // The root of a path into the context values: `{ "context": name }`.
+                            Some(HostValue::Record(root))
+                                if position == 0
+                                    && root.0.len() == 1
+                                    && matches!(
+                                        root.get("context"),
+                                        Some(HostValue::String(_))
+                                    ) =>
+                            {
+                                let Some(HostValue::String(context)) = root.get("context") else {
+                                    unreachable!("matched above")
+                                };
+                                path.push(PathSegment::Name(CONTEXT_ROOT.to_string()));
+                                PathSegment::Name(context.clone())
                             }
                             _ => {
                                 let mut where_ = at.to_vec();
                                 where_.extend([name("path"), PathSegment::Index(position)]);
                                 return Err(vec![invalid(
                                     &where_,
-                                    "a path segment is a field name (a string) or a list index (a non-negative integer)",
+                                    "a path segment is a field name (a string) or a list index (a non-negative integer); the first may be `{ context: name }`",
                                 )]);
                             }
-                        });
+                        };
+                        path.push(segment);
                     }
                     path
                 }
@@ -340,16 +361,19 @@ impl Editor<'_> {
     }
 }
 
-/// Applies `changes`, in order, to `values` (the root scope's values),
-/// checking each before it is applied. On the first failure `values` is
-/// unchanged and the failure is returned.
+/// Applies `changes`, in order, to `values` (the root scope's values) and
+/// `context` (the context values: a path from `$context` and a context name),
+/// checking each before it is applied. On the first failure neither is
+/// changed and the failure is returned.
 pub(crate) fn apply(
     valid: &Valid,
     values: &mut BTreeMap<String, Value>,
+    context: &mut BTreeMap<String, Value>,
     changes: &[Change],
 ) -> Result<(), Vec<RuntimeDiagnostic>> {
-    let scope = &valid.component(&valid.root).scope;
+    let root_component = valid.component(&valid.root);
     let mut working = values.clone();
+    let mut working_context = context.clone();
     for (index, change) in changes.iter().enumerate() {
         let (path, op) = match change {
             Change::Set { path, value } => (path, Op::Set(value)),
@@ -363,17 +387,46 @@ pub(crate) fn apply(
                 Location::Input(path.clone()),
             )]
         };
-        let Some(PathSegment::Name(root)) = path.first() else {
+        let Some(PathSegment::Name(first)) = path.first() else {
             return Err(at("a path starts with a scope name".into()));
         };
-        let Some(ty) = scope.get(root) else {
-            return Err(at(format!("`{root}` isn't a scope name of the root")));
+        // A path from `$context` edits a context value; any other, the snapshot.
+        let in_context = first == CONTEXT_ROOT;
+        let (path, prefix): (&[PathSegment], &[PathSegment]) = if in_context {
+            (&path[1..], &path[..1])
+        } else {
+            (&path[..], &[])
+        };
+        let Some(PathSegment::Name(root)) = path.first() else {
+            return Err(at(
+                "a path from `$context` goes on with a context name".into()
+            ));
+        };
+        let ty = if in_context {
+            valid.manifest.context().get(root)
+        } else if root_component.uses.contains(root) {
+            None
+        } else {
+            root_component.scope.get(root)
+        };
+        let Some(ty) = ty else {
+            return Err(at(if in_context {
+                format!("`{root}` isn't a name of the context")
+            } else {
+                format!("`{root}` isn't a scope name of the root")
+            }));
+        };
+        let target = if in_context {
+            &mut working_context
+        } else {
+            &mut working
         };
         let mut editor = Editor {
             manifest: &valid.manifest,
             inputs: Inputs::new(&valid.manifest),
         };
-        let mut where_ = vec![name(root)];
+        let mut where_ = prefix.to_vec();
+        where_.push(name(root));
         let edited = if path.len() == 1 {
             match op {
                 Op::Set(host) => editor.inputs.value(Some(host), ty, &mut where_),
@@ -390,7 +443,7 @@ pub(crate) fn apply(
                 }
             }
         } else {
-            let current = working.get(root).cloned().unwrap_or(Value::Absent);
+            let current = target.get(root).cloned().unwrap_or(Value::Absent);
             match editor.edit(&current, ty, &path[1..], op, &mut where_) {
                 Ok(value) => value,
                 Err(diagnostic) => {
@@ -406,9 +459,10 @@ pub(crate) fn apply(
         if !diagnostics.is_empty() {
             return Err(diagnostics);
         }
-        working.insert(root.clone(), edited);
+        target.insert(root.clone(), edited);
     }
     *values = working;
+    *context = working_context;
     Ok(())
 }
 

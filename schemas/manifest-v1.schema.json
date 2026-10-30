@@ -12,6 +12,12 @@
       "propertyNames": { "$ref": "#/$defs/identifier" },
       "additionalProperties": { "$ref": "#/$defs/type" }
     },
+    "context": {
+      "description": "The context channel: names a host supplies beside the snapshot, each with its type (no snippet). A component reads one only if its `uses` lists it; nothing is in scope implicitly. Optional; since 0.18.0.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": { "$ref": "#/$defs/type" }
+    },
     "components": {
       "type": "object",
       "propertyNames": { "$ref": "#/$defs/tagName" },
@@ -55,7 +61,12 @@
           "propertyNames": { "$ref": "#/$defs/identifier" },
           "additionalProperties": { "$ref": "#/$defs/type" }
         },
-        "unit": { "$ref": "#/$defs/unit" }
+        "unit": { "$ref": "#/$defs/unit" },
+        "uses": {
+          "description": "The names of the manifest's `context` this component reads. Each joins its scope (read-only) with the context's type. A name the `context` doesn't declare is an error (`manifest-unknown-context`), as is one that is also a prop or a scope name of the component, or listed twice (`manifest-context-clash`). Since 0.18.0.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        }
       },
       "required": ["props", "events", "commands", "scope"],
       "additionalProperties": false

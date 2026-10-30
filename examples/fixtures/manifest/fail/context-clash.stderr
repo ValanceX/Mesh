@@ -1,0 +1,5 @@
+error[manifest-context-clash]: the context name `theme` is a prop of the component
+  --> fixtures/manifest/fail/context-clash.json:11:16
+   |
+11 |       "uses": ["theme"]
+   |                ^^^^^^^

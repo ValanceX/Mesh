@@ -1,0 +1,107 @@
+[
+  {
+    "case": "the context values a render is given are what the components that use them read: the root, a composite, a snippet and the content a slot places, each where it was declared",
+    "snapshot": {
+      "title": "Hi"
+    },
+    "context": {
+      "theme": "light"
+    },
+    "changes": []
+  },
+  {
+    "case": "a change to a context value re-evaluates every node that reads it, and only the context changes",
+    "snapshot": {
+      "title": "Hi"
+    },
+    "context": {
+      "theme": "dark"
+    },
+    "changes": [
+      {
+        "op": "set",
+        "path": [
+          {
+            "context": "theme"
+          }
+        ],
+        "value": "dark"
+      }
+    ]
+  },
+  {
+    "case": "an optional context value is given: only the composite that uses it reads it",
+    "snapshot": {
+      "title": "Hi"
+    },
+    "context": {
+      "theme": "dark",
+      "user": "Ada"
+    },
+    "changes": [
+      {
+        "op": "set",
+        "path": [
+          {
+            "context": "user"
+          }
+        ],
+        "value": "Ada"
+      }
+    ]
+  },
+  {
+    "case": "a change to the snapshot alone keeps the context values",
+    "snapshot": {
+      "title": "Hello"
+    },
+    "context": {
+      "theme": "dark",
+      "user": "Ada"
+    },
+    "changes": [
+      {
+        "op": "set",
+        "path": [
+          "title"
+        ],
+        "value": "Hello"
+      }
+    ]
+  },
+  {
+    "case": "a change to the snapshot and one to the context, in one update; an optional value removed",
+    "snapshot": {
+      "title": "Bye"
+    },
+    "context": {
+      "theme": "light"
+    },
+    "changes": [
+      {
+        "op": "set",
+        "path": [
+          "title"
+        ],
+        "value": "Bye"
+      },
+      {
+        "op": "set",
+        "path": [
+          {
+            "context": "theme"
+          }
+        ],
+        "value": "light"
+      },
+      {
+        "op": "remove",
+        "path": [
+          {
+            "context": "user"
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -137,10 +137,18 @@ export function render(input: RenderInput): Promise<RenderResult> {
  * Without it the new render is made with the previous render's, which is also what
  * `updateChanges` does unless `options.units` gives others.
  *
+ * `context` is the context values the host holds now (see {@link RenderInput.context}); without it,
+ * the previous render's. A part that reads a context name whose value changed is rendered again.
+ *
  * It rejects as {@link render} does.
  */
-export function update(previous: Render, snapshot: Record<string, unknown>, units?: UnitStates): Promise<UpdateResult> {
-  return updateWith(previous, snapshot, units);
+export function update(
+  previous: Render,
+  snapshot: Record<string, unknown>,
+  units?: UnitStates,
+  context?: Record<string, unknown>,
+): Promise<UpdateResult> {
+  return updateWith(previous, snapshot, units, context);
 }
 
 /**
@@ -154,7 +162,8 @@ export function update(previous: Render, snapshot: Record<string, unknown>, unit
  * computed against another state, applied twice, or applied out of order is
  * refused (`runtime-changes-base-mismatch`). Each edit is a `set`, an `insert`
  * (into a list, shifting the rest) or a `remove`, at a `path` of record field
- * names and list indices from a scope name down; edits apply in order, each
+ * names and list indices from a scope name down (or, from `{ context: name }`,
+ * from a context value down: the context values change like the snapshot); edits apply in order, each
  * seeing those before it. The changes *define* the new snapshot: the runtime
  * applies them to the one it holds, sharing what they don't touch, and
  * validates only the values they give. So an update costs the changes and what

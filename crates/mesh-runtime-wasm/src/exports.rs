@@ -92,8 +92,8 @@ fn keep(result: Option<Result<String, Refusal>>) -> u32 {
 }
 
 /// Renders (`crate::respond_render`): the root's name, the templates as a
-/// text list, the manifest, the snapshot, encoded, and the units, encoded
-/// (empty for none).
+/// text list, the manifest, the snapshot, encoded, the units, encoded
+/// (empty for none), and the context values, encoded (empty for none).
 ///
 /// # Safety
 ///
@@ -112,6 +112,8 @@ pub unsafe extern "C" fn mesh_render(
     snapshot_len: usize,
     units: *const u8,
     units_len: usize,
+    context: *const u8,
+    context_len: usize,
 ) -> u32 {
     // SAFETY: the caller's guarantee, passed on for each input.
     let result = unsafe {
@@ -122,6 +124,7 @@ pub unsafe extern "C" fn mesh_render(
                 model,
                 bytes(snapshot, snapshot_len),
                 bytes(units, units_len),
+                bytes(context, context_len),
             )),
             _ => None,
         }
@@ -130,8 +133,8 @@ pub unsafe extern "C" fn mesh_render(
 }
 
 /// Updates (`crate::respond_update`): a render's inputs, as
-/// [`mesh_render`] took them, with the render's snapshot and its units, then
-/// the new snapshot and the new units, encoded, then the new render's version and the previous render's
+/// [`mesh_render`] took them, with the render's snapshot, its units and its context, then
+/// the new snapshot, the new units and the new context (empty to keep the render's), encoded, then the new render's version and the previous render's
 /// handle, which is used when `has_handle` is not 0 and the module still
 /// holds it.
 ///
@@ -152,10 +155,14 @@ pub unsafe extern "C" fn mesh_update(
     previous_len: usize,
     previous_units: *const u8,
     previous_units_len: usize,
+    previous_context: *const u8,
+    previous_context_len: usize,
     snapshot: *const u8,
     snapshot_len: usize,
     units: *const u8,
     units_len: usize,
+    context: *const u8,
+    context_len: usize,
     new_version: f64,
     handle: u32,
     has_handle: u32,
@@ -170,8 +177,10 @@ pub unsafe extern "C" fn mesh_update(
                 (has_handle != 0).then_some(handle),
                 bytes(previous, previous_len),
                 bytes(previous_units, previous_units_len),
+                bytes(previous_context, previous_context_len),
                 bytes(snapshot, snapshot_len),
                 bytes(units, units_len),
+                bytes(context, context_len),
                 new_version as u64,
             )),
             _ => None,
@@ -211,6 +220,8 @@ pub unsafe extern "C" fn mesh_update_changes(
     previous_len: usize,
     previous_units: *const u8,
     previous_units_len: usize,
+    previous_context: *const u8,
+    previous_context_len: usize,
     changes: *const u8,
     changes_len: usize,
     verify: *const u8,
@@ -233,6 +244,7 @@ pub unsafe extern "C" fn mesh_update_changes(
                 (has_handle != 0).then_some(handle),
                 bytes(previous, previous_len),
                 bytes(previous_units, previous_units_len),
+                bytes(previous_context, previous_context_len),
                 version as u64,
                 new_version as u64,
                 bytes(changes, changes_len),
@@ -301,6 +313,8 @@ pub unsafe extern "C" fn mesh_dispatch(
     snapshot_len: usize,
     units: *const u8,
     units_len: usize,
+    context: *const u8,
+    context_len: usize,
     handler: *const u8,
     handler_len: usize,
     payload: *const u8,
@@ -320,6 +334,7 @@ pub unsafe extern "C" fn mesh_dispatch(
                 model,
                 bytes(snapshot, snapshot_len),
                 bytes(units, units_len),
+                bytes(context, context_len),
                 handler,
                 (has_payload != 0).then(|| bytes(payload, payload_len)),
             )),
@@ -392,6 +407,8 @@ pub unsafe extern "C" fn mesh_raise(
     snapshot_len: usize,
     units: *const u8,
     units_len: usize,
+    context: *const u8,
+    context_len: usize,
     occurrence: *const u8,
     occurrence_len: usize,
     event: *const u8,
@@ -414,6 +431,7 @@ pub unsafe extern "C" fn mesh_raise(
                 model,
                 bytes(snapshot, snapshot_len),
                 bytes(units, units_len),
+                bytes(context, context_len),
                 occurrence,
                 event,
                 (has_payload != 0).then(|| bytes(payload, payload_len)),

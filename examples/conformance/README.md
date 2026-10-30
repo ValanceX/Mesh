@@ -89,6 +89,14 @@ This program has its own `components.json`: `disclosure` has a unit (`open`, and
 
 What the steps pin: with no state held an occurrence has the defaults; the state held for an occurrence is what its template sees and only its; a re-sorted list keeps the state with the row (the occurrence's key is its place by the item's declared key, not its position); a row that leaves is not listed and the state held for it is not used; and a `controllable` field the caller writes a prop for is the caller's value whatever the host holds.
 
+## `context/`: the context channel (docs/manual/runtime.md, "Context"; spec §9.11)
+
+This program has its own `components.json`, whose top-level `context` declares `theme` (an enum) and `user` (an optional string). `page`, the root, `uses` `theme`; `badge` uses both; `frame` uses neither, and is given a snippet and content that `page` declared, which read `theme`. `steps.json` is a list of `{ case, snapshot, context, changes }`: each step renders its committed tree (`step-N.expected.tree.json`) with its `snapshot` and `context`, and from the step before, an update by its `changes` (a path into the context starts `{ "context": name }`) and an update with the whole snapshot and context are both the render of the step. The steps change the theme, give the optional user, change the snapshot alone (the context is kept), and change both at once.
+
+`cases.json` is `{ checks, manifests, rejects, dispatches }`: templates that don't check against this manifest (a component that doesn't use a name can't read it; a context name has its declared type), with the one code each gives; manifests that don't load (`manifest-unknown-context`, `manifest-context-clash`); context values a render refuses, with the first diagnostic's code and location (at `$context.<name>`; the snapshot never supplies one); and the intent a handler gives that passes a context value as an argument.
+
+A renderer needs none of this: the tree's format is unchanged. A host does.
+
 ## `replay/`: session logs (Bet 15)
 
 Recorded sessions: the inputs a host gave the runtime and the hashes of the trees it got, as line-JSON, and 1,000 random sessions with their digests. Any runtime must replay them exactly, by three routes (an `update_changes` chain, an `update` chain, a `render` of each snapshot). The format and the files are in [`replay/README.md`](./replay/README.md); the checks are `crates/mesh-runtime/tests/replay.rs` and `packages/mesh-runtime/test/replay.test.mjs`.
