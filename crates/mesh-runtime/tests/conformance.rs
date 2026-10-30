@@ -431,6 +431,33 @@ fn an_interaction_on_a_key_the_tree_lacks_is_refused() {
     );
 }
 
+/// `arguments/`: an intent's argument names. Each case is an event reported on a node, with a
+/// payload or none, and the intent it gives: an argument written as a plain path carries its last
+/// segment as `name`, any other has none.
+#[test]
+fn arguments_carry_their_names_as_committed() {
+    let render = render("arguments");
+    let mut all = BTreeMap::new();
+    nodes(&render.tree().root, &mut all);
+    let mut failures = Vec::new();
+    for case in json(&dir().join("arguments/cases.json"))
+        .as_array()
+        .unwrap()
+    {
+        let handler = &all[case["node"].as_str().unwrap()].events[case["event"].as_str().unwrap()];
+        let payload = case
+            .get("payload")
+            .map(|p| HostValue::from_json(&p.to_string()).unwrap());
+        let intent = mesh_runtime::dispatch(&render, handler, payload.as_ref())
+            .unwrap_or_else(|d| panic!("{}: {d:#?}", case["case"]));
+        let actual = serde_json::from_str::<Value>(&intent.to_json()).unwrap();
+        if actual != case["intent"] {
+            failures.push(format!("{}: {actual}", case["case"]));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
 /// `enums/`: the first program with its own manifest. Its `cases.json` is
 /// `{ props, rejects, dispatches }`:
 ///

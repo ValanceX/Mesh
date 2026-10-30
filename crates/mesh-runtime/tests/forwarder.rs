@@ -120,7 +120,7 @@ fn an_event_in_forwarded_content_is_the_callers_and_finds_its_item() {
         intent["command"],
         json!({ "component": "screen", "name": "select" })
     );
-    assert_eq!(intent["arguments"], json!([{ "value": 7 }]));
+    assert_eq!(intent["arguments"], json!([{ "value": 7, "name": "id" }]));
 }
 
 const MODEL: &str = r#"{

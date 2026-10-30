@@ -284,3 +284,22 @@ test("openScreen checks its arguments", () => {
   assert.throws(() => openScreen({ program, model: 1 }), { name: "MeshUsageError", code: "invalid-argument" });
   assert.throws(() => openScreen({ program, model: MODEL, transitions: { disclosure: { toggle: 1 } } }), { code: "invalid-argument" });
 });
+
+test("dispatch gives the intent as the runtime wrote it, an argument's name included", async () => {
+  const model = JSON.stringify({
+    version: 1,
+    types: {},
+    components: {
+      button: { props: {}, events: { click: {} }, commands: {}, scope: {} },
+      page: { props: {}, events: {}, commands: { chose: { parameters: [{ name: "n", type: { kind: "number" } }] } }, scope: { at: { kind: "number" } } },
+    },
+  });
+  const screen = openScreen({ program: { root: "page", templates: [await template("page", "<button on.click={chose(at)} />", model)] }, model });
+  const drawn = drawing();
+
+  drawn.take(await screen.show({ at: 3 }));
+  const { intent } = await screen.dispatch(button(drawn.tree, 0));
+
+  assert.deepEqual(intent, { command: { component: "page", name: "chose" }, arguments: [{ value: 3, name: "at" }] });
+  screen.close();
+});

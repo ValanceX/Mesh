@@ -1,0 +1,38 @@
+{
+  "$schema": "../../../schemas/manifest-v1.schema.json",
+  "version": 1,
+  "types": {},
+  "components": {
+    "page": { "props": {}, "events": {}, "commands": {}, "scope": {} },
+    "tile": {
+      "props": { "label": { "type": { "kind": "string" }, "required": false } },
+      "events": { "press": {}, "pick": { "payload": { "kind": "string" } } },
+      "commands": {},
+      "scope": {}
+    },
+    "arguments": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "move": {
+          "parameters": [
+            { "name": "to", "type": { "kind": "string" } },
+            { "name": "from", "type": { "kind": "string" } }
+          ]
+        },
+        "open": {
+          "parameters": [{ "name": "id", "type": { "kind": "number" } }]
+        },
+        "note": {
+          "parameters": [{ "name": "text", "type": { "kind": "optional", "type": { "kind": "string" } } }]
+        }
+      },
+      "scope": {
+        "to": { "kind": "string" },
+        "from": { "kind": "string" },
+        "draft": { "kind": "optional", "type": { "kind": "string" } },
+        "items": { "kind": "list", "element": { "kind": "record", "fields": { "id": { "type": { "kind": "number" }, "required": true } } } }
+      }
+    }
+  }
+}

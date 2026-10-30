@@ -263,6 +263,17 @@ It is `$defs/intent` in `render-v1.schema.json`:
 
 `{ "value": null }` is `null`, and `{ "absent": true }` is absent: the two are always distinct.
 
+An argument **written as a plain path**, a scope name or fields of one, also has its **`name`**: the path's last segment. `on.press={move(to, item.id)}` gives
+
+```json intent
+{
+  "command": { "component": "board", "name": "move" },
+  "arguments": [ { "value": "kitchen", "name": "to" }, { "value": 7, "name": "id" } ]
+}
+```
+
+and an absent argument keeps its name (`{ "absent": true, "name": "draft" }`). Any other argument (`$event`, a literal, `a ?? b`, a record) has no `name`, so an intent with none is written exactly as before. The name is the argument's, not the parameter's: `move(from, to)` gives `from` then `to`, in the parameter order of `to` and `from`, which is what lets a host notice the two differ and bind by name. From Rust it is `Intent::names`, one per argument; from JavaScript, `IntentArgument.name`. Provisional (spec §9.7.5).
+
 ```json intent-invalid
 { "command": { "component": "user-card", "name": "selectUser" }, "arguments": [ { "value": 1, "absent": true } ] }
 ```

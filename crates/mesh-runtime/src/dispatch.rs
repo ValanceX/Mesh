@@ -15,7 +15,7 @@ use crate::render::{
 use crate::tree::Intent;
 use crate::types::fits;
 use crate::value::{HostRecord, HostValue, Units, Value};
-use mesh_template::Element;
+use mesh_template::{Element, Expression};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -534,9 +534,27 @@ fn intent_of(
         component: component.to_string(),
         command: binding.command.clone(),
         arguments,
+        names: binding.arguments.iter().map(path_name).collect(),
         instance: owner.map(|owner| owner.key.clone()),
         controlled: owner.map_or_else(Vec::new, |owner| owner.controlled.clone()),
     })
+}
+
+/// The last segment of `argument` when it is a plain path: a scope name (`to`), or fields of one
+/// (`item.id`). `None` for any other expression, `$event` included.
+fn path_name(argument: &Expression) -> Option<String> {
+    fn rooted(expression: &Expression) -> bool {
+        match expression {
+            Expression::Scope { .. } => true,
+            Expression::Member { object, .. } => rooted(object),
+            _ => false,
+        }
+    }
+    match argument {
+        Expression::Scope { name, .. } => Some(name.clone()),
+        Expression::Member { object, field, .. } if rooted(object) => Some(field.clone()),
+        _ => None,
+    }
 }
 
 /// The payload a forwarding `binding` gives the event it names (an event of

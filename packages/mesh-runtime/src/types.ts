@@ -141,8 +141,12 @@ export interface UnitOccurrence {
  */
 export type UnitStates = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
-/** A present argument, or an absent one (where the parameter is optional), which isn't `null`. */
-export type IntentArgument = { readonly value: BoundaryValue } | { readonly absent: true };
+/**
+ * A present argument, or an absent one (where the parameter is optional), which isn't `null`.
+ * `name` is there exactly when the argument is written as a plain path (`to`, `item.id`): its last
+ * segment, so a host can bind arguments by name as well as by position.
+ */
+export type IntentArgument = ({ readonly value: BoundaryValue } | { readonly absent: true }) & { readonly name?: string };
 
 /**
  * The runtime diagnostics document, as

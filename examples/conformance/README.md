@@ -35,6 +35,12 @@ Each node must be exactly as given, and no two states may be written alike: abse
 
 A renderer realizing any of these props in a slot that holds only text must produce exactly the value (for a string) or the `propText` entry, and must refuse a list or record there. It never makes a text itself.
 
+## `arguments/`: an intent's argument names (spec §9.7.5)
+
+This program has **its own `components.json`**. `cases.json` is a list of events reported on a node (`node`, `event`, and `payload` when the event has one), each with the exact `intent` it dispatches to. An argument written as a plain path, a scope name or fields of one, carries its last segment as `name`, and an absent one keeps it; `$event`, a literal and any other expression have none. The cases cover names in an order other than the parameters', `$event`, a computed argument and a literal, an absent argument, and a field path inside a repeat's item.
+
+A renderer needs none of this. A host that binds an intent's arguments by name does.
+
 ## `enums/`: enum types, `has`, `??` and prop defaults (spec §9.2, §9.3, §9.4, §9.8)
 
 This program has **its own `components.json`** (the shared one, and so every other program's keys, is untouched). `cases.json` is `{ props, rejects, dispatches }`:

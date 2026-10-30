@@ -26,14 +26,14 @@ test("changing the host's objects after render changes nothing", async () => {
   snapshot.maybeName = "Someone else";
   snapshot.user.name = 7; // would no longer even fit
   const { intent } = await dispatch(made, setName(made));
-  assert.deepEqual(intent.arguments, [{ value: "Countess" }]);
+  assert.deepEqual(intent.arguments, [{ value: "Countess", name: "maybeName" }]);
 });
 
 test("an earlier render gives the earlier values' intent", async () => {
   const first = (await render({ program, model: MODEL, snapshot: { ...SNAPSHOT, maybeName: "Ada" } })).render;
   const second = (await render({ program, model: MODEL, snapshot: SNAPSHOT })).render;
-  assert.deepEqual((await dispatch(second, setName(second))).intent.arguments, [{ absent: true }]);
-  assert.deepEqual((await dispatch(first, setName(first))).intent.arguments, [{ value: "Ada" }]);
+  assert.deepEqual((await dispatch(second, setName(second))).intent.arguments, [{ absent: true, name: "maybeName" }]);
+  assert.deepEqual((await dispatch(first, setName(first))).intent.arguments, [{ value: "Ada", name: "maybeName" }]);
   // One program, so both trees have the same handler identifiers.
   assert.equal(setName(first), setName(second));
 });

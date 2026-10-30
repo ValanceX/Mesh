@@ -159,6 +159,18 @@ test("events: each interaction resolves to its committed binding, and one intent
   }
 });
 
+// `arguments/`: an intent's argument names. Each case is an event on a node, with a payload or none,
+// and the intent it gives: an argument written as a plain path carries its last segment as `name`.
+test("arguments: each argument written as a path carries its name, as committed", async () => {
+  const kept = await rendered("arguments");
+  const all = nodes(kept.tree.root);
+  for (const item of JSON.parse(read("arguments", "cases.json"))) {
+    const { intent, diagnostics } = await dispatch(kept, all.get(item.node).events[item.event], item.payload);
+    assert.equal(diagnostics, undefined, item.case);
+    assert.deepEqual(intent, item.intent, item.case);
+  }
+});
+
 // `enums/`: the first program with its own manifest. Its cases are
 // `{ props, rejects, dispatches }`: a node's props; snapshots that don't
 // render, with the first diagnostic's code and location; and events with a
@@ -256,7 +268,7 @@ test(`${dir}: an event in a snippet's body is the declaring template's, and disp
   const press = [...all.values()].find((node) => node.component === "row" && node.props.label === "Grace");
   const { intent, diagnostics } = await dispatch(kept, press.events.press);
   assert.equal(diagnostics, undefined);
-  assert.deepEqual(intent, { command: { component: "screen", name: "select" }, arguments: [{ value: 2 }] });
+  assert.deepEqual(intent, { command: { component: "screen", name: "select" }, arguments: [{ value: 2, name: "id" }] });
 });
 }
 

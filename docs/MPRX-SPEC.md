@@ -668,6 +668,7 @@ One relation, **fits(value, T)**, decides every runtime type check: in §9.7.10,
    - At a composite occurrence, it evaluates the props, then the composite's template.
    - Event handlers are **not** evaluated at render.
 3. **Dispatch** evaluates the props of the composite occurrences on the path to the handler's element, as render did, then the handler's arguments, left to right (`docs/manual/runtime.md`).
+   - The intent gives each argument **written as a plain path**, a scope name or fields of one (`to`, `item.id`), its last segment as its **name** (`to`, `id`). Any other argument, `$event` and a literal included, has none. A name is read from the binding's source, not evaluated, and changes no value and no position: an argument is still its parameter's by position. It lets a host bind arguments by name (*added after 0.17.0; Provisional*).
 4. Expressions have no side effects, so the order decides only one thing: which evaluation error is reported. It is always the first.
 
 #### 9.7.6 Runtime checks
@@ -886,7 +887,7 @@ With `click` as the applicable event of both `card` and `button`: an interaction
 
 #### 9.9.4 Reference and conformance
 
-`mesh_runtime::resolve` is the reference implementation: a pure function of a render tree and an interaction, given as the interacted node's key and the applicable event for each primitive component. It needs no target. A renderer doesn't call it: it implements the rule for its own target, and checks itself against the language-neutral vectors in `examples/conformance/events/`, each a real program, its tree, an interaction, and the handler identifier and intent it resolves to, or none.
+`mesh_runtime::resolve` is the reference implementation: a pure function of a render tree and an interaction, given as the interacted node's key and the applicable event for each primitive component. It needs no target. A renderer doesn't call it: it implements the rule for its own target, and checks itself against the language-neutral vectors in `examples/conformance/events/`, each a real program, its tree, an interaction, and the handler identifier and intent it resolves to, or none. The argument names of an intent (§9.7.5) are pinned by `examples/conformance/arguments/`.
 
 ---
 
