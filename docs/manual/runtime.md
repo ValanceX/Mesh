@@ -272,7 +272,7 @@ An argument **written as a plain path**, a scope name or fields of one, also has
 }
 ```
 
-and an absent argument keeps its name (`{ "absent": true, "name": "draft" }`). Any other argument (`$event`, a literal, `a ?? b`, a record) has no `name`, so an intent with none is written exactly as before. The name is the argument's, not the parameter's: `move(from, to)` gives `from` then `to`, in the parameter order of `to` and `from`, which is what lets a host notice the two differ and bind by name. From Rust it is `Intent::names`, one per argument; from JavaScript, `IntentArgument.name`. Provisional (spec §9.7.5).
+and an absent argument keeps its name (`{ "absent": true, "name": "draft" }`). Any other argument (`$event`, a literal, `a ?? b`, a record) has no `name`, so an intent with none is written exactly as before. The name is the argument's, not the parameter's: for parameters declared `(to, from)`, `move(from, to)` gives the names `from`, `to`. That is what lets a host see the two differ and bind by name. From JavaScript it is `IntentArgument.name`. From Rust, `dispatch` and `raise` give the `Intent` as before, and `dispatch_named`, `dispatch_named_from_units`, `raise_named` and `raise_named_from_units` give a `NamedIntent`: the same `intent` and its `names`, one per argument, which its `to_json` writes as above. A session log (`examples/conformance/replay/`) does not record names, and a player compares an event's outcome without them. Provisional (spec §9.7.5).
 
 ```json intent-invalid
 { "command": { "component": "user-card", "name": "selectUser" }, "arguments": [ { "value": 1, "absent": true } ] }

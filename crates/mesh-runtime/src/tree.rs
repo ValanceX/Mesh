@@ -154,10 +154,6 @@ pub struct Intent {
     /// One per parameter, in order: `None` is absent, distinct from
     /// `Some(null)`.
     pub arguments: Vec<Option<Value>>,
-    /// One per argument: the last segment of an argument written as a plain path (`to`,
-    /// `item.id`), `None` for any other expression (`$event` included). So a host can bind arguments by
-    /// name as well as by position.
-    pub names: Vec<Option<String>>,
     /// For a command of a unit: the occurrence it is for, by the key the render gave it.
     pub instance: Option<String>,
     /// For a command of a unit: the fields of the occurrence the caller owned when the event was
@@ -170,17 +166,9 @@ impl Intent {
     pub fn to_json(&self) -> String {
         let mut intent = json!({
             "command": { "component": self.component, "name": self.command },
-            "arguments": self.arguments.iter().enumerate().map(|(at, argument)| {
-                let mut entry = match argument {
-                    Some(value) => json!({ "value": value }),
-                    None => json!({ "absent": true }),
-                };
-                // Present exactly for a path, so any other argument is written as it was.
-                // `get`, so an intent built with fewer names keeps every argument.
-                if let Some(Some(name)) = self.names.get(at) {
-                    entry["name"] = json!(name);
-                }
-                entry
+            "arguments": self.arguments.iter().map(|argument| match argument {
+                Some(value) => json!({ "value": value }),
+                None => json!({ "absent": true }),
             }).collect::<Vec<_>>(),
         });
         // Present exactly for a command of a unit, so any other intent is written as it was.
@@ -188,6 +176,40 @@ impl Intent {
             intent["instance"] = json!(instance);
             if !self.controlled.is_empty() {
                 intent["controlled"] = json!(self.controlled);
+            }
+        }
+        intent.to_string()
+    }
+}
+
+/// An [`Intent`] with the name of each argument: the last segment of an argument written as a plain
+/// path (`to`, `item.id`), `None` for any other expression (`$event` included). So a host can bind
+/// arguments by name as well as by position. What [`crate::dispatch_named`] and
+/// [`crate::raise_named`] give.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct NamedIntent {
+    /// The intent, exactly as [`crate::dispatch`] gives it.
+    pub intent: Intent,
+    /// One per argument, in order.
+    pub names: Vec<Option<String>>,
+}
+
+impl NamedIntent {
+    /// The intent in docs/manual/runtime.md's form (`$defs/intent`), each argument written as a path
+    /// with its `name`: what the WebAssembly module gives JavaScript.
+    pub fn to_json(&self) -> String {
+        let mut intent: Value =
+            serde_json::from_str(&self.intent.to_json()).expect("an intent is JSON");
+        for (entry, name) in intent["arguments"]
+            .as_array_mut()
+            .expect("an intent has arguments")
+            .iter_mut()
+            .zip(&self.names)
+        {
+            // Present exactly for a path, so any other argument is written as it was.
+            if let Some(name) = name {
+                entry["name"] = json!(name);
             }
         }
         intent.to_string()

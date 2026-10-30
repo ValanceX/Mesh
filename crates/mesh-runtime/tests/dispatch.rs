@@ -70,16 +70,13 @@ fn an_absent_argument_is_distinct_from_null() {
     assert_eq!(absent.arguments, [None]);
     assert_eq!(
         intent_json(&absent)["arguments"],
-        json!([{ "absent": true, "name": "maybeName" }])
+        json!([{ "absent": true }])
     );
     // `pick`'s payload is `any`, which excludes absence: give one.
     let null =
         mesh_runtime::dispatch(&render, &nth(&render, 1, "pick"), Some(&payload("0"))).unwrap();
     assert_eq!(null.arguments, [Some(Value::Null)]);
-    assert_eq!(
-        intent_json(&null)["arguments"],
-        json!([{ "value": null, "name": "nothing" }])
-    );
+    assert_eq!(intent_json(&null)["arguments"], json!([{ "value": null }]));
     // An optional payload, absent: an absent argument.
     let maybe = mesh_runtime::dispatch(&render, &nth(&render, 1, "maybe"), None).unwrap();
     assert_eq!(maybe.arguments, [None]);
@@ -258,10 +255,13 @@ fn an_argument_that_is_a_plain_path_carries_its_last_segment_as_its_name() {
     .unwrap();
     let at = |n: usize, event: &str, payload: Option<&str>| {
         let payload = payload.map(|text| HostValue::from_json(text).unwrap());
-        intent_json(
-            &mesh_runtime::dispatch(&render, &nth(&render, n, event), payload.as_ref()).unwrap(),
-        )["arguments"]
-            .clone()
+        let named =
+            mesh_runtime::dispatch_named(&render, &nth(&render, n, event), payload.as_ref())
+                .unwrap();
+        // `dispatch` gives the same intent, without the names.
+        let plain = mesh_runtime::dispatch(&render, &nth(&render, n, event), payload.as_ref());
+        assert_eq!(plain.unwrap(), named.intent);
+        serde_json::from_str::<Value>(&named.to_json()).unwrap()["arguments"].clone()
     };
     assert_eq!(
         at(0, "tap", None),
@@ -281,6 +281,6 @@ fn an_argument_that_is_a_plain_path_carries_its_last_segment_as_its_name() {
         at(1, "pick", Some("0")),
         json!([{ "value": 3, "name": "count" }])
     );
-    let intent = mesh_runtime::dispatch(&render, &nth(&render, 1, "tap"), None).unwrap();
+    let intent = mesh_runtime::dispatch_named(&render, &nth(&render, 1, "tap"), None).unwrap();
     assert_eq!(intent.names, [Some("maybeName".to_string())]);
 }

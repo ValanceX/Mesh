@@ -340,7 +340,7 @@ pub fn respond_dispatch_kept(
 ) -> Result<String, Refusal> {
     let payload = payload_bytes.map(decode_value).transpose()?;
     let result = retained::with(handle, |render| {
-        mesh_runtime::dispatch(render, handler, payload.as_ref())
+        mesh_runtime::dispatch_named(render, handler, payload.as_ref())
     })
     .ok_or_else(|| Refusal::Input("the module holds no such render".to_string()))?;
     Ok(match result {
@@ -374,7 +374,7 @@ pub fn respond_dispatch(
         templates: &texts,
     };
     Ok(
-        match mesh_runtime::dispatch_from_units(
+        match mesh_runtime::dispatch_named_from_units(
             &program,
             model,
             &snapshot,
@@ -393,7 +393,7 @@ pub fn respond_dispatch(
 
 /// The result document of a raise: the intent of the handler the caller bound, or that there was none.
 fn raised_document(
-    result: Result<Option<mesh_runtime::Intent>, Vec<mesh_runtime::RuntimeDiagnostic>>,
+    result: Result<Option<mesh_runtime::NamedIntent>, Vec<mesh_runtime::RuntimeDiagnostic>>,
     model: &str,
 ) -> String {
     match result {
@@ -418,7 +418,7 @@ pub fn respond_raise_kept(
 ) -> Result<String, Refusal> {
     let payload = payload_bytes.map(decode_value).transpose()?;
     let result = retained::with(handle, |render| {
-        mesh_runtime::raise(render, instance, event, payload.as_ref())
+        mesh_runtime::raise_named(render, instance, event, payload.as_ref())
     })
     .ok_or_else(|| Refusal::Input("the module holds no such render".to_string()))?;
     Ok(raised_document(result, model))
@@ -446,7 +446,7 @@ pub fn respond_raise(
         templates: &texts,
     };
     Ok(raised_document(
-        mesh_runtime::raise_from_units(
+        mesh_runtime::raise_named_from_units(
             &program,
             model,
             &snapshot,

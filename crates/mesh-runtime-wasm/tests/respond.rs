@@ -80,7 +80,8 @@ fn render_and_dispatch_give_the_runtimes_results() {
         None,
     )
     .unwrap();
-    let native_intent = mesh_runtime::dispatch(&native, &handler, None).unwrap();
+    // The module gives the intent with its arguments' names.
+    let native_intent = mesh_runtime::dispatch_named(&native, &handler, None).unwrap();
     assert_eq!(
         intent,
         format!("{{\"intent\":{}}}", native_intent.to_json())

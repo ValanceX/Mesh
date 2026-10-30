@@ -448,7 +448,7 @@ fn arguments_carry_their_names_as_committed() {
         let payload = case
             .get("payload")
             .map(|p| HostValue::from_json(&p.to_string()).unwrap());
-        let intent = mesh_runtime::dispatch(&render, handler, payload.as_ref())
+        let intent = mesh_runtime::dispatch_named(&render, handler, payload.as_ref())
             .unwrap_or_else(|d| panic!("{}: {d:#?}", case["case"]));
         let actual = serde_json::from_str::<Value>(&intent.to_json()).unwrap();
         if actual != case["intent"] {

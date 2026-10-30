@@ -12,7 +12,7 @@ use crate::program::{
 use crate::render::{
     bind, is_live, render_children, snapshot_values, statics, Instance, Link, Render, RenderChild,
 };
-use crate::tree::Intent;
+use crate::tree::{Intent, NamedIntent};
 use crate::types::fits;
 use crate::value::{HostRecord, HostValue, Units, Value};
 use mesh_template::{Element, Expression};
@@ -224,8 +224,17 @@ pub fn dispatch(
     handler: &str,
     payload: Option<&HostValue>,
 ) -> Result<Intent, Vec<RuntimeDiagnostic>> {
+    dispatch_named(render, handler, payload).map(|named| named.intent)
+}
+
+/// [`dispatch`], with the name of each argument written as a plain path (`to`, `item.id`).
+pub fn dispatch_named(
+    render: &Render,
+    handler: &str,
+    payload: Option<&HostValue>,
+) -> Result<NamedIntent, Vec<RuntimeDiagnostic>> {
     let (templates, root) = render.program();
-    dispatch_from_units(
+    dispatch_named_from_units(
         &Program {
             root,
             templates: &templates,
@@ -273,6 +282,19 @@ pub fn dispatch_from_units(
     handler: &str,
     payload: Option<&HostValue>,
 ) -> Result<Intent, Vec<RuntimeDiagnostic>> {
+    dispatch_named_from_units(program, model, snapshot, units, handler, payload)
+        .map(|named| named.intent)
+}
+
+/// [`dispatch_from_units`], with the name of each argument written as a plain path.
+pub fn dispatch_named_from_units(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Rc<Units>,
+    handler: &str,
+    payload: Option<&HostValue>,
+) -> Result<NamedIntent, Vec<RuntimeDiagnostic>> {
     // 1. Program validation, of the render's own copies (I14).
     let valid = program::validate(program, model)?;
 
@@ -372,7 +394,7 @@ pub fn dispatch_from_units(
     // it, then the handler's arguments, left to right. A handler that
     // forwards an event of its component goes on, out through the
     // occurrences around it, until one binds the event to a command.
-    let evaluate = || -> Result<Intent, RuntimeDiagnostic> {
+    let evaluate = || -> Result<NamedIntent, RuntimeDiagnostic> {
         let mut values = root_values;
         // The occurrences around the node, outermost first, with the scope
         // each was written in.
@@ -463,7 +485,7 @@ fn deliver<'v>(
     mut component: String,
     mut name: &'v str,
     mut carried: Value,
-) -> Result<Option<Intent>, RuntimeDiagnostic> {
+) -> Result<Option<NamedIntent>, RuntimeDiagnostic> {
     loop {
         let Some((caller, occurrence, caller_values, _)) = around.pop() else {
             return Ok(None);
@@ -500,7 +522,7 @@ fn intent_of(
     component: &str,
     binding: &mesh_template::EventBinding,
     owner: Option<&Instance>,
-) -> Result<Intent, RuntimeDiagnostic> {
+) -> Result<NamedIntent, RuntimeDiagnostic> {
     let command = &valid.component(component).commands[&binding.command];
     let mut arguments = Vec::with_capacity(binding.arguments.len());
     for (argument, parameter) in binding.arguments.iter().zip(&command.parameters) {
@@ -530,13 +552,15 @@ fn intent_of(
         .as_ref()
         .is_some_and(|unit| unit.commands.contains(&binding.command));
     let owner = owner.filter(|_| of_unit);
-    Ok(Intent {
-        component: component.to_string(),
-        command: binding.command.clone(),
-        arguments,
+    Ok(NamedIntent {
+        intent: Intent {
+            component: component.to_string(),
+            command: binding.command.clone(),
+            arguments,
+            instance: owner.map(|owner| owner.key.clone()),
+            controlled: owner.map_or_else(Vec::new, |owner| owner.controlled.clone()),
+        },
         names: binding.arguments.iter().map(path_name).collect(),
-        instance: owner.map(|owner| owner.key.clone()),
-        controlled: owner.map_or_else(Vec::new, |owner| owner.controlled.clone()),
     })
 }
 
@@ -595,8 +619,18 @@ pub fn raise(
     event: &str,
     payload: Option<&HostValue>,
 ) -> Result<Option<Intent>, Vec<RuntimeDiagnostic>> {
+    raise_named(render, instance, event, payload).map(|named| named.map(|named| named.intent))
+}
+
+/// [`raise`], with the name of each argument written as a plain path.
+pub fn raise_named(
+    render: &Render,
+    instance: &str,
+    event: &str,
+    payload: Option<&HostValue>,
+) -> Result<Option<NamedIntent>, Vec<RuntimeDiagnostic>> {
     let (templates, root) = render.program();
-    raise_from_units(
+    raise_named_from_units(
         &Program {
             root,
             templates: &templates,
@@ -627,6 +661,20 @@ pub fn raise_from_units(
     event: &str,
     payload: Option<&HostValue>,
 ) -> Result<Option<Intent>, Vec<RuntimeDiagnostic>> {
+    raise_named_from_units(program, model, snapshot, units, instance, event, payload)
+        .map(|named| named.map(|named| named.intent))
+}
+
+/// [`raise_from_units`], with the name of each argument written as a plain path.
+pub fn raise_named_from_units(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Rc<Units>,
+    instance: &str,
+    event: &str,
+    payload: Option<&HostValue>,
+) -> Result<Option<NamedIntent>, Vec<RuntimeDiagnostic>> {
     let valid = program::validate(program, model)?;
     let rendered = crate::render::tree(&valid, snapshot, true, None, units)?;
     let Some(found) = rendered.occurrences.get(instance) else {

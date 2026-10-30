@@ -1,0 +1,66 @@
+{
+  "$schema": "../../../../schemas/manifest-v1.schema.json",
+  "version": 1,
+  "types": {},
+  "components": {
+    "page": {
+      "props": {},
+      "events": {},
+      "commands": {},
+      "scope": {}
+    },
+    "row": {
+      "props": {
+        "title": {
+          "type": {
+            "kind": "string"
+          },
+          "required": true
+        }
+      },
+      "events": {
+        "press": {}
+      },
+      "commands": {},
+      "scope": {}
+    },
+    "mover": {
+      "props": {},
+      "events": {},
+      "commands": {
+        "move": {
+          "parameters": [
+            {
+              "name": "to",
+              "type": {
+                "kind": "string"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "items": {
+          "kind": "list",
+          "element": {
+            "kind": "record",
+            "fields": {
+              "id": {
+                "type": {
+                  "kind": "number"
+                },
+                "required": true
+              },
+              "label": {
+                "type": {
+                  "kind": "string"
+                },
+                "required": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

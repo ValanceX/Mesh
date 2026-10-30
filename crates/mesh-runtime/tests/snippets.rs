@@ -142,7 +142,7 @@ fn an_event_in_a_snippet_is_the_declaring_templates_and_finds_its_row_again() {
         intent["command"],
         json!({ "component": "screen", "name": "select" })
     );
-    assert_eq!(intent["arguments"], json!([{ "value": 7, "name": "id" }]));
+    assert_eq!(intent["arguments"], json!([{ "value": 7 }]));
 }
 
 const MODEL: &str = r#"{
