@@ -4,6 +4,10 @@ All notable changes to MESH are recorded here. The project follows [Semantic Ver
 
 ## [Unreleased]
 
+### Added
+
+- **A screen: `openScreen({ program, model, transitions? })` in `@valancex/mesh-runtime`** (Tier 1; Provisional). The host's lifecycle in one object: `show(snapshot)` gives the first tree, then the patches from the tree drawn; `dispatch(handler, payload?)` dispatches with the render on screen and gives the intent; `close()` (and `[Symbol.dispose]`) releases everything. It keeps the render on screen, releases the one before it once its patches are given, gives each update the right previous render and version, holds the unit occurrences' state, and runs a unit command's transition when it is given one (`{ occurrence, patches }`), leaving out the fields the caller owns. Calls run in order. JavaScript only: a Rust render is a value with nothing to release. `render`, `update`, `updateChanges`, `dispatch` and `release()` are unchanged and are now the Tier 2 path; `docs/manual/runtime.md` leads with the screen. North-star scorecard: **E2** ◐ → ✓ (a Tier 1 author of a Mesh host triggers no lifecycle, update or release step); **T1.3** unchanged for the package README, ✓ for the runtime manual (it leads with the Tier 1 path). No audit regresses.
+
 ## [0.17.0] - 2026-10-24
 
 Prepared, not yet published. Streaming: checking a source while it arrives (direction Bet 13, WP9). No behavior changes for a source that is checked whole: `check`, `compile` and `checkProgram` give what they gave in 0.16.0.

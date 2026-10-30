@@ -10,6 +10,37 @@ host ── program, model, snapshot ──▶ render ──▶ a render ──�
 host ◀── command intent ◀── dispatch ◀── the render, handler identifier, payload
 ```
 
+## Showing a program
+
+A host that draws one program and relays its events needs one object: a **screen** (`openScreen`, in `@valancex/mesh-runtime`). It is the Tier 1 way to host a program. Give it the program and the manifest, then show snapshots and dispatch the events the renderer reports; the screen does the host's duties below (keeping the render on screen, releasing the one before it, holding unit state) so its caller never meets them.
+
+```js
+import { openScreen } from "@valancex/mesh-runtime";
+
+const screen = openScreen({ program: { root: "users", templates }, model: manifest });
+const first = await screen.show(snapshot);
+if (first.diagnostics) throw new Error(first.diagnostics.diagnostics[0].message);
+renderer.draw(first.tree);
+
+// When the renderer reports an event on the tree it drew:
+const result = await screen.dispatch(handler, payload);
+if (result.intent) run(result.intent);             // the application's command
+if (result.patches) renderer.patch(result.patches); // a unit's command, which the screen ran
+
+// Each new snapshot gives the patches from the tree drawn:
+renderer.patch((await screen.show(next)).patches);
+screen.close();
+```
+
+- **`show(snapshot)`** gives `{ tree }` the first time (and after `close()`), then `{ patches }`: the `render-patch-v1` list from the tree it last gave to this snapshot's ([Update](#update)). Or `{ diagnostics }`, and then nothing changes: the tree drawn still dispatches.
+- **`dispatch(handler, payload?)`** dispatches with the render whose tree is on screen and gives `{ intent }`, the command for the host to run, or `{ diagnostics }`. A command of a [unit](#units) whose transition the screen was given is run by the screen instead, and gives `{ occurrence, patches }`: the occurrence it changed, and the patches to draw its new state.
+- **`transitions`** (optional) are the units' commands, by component and command: `{ disclosure: { toggle: (state) => ({ open: !state.open }) } }`. A transition takes the occurrence's state as the person saw it and the command's arguments in order, and returns the fields it changes; a field the caller owns is not applied. A unit command with no transition comes back as its intent. The screen holds the state of the occurrences a transition changed, and lets go of an occurrence's when a render no longer lists it.
+- **`close()`** releases the render on screen and the occurrences' state, and is safe twice; `[Symbol.dispose]` does the same. The screen stays usable: the next `show` gives a tree to draw afresh.
+- **Calls run one at a time, in the order made,** so a `show` not awaited still patches from the one before it. A renderer applies what each call gives before it reports the next event, since the screen dispatches with the render whose patches it last gave.
+- It is for **one program**. A different program is a new screen, and its first tree is drawn afresh.
+
+The screen is JavaScript only: in Rust a render is a value that `update` borrows and dropping it frees it, so there is nothing to release, and a host keeps the `Render` it drew. Everything below is what the screen is made of, for a host that does the duties itself (Tier 2).
+
 ## The operations
 
 - **render:** a program, a model and a snapshot in. Out: a **render**, or diagnostics.
@@ -28,9 +59,9 @@ Each returns either its result and no diagnostics, or diagnostics and no result.
 
 **The snapshot** is one record of scope values for the program's root template: a scope name to each value (§9.8.4). **A payload** is the value an event carries, or absent.
 
-## The host
+## The host by hand (Tier 2)
 
-A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any program. It supplies snapshots, keeps renders, relays events, and receives intents.
+A **host** is whatever calls the runtime: a [screen](#showing-a-program), NEXUS's adapter, a test host, or any program. It supplies snapshots, keeps renders, relays events, and receives intents. A screen does all of this; this section is for a host that calls the operations itself.
 
 **The dispatch lifecycle:**
 1. The host calls render with a program, a model and a snapshot. The result is a render.
@@ -308,6 +339,8 @@ A component whose manifest entry has a [`unit`](./manifest.md#units) has state a
 
 **Raising.** A transition may announce something to the caller (a controlled tab strip tells its caller what the person chose). `raise(render, instance, event, payload)` takes an event the occurrence's component declares and resolves it as an event forwarded out of the component is (§9.9): the result is the intent of the handler the caller bound to it, found through the occurrences around, or nothing when the caller bound none. It renders nothing and changes nothing. An instance not in the render is `runtime-unknown-instance`, an event the component does not declare is `runtime-unknown-event`, and a payload that does not fit the event's is the usual input diagnostics (the key stands where a handler identifier does, location `handler`).
 
+**With a screen,** the host holds none of this: given a unit's `transitions`, a [screen](#showing-a-program) keeps the state of the occurrences, runs a command's transition on the state the person saw, leaves out the fields in `controlled`, renders again and gives the patches, and lets go of an occurrence's state when a render no longer lists it. `raise` is not done for it: a transition that must tell its caller something is a host's own, by hand.
+
 **What does not change.** `render-v1` and the patches are as they were: no renderer needs to know units exist. Units are not persisted by the runtime; state that must outlive a reload is the application's. Changing the program resets them, since keys are not stable across programs.
 
 ## Updates
@@ -346,7 +379,7 @@ A component whose manifest entry has a [`unit`](./manifest.md#units) has state a
 - **The module returns the patches, not the new tree.** The caller already has the previous tree, and applying the patches to it gives the new one (the law above), so what crosses the boundary on an update is what changed. The JavaScript package applies them (`src/patches.ts`) as a renderer would, over immutable data: the new tree is frozen and shares with the previous tree every part the patches didn't reach, so a part that didn't change is the very same object. The package's review test names that file as the one place it reads a tree, and checks that it makes no text and no number.
 - **The module's calls are one at a time,** so retention adds no ordering of its own: a `release` is queued behind the calls already made.
 
-Keeping a render, its version, calling `release()` and holding unit state are Tier 2 host duties: they belong to the code that embeds the runtime. A Tier 1 author never meets them; Valance does them on the author's behalf.
+Keeping a render, its version, calling `release()` and holding unit state are Tier 2 host duties: they belong to the code that embeds the runtime. A Tier 1 author never meets them: a [screen](#showing-a-program) does them, and so does Valance on its author's behalf.
 
 Measured on one machine, a keyed list of 10,000 items with one changed (the least of 15 runs; `cargo test -p mesh-runtime --release --test update_baseline full_render -- --ignored --nocapture` in Rust, `node scripts/bench-update.mjs` in the package):
 

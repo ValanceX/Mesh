@@ -232,7 +232,7 @@ export interface DeclaredEvent {
 }
 
 /**
- * A host's obligations (docs/manual/runtime.md, "The host"). Nothing
+ * A host's obligations (docs/manual/runtime.md, "The host by hand"). Nothing
  * checks that a host implements this; it names what a host must do.
  */
 export interface Host {

@@ -87,6 +87,8 @@ export type {
 export { MeshInternalError, MeshUsageError, MeshVersionError, Render } from "./engine.js";
 export type { MeshUsageCode } from "./engine.js";
 export { diff } from "./changes.js";
+export { openScreen, Screen } from "./screen.js";
+export type { ScreenDispatchResult, ScreenInput, ShowResult, Transition } from "./screen.js";
 export { version } from "./version.js";
 
 /**

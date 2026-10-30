@@ -18,6 +18,11 @@
 // does and carries the host's own values into edits, for the runtime to judge.
 // It is on no path of render, update or dispatch (the engine doesn't import
 // it): the tests below check that, and that it makes no text and no number.
+//
+// A third file reads an intent: `screen.ts`, the Tier 1 host helper. It does
+// what a host does with an intent (finds the unit transition its command names,
+// hands it the arguments) and calls only the package's public operations; the
+// runtime validates the state a transition gives. The engine doesn't import it.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -90,6 +95,8 @@ test("nothing reads the tree or an intent after parsing them", () => {
     { file: "patches.ts", text: "", reason: "applies the runtime's patches to a tree by key, moving parts and reading no value" },
     { file: "changes.ts", text: "", reason: "diff reads two host snapshots (not a tree or an intent) to compute edits; see the file's own test" },
     { file: "engine.ts", text: "this.code = code", reason: "the package's own error stores its own stable code" },
+    { file: "screen.ts", text: "intent.command.component, intent.command.name", reason: "the host helper finds the unit transition an intent's command names, as a host does" },
+    { file: "screen.ts", text: "intent.arguments.map", reason: "the host helper hands a unit transition the intent's arguments, as a host does; it judges none" },
     { file: "engine.ts", text: "result.events", reason: "the result document's envelope key, like `tree` and `intent`: the declared events are returned as the module wrote them" },
   ];
   assert.deepEqual(unexcused(find(pattern), exceptions), []);
@@ -106,6 +113,7 @@ test("nothing names a MESH type", () => {
     { file: "encode.ts", text: "case \"", reason: "the encoder's switch on `typeof`, to write each JavaScript kind's tag" },
     { file: "encode.ts", text: "typeof name === \"string\"", reason: "an unsupported object's constructor name, reported as a fact of its kind" },
     { file: "engine.ts", text: "typeof", reason: "checking the host's arguments are strings (JavaScript hygiene, not MESH validation)" },
+    { file: "screen.ts", text: "typeof input", reason: "checking openScreen's arguments (JavaScript hygiene, not MESH validation)" },
   ];
   assert.deepEqual(unexcused(typeofs, exceptions), []);
 });
@@ -153,6 +161,16 @@ test("diff, the one other file that reads host values, is on no path of render, 
   const engine = files.find(({ name }) => name === "engine.ts").code;
   assert.ok(!/from ["']\.\/changes\.js["']/.test(engine), "engine.ts must not import changes.ts");
   const { code: text } = files.find(({ name }) => name === "changes.ts");
+  assert.deepEqual(
+    text.split("\n").filter((line) => /\bString\(|\bNumber\(|\.toString\(|JSON\.|parseFloat|parseInt|\.toFixed\(|\bIntl\b|isNaN|isFinite|Math\.|\bNaN\b|Infinity|\?\? /.test(line)),
+    [],
+  );
+});
+
+test("the screen, the host helper, is on no path of render, update or dispatch, and makes no text and no number", () => {
+  const engine = files.find(({ name }) => name === "engine.ts").code;
+  assert.ok(!/from ["']\.\/screen\.js["']/.test(engine), "engine.ts must not import screen.ts");
+  const { code: text } = files.find(({ name }) => name === "screen.ts");
   assert.deepEqual(
     text.split("\n").filter((line) => /\bString\(|\bNumber\(|\.toString\(|JSON\.|parseFloat|parseInt|\.toFixed\(|\bIntl\b|isNaN|isFinite|Math\.|\bNaN\b|Infinity|\?\? /.test(line)),
     [],
