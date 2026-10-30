@@ -4,14 +4,17 @@
  * reports into command intents, for the host.
  *
  * ```js
- * import { render, dispatch } from "@valancex/mesh-runtime";
+ * import { openScreen } from "@valancex/mesh-runtime";
  *
- * const result = await render({ program: { root: "users", templates }, model, snapshot });
- * if (result.diagnostics) throw new Error(result.diagnostics.diagnostics[0].message);
- * draw(result.render.tree);
+ * const screen = openScreen({ program: { root: "users", templates }, model });
+ * const first = await screen.show(snapshot);
+ * if (first.diagnostics) throw new Error(first.diagnostics.diagnostics[0].message);
+ * draw(first.tree);
  * // later, when the renderer reports an event on that tree:
- * const { intent } = await dispatch(result.render, handler, payload);
+ * const { intent } = await screen.dispatch(handler, payload);
  * ```
+ *
+ * `render`, `update`, `dispatch` and `release()` are what a screen is made of, for a host that does its duties itself (Tier 2).
  *
  * The runtime runs entirely in WebAssembly: this package encodes values
  * and transports them, and evaluates, converts and judges nothing (I11).
@@ -88,7 +91,7 @@ export { MeshInternalError, MeshUsageError, MeshVersionError, Render } from "./e
 export type { MeshUsageCode } from "./engine.js";
 export { diff } from "./changes.js";
 export { openScreen, Screen } from "./screen.js";
-export type { ScreenDispatchResult, ScreenInput, ShowResult, Transition } from "./screen.js";
+export type { ScreenDispatchResult, ScreenInput, ShowResult, Transition, TransitionResult } from "./screen.js";
 export { version } from "./version.js";
 
 /**

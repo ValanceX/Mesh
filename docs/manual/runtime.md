@@ -24,8 +24,8 @@ renderer.draw(first.tree);
 
 // When the renderer reports an event on the tree it drew:
 const result = await screen.dispatch(handler, payload);
-if (result.intent) run(result.intent);             // the application's command
 if (result.patches) renderer.patch(result.patches); // a unit's command, which the screen ran
+if (result.intent) run(result.intent);             // a command for the application
 
 // Each new snapshot gives the patches from the tree drawn:
 renderer.patch((await screen.show(next)).patches);
@@ -33,10 +33,10 @@ screen.close();
 ```
 
 - **`show(snapshot)`** gives `{ tree }` the first time (and after `close()`), then `{ patches }`: the `render-patch-v1` list from the tree it last gave to this snapshot's ([Update](#update)). Or `{ diagnostics }`, and then nothing changes: the tree drawn still dispatches.
-- **`dispatch(handler, payload?)`** dispatches with the render whose tree is on screen and gives `{ intent }`, the command for the host to run, or `{ diagnostics }`. A command of a [unit](#units) whose transition the screen was given is run by the screen instead, and gives `{ occurrence, patches }`: the occurrence it changed, and the patches to draw its new state.
-- **`transitions`** (optional) are the units' commands, by component and command: `{ disclosure: { toggle: (state) => ({ open: !state.open }) } }`. A transition takes the occurrence's state as the person saw it and the command's arguments in order, and returns the fields it changes; a field the caller owns is not applied. A unit command with no transition comes back as its intent. The screen holds the state of the occurrences a transition changed, and lets go of an occurrence's when a render no longer lists it.
+- **`dispatch(handler, payload?)`** dispatches with the render whose tree or patches the screen gave last (so a renderer applies each result before it reports the next event) and gives `{ intent }`, the command for the host to run, or `{ diagnostics }`. A command of a [unit](#units) whose transition the screen was given is run by the screen instead, and gives `{ occurrence, patches }`: the occurrence it changed, and the patches to draw its new state. It also has an `intent` when there is one for the host: the handler the caller bound to the event the transition raised, or, when the transition changed a field the caller owns and raised nothing, the unit's own intent, so the caller can make the change it owns.
+- **`transitions`** (optional) are the units' commands, by component and command: `{ disclosure: { toggle: (state) => ({ changes: { open: !state.open } }) } }`. A transition takes the occurrence's state as the person saw it and the command's arguments in order, and returns `{ changes?, raise? }`: the fields it changes (a field the caller owns is not applied), and an event of the component with its payload, `raise: ["change", n]`, which the screen [raises](#units) for it. A result of another shape rejects with `MeshUsageError` (`invalid-argument`). A unit command with no transition comes back as its intent. The screen holds the state of the occurrences a transition changed, and lets go of an occurrence's when a render no longer lists it.
 - **`close()`** releases the render on screen and the occurrences' state, and is safe twice; `[Symbol.dispose]` does the same. The screen stays usable: the next `show` gives a tree to draw afresh.
-- **Calls run one at a time, in the order made,** so a `show` not awaited still patches from the one before it. A renderer applies what each call gives before it reports the next event, since the screen dispatches with the render whose patches it last gave.
+- **Calls run one at a time, in the order made,** so a `show` not awaited still patches from the one before it. Every render the screen keeps has its own snapshot, so it carries on after the package replaces its module (a trap); for the same reason, don't change a snapshot's objects after showing it, since a unit's change renders that snapshot again.
 - It is for **one program**. A different program is a new screen, and its first tree is drawn afresh.
 
 The screen is JavaScript only: in Rust a render is a value that `update` borrows and dropping it frees it, so there is nothing to release, and a host keeps the `Render` it drew. Everything below is what the screen is made of, for a host that does the duties itself (Tier 2).
@@ -339,7 +339,7 @@ A component whose manifest entry has a [`unit`](./manifest.md#units) has state a
 
 **Raising.** A transition may announce something to the caller (a controlled tab strip tells its caller what the person chose). `raise(render, instance, event, payload)` takes an event the occurrence's component declares and resolves it as an event forwarded out of the component is (§9.9): the result is the intent of the handler the caller bound to it, found through the occurrences around, or nothing when the caller bound none. It renders nothing and changes nothing. An instance not in the render is `runtime-unknown-instance`, an event the component does not declare is `runtime-unknown-event`, and a payload that does not fit the event's is the usual input diagnostics (the key stands where a handler identifier does, location `handler`).
 
-**With a screen,** the host holds none of this: given a unit's `transitions`, a [screen](#showing-a-program) keeps the state of the occurrences, runs a command's transition on the state the person saw, leaves out the fields in `controlled`, renders again and gives the patches, and lets go of an occurrence's state when a render no longer lists it. `raise` is not done for it: a transition that must tell its caller something is a host's own, by hand.
+**With a screen,** the host holds none of this, and raises nothing by hand: given a unit's `transitions`, a [screen](#showing-a-program) keeps the state of the occurrences, runs a command's transition on the state the person saw, leaves out the fields in `controlled`, raises the event the transition names and gives the intent of the handler the caller bound, renders again and gives the patches, and lets go of an occurrence's state when a render no longer lists it.
 
 **What does not change.** `render-v1` and the patches are as they were: no renderer needs to know units exist. Units are not persisted by the runtime; state that must outlive a reload is the application's. Changing the program resets them, since keys are not stable across programs.
 

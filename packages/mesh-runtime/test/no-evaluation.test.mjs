@@ -96,6 +96,7 @@ test("nothing reads the tree or an intent after parsing them", () => {
     { file: "changes.ts", text: "", reason: "diff reads two host snapshots (not a tree or an intent) to compute edits; see the file's own test" },
     { file: "engine.ts", text: "this.code = code", reason: "the package's own error stores its own stable code" },
     { file: "screen.ts", text: "intent.command.component, intent.command.name", reason: "the host helper finds the unit transition an intent's command names, as a host does" },
+    { file: "screen.ts", text: "the transition of ${intent.command", reason: "the host helper names the command whose transition misbehaved, in its usage error" },
     { file: "screen.ts", text: "intent.arguments.map", reason: "the host helper hands a unit transition the intent's arguments, as a host does; it judges none" },
     { file: "engine.ts", text: "result.events", reason: "the result document's envelope key, like `tree` and `intent`: the declared events are returned as the module wrote them" },
   ];
@@ -114,6 +115,7 @@ test("nothing names a MESH type", () => {
     { file: "encode.ts", text: "typeof name === \"string\"", reason: "an unsupported object's constructor name, reported as a fact of its kind" },
     { file: "engine.ts", text: "typeof", reason: "checking the host's arguments are strings (JavaScript hygiene, not MESH validation)" },
     { file: "screen.ts", text: "typeof input", reason: "checking openScreen's arguments (JavaScript hygiene, not MESH validation)" },
+    { file: "screen.ts", text: "typeof raise[0]", reason: "checking a transition's result has the shape the screen reads (JavaScript hygiene, not MESH validation)" },
   ];
   assert.deepEqual(unexcused(typeofs, exceptions), []);
 });
@@ -136,6 +138,7 @@ test("the only code that walks host values is the encoder", () => {
     { file: "encode.ts", text: "", reason: "the encoder: the one walk of host values (§9.8.6)" },
     { file: "patches.ts", text: "", reason: "applies patches by key: counts a record's entries to drop an empty `propText`, as the runtime's tree has none; reads no value" },
     { file: "changes.ts", text: "", reason: "diff walks host values to compare them, as the encoder does to encode them; the only other place" },
+    { file: "screen.ts", text: "Array.isArray(raise)", reason: "a transition's `raise` is a pair: its shape, checked; the event and payload go to the runtime" },
     { file: "engine.ts", text: "Array.isArray(program.templates)", reason: "the host's template list, checked to be an array" },
     { file: "engine.ts", text: "Array.isArray((value as", reason: "the module's result envelope has a diagnostics array" },
     { file: "engine.ts", text: "Array.isArray(result.instances)", reason: "the module's result envelope has an instances array" },
