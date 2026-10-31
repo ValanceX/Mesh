@@ -1,4 +1,4 @@
-//! Composite children and the slot (docs/manual/templates.md, "Children and
+//! Composite children and the slot (docs/reference/templates.md, "Children and
 //! the slot"): a composite's template places the children of an occurrence
 //! with `mesh-slot`, and they are the *caller's*: evaluated in the scope they
 //! were written in, calling the caller's commands, and named by paths of their

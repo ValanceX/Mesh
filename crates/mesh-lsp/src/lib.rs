@@ -9,7 +9,7 @@
 //!
 //! [`run`] serves one client over any [`lsp_server::Connection`]: the
 //! `mesh-lsp` binary passes stdio, and tests pass an in-memory connection.
-//! See `docs/manual/mesh-lsp.md` for configuring it.
+//! See `docs/reference/mesh-lsp.md` for configuring it.
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 mod config;

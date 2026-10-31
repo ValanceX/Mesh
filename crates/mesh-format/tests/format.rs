@@ -187,7 +187,7 @@ fn a_new_line_in_the_middle_of_text_keeps_the_previous_indentation() {
 
 #[test]
 fn leaves_a_space_between_two_interpolations_alone() {
-    // The space is content (docs/superpowers/specs/2026-10-16-mprx-whitespace-between-interpolations.md, W-7), not formatting.
+    // The space is content (docs/explanation/specs/2026-10-16-mprx-whitespace-between-interpolations.md, W-7), not formatting.
     let source = "<text>{first} {last}</text>\n";
     assert_eq!(fmt(source), source);
     assert_eq!(

@@ -19,14 +19,14 @@ draw(first.tree);
 const { intent, diagnostics } = await screen.dispatch(handler, payload);
 ```
 
-The screen keeps the render on screen, releases the one before it, and holds unit state, so you never call a lifecycle step; each later `show(snapshot)` gives the patches from the tree drawn. Everything else in the API below is Tier 2: for a host that does those duties itself.
+The screen keeps the render on screen, releases the one before it, and holds unit state, so you never call a lifecycle step; each later `show(snapshot)` gives the patches from the tree drawn. Everything else in the API below is for a host that does those duties itself.
 
 Templates come from the compiler: `mesh compile`, or `compile()` in [`@valancex/mesh-compiler`](https://www.npmjs.com/package/@valancex/mesh-compiler). This package has no dependencies, and doesn't include the compiler.
 
 ## The API
 
-- **`openScreen({ program, model, transitions? })`** is the simplest way to host a program: `show(snapshot)` gives the first tree, then patches; `dispatch(handler, payload?)` gives the intent (or, for a unit command it was given a transition for, runs it and gives patches); `close()` releases everything. It keeps, updates and releases renders and holds unit state for you, so the rest of this list is for a host that does that itself. See [Showing a program](https://github.com/ValanceX/Mesh/blob/main/docs/manual/runtime.md#showing-a-program) (Provisional).
-**Tier 2: the operations a screen is made of.**
+- **`openScreen({ program, model, transitions? })`** is the simplest way to host a program: `show(snapshot)` gives the first tree, then patches; `dispatch(handler, payload?)` gives the intent (or, for a unit command it was given a transition for, runs it and gives patches); `close()` releases everything. It keeps, updates and releases renders and holds unit state for you, so the rest of this list is for a host that does that itself. See [Showing a program](https://github.com/ValanceX/Mesh/blob/main/docs/reference/runtime.md#showing-a-program) (Provisional).
+**The operations a screen is made of.**
 
 - **`render({ program, model, snapshot })`** returns a promise of `{ render }` or `{ diagnostics }`. `render.tree` is the render tree ([`schemas/render-v1.schema.json`](https://github.com/ValanceX/Mesh/blob/main/schemas/render-v1.schema.json)), frozen: primitive nodes, final prop values with the MESH text of each number, boolean and `null` prop (`propText`), text and handler identifiers, and nothing to compute: a renderer realizes a prop natively or with that text, and never converts a value itself. `diagnostics` is the runtime diagnostics document ([`schemas/runtime-diagnostics-v1.schema.json`](https://github.com/ValanceX/Mesh/blob/main/schemas/runtime-diagnostics-v1.schema.json)): every problem with the program or the snapshot, each at its location, or the first evaluation error.
 - **`dispatch(render, handler, payload?)`** returns a promise of `{ intent }` or `{ diagnostics }`. The intent names the command and holds its evaluated arguments. It evaluates against the snapshot `render` was made from, never a newer one.
@@ -35,7 +35,7 @@ Templates come from the compiler: `mesh compile`, or `compile()` in [`@valancex/
 - **`diff(previous, next)`** returns the `changes` list that turns one snapshot into the other, for a host that has both and no record of what changed. Numbers compare by their bits (`0` and `-0` differ); an unchanged value gives no edit, a list changed at its ends gives edits at its ends, and a value that isn't a plain record, list or scalar is given whole for the runtime to judge. Nothing the runtime does calls it.
 - **`render.version`** is the `RenderVersion` `updateChanges` takes as `base`; each render has its own. The type is a branded number: take it from `render.version`, don't write one.
 - **`render.release()`** ends the module's copy of a render that `update` or `updateChanges` made (`render` keeps nothing, so releasing its result does nothing). Call it on a render you will no longer update from or dispatch with (typically the previous one, once its patches are applied). It is safe to call twice, a released render still works (its next `update` derives it again), except a render `updateChanges` made, which has no snapshot outside the module (`render-gone`), and a render you never release is released when it is garbage collected, which can be late.
-- **`declaredEvents({ program, model })`** returns a promise of `{ events }` or `{ diagnostics }`. The events are the ones the program's templates declare, each with its declaring `component`, `event`, `command` and source `span`, whether or not a render contains them: those in composites, in inactive `mesh-if` alternatives and in `mesh-each` bodies are there, and nothing is deduplicated. It needs no snapshot, and gives the diagnostics `render` would for an invalid program. See [The declared events](https://github.com/ValanceX/Mesh/blob/main/docs/manual/runtime.md#the-declared-events).
+- **`declaredEvents({ program, model })`** returns a promise of `{ events }` or `{ diagnostics }`. The events are the ones the program's templates declare, each with its declaring `component`, `event`, `command` and source `span`, whether or not a render contains them: those in composites, in inactive `mesh-if` alternatives and in `mesh-each` bodies are there, and nothing is deduplicated. It needs no snapshot, and gives the diagnostics `render` would for an invalid program. See [The declared events](https://github.com/ValanceX/Mesh/blob/main/docs/reference/runtime.md#the-declared-events).
 - **`init(source)`** loads the WebAssembly module from a URL, its bytes, or a `WebAssembly.Module`. Optional: the package loads its own module (the file next to its code) on the first call, in Node and in a browser. Call `init` to load another copy or to give the URL yourself, for example of `@valancex/mesh-runtime/mesh-runtime.wasm` as a bundler resolves it; a Vite 5 to 7 development server may need `@valancex/mesh-runtime` excluded from dependency optimization (`optimizeDeps.exclude`) for the automatic path to find its file.
 - **`version`** is the package's version, which is also its module's.
 
@@ -65,9 +65,9 @@ Match on `code`, never on `message`. Codes are stable: never renamed, never reus
 
 ## Guides
 
-- [Integrating MESH with NEXUS](https://github.com/ValanceX/Mesh/blob/main/docs/guides/integrating-mesh-with-nexus.md): a host, end to end.
-- [Rendering MESH output](https://github.com/ValanceX/Mesh/blob/main/docs/guides/rendering-mesh-output.md): a renderer, end to end.
-- [The runtime manual](https://github.com/ValanceX/Mesh/blob/main/docs/manual/runtime.md): the whole contract.
+- [Integrating MESH with NEXUS](https://github.com/ValanceX/Mesh/blob/main/docs/how-to/integrating-mesh-with-nexus.md): a host, end to end.
+- [Rendering MESH output](https://github.com/ValanceX/Mesh/blob/main/docs/how-to/rendering-mesh-output.md): a renderer, end to end.
+- [The runtime manual](https://github.com/ValanceX/Mesh/blob/main/docs/reference/runtime.md): the whole contract.
 
 ## Support
 

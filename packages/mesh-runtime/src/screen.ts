@@ -1,5 +1,5 @@
 /**
- * The screen: the Tier 1 way to host a program. It does the host's duties (docs/manual/runtime.md, "The host by hand"), so
+ * The screen: the simplest way to host a program. It does the host's duties (docs/reference/runtime.md, "The host by hand"), so
  * the code that uses it only shows snapshots and dispatches the events its renderer reports: it keeps the render
  * whose tree is on screen, releases the one before it once its patches are handed over, gives an update the right
  * previous render and version, holds the state of the unit occurrences, and runs a unit's command on that state.

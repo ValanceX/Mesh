@@ -231,7 +231,7 @@ impl DiagnosticCode {
     pub const MISSING_REPEAT_KEY: DiagnosticCode = DiagnosticCode("missing-repeat-key");
 
     /// Every code MESH can emit, in catalogue order. The diagnostics
-    /// reference (`docs/manual/diagnostics.md`) documents each one, and a
+    /// reference (`docs/reference/diagnostics.md`) documents each one, and a
     /// test keeps the two in step.
     pub const ALL: &'static [DiagnosticCode] = &[
         DiagnosticCode::SYNTAX_ERROR,
@@ -407,7 +407,7 @@ pub struct Text {
 /// so the AST stays a lossless representation of what was written. Always
 /// unsigned as of Pass 3a — a negative numeric literal like `-3.5` lowers
 /// to a [`UnaryExpression`] (`Negate`) wrapping this, not a signed token;
-/// see `docs/MPRX-SPEC.md` §2.
+/// see `docs/reference/mprx-spec.md` §2.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumberLiteral {
     pub value: String,
@@ -472,7 +472,7 @@ pub struct UnaryExpression {
 }
 
 /// An infix operator applicable to a [`BinaryExpression`], covering
-/// `docs/MPRX-SPEC.md` §5's multiplicative, additive, relational,
+/// `docs/reference/mprx-spec.md` §5's multiplicative, additive, relational,
 /// equality, and logical operator tiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
@@ -542,7 +542,7 @@ pub struct ObjectMember {
 /// An object literal expression, e.g. `{{ name: user.name, active: true }}`
 /// — doubled braces, since the outer pair is the `{...}` expression-block
 /// wrapper and the inner pair is the object literal itself; see
-/// `docs/MPRX-SPEC.md` §5.
+/// `docs/reference/mprx-spec.md` §5.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjectExpression {
     pub members: Vec<ObjectMember>,
@@ -550,7 +550,7 @@ pub struct ObjectExpression {
 }
 
 /// A command invocation, representing intent rather than execution — see
-/// `docs/MPRX-SPEC.md` §6. e.g. `selectUser($event)`.
+/// `docs/reference/mprx-spec.md` §6. e.g. `selectUser($event)`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandInvocation {
     pub command: String,
@@ -563,7 +563,7 @@ pub struct CommandInvocation {
 /// A `$`-prefixed special value, e.g. `$event`. The lexical rule is
 /// general (`'$' identifier`), and parsing accepts any name; `$event` is
 /// the only one with a meaning, and checking against a component model
-/// reports any other as `unknown-special-value`. See `docs/MPRX-SPEC.md`
+/// reports any other as `unknown-special-value`. See `docs/reference/mprx-spec.md`
 /// §2, §5 and §9.5.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventValue {

@@ -1,5 +1,5 @@
 //! What render and dispatch produce: the render tree (`render-v1`) and
-//! the command intent (docs/manual/runtime.md).
+//! the command intent (docs/reference/runtime.md).
 //!
 //! Values in them are in the boundary data model (§9.8.1), as
 //! `serde_json::Value`s: `null`, booleans, finite numbers (never `-0`),
@@ -41,7 +41,7 @@ pub struct Node {
     pub(crate) memo: Memo,
 }
 
-/// What a node was computed from (docs/manual/runtime.md, "Update"): the
+/// What a node was computed from (docs/reference/runtime.md, "Update"): the
 /// values, in the scope the node was rendered in, of the names its subtree
 /// reads from outside it, of the names its own props read, and, for each
 /// text run under it, the values its text was computed from and the text.
@@ -164,7 +164,7 @@ pub struct Intent {
     )]
     pub instance: Option<String>,
     /// For a command of a unit: the fields of the occurrence the caller owned when the event was
-    /// dispatched, whose change the host must not apply (docs/manual/runtime.md, "Units").
+    /// dispatched, whose change the host must not apply (docs/reference/runtime.md, "Units").
     pub controlled: Vec<String>,
 }
 
@@ -175,7 +175,7 @@ impl Intent {
         self.instance.as_deref()
     }
 
-    /// The intent in docs/manual/runtime.md's form (`$defs/intent`).
+    /// The intent in docs/reference/runtime.md's form (`$defs/intent`).
     pub fn to_json(&self) -> String {
         let mut intent = json!({
             "command": { "component": self.component, "name": self.command },
@@ -209,7 +209,7 @@ pub struct NamedIntent {
 }
 
 impl NamedIntent {
-    /// The intent in docs/manual/runtime.md's form (`$defs/intent`), each argument written as a path
+    /// The intent in docs/reference/runtime.md's form (`$defs/intent`), each argument written as a path
     /// with its `name`: what the WebAssembly module gives JavaScript.
     pub fn to_json(&self) -> String {
         let mut intent: Value =

@@ -388,7 +388,7 @@ fn rejects_an_unknown_format() {
 /// it shows, and its indented copy is the same document.
 #[test]
 fn the_cli_manuals_json_example_is_what_mesh_prints() {
-    let manual = std::fs::read_to_string("../../docs/manual/mesh-cli.md")
+    let manual = std::fs::read_to_string("../../docs/reference/mesh-cli.md")
         .expect("should read the CLI manual");
     let mut lines = manual.lines();
     let command = lines

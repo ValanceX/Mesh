@@ -1,4 +1,4 @@
-//! Changes (docs/manual/runtime.md, "Changes"): `update_changes` applies edits
+//! Changes (docs/reference/runtime.md, "Changes"): `update_changes` applies edits
 //! to a render's snapshot instead of taking a whole new one. The law is the
 //! update's: the render it makes is the render of the snapshot the edits
 //! make. Also: every kind of invalid change fails closed, with nothing done;

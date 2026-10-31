@@ -1,6 +1,6 @@
 // The differential number-to-text test against V8 (Pass 3 Decision 13a;
 // outline D8). Compatibility and regression evidence, NOT the normative
-// proof: the normative table (`docs/tables/number-to-text.tsv`) is that,
+// proof: the normative table (`docs/reference/tables/number-to-text.tsv`) is that,
 // and V8 is never the authority for MESH's output. ECMA-262 leaves the
 // last digit open, so a conforming engine may legitimately differ.
 //

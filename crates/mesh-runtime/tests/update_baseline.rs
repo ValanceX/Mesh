@@ -1,4 +1,4 @@
-//! The baseline for update's refinements (docs/superpowers/specs/
+//! The baseline for update's refinements (docs/explanation/specs/
 //! 2026-10-06-mesh-fine-grained-reactivity-and-composition.md, A6): what a
 //! full render costs when one item of a large keyed list changes. Run with
 //! `cargo test -p mesh-runtime --release --test update_baseline -- --ignored --nocapture`.

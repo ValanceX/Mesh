@@ -1,4 +1,4 @@
-//! A chain of branches, `{#if} … {:else if} … {:else} … {/if}` (docs/manual/templates.md, "Blocks"): the compiler writes it as the conditionals it stands for, so the runtime has
+//! A chain of branches, `{#if} … {:else if} … {:else} … {/if}` (docs/reference/templates.md, "Blocks"): the compiler writes it as the conditionals it stands for, so the runtime has
 //! nothing new to do and these tests pin what a program written with one means: the first case whose `when` holds is rendered, else the default, else nothing; each case is its own site;
 //! and `update` between cases gives the tree a fresh render gives.
 

@@ -21,7 +21,7 @@ const packages = {
  * and returns its output and the ```text block that follows it.
  */
 function run(name) {
-  const guide = readFileSync(join(root, "docs", "guides", name), "utf8");
+  const guide = readFileSync(join(root, "docs", "how-to", name), "utf8");
   const parts = guide.split("```js\n");
   assert.equal(parts.length, 2, `${name} has exactly one js block`);
   let [example, rest] = parts[1].split("\n```\n");

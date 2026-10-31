@@ -1,4 +1,4 @@
-//! The runtime diagnostics document (docs/manual/runtime.md,
+//! The runtime diagnostics document (docs/reference/runtime.md,
 //! "Diagnostics"): its codes, each with one location form, and the
 //! document they render to.
 
@@ -26,7 +26,7 @@ fn validator() -> jsonschema::Validator {
 /// the one location form the diagnostics reference gives it.
 #[test]
 fn the_codes_are_pass_0s_each_with_its_manuals_form() {
-    let reference = read("docs/manual/diagnostics.md");
+    let reference = read("docs/reference/diagnostics.md");
     let mut documented = Vec::new();
     for section in reference.split("\n### `").skip(1) {
         let code = section.split('`').next().unwrap().to_string();

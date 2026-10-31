@@ -1,6 +1,6 @@
 # Design north star (locked)
 
-This repo is part of the ValanceX ecosystem (Valance, Nexus, Mesh, Port). Every public API here is held to one design north star: **progressive disclosure**. Canonical text: `docs/DESIGN_NORTH_STAR.md` in the Valance repo (https://github.com/ValanceX/Valance). Read it before adding or changing a public API, and name the tier of the change.
+This repo is part of the ValanceX ecosystem (Valance, Nexus, Mesh, Port). Every public API here is held to one design north star: **progressive disclosure**. Canonical text: `docs/explanation/design-north-star.md` in the Valance repo (https://github.com/ValanceX/Valance). Read it before adding or changing a public API, and name the tier of the change.
 
 **Principles**
 1. Minimize *extraneous* cognitive load (boilerplate, manual loops, config mechanics) so authors spend effort on their domain.
@@ -20,5 +20,5 @@ This repo is part of the ValanceX ecosystem (Valance, Nexus, Mesh, Port). Every 
 **Working rules**
 - A change that cannot be placed in a tier, or that matches an anti-pattern, is a finding for the owner: report it, do not ship it quietly.
 - If this and another document disagree, record the disagreement; do not resolve it silently.
-- Score a public-API change with the Valance `docs/NORTH_STAR_SCORECARD.md` (0 to 100, 19 audits): no touched audit may regress, no new Fail ships, and the change states the audits touched with before and after. The current baseline is Valance `docs/north-star-validation-2026-10-19.md`.
-- Related: the API Design Principles v1.0 (Mesh `docs/standards/api-design-principles.md`) are the detailed rules.
+- Score a public-API change with the Valance `docs/explanation/north-star-scorecard.md` (0 to 100, 19 audits): no touched audit may regress, no new Fail ships, and the change states the audits touched with before and after. The current baseline is Valance `docs/explanation/north-star-validation-2026-10-19.md`.
+- Related: the API Design Principles v1.0 (Mesh `docs/explanation/api-design-principles.md`) are the detailed rules.

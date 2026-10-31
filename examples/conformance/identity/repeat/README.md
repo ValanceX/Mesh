@@ -35,4 +35,4 @@ Like those, they are **render-v1 and nothing else**. They contain no MPRX, and n
 
 ## What these do not decide
 
-The syntax for a repeat and for declaring a key; how an identity is encoded into a key (the runtime's `s:`/`n:` is an implementation detail, not this contract); nested repeats; how a renderer reconciles; how hydration transports identity; and how dispatch recovers an item's scope, beyond the requirement that it come from the program and the snapshot. See [§9.10.12](../../../../docs/MPRX-SPEC.md).
+The syntax for a repeat and for declaring a key; how an identity is encoded into a key (the runtime's `s:`/`n:` is an implementation detail, not this contract); nested repeats; how a renderer reconciles; how hydration transports identity; and how dispatch recovers an item's scope, beyond the requirement that it come from the program and the snapshot. See [§9.10.12](../../../../docs/reference/mprx-spec.md).

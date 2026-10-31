@@ -154,5 +154,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          notes="docs/releases/v$(echo "$version" | cut -d. -f1,2).md"
+          notes="docs/reference/releases/v$(echo "$version" | cut -d. -f1,2).md"
           gh release create "$GITHUB_REF_NAME" --title "MESH $GITHUB_REF_NAME" --notes-file "$notes" --verify-tag out/*

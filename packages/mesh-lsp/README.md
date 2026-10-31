@@ -21,7 +21,7 @@ The Linux binaries are static, so they run on any distribution. Everything the s
 
 Elsewhere, build the server from source: `cargo install --path crates/mesh-lsp` in a clone of the repository.
 
-To set up your editor, see the [editor setup guide](https://github.com/ValanceX/Mesh/blob/main/docs/guides/editor-setup.md).
+To set up your editor, see the [editor setup guide](https://github.com/ValanceX/Mesh/blob/main/docs/how-to/editor-setup.md).
 
 ## License
 

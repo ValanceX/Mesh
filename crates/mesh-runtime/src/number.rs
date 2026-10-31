@@ -33,7 +33,7 @@
 //! That is §9.7.7.1's step 3: the shortest digit string that reads back,
 //! the nearest one if there are several, the even one if two are equally
 //! near. The layout is ECMA-262's. The normative table
-//! (`docs/tables/number-to-text.tsv`) is what proves it; this is why it
+//! (`docs/reference/tables/number-to-text.tsv`) is what proves it; this is why it
 //! should pass it.
 
 use std::cmp::Ordering;

@@ -1,4 +1,4 @@
-//! The MESH template format, `template-v1` and `template-v2` (docs/manual/templates.md).
+//! The MESH template format, `template-v1` and `template-v2` (docs/reference/templates.md).
 //!
 //! A **template** is one component's MPRX, checked clean against a
 //! component model and compiled: every name resolved to the declaration

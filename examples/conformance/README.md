@@ -83,13 +83,13 @@ This program has **its own `components.json`** and is a `template-v2` program. `
 
 This program has **its own `components.json`** and is a `template-v2` program. A local snippet is declared among the children of `page`, and then is the whole value of an attribute of an occurrence in them: `row={fmt}` to a `data-list` (the same `fmt` to two of them, at two positions), `row={note}` through `shell`, which passes it on again as `row={row}`; a local snippet declared inside a repeat's item and reading the item, given to `panel` as its optional `header`; `panel`'s optional `header` and optional `children` left out, which draw nothing (`panel` renders each only inside `{#if has(…)}`). The snippet is rendered in the scope it was declared in, not the holder's: the item and the title it reads are the declaring template's. Steps reorder the list, drop a flag and empty it; `cases.json` pins the keys (the same snippet passed twice makes two nodes; a row keeps its key when its item moves).
 
-## `units/`: a component's state for one occurrence (docs/manual/runtime.md, "Units")
+## `units/`: a component's state for one occurrence (docs/reference/runtime.md, "Units")
 
 This program has its own `components.json`: `disclosure` has a unit (`open`, and `toggle`), `tabs` has one whose field `at` is `controllable`, and the page writes `at={tab}` on its tabs. `steps.json` is a list of `{ case, snapshot, units }`; `units` is `[ { occurrence, state } ]`, the state a host holds for the occurrences it has changed, by the key the render gave each (`step-N.expected.occurrences.json` lists the occurrences a render has, with the keys). Each step has a committed tree (`step-N.expected.tree.json`) and a committed list of occurrences (`step-N.expected.occurrences.json`), and updating from a step to the next, with the next's `units`, gives exactly the render of the next.
 
 What the steps pin: with no state held an occurrence has the defaults; the state held for an occurrence is what its template sees and only its; a re-sorted list keeps the state with the row (the occurrence's key is its place by the item's declared key, not its position); a row that leaves is not listed and the state held for it is not used; and a `controllable` field the caller writes a prop for is the caller's value whatever the host holds.
 
-## `context/`: the context channel (docs/manual/runtime.md, "Context"; spec §9.11)
+## `context/`: the context channel (docs/reference/runtime.md, "Context"; spec §9.11)
 
 This program has its own `components.json`, whose top-level `context` declares `theme` (an enum) and `user` (an optional string). `page`, the root, `uses` `theme`; `badge` uses both; `frame` uses neither, and is given a snippet and content that `page` declared, which read `theme`. `steps.json` is a list of `{ case, snapshot, context, changes }`: each step renders its committed tree (`step-N.expected.tree.json`) with its `snapshot` and `context`, and from the step before, an update by its `changes` (a path into the context starts `{ "context": name }`) and an update with the whole snapshot and context are both the render of the step. The steps change the theme, give the optional user, change the snapshot alone (the context is kept), and change both at once.
 
@@ -103,4 +103,4 @@ Recorded sessions: the inputs a host gave the runtime and the hashes of the tree
 
 ## `generated/`: checking a source while it arrives (decisions G1 to G14)
 
-Six pages, eight planted mistakes and the digests of every prefix's step, for the stream session (`docs/manual/streaming.md`). It has its own `components.json`. See [`generated/README.md`](./generated/README.md).
+Six pages, eight planted mistakes and the digests of every prefix's step, for the stream session (`docs/reference/streaming.md`). It has its own `components.json`. See [`generated/README.md`](./generated/README.md).

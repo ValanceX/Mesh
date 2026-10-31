@@ -1,4 +1,4 @@
-//! The MESH runtime (docs/manual/runtime.md): MPRX's one evaluator.
+//! The MESH runtime (docs/reference/runtime.md): MPRX's one evaluator.
 //!
 //! It renders a **program** of templates (`mesh-template`) against a
 //! host's **snapshot**, producing a render tree for a renderer to draw,

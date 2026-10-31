@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/runtime-diagnostics-v1.schema.json",
   "title": "MESH runtime diagnostics, version 1",
-  "description": "What the MESH runtime's render and dispatch return instead of a result, and what `mesh check-program` prints (see docs/manual/runtime.md): every diagnostic of one call, in the order MESH reports them. A diagnostic's identity is its `code` and its `location`; `message` may change between versions. This schema lists exactly the properties this MESH produces. A later MESH may add properties without changing `version`, so consumers should ignore properties they don't know.",
+  "description": "What the MESH runtime's render and dispatch return instead of a result, and what `mesh check-program` prints (see docs/reference/runtime.md): every diagnostic of one call, in the order MESH reports them. A diagnostic's identity is its `code` and its `location`; `message` may change between versions. This schema lists exactly the properties this MESH produces. A later MESH may add properties without changing `version`, so consumers should ignore properties they don't know.",
   "type": "object",
   "properties": {
     "version": {

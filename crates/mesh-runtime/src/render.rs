@@ -1,4 +1,4 @@
-//! Render (docs/manual/runtime.md): a program, a model and a snapshot in;
+//! Render (docs/reference/runtime.md): a program, a model and a snapshot in;
 //! a render out, or diagnostics.
 
 use crate::boundary::{output, Inputs};
@@ -23,7 +23,7 @@ use std::rc::Rc;
 /// A composite occurrence's scope, and the occurrence as a unit when its component has one.
 pub(crate) type Bound = (BTreeMap<String, Value>, Option<Rc<Occurrence>>);
 
-/// A unit occurrence a render met (docs/manual/runtime.md, "Units"): where it is, whose unit it is,
+/// A unit occurrence a render met (docs/reference/runtime.md, "Units"): where it is, whose unit it is,
 /// and the state it was rendered with. A host keeps the state of the occurrences it has changed, and
 /// lets go of those a later render no longer lists.
 #[derive(Debug, Clone, PartialEq)]
@@ -61,7 +61,7 @@ pub struct Render {
     /// The units this render was given, so that dispatch evaluates against exactly the state the
     /// person saw, and an update without new ones keeps these.
     pub(crate) units: Rc<Units>,
-    /// The context values this render was given, validated (docs/manual/runtime.md, "Context"): for
+    /// The context values this render was given, validated (docs/reference/runtime.md, "Context"): for
     /// dispatch, and for an update that gives none, which keeps these.
     pub(crate) context: Rc<BTreeMap<String, Value>>,
     /// The unit occurrences in the tree, in the order they were met.
@@ -140,7 +140,7 @@ impl Render {
         self.occurrences_to_json()
     }
 
-    /// The context values this render was made with (docs/manual/runtime.md, "Context"), as a JSON
+    /// The context values this render was made with (docs/reference/runtime.md, "Context"), as a JSON
     /// object of each name that has a value: what an update by changes that edited them made, for a
     /// host that keeps a render's inputs itself. `{}` when the manifest declares no context.
     pub fn context_to_json(&self) -> String {
@@ -246,7 +246,7 @@ pub fn render(
     render_units(program, model, snapshot, &Units::default())
 }
 
-/// [`render`], with the state of the unit occurrences the host holds (docs/manual/runtime.md,
+/// [`render`], with the state of the unit occurrences the host holds (docs/reference/runtime.md,
 /// "Units"). An occurrence with no entry in `units` has its unit's defaults.
 pub fn render_units(
     program: &Program<'_>,
@@ -257,7 +257,7 @@ pub fn render_units(
     render_context(program, model, snapshot, units, &HostRecord::default())
 }
 
-/// [`render_units`], with the values of the manifest's context channel (docs/manual/runtime.md,
+/// [`render_units`], with the values of the manifest's context channel (docs/reference/runtime.md,
 /// "Context"): a record of each context name's value, validated against its declared type as a
 /// snapshot's scope names are (a name of an optional type may be left out; a name the manifest
 /// doesn't declare is ignored). A component reads only the names its `uses` lists.
@@ -388,7 +388,7 @@ pub fn update_with_context(
 }
 
 /// Updates `previous` by `changes` to its snapshot, not a whole new one
-/// (docs/manual/runtime.md, "Changes"): the same result as an update to the
+/// (docs/reference/runtime.md, "Changes"): the same result as an update to the
 /// snapshot the changes make, at the cost of the changes and what depends on
 /// them. The new snapshot is the previous render's values with the changes
 /// applied, sharing what they don't touch, and only the values the changes give
@@ -801,7 +801,7 @@ pub(crate) fn validated_inputs(
     Ok((scope, context))
 }
 
-/// The context values (docs/manual/runtime.md, "Context"): each name the manifest's `context`
+/// The context values (docs/reference/runtime.md, "Context"): each name the manifest's `context`
 /// declares, checked against its type as a snapshot's scope name is; names it doesn't declare are
 /// never looked at.
 pub(crate) fn context_values(
@@ -986,7 +986,7 @@ pub(crate) fn render_children(element: &Element) -> Vec<RenderChild<'_>> {
     children
 }
 
-/// The scope of the template of a composite occurrence (docs/manual/
+/// The scope of the template of a composite occurrence (docs/reference/
 /// templates.md, "Binding a composite's scope"): each written prop,
 /// evaluated in the enclosing template and checked against its declared
 /// type; each scope name bound to its prop's value, else the prop's `default`, else absent.

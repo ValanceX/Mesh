@@ -1,5 +1,5 @@
 /**
- * `diff`: the changes from one snapshot to the next (docs/manual/runtime.md,
+ * `diff`: the changes from one snapshot to the next (docs/reference/runtime.md,
  * "Changes"), computed by the host from the two snapshots it has, never from
  * what its code meant to change. A command that mutates the wrong thing, or
  * two things, or nothing, still leaves a previous and a next state, and the

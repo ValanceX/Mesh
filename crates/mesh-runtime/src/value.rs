@@ -41,7 +41,7 @@ pub enum HostKey {
     Utf16(Vec<u16>),
 }
 
-/// The state of the unit occurrences a host holds (docs/manual/runtime.md, "Units"): for each
+/// The state of the unit occurrences a host holds (docs/reference/runtime.md, "Units"): for each
 /// occurrence, by the key the render gave it, a record of the fields of its unit it has changed
 /// from the defaults. An occurrence with no entry has the manifest's defaults; an entry for an
 /// occurrence the render does not contain is ignored.

@@ -72,7 +72,7 @@ fn decode_units(bytes: &[u8]) -> Result<Units, Refusal> {
     Ok(Units(units))
 }
 
-/// The context values the host gives, encoded as a record (docs/manual/runtime.md, "Context"):
+/// The context values the host gives, encoded as a record (docs/reference/runtime.md, "Context"):
 /// `None` when `bytes` is empty, which a render reads as no values and an update as the previous
 /// render's.
 fn decode_context(bytes: &[u8]) -> Result<Option<HostRecord>, Refusal> {

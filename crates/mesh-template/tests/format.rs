@@ -1,4 +1,4 @@
-//! Reading and writing `template-v1` and `template-v2` (docs/manual/templates.md, "The
+//! Reading and writing `template-v1` and `template-v2` (docs/reference/templates.md, "The
 //! format"): what reads, what is refused and why, and that what is
 //! written reads back as the same template and matches the schema.
 

@@ -1,4 +1,4 @@
-//! The context channel (docs/manual/runtime.md, "Context"): values a host gives beside the snapshot, read only by
+//! The context channel (docs/reference/runtime.md, "Context"): values a host gives beside the snapshot, read only by
 //! the components whose manifest entry `uses` them. The conformance vectors (`examples/conformance/context/`) pin
 //! the trees; these pin the rest: what an update keeps, the paths a change may take, and that the older entry
 //! points are the same operations with no context.

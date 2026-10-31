@@ -83,7 +83,7 @@ module.exports = grammar({
       alias($._nested_element, $.element),
     ),
 
-    // Control flow is syntax, not elements (docs/MPRX-SPEC.md, "Blocks").
+    // Control flow is syntax, not elements (docs/reference/mprx-spec.md, "Blocks").
     if_block: $ => seq(
       field('keyword', $.if_open),
       field('condition', $.expression),

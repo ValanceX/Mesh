@@ -1,4 +1,4 @@
-//! Dispatch (docs/manual/runtime.md, "The dispatch lifecycle"): a render,
+//! Dispatch (docs/reference/runtime.md, "The dispatch lifecycle"): a render,
 //! a handler identifier and a payload in; a command intent out, or
 //! diagnostics.
 
@@ -676,7 +676,7 @@ pub fn raise_named(
 
 /// Raises the event `event` of the unit occurrence `occurrence`, carrying `payload` (absent when
 /// `None`), against the render the host holds: what the occurrence's unit announces to its caller
-/// (docs/manual/runtime.md, "Units"). The result is the intent of the handler the caller bound to
+/// (docs/reference/runtime.md, "Units"). The result is the intent of the handler the caller bound to
 /// the event, found as a handler is when the event is forwarded out through occurrences; `None` when
 /// the caller bound none. Nothing is rendered.
 ///

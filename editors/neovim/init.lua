@@ -1,6 +1,6 @@
 -- MESH in Neovim 0.11 or later: the mesh-lsp language server, and MPRX
 -- highlighting from the grammar's Tree-sitter queries.
--- See docs/guides/editor-setup.md.
+-- See docs/how-to/editor-setup.md.
 
 -- `.mprx` files are MPRX. Neovim sends the filetype as the `languageId`,
 -- and mesh-lsp checks only documents whose `languageId` is `mprx`.
