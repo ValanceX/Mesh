@@ -1,5 +1,5 @@
 // A reference applier for the changes `diff` makes and `updateChanges` takes,
-// over plain data: what the edits mean (docs/manual/runtime.md, "Changes"),
+// over plain data: what the edits mean (docs/reference/runtime.md, "Changes"),
 // for tests that check the two agree. It is the specification in code, not the
 // runtime's implementation, which is Rust.
 

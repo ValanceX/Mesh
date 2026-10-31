@@ -212,7 +212,7 @@ fn parses_a_string_literal_expression_attribute() {
 
 #[test]
 fn parses_a_negated_number_literal_expression_attribute() {
-    // Pass 3a: number tokens are always unsigned (docs/MPRX-SPEC.md §2) —
+    // Pass 3a: number tokens are always unsigned (docs/reference/mprx-spec.md §2) —
     // a leading `-` is unary negation, not part of the literal. This test
     // replaces Pass 2's `parses_a_negative_decimal_number_literal_expression_attribute`,
     // whose old assertion (a bare `Literal::Number("-3.5")`) no longer holds.
@@ -238,7 +238,7 @@ fn parses_a_negated_number_literal_expression_attribute() {
 fn preserves_whitespace_only_text_children() {
     // Pins AST-level behavior: the AST retains whitespace-only text
     // children verbatim (unlike the IR, which omits them — see
-    // mesh-semantic's lower tests and docs/MPRX-SPEC.md §3).
+    // mesh-semantic's lower tests and docs/reference/mprx-spec.md §3).
     let element = mesh_parser::parse("<title>\n  {user}\n</title>")
         .ast
         .expect("should parse");
@@ -647,7 +647,7 @@ fn parses_an_object_expression_with_a_trailing_comma_attribute() {
 
 #[test]
 fn rejects_a_single_brace_object_literal() {
-    // Proves the doubled-brace requirement (docs/MPRX-SPEC.md §5) is
+    // Proves the doubled-brace requirement (docs/reference/mprx-spec.md §5) is
     // actually enforced, not just documented: `data={{ ... }}` is valid,
     // but the single-brace form below is not — `key` parses as a bare
     // reference, then `:` has no valid continuation without a preceding
@@ -711,7 +711,7 @@ fn parses_a_command_invocation_with_multiple_arguments_attribute() {
 
 #[test]
 fn rejects_a_command_invocation_with_a_trailing_comma() {
-    // docs/MPRX-SPEC.md §5 deliberately gives `command_invocation` no
+    // docs/reference/mprx-spec.md §5 deliberately gives `command_invocation` no
     // `','?` even though array/object expressions have one. Guard the
     // asymmetry so it can't be "fixed" for consistency.
     let result = mesh_parser::parse(r#"<page action={selectUser(a,)} />"#);

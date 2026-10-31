@@ -14,7 +14,7 @@
  * const { intent } = await screen.dispatch(handler, payload);
  * ```
  *
- * `render`, `update`, `dispatch` and `release()` are what a screen is made of, for a host that does its duties itself (Tier 2).
+ * `render`, `update`, `dispatch` and `release()` are what a screen is made of, for a host that does its duties itself.
  *
  * The runtime runs entirely in WebAssembly: this package encodes values
  * and transports them, and evaluates, converts and judges nothing (I11).
@@ -214,7 +214,7 @@ export function dispatch(render: Render, handler: string, payload?: unknown): Pr
 
 /**
  * Raises an event of a unit occurrence, which a unit's transition does to tell its caller
- * something (docs/manual/runtime.md, "Units"): `occurrence` is a key from `render.occurrences`,
+ * something (docs/reference/runtime.md, "Units"): `occurrence` is a key from `render.occurrences`,
  * `event` one the occurrence's component declares, and `payload` what it carries. Returns
  * `{ intent }`, the intent of the handler the caller bound to the event (found as an event
  * forwarded out of a component is), `{ intent: undefined }` when the caller bound none, or

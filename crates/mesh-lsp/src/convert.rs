@@ -12,7 +12,7 @@ use std::str::FromStr;
 
 /// Where each code's entry in the diagnostics reference is. GitHub makes
 /// each `` ### `code` `` heading an anchor named after the code.
-const REFERENCE: &str = "https://github.com/ValanceX/Mesh/blob/main/docs/manual/diagnostics.md";
+const REFERENCE: &str = "https://github.com/ValanceX/Mesh/blob/main/docs/reference/diagnostics.md";
 
 /// A source text and its map, with the column unit the session
 /// negotiated: everything needed to turn a byte offset into an LSP

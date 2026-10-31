@@ -125,7 +125,7 @@ export interface CommandIntent {
 }
 
 /**
- * One occurrence of a component with a unit (docs/manual/runtime.md, "Units") in a render's tree.
+ * One occurrence of a component with a unit (docs/reference/runtime.md, "Units") in a render's tree.
  * The host keeps the state of the occurrences it has changed and lets go of those a later render
  * does not list.
  */
@@ -231,7 +231,7 @@ export interface SourceOffset {
 }
 
 /**
- * One event binding that a program's templates declare (docs/manual/runtime.md,
+ * One event binding that a program's templates declare (docs/reference/runtime.md,
  * "The declared events"): a fact about the validated program, whether or not any
  * render currently contains it.
  */
@@ -247,7 +247,7 @@ export interface DeclaredEvent {
 }
 
 /**
- * A host's obligations (docs/manual/runtime.md, "The host by hand"). Nothing
+ * A host's obligations (docs/reference/runtime.md, "The host by hand"). Nothing
  * checks that a host implements this; it names what a host must do.
  */
 export interface Host {

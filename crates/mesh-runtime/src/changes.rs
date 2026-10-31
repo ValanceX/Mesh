@@ -1,4 +1,4 @@
-//! Changes (docs/manual/runtime.md, "Changes"): an update from a render and
+//! Changes (docs/reference/runtime.md, "Changes"): an update from a render and
 //! the changes to its snapshot, not a whole new snapshot.
 //!
 //! The changes are an ordered list of edits at paths into the snapshot, or into

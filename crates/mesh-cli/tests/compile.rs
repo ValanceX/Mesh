@@ -234,7 +234,7 @@ fn a_broken_manifest_is_reported_as_check_reports_it() {
 /// from the `compiler` version, which changes with every release.
 #[test]
 fn the_cli_manuals_compile_example_is_what_mesh_prints() {
-    let manual = fs::read_to_string(examples().join("../docs/manual/mesh-cli.md")).unwrap();
+    let manual = fs::read_to_string(examples().join("../docs/reference/mesh-cli.md")).unwrap();
     let mut lines = manual.lines();
     let command = lines
         .find_map(|line| line.strip_prefix("$ mesh compile "))

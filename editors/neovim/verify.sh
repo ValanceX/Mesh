@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks docs/guides/editor-setup.md's Neovim configuration in a real
+# Checks docs/how-to/editor-setup.md's Neovim configuration in a real
 # Neovim, headless: builds mesh-lsp and the MPRX parser, installs them
 # where the guide says (inside a temporary directory, not your own
 # Neovim), and runs verify.lua on a copy of examples/.

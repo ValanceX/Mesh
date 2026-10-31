@@ -9,7 +9,7 @@ import { test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { packageDir, root } from "./common.mjs";
 
-const guide = readFileSync(join(root, "docs", "guides", "using-mesh-from-javascript.md"), "utf8");
+const guide = readFileSync(join(root, "docs", "how-to", "using-mesh-from-javascript.md"), "utf8");
 
 /** The fenced block of `language` right after the heading `heading`. */
 function block(heading, language) {

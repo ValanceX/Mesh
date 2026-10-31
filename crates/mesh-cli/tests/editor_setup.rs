@@ -14,7 +14,7 @@ fn read(relative: &str) -> String {
 
 #[test]
 fn the_guides_neovim_configuration_is_the_verified_one() {
-    let guide = read("docs/guides/editor-setup.md");
+    let guide = read("docs/how-to/editor-setup.md");
     let blocks: Vec<&str> = guide
         .split("```lua\n")
         .skip(1)

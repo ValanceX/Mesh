@@ -3,7 +3,7 @@
  * tree of a render into the tree of the render `update` made from it, so that
  * the module returns what changed and not the whole tree.
  *
- * It does what a renderer does (docs/manual/runtime.md, "Update"), over
+ * It does what a renderer does (docs/reference/runtime.md, "Update"), over
  * immutable data: the result shares every part the patches don't reach with
  * the tree it came from, and every part is frozen. It trusts the patches:
  * they come from the runtime's own `update`, which checks the law (applying

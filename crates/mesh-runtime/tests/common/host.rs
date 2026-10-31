@@ -1,7 +1,7 @@
 //! The test host (D10): supplies snapshots from JSON fixtures, keeps
 //! every render, relays each event to dispatch with the render it names,
 //! and records what dispatch gives. It models the host's obligation
-//! (docs/manual/runtime.md): an event is dispatched with the render whose
+//! (docs/reference/runtime.md): an event is dispatched with the render whose
 //! tree the renderer had drawn.
 
 use mesh_runtime::{HostRecord, HostValue, Program, Render, RuntimeDiagnostic};

@@ -119,7 +119,7 @@ fn template_v1_is_a_valid_schema() {
 #[test]
 fn the_template_manuals_examples_match_template_v1() {
     check_examples(
-        "docs/manual/templates.md",
+        "docs/reference/templates.md",
         "schemas/template-v1.schema.json",
         "template-v1",
         (1, 4),
@@ -129,7 +129,7 @@ fn the_template_manuals_examples_match_template_v1() {
 #[test]
 fn the_template_manuals_models_are_valid_manifests() {
     let validator = validator("schemas/manifest-v1.schema.json");
-    let models = blocks("docs/manual/templates.md", "manifest");
+    let models = blocks("docs/reference/templates.md", "manifest");
     assert!(!models.is_empty());
     for text in models {
         let document: Value = serde_json::from_str(&text).expect("the model is JSON");
@@ -149,7 +149,7 @@ fn render_v1_is_a_valid_schema() {
 #[test]
 fn the_runtime_manuals_trees_match_render_v1() {
     check_examples(
-        "docs/manual/runtime.md",
+        "docs/reference/runtime.md",
         "schemas/render-v1.schema.json",
         "render-v1",
         (1, 3),
@@ -159,7 +159,7 @@ fn the_runtime_manuals_trees_match_render_v1() {
 #[test]
 fn the_runtime_manuals_intents_match_the_intent_definition() {
     check_examples_with(
-        "docs/manual/runtime.md",
+        "docs/reference/runtime.md",
         &definition_validator("schemas/render-v1.schema.json", "intent"),
         "intent",
         (1, 1),
@@ -174,7 +174,7 @@ fn runtime_diagnostics_v1_is_a_valid_schema() {
 #[test]
 fn the_runtime_manuals_diagnostics_match_runtime_diagnostics_v1() {
     check_examples(
-        "docs/manual/runtime.md",
+        "docs/reference/runtime.md",
         "schemas/runtime-diagnostics-v1.schema.json",
         "runtime-diagnostics",
         (5, 1),
@@ -231,9 +231,9 @@ const RUNTIME_CODES: [&str; 39] = [
 /// check codes are named in §9.7 too.
 #[test]
 fn every_new_code_is_in_the_reference() {
-    let runtime = read("docs/manual/runtime.md");
-    let reference = read("docs/manual/diagnostics.md");
-    let spec = read("docs/MPRX-SPEC.md");
+    let runtime = read("docs/reference/runtime.md");
+    let reference = read("docs/reference/diagnostics.md");
+    let spec = read("docs/reference/mprx-spec.md");
     for code in CHECK_CODES {
         assert!(
             spec.contains(&format!("`{code}`")),
@@ -254,7 +254,7 @@ fn every_new_code_is_in_the_reference() {
 
 /// The runtime and assembly codes' entries in the diagnostics reference.
 fn runtime_entries() -> Vec<(String, String)> {
-    let reference = read("docs/manual/diagnostics.md");
+    let reference = read("docs/reference/diagnostics.md");
     reference
         .split("\n### `")
         .skip(1)
@@ -302,7 +302,7 @@ fn the_schema_has_exactly_the_six_location_forms() {
 
 #[test]
 fn the_runtime_manual_defines_exactly_the_six_location_forms() {
-    let runtime = read("docs/manual/runtime.md");
+    let runtime = read("docs/reference/runtime.md");
     let table = runtime
         .split("### Identity and locations")
         .nth(1)
@@ -346,7 +346,7 @@ fn every_runtime_code_has_exactly_one_location_form() {
 
 #[test]
 fn every_location_form_has_an_example() {
-    let used: Vec<String> = blocks("docs/manual/runtime.md", "runtime-diagnostics")
+    let used: Vec<String> = blocks("docs/reference/runtime.md", "runtime-diagnostics")
         .iter()
         .flat_map(|text| {
             let document: Value = serde_json::from_str(text).expect("JSON");

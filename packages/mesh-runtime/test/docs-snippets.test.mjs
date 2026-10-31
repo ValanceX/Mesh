@@ -67,7 +67,7 @@ test("the compiler package's README sample checks a source against a manifest", 
 });
 
 test("the JavaScript guide's samples check, and slice a diagnostic's span", async () => {
-  const [checkSample, spanSample, repairSample, browserSample, ...others] = jsBlocks(join(root, "docs", "guides", "using-mesh-from-javascript.md"));
+  const [checkSample, spanSample, repairSample, browserSample, ...others] = jsBlocks(join(root, "docs", "how-to", "using-mesh-from-javascript.md"));
   assert.equal(others.length, 0, "four samples; add the new one's scope here");
   assert.ok(browserSample.includes("init("), "the last sample is the browser one, which needs a browser");
   const checked = await run(checkSample, {}, "return document;");
@@ -81,7 +81,7 @@ test("the JavaScript guide's samples check, and slice a diagnostic's span", asyn
 });
 
 test("the runtime manual's screen sample shows, dispatches, patches and closes", async () => {
-  const [sample, ...others] = jsBlocks(join(root, "docs", "manual", "runtime.md"));
+  const [sample, ...others] = jsBlocks(join(root, "docs", "reference", "runtime.md"));
   assert.equal(others.length, 0, "one sample; add its scope here when another is added");
   const { manifest, templates, snapshot } = await sliceProgram();
   const first = await modules["@valancex/mesh-runtime"].render({ program: { root: "users", templates }, model: manifest, snapshot });

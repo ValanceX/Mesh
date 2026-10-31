@@ -500,7 +500,7 @@ fn lower_child(child: &mesh_syntax::Child) -> (Option<Child>, Vec<mesh_syntax::D
 }
 
 /// A whitespace-only text child with no line break and an interpolation on each side: a space someone wrote between two parts of a text run, so it is content, not formatting. A line break
-/// makes it layout (indentation), and next to anything but an interpolation it is dropped as before (docs/superpowers/specs/2026-10-16-mprx-whitespace-between-interpolations.md, W-1 to W-3).
+/// makes it layout (indentation), and next to anything but an interpolation it is dropped as before (docs/explanation/specs/2026-10-16-mprx-whitespace-between-interpolations.md, W-1 to W-3).
 fn is_space_between_interpolations(children: &[mesh_syntax::Child], at: usize) -> bool {
     let mesh_syntax::Child::Text(text) = &children[at] else {
         return false;

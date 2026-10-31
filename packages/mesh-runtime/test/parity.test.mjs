@@ -185,7 +185,7 @@ test("every kind of JavaScript value, and random JavaScript snapshots", async ()
 });
 
 test("the normative number-to-text table, through WebAssembly", async () => {
-  const rows = readFileSync(join(root, "docs", "tables", "number-to-text.tsv"), "utf8")
+  const rows = readFileSync(join(root, "docs", "reference", "tables", "number-to-text.tsv"), "utf8")
     .split("\n")
     .slice(1)
     .filter(Boolean)
@@ -230,7 +230,7 @@ test("the normative number-to-text table, as a prop's propText", async () => {
   // Each finite row's number as a prop: native and WebAssembly give the
   // same tree, and its `propText` is the row's text. A renderer's text
   // for a number prop is exactly MESH's, on both.
-  const rows = readFileSync(join(root, "docs", "tables", "number-to-text.tsv"), "utf8")
+  const rows = readFileSync(join(root, "docs", "reference", "tables", "number-to-text.tsv"), "utf8")
     .split("\n")
     .slice(1)
     .filter(Boolean)

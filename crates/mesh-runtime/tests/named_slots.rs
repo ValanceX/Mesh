@@ -1,4 +1,4 @@
-//! Named slots (docs/manual/templates.md, "Named slots"): a composite's template places an occurrence's content in several places with
+//! Named slots (docs/reference/templates.md, "Named slots"): a composite's template places an occurrence's content in several places with
 //! `<mesh-slot name="…" />`, and the occurrence says which content goes where with `<mesh-fill slot="…">`. What is not in a fill goes to the default slot.
 //! Like the default slot's, the content is the caller's: its scope, its commands, and paths of its own.
 

@@ -119,7 +119,7 @@ impl Emitter<'_> {
     /// `mesh-if` per case (and for the default), each true only when no case
     /// before it is: `<mesh-if when={!a && b}>`. The template, and so the
     /// runtime, never sees a switch; and as each case is a conditional site,
-    /// a case's identity is the one a conditional's is (docs/manual/templates.md,
+    /// a case's identity is the one a conditional's is (docs/reference/templates.md,
     /// "Switch").
     fn switch(&self, switch: &Element) -> Vec<t::Child> {
         let mut earlier: Vec<t::Expression> = Vec::new();

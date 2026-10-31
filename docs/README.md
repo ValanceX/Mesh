@@ -1,75 +1,67 @@
 # MESH documentation
 
-Documentation for **MESH v0.15**. New here? Start with *Getting started*.
+> **TL;DR:** MESH is the compiler and runtime for MPRX, the language that describes a user interface as data. Start with *Getting started* to check your first file; the rest is here when you need it.
 
-## Guides
+## Prerequisites
 
-Learning-oriented walkthroughs.
+* A terminal, to install the `mesh` command. JavaScript users can use the npm packages instead.
 
-- [**Getting started**](./guides/getting-started.md): install `mesh`, write and check your first file, and read diagnostics.
-- [**Writing MPRX**](./guides/writing-mprx.md): a tour of everything the language supports, plus common mistakes and their fixes.
-- [**Checking against a component model**](./guides/checking-against-a-component-model.md): declare your components in a manifest and check what a file means, not just its shape; requiredness, absence and `any`, explained.
-- [**Editor setup**](./guides/editor-setup.md): diagnostics, hover, go to definition, completion and syntax highlighting in your editor, with a configuration verified in Neovim.
-- [**Using MESH from JavaScript**](./guides/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`, and a generate-check-repair loop that applies MESH's suggestions.
-- [**Embedding the compiler**](./guides/embedding-the-compiler.md): call MESH from Rust, handle diagnostics, and walk the Semantic IR.
-- [**Integrating MESH with NEXUS**](./guides/integrating-mesh-with-nexus.md): build a host: compile templates, render from your state, pair each event with its render, and map intents to commands.
-- [**Rendering MESH output**](./guides/rendering-mesh-output.md): build a renderer: realize a render tree as given (natively, or with MESH's text), resolve and report events, and update by key. Its [conformance vectors](../examples/conformance/README.md) test one without a target, and the [identity vectors](../examples/conformance/identity/README.md) pin what a key means when structure varies (spec §9.10).
+---
 
-## Manuals
+## Where to go
 
-Reference material for when you need exact details.
-
-- [**`mesh` CLI manual**](./manual/mesh-cli.md): commands, output streams, the human and JSON diagnostic formats, and exit codes.
-- [**`mesh-lsp` manual**](./manual/mesh-lsp.md): the language server: installing, configuring it for your editor, and what it publishes when.
-- [**Diagnostics reference**](./manual/diagnostics.md): every diagnostic code and message, what causes it, and how to fix it.
-- [**Component manifest reference**](./manual/manifest.md): the manifest's format, version 1, and how it's validated. Also published as a [JSON Schema](../schemas/manifest-v1.schema.json).
-- [**Diagnostics JSON Schema**](../schemas/diagnostics-v1.schema.json): the document `mesh check --format json` prints.
-- [**MPRX Language Spec**](./MPRX-SPEC.md): the canonical grammar and semantics.
-
-**Templates and the runtime.** These are the contracts NEXUS's adapter and PORT's renderers build against. The compiler, the Rust runtime (`mesh-runtime`) and `@valancex/mesh-runtime` implement them:
-
-- [**Evaluation and the boundary**](./MPRX-SPEC.md#97-evaluation): §9.7 and §9.8 of the spec, with the normative [number-to-text table](./tables/number-to-text.tsv) and its [reference generator](./tables/number_to_text.py).
-- [**Templates and programs**](./manual/templates.md): the compiled form of a template, the model fingerprint, and the assembly rules. Also a [JSON Schema](../schemas/template-v1.schema.json). `mesh compile` and `compile()` emit templates; `mesh check-program` and `checkProgram()` check programs.
-- [**API stability**](./manual/stability.md): what each public surface promises (stable, unreleased, provisional, internal).
-- [**The MESH runtime**](./manual/runtime.md): render and dispatch, the host's obligations, the render tree and `propText`, event resolution, keys, handler identifiers, command intents, and runtime diagnostics. Also JSON Schemas for [render trees and intents](../schemas/render-v1.schema.json) and [runtime diagnostics](../schemas/runtime-diagnostics-v1.schema.json).
-- [**Glossary**](https://github.com/ValanceX/Valance/blob/main/docs/understand/glossary.md): words that mean different things across the Valance repos (`instance`, `unit`, `scope`, `Render`), and the canonical name for each.
-
-## Background
-
-- [**Architecture**](./ARCHITECTURE.md): why MPRX looks the way it does, and how MESH fits into Valance.
-- Release notes for [**v0.15**](./releases/v0.15.md), [**v0.14**](./releases/v0.14.md), [**v0.13**](./releases/v0.13.md), [**v0.12**](./releases/v0.12.md), [**v0.11**](./releases/v0.11.md), [**v0.10**](./releases/v0.10.md), [**v0.9**](./releases/v0.9.md), [**v0.8**](./releases/v0.8.md), [**v0.7**](./releases/v0.7.md), [**v0.6**](./releases/v0.6.md), [**v0.5**](./releases/v0.5.md), [**v0.4**](./releases/v0.4.md), [**v0.3**](./releases/v0.3.md), [**v0.2**](./releases/v0.2.md) and [**v0.1**](./releases/v0.1.md), and the [**CHANGELOG**](../CHANGELOG.md).
-
-## For contributors
-
-`docs/superpowers/` holds the design specs (`specs/`) and step-by-step implementation plans (`plans/`) that MESH was built from. They record *how* each feature was decided and aren't needed for using MESH.
-
-Before opening a pull request, run the same checks as CI:
-
-```console
-$ cargo fmt --all -- --check
-$ cargo clippy --workspace --all-targets -- -D warnings
-$ cargo test --workspace
-$ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
+```mermaid
+flowchart LR
+  T["Tutorial<br/>check your first file"] --> H["How-to guides<br/>write, check, embed, render"]
+  H --> R["Reference<br/>CLI, diagnostics, spec, runtime"]
+  H --> E["Explanation<br/>why MPRX looks this way"]
 ```
 
-CI runs `cargo test --workspace` on Linux, macOS and Windows, so keep tests free of platform assumptions: build paths with `Path`, and don't expect `/` in a printed path. Every text file checks out with LF line endings on every platform (`.gitattributes`).
+## Tutorial
 
-**Releases** are built by `.github/workflows/release.yml` from a `v*` tag: bump every version together (`crates/mesh-cli/tests/packages.rs` checks they agree), then push the tag. Publishing needs the `@valancex` npm organisation to exist (a token alone isn't enough: v0.4.0's first publish failed with `E404` until it did), and the `NPM_ACCESS_TOKEN` repository secret: an npm granular access token with read and write access to the `@valancex` scope. The token expires 60 days after it's created (the current one around 2026-11-24), and the release workflow's dry run can't tell: before tagging a release, renew it if it's close to expiry, and update the secret. A manual run of the workflow, without `publish`, is a dry run.
+- [**Getting started**](tutorials/01-getting-started.md): install `mesh`, write and check your first file, and read diagnostics.
 
-The npm packages under `packages/` are one npm workspace. Regenerate `packages/package-lock.json` with npm 11 or newer (`npx npm@11 install`), which records the unpublished platform packages npm 11's `npm ci` requires. If you change them, run, in `packages/`:
+## How-to guides
 
-```console
-$ npm ci
-$ npm run build:wasm -w @valancex/mesh-compiler
-$ npm run build:wasm -w @valancex/mesh-runtime
-$ npm run build
-$ npm run typecheck
-$ npm test -w @valancex/mesh-compiler
-$ npm test -w @valancex/mesh-runtime
-```
+- [**Writing MPRX**](how-to/writing-mprx.md): everything the language supports, with common mistakes and their fixes.
+- [**Checking against a component model**](how-to/checking-against-a-component-model.md): declare your components in a manifest and check what a file means, not just its shape.
+- [**Editor setup**](how-to/editor-setup.md): diagnostics, hover, go to definition, completion and highlighting in your editor.
+- [**Using MESH from JavaScript**](how-to/using-mesh-from-javascript.md): check MPRX in Node or a browser with `@valancex/mesh-compiler`, and a generate-check-repair loop.
+- [**Embedding the compiler**](how-to/embedding-the-compiler.md): call MESH from Rust, handle diagnostics, and walk the Semantic IR.
+- [**Integrating MESH with NEXUS**](how-to/integrating-mesh-with-nexus.md): build a host that renders from your state and maps intents to commands.
+- [**Rendering MESH output**](how-to/rendering-mesh-output.md): build a renderer that realizes a render tree, reports events and updates by key. Its [conformance vectors](../examples/conformance/README.md) test one without a target.
 
-`build:wasm` builds the compiler, or the runtime, for WebAssembly with Cargo; add the target once with `rustup target add wasm32-unknown-unknown`. Tree-sitter's C is compiled by `clang`, which needs its WebAssembly backend: LLVM's `clang` has it, and Apple's `clang` on macOS may not, so install LLVM there if the build can't find a `wasm32` target. The tests compare the package with a native `mesh` (`cargo build -p mesh-cli`, or `MESH_BIN`), the runtime's tests compare it with the native runtime's harness (`cargo build -p mesh-runtime-wasm --example harness`, or `MESH_RUNTIME_HARNESS`), and the browser test needs Playwright's Chromium (`npx playwright install chromium`, or `MESH_CHROMIUM` pointing at a Chromium).
+## Reference
 
-If you change `grammar/tree-sitter-mprx/grammar.js`, regenerate the parser with `npx tree-sitter generate` in that directory and commit `src/`; CI checks that it's up to date.
+| Page | What it answers |
+|---|---|
+| [`mesh` CLI](reference/mesh-cli.md) | Commands, output streams, diagnostic formats, exit codes |
+| [`mesh-lsp`](reference/mesh-lsp.md) | The language server: installing, configuring, what it publishes when |
+| [Diagnostics](reference/diagnostics.md) | Every diagnostic code, its cause and its fix |
+| [Component manifest](reference/manifest.md) | The manifest format, version 1 ([JSON Schema](../schemas/manifest-v1.schema.json)) |
+| [MPRX language spec](reference/mprx-spec.md) | The canonical grammar and semantics |
+| [Templates and programs](reference/templates.md) | The compiled form of a template and the assembly rules ([JSON Schema](../schemas/template-v1.schema.json)) |
+| [The MESH runtime](reference/runtime.md) | Render and dispatch, the render tree, keys, intents, runtime diagnostics |
+| [Streaming](reference/streaming.md) | Checking MPRX as a model writes it |
+| [API stability](reference/stability.md) | What each public surface promises |
+| [Release notes](reference/releases/) | Each version in full; the [changelog](../CHANGELOG.md) is the summary |
 
-Expected CLI output lives next to each file in `examples/fixtures/`. If you change a diagnostic, update the matching `.stderr` file.
+<details>
+<summary><b>Normative data and schemas</b></summary>
+
+* [Evaluation and the boundary](reference/mprx-spec.md#97-evaluation): §9.7 and §9.8 of the spec, with the normative [number-to-text table](reference/tables/number-to-text.tsv) and its [reference generator](reference/tables/number-to-text.py).
+* JSON Schemas: [diagnostics](../schemas/diagnostics-v1.schema.json), [render trees and intents](../schemas/render-v1.schema.json), [runtime diagnostics](../schemas/runtime-diagnostics-v1.schema.json).
+* [Glossary](https://github.com/ValanceX/Valance/blob/main/docs/reference/glossary.md): words that mean different things across the Valance repos, and the canonical name for each.
+
+</details>
+
+## Explanation
+
+- [**Architecture**](explanation/architecture.md): why MPRX looks the way it does, and how MESH fits into Valance.
+- [**API design principles**](explanation/api-design-principles.md): the rules public APIs across the ecosystem are held to.
+- The design record: [specs](explanation/specs/) and [implementation plans](explanation/plans/) that MESH was built from. Not needed to use MESH.
+
+## Next steps
+
+* [Getting started](tutorials/01-getting-started.md).
+* Working on MESH itself? See [Contributing](../CONTRIBUTING.md).

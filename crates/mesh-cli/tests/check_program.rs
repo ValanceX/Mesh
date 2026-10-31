@@ -294,7 +294,7 @@ fn an_unreadable_template_is_reported_and_nothing_is_checked() {
 /// The CLI manual's example is the `cycle` case's output.
 #[test]
 fn the_manuals_example_is_the_cycle_case() {
-    let manual = read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/manual/mesh-cli.md"));
+    let manual = read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/reference/mesh-cli.md"));
     let expected = read(&cases_dir().join("cycle/expected.stderr"));
     let program: Value =
         serde_json::from_str(&read(&cases_dir().join("cycle/program.json"))).unwrap();

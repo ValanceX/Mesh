@@ -706,7 +706,7 @@ snippet_vectors!(snippets, "snippets");
 snippet_vectors!(forwarder, "forwarder");
 snippet_vectors!(passing, "passing");
 
-/// `units/`: a component's state for one occurrence, which a render takes beside the snapshot (docs/manual/runtime.md, "Units").
+/// `units/`: a component's state for one occurrence, which a render takes beside the snapshot (docs/reference/runtime.md, "Units").
 /// `steps.json` is a list of `{ case, snapshot, units }`; each step's committed outputs are `step-N.expected.tree.json` and
 /// `step-N.expected.occurrences.json` (the occurrences the render lists). An update from a step to the next, given the next's units,
 /// is the render of the next.
@@ -815,7 +815,7 @@ mod units {
 }
 
 /// `context/`: the context channel, values a host gives beside the snapshot that a component reads only if
-/// its manifest entry `uses` them (docs/manual/runtime.md, "Context"). `steps.json` is a list of
+/// its manifest entry `uses` them (docs/reference/runtime.md, "Context"). `steps.json` is a list of
 /// `{ case, snapshot, context, changes }`; each step renders its committed tree (`step-N.expected.tree.json`),
 /// and from the step before, an update by `changes` (whose paths into the context start `{ "context": name }`)
 /// and an update with the whole snapshot and context are both the render of the step. `cases.json` is

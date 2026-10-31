@@ -9,7 +9,7 @@ MESH. It has two users:
 - **Editors**, through `queries/highlights.scm`, which colours MPRX with
   nvim-treesitter's capture names. The queries only colour text: no MESH
   feature reads them. The [editor setup
-  guide](../../docs/guides/editor-setup.md) installs them.
+  guide](../../docs/how-to/editor-setup.md) installs them.
 
 ## Layout
 

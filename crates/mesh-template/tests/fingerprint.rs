@@ -1,4 +1,4 @@
-//! The model fingerprint (docs/manual/templates.md, "The model
+//! The model fingerprint (docs/reference/templates.md, "The model
 //! fingerprint"): determined by the model's meaning and nothing else.
 
 use mesh_template::{fingerprint, Fingerprint};

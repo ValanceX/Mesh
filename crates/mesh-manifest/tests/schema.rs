@@ -121,7 +121,7 @@ fn the_schema_agrees_with_every_broken_manifest_fixture() {
 /// loader and the schema accept.
 #[test]
 fn the_manifest_references_example_is_valid() {
-    let reference = read(&repo("docs/manual/manifest.md"));
+    let reference = read(&repo("docs/reference/manifest.md"));
     let example = reference
         .split("```json\n")
         .nth(1)

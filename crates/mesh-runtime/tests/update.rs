@@ -1,4 +1,4 @@
-//! `update` (docs/superpowers/specs/2026-10-06-mesh-fine-grained-reactivity-
+//! `update` (docs/explanation/specs/2026-10-06-mesh-fine-grained-reactivity-
 //! and-composition.md, A3): the equivalence law (applying an update's
 //! patches to the previous tree gives exactly the tree a full render of the
 //! new snapshot gives), the work an update skips, and that a refused update

@@ -1,6 +1,6 @@
 //! Number to text: the normative verification (outline D8; spec
 //! §9.7.7.1). The runtime must reproduce every row of the normative table
-//! exactly. The table is read from `docs/tables/number-to-text.tsv`
+//! exactly. The table is read from `docs/reference/tables/number-to-text.tsv`
 //! itself, never a copy, and no row is skipped.
 
 use mesh_runtime::number_to_text;
@@ -17,7 +17,7 @@ struct Row {
 }
 
 fn table() -> Vec<Row> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/tables/number-to-text.tsv");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/reference/tables/number-to-text.tsv");
     let text = fs::read_to_string(&path).expect("the normative table reads");
     let mut lines = text.lines();
     assert_eq!(

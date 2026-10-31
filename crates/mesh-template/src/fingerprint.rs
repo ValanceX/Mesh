@@ -1,4 +1,4 @@
-//! The model fingerprint (docs/manual/templates.md, "The model
+//! The model fingerprint (docs/reference/templates.md, "The model
 //! fingerprint"): a digest of a manifest's meaning, and of nothing else.
 
 use mesh_manifest::{Component, Constant, Manifest, Type};

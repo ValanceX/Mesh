@@ -1,5 +1,5 @@
 //! `recover`: what the editor may still use of a file with syntax errors
-//! (the recovery spec, `docs/superpowers/specs/2026-09-24-mesh-v0.3-editor-recovery.md`).
+//! (the recovery spec, `docs/explanation/specs/2026-09-24-mesh-v0.3-editor-recovery.md`).
 //!
 //! One test per observed shape, S1–S18. Each expectation is a compact
 //! summary of the parts: an element part as `tag [attributes and on.events]

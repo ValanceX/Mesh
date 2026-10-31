@@ -1,4 +1,4 @@
-//! Keeps the diagnostics reference (`docs/manual/diagnostics.md`) in step
+//! Keeps the diagnostics reference (`docs/reference/diagnostics.md`) in step
 //! with the codes MESH can emit, the compiler's and the runtime's: every
 //! code has a `` ### `code` `` heading, and every code-shaped heading
 //! names a real code. It and the guide to
@@ -19,7 +19,7 @@ use std::fs;
 use std::path::Path;
 
 fn reference() -> String {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/manual/diagnostics.md");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/reference/diagnostics.md");
     fs::read_to_string(&path).unwrap_or_else(|err| panic!("should read {}: {err}", path.display()))
 }
 
@@ -44,7 +44,7 @@ fn every_code_has_a_reference_entry() {
         .collect();
     assert!(
         missing.is_empty(),
-        "docs/manual/diagnostics.md has no ### heading for: {missing:?}"
+        "docs/reference/diagnostics.md has no ### heading for: {missing:?}"
     );
 }
 
@@ -57,7 +57,7 @@ fn every_reference_entry_is_a_real_code() {
         .collect();
     assert!(
         unknown.is_empty(),
-        "docs/manual/diagnostics.md documents codes MESH doesn't have: {unknown:?}"
+        "docs/reference/diagnostics.md documents codes MESH doesn't have: {unknown:?}"
     );
 }
 
@@ -100,7 +100,7 @@ fn assert_examples_match_their_fixtures(doc: &str) -> usize {
 
 #[test]
 fn every_example_matches_its_fixture() {
-    let checked = assert_examples_match_their_fixtures("docs/manual/diagnostics.md");
+    let checked = assert_examples_match_their_fixtures("docs/reference/diagnostics.md");
     // Guards against a format change making the test pass vacuously.
     assert!(checked >= 10, "only {checked} examples were checked");
 }
@@ -108,6 +108,6 @@ fn every_example_matches_its_fixture() {
 #[test]
 fn every_example_in_the_model_checking_guide_matches_its_fixture() {
     let checked =
-        assert_examples_match_their_fixtures("docs/guides/checking-against-a-component-model.md");
+        assert_examples_match_their_fixtures("docs/how-to/checking-against-a-component-model.md");
     assert!(checked >= 10, "only {checked} examples were checked");
 }

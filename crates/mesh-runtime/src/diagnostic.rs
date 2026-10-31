@@ -1,5 +1,5 @@
 //! Runtime and assembly diagnostics, and the runtime diagnostics document
-//! (docs/manual/runtime.md, "Diagnostics").
+//! (docs/reference/runtime.md, "Diagnostics").
 
 use mesh_syntax::source_map::{ColumnUnit, SourceMap};
 use serde_json::{json, Value};

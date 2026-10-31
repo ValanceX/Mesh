@@ -1,5 +1,5 @@
 //! The byte encoding a JavaScript host's inputs cross into WebAssembly
-//! in (docs/manual/runtime.md, "The JavaScript encoding"), and its
+//! in (docs/reference/runtime.md, "The JavaScript encoding"), and its
 //! decoding. The encoder, in `@valancex/mesh-runtime`, only walks values
 //! and writes what it finds; everything MESH decides about them is
 //! decided after decoding, by the same code that judges a native host's

@@ -1,7 +1,7 @@
 /**
  * The types of a `template-v1` or `template-v2` document: one component's MPRX, checked
  * clean and compiled (see the MESH repository's
- * `docs/manual/templates.md` and `schemas/template-v1.schema.json`).
+ * `docs/reference/templates.md` and `schemas/template-v1.schema.json`).
  *
  * A template is data to store and hand to the MESH runtime, not to
  * interpret: nothing in this package reads one. The format may gain

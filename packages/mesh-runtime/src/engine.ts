@@ -94,7 +94,7 @@ export interface RenderInput {
   /** The state of the unit occurrences the host holds, beside the snapshot. Without it, every occurrence has its unit's defaults. */
   readonly units?: UnitStates;
   /**
-   * The values of the manifest's context channel, by context name, beside the snapshot (docs/manual/runtime.md,
+   * The values of the manifest's context channel, by context name, beside the snapshot (docs/reference/runtime.md,
    * "Context"). Each is checked against its declared type, as a snapshot's scope names are; a component reads only
    * the names its `uses` lists. Without it, no name has a value, which is valid only when every context type is optional.
    */

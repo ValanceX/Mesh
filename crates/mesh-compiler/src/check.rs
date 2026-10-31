@@ -57,7 +57,7 @@ impl Model {
     }
 
     /// The model's fingerprint, which every template compiled against it
-    /// carries (docs/manual/templates.md).
+    /// carries (docs/reference/templates.md).
     pub fn fingerprint(&self) -> mesh_template::Fingerprint {
         mesh_template::fingerprint(&self.manifest)
     }

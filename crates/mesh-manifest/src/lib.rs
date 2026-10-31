@@ -166,7 +166,7 @@ pub struct Component {
     /// reference, and its type. Nothing else is in scope.
     pub scope: BTreeMap<String, Type>,
     /// The state and commands that belong to one occurrence of this composite, if it has any
-    /// (a *unit*, docs/manual/manifest.md). Its state names are also in `scope` and its
+    /// (a *unit*, docs/reference/manifest.md). Its state names are also in `scope` and its
     /// commands also in `commands`: the template reads and invokes them like any others, so
     /// checking needs nothing more. The runtime needs this to tell them apart from the rest.
     pub unit: Option<Unit>,
@@ -299,7 +299,7 @@ pub struct Manifest {
 
 /// The names of the components the language itself gives meaning to when a template is written with
 /// blocks: the conditional and the repeat a block lowers to, and the fragment that wraps a branch or body
-/// that is not exactly one element. A manifest need not declare them (docs/MPRX-SPEC.md, "Blocks"); one
+/// that is not exactly one element. A manifest need not declare them (docs/reference/mprx-spec.md, "Blocks"); one
 /// that does is used as declared.
 pub const BUILT_IN_COMPONENTS: [&str; 5] = [
     "mesh-if",
@@ -395,7 +395,7 @@ impl Manifest {
         &self.types
     }
 
-    /// The context channel (docs/manual/manifest.md, "Context"): each name a host supplies beside
+    /// The context channel (docs/reference/manifest.md, "Context"): each name a host supplies beside
     /// the snapshot, with its type. A component reads one only if it lists it in its `uses`.
     pub fn context(&self) -> &BTreeMap<String, Type> {
         &self.context

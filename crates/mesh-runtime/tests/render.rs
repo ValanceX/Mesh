@@ -1,5 +1,5 @@
 //! Render trees, keys and handler identifiers (D4, D6, I13), and the
-//! program identity they're salted with (docs/manual/runtime.md).
+//! program identity they're salted with (docs/reference/runtime.md).
 
 mod common;
 

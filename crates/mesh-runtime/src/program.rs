@@ -1,6 +1,6 @@
 //! A program, validated (D3's program validation, and the assembly rules
-//! of docs/manual/templates.md), and the identities derived from it:
-//! program identity, keys and handler identifiers (docs/manual/runtime.md).
+//! of docs/reference/templates.md), and the identities derived from it:
+//! program identity, keys and handler identifiers (docs/reference/runtime.md).
 
 use crate::diagnostic::{Location, RuntimeCode, RuntimeDiagnostic};
 use crate::number::number_to_text;
@@ -151,7 +151,7 @@ fn readable_component(text: &str) -> Option<String> {
 }
 
 /// Every name in `template` the model doesn't declare with the kind the
-/// template gives it (docs/manual/templates.md, "Names").
+/// template gives it (docs/reference/templates.md, "Names").
 fn undeclared(manifest: &Manifest, template: &Template) -> Vec<String> {
     let mut problems = Vec::new();
     let Some(own) = manifest.components().get(&template.component) else {
@@ -535,7 +535,7 @@ pub(crate) fn visit(expression: &Expression, f: &mut impl FnMut(&Expression)) {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeclaredEvent {
     /// The component whose template declares the binding: the component of
-    /// the command's intent (docs/manual/runtime.md, "The command intent").
+    /// the command's intent (docs/reference/runtime.md, "The command intent").
     pub component: String,
     /// The event of the element the binding is on.
     pub event: String,
@@ -573,7 +573,7 @@ pub(crate) fn declared_events(valid: &Valid) -> Vec<DeclaredEvent> {
     found
 }
 
-/// The declared events as a JSON array, in the form docs/manual/runtime.md
+/// The declared events as a JSON array, in the form docs/reference/runtime.md
 /// describes ("The declared events"): each one's `component`, `event`,
 /// `command` and `span`, in the order given.
 pub fn declared_events_to_json(events: &[DeclaredEvent]) -> String {
@@ -604,7 +604,7 @@ fn elements<'t>(element: &'t Element, out: &mut Vec<&'t Element>) {
     }
 }
 
-/// Step 4: the assembly rules (docs/manual/templates.md), every violation
+/// Step 4: the assembly rules (docs/reference/templates.md), every violation
 /// of every rule, in the manual's order.
 fn assembly(manifest: &Manifest, root: &str, read: &[(usize, Template)]) -> Vec<RuntimeDiagnostic> {
     let mut diagnostics = Vec::new();
@@ -961,7 +961,7 @@ fn identity(program: &Program<'_>) -> [u8; 32] {
     hash.finalize().into()
 }
 
-/// A template's canonical digest (docs/manual/templates.md): SHA-256 of
+/// A template's canonical digest (docs/reference/templates.md): SHA-256 of
 /// its RFC 8785 canonical JSON, as given, without `compiler`, numbers
 /// written by §9.7.7.1.
 pub(crate) fn canonical_digest(template: &serde_json::Value) -> [u8; 32] {

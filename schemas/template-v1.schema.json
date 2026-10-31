@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/ValanceX/Mesh/main/schemas/template-v1.schema.json",
   "title": "MESH template, version 1",
-  "description": "One component's MPRX, checked clean against a component model and compiled: every name resolved, every literal converted, and no values (see docs/manual/templates.md). The MESH runtime consumes it; a template runs under any runtime that supports its `version` and is given a model with the same `fingerprint`, whatever `compiler` produced it. This schema lists exactly the properties this MESH writes. A later MESH may add properties without changing `version`; removing one or changing its meaning is a new version. Readers must ignore properties they don't know.",
+  "description": "One component's MPRX, checked clean against a component model and compiled: every name resolved, every literal converted, and no values (see docs/reference/templates.md). The MESH runtime consumes it; a template runs under any runtime that supports its `version` and is given a model with the same `fingerprint`, whatever `compiler` produced it. This schema lists exactly the properties this MESH writes. A later MESH may add properties without changing `version`; removing one or changing its meaning is a new version. Readers must ignore properties they don't know.",
   "type": "object",
   "properties": {
     "format": {
@@ -18,7 +18,7 @@
       "$ref": "#/$defs/tagName"
     },
     "fingerprint": {
-      "description": "The fingerprint of the model the template was checked against (docs/manual/templates.md). The runtime requires it to equal its model's.",
+      "description": "The fingerprint of the model the template was checked against (docs/reference/templates.md). The runtime requires it to equal its model's.",
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
     },

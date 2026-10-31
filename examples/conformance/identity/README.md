@@ -1,6 +1,6 @@
 # Identity vectors (spec §9.10)
 
-Contract vectors for **node identity**: what makes a node in one render the same node as one in the next, when a program's structure can vary. They pin the rule in [spec §9.10](../../../docs/MPRX-SPEC.md), and were written before any syntax, compiler or renderer implemented it.
+Contract vectors for **node identity**: what makes a node in one render the same node as one in the next, when a program's structure can vary. They pin the rule in [spec §9.10](../../../docs/reference/mprx-spec.md), and were written before any syntax, compiler or renderer implemented it.
 
 These are unlike [`values/`](../values/) and [`events/`](../events/). Those are real programs, rendered by the runtime. **These are not.** MPRX has expressed conditionals and repeats since v0.11 (`{#if}` and `{#each}`), but these trees were written by hand, not produced by MESH. Every tree is hand-written render-v1 (it validates against [`render-v1.schema.json`](../../../schemas/render-v1.schema.json)), and nothing here needs MPRX, a manifest or the compiler. They stay valid however a renderer is written, and whatever identity ends up being encoded as.
 
@@ -52,4 +52,4 @@ Repeated sites have their own vectors, C11–C22, in [`repeat/`](./repeat/README
 
 ## What these do not decide
 
-The syntax for conditional and repeated elements and for declaring a key (decided since v0.11: `{#if}`, `{#each … (key)}`); how an identity is encoded into a key; collisions; other key types; render-v1 changes; how a renderer reconciles; how hydration transports identity; how dispatch finds an item from an identifier; and whether a target may cache a realization across an absence. See [§9.10.12](../../../docs/MPRX-SPEC.md).
+The syntax for conditional and repeated elements and for declaring a key (decided since v0.11: `{#if}`, `{#each … (key)}`); how an identity is encoded into a key; collisions; other key types; render-v1 changes; how a renderer reconciles; how hydration transports identity; how dispatch finds an item from an identifier; and whether a target may cache a realization across an absence. See [§9.10.12](../../../docs/reference/mprx-spec.md).

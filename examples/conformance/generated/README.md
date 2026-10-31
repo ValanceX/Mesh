@@ -1,6 +1,6 @@
 # `generated/`: checking a source while it arrives (decisions G1 to G14)
 
-The data for streaming checks (`docs/manual/streaming.md`): programs a model might write, mistakes it might plant, and the digests of what a session reports at every prefix. Against [`components.json`](./components.json) (its own manifest, with command `effect` and `title` annotations), as the template of the component `page`.
+The data for streaming checks (`docs/reference/streaming.md`): programs a model might write, mistakes it might plant, and the digests of what a session reports at every prefix. Against [`components.json`](./components.json) (its own manifest, with command `effect` and `title` annotations), as the template of the component `page`.
 
 | File | What it is |
 |---|---|

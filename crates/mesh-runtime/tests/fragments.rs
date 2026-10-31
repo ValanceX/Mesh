@@ -1,4 +1,4 @@
-//! `mesh-fragment` (docs/manual/templates.md, "Fragments"): content placed without a node of its own. MESH never wraps content in a node: a composite's template, a
+//! `mesh-fragment` (docs/reference/templates.md, "Fragments"): content placed without a node of its own. MESH never wraps content in a node: a composite's template, a
 //! conditional's alternative or a repeat's item is a node only if the author wrote an element, and text or several nodes only if the author wrote a fragment.
 
 mod common;

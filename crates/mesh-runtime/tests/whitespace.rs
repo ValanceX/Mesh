@@ -1,4 +1,4 @@
-//! The space between two interpolations (docs/superpowers/specs/2026-10-16-mprx-whitespace-between-interpolations.md, W-1 to W-3, W-9): a space written on the line is content; a line break
+//! The space between two interpolations (docs/explanation/specs/2026-10-16-mprx-whitespace-between-interpolations.md, W-1 to W-3, W-9): a space written on the line is content; a line break
 //! and the indentation after it are formatting, and so is whitespace next to anything but an interpolation.
 
 mod common;

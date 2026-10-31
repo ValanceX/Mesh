@@ -15,7 +15,7 @@
 //! with it. `compile`, `compile_with` and `mesh check` never call it.
 //!
 //! The rules for what is recovered are in
-//! `docs/superpowers/specs/2026-09-24-mesh-v0.3-editor-recovery.md`.
+//! `docs/explanation/specs/2026-09-24-mesh-v0.3-editor-recovery.md`.
 //!
 //! [`candidates`] answers the other question an editor asks while the
 //! file is broken: what may be written here? Its answers come only from

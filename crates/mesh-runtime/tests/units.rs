@@ -1,4 +1,4 @@
-//! Units (docs/manual/runtime.md, "Units"): state that belongs to one occurrence of a composite and
+//! Units (docs/reference/runtime.md, "Units"): state that belongs to one occurrence of a composite and
 //! reaches a pure render as an input beside the snapshot. Its lifetime is its node's identity
 //! (spec §9.10.6): a reorder keeps it, and a part of the tree that a render keeps is not kept when
 //! the state of a unit under it has changed.

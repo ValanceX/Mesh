@@ -7,7 +7,7 @@
 //! go-to-definition keep working on the parts of a file that parse while
 //! another part is being typed. Its rules, and the Tree-sitter recovery
 //! trees they were written against, are in
-//! `docs/superpowers/specs/2026-09-24-mesh-v0.3-editor-recovery.md`
+//! `docs/explanation/specs/2026-09-24-mesh-v0.3-editor-recovery.md`
 //! (R2–R5 here).
 //!
 //! It keeps only clean subtrees whose delimiters are real: an element
