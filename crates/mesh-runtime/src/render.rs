@@ -21,13 +21,13 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
 /// A composite occurrence's scope, and the occurrence as a unit when its component has one.
-pub(crate) type Bound = (BTreeMap<String, Value>, Option<Rc<Instance>>);
+pub(crate) type Bound = (BTreeMap<String, Value>, Option<Rc<Occurrence>>);
 
 /// A unit occurrence a render met (docs/manual/runtime.md, "Units"): where it is, whose unit it is,
 /// and the state it was rendered with. A host keeps the state of the occurrences it has changed, and
 /// lets go of those a later render no longer lists.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Instance {
+pub struct Occurrence {
     /// The occurrence's identity: the key of its place in the program, as spec §9.10 defines it.
     pub key: String,
     /// The composite whose unit it is.
@@ -40,6 +40,10 @@ pub struct Instance {
     /// The host's entry this was rendered from, so an update can tell that it is as it was.
     pub(crate) entry: Option<HostRecord>,
 }
+
+/// The old name of [`Occurrence`] (refinements C-4).
+#[deprecated(since = "0.18.0", note = "renamed `Occurrence`; removed after 0.18")]
+pub type Instance = Occurrence;
 
 /// One successful render: its tree, and the program, model and snapshot
 /// it came from. It owns copies of all of them, so nothing a host does
@@ -57,8 +61,11 @@ pub struct Render {
     /// The units this render was given, so that dispatch evaluates against exactly the state the
     /// person saw, and an update without new ones keeps these.
     pub(crate) units: Rc<Units>,
+    /// The context values this render was given, validated (docs/manual/runtime.md, "Context"): for
+    /// dispatch, and for an update that gives none, which keeps these.
+    pub(crate) context: Rc<BTreeMap<String, Value>>,
     /// The unit occurrences in the tree, in the order they were met.
-    instances: Vec<Rc<Instance>>,
+    instances: Vec<Rc<Occurrence>>,
     /// This render's version in this thread: no two renders have the same
     /// one. Changes name the version they were computed against.
     id: u64,
@@ -89,19 +96,28 @@ impl Render {
 
     /// The unit occurrences in this render, in the order they were met: the host's registry lets go
     /// of the state of any occurrence that is not here.
-    pub fn instances(&self) -> impl Iterator<Item = &Instance> {
-        self.instances.iter().map(|instance| &**instance)
+    pub fn occurrences(&self) -> impl Iterator<Item = &Occurrence> {
+        self.instances.iter().map(|occurrence| &**occurrence)
+    }
+
+    /// The old name of [`Render::occurrences`].
+    #[deprecated(
+        since = "0.18.0",
+        note = "renamed `occurrences` (refinements C-4); removed after 0.18"
+    )]
+    pub fn instances(&self) -> impl Iterator<Item = &Occurrence> {
+        self.occurrences()
     }
 
     /// The unit occurrences as a JSON array, for a host that cannot hold them as Rust values:
-    /// `[ { "instance", "component", "state", "controlled" } ]`.
-    pub fn instances_to_json(&self) -> String {
+    /// `[ { "occurrence", "component", "state", "controlled" } ]`.
+    pub fn occurrences_to_json(&self) -> String {
         serde_json::Value::Array(
             self.instances
                 .iter()
                 .map(|instance| {
                     let mut item = serde_json::json!({
-                        "instance": instance.key,
+                        "occurrence": instance.key,
                         "component": instance.component,
                         "state": instance.state,
                     });
@@ -109,6 +125,34 @@ impl Render {
                         item["controlled"] = serde_json::json!(instance.controlled);
                     }
                     item
+                })
+                .collect(),
+        )
+        .to_string()
+    }
+
+    /// The old name of [`Render::occurrences_to_json`]; it now writes `"occurrence"`, not `"instance"`.
+    #[deprecated(
+        since = "0.18.0",
+        note = "renamed `occurrences_to_json` (refinements C-4); removed after 0.18"
+    )]
+    pub fn instances_to_json(&self) -> String {
+        self.occurrences_to_json()
+    }
+
+    /// The context values this render was made with (docs/manual/runtime.md, "Context"), as a JSON
+    /// object of each name that has a value: what an update by changes that edited them made, for a
+    /// host that keeps a render's inputs itself. `{}` when the manifest declares no context.
+    pub fn context_to_json(&self) -> String {
+        serde_json::Value::Object(
+            self.context
+                .iter()
+                .filter(|(_, value)| !matches!(value, Value::Absent))
+                .map(|(name, value)| {
+                    (
+                        name.clone(),
+                        output(value).unwrap_or(serde_json::Value::Null),
+                    )
                 })
                 .collect(),
         )
@@ -138,6 +182,17 @@ impl Render {
     pub(crate) fn host_snapshot(&self) -> HostRecord {
         HostRecord(
             self.values
+                .iter()
+                .filter(|(_, value)| !matches!(value, Value::Absent))
+                .map(|(name, value)| (HostKey::Text(name.clone()), to_host(value)))
+                .collect(),
+        )
+    }
+
+    /// The context values this render has, as a host would give them: for a dispatch.
+    pub(crate) fn host_context(&self) -> HostRecord {
+        HostRecord(
+            self.context
                 .iter()
                 .filter(|(_, value)| !matches!(value, Value::Absent))
                 .map(|(name, value)| (HostKey::Text(name.clone()), to_host(value)))
@@ -199,12 +254,27 @@ pub fn render_units(
     snapshot: &HostRecord,
     units: &Units,
 ) -> Result<Render, Vec<RuntimeDiagnostic>> {
+    render_context(program, model, snapshot, units, &HostRecord::default())
+}
+
+/// [`render_units`], with the values of the manifest's context channel (docs/manual/runtime.md,
+/// "Context"): a record of each context name's value, validated against its declared type as a
+/// snapshot's scope names are (a name of an optional type may be left out; a name the manifest
+/// doesn't declare is ignored). A component reads only the names its `uses` lists.
+pub fn render_context(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Units,
+    context: &HostRecord,
+) -> Result<Render, Vec<RuntimeDiagnostic>> {
     let valid = program::validate(program, model)?;
-    let values = validated_values(&valid, snapshot)?;
+    let (values, context) = validated_inputs(&valid, snapshot, context)?;
     let units = Rc::new(units.clone());
+    let context = Rc::new(context);
     let Rendered {
         tree, instances, ..
-    } = tree_of(&valid, &values, false, None, &units)?;
+    } = tree_of(&valid, &values, &context, false, None, &units)?;
     Ok(Render {
         root: program.root.to_string(),
         templates: program
@@ -216,6 +286,7 @@ pub fn render_units(
         values,
         tree,
         units,
+        context,
         instances,
         id: next_version(),
     })
@@ -255,6 +326,18 @@ pub fn update_with_units(
     snapshot: HostRecord,
     units: Option<&Units>,
 ) -> Result<Update, Vec<RuntimeDiagnostic>> {
+    update_with_context(previous, snapshot, units, None)
+}
+
+/// [`update_with_units`], and the context values the host holds now (see [`render_context`]):
+/// `None` keeps the previous render's. A part that reads a context name whose value changed is
+/// rendered again.
+pub fn update_with_context(
+    previous: &Render,
+    snapshot: HostRecord,
+    units: Option<&Units>,
+    context: Option<&HostRecord>,
+) -> Result<Update, Vec<RuntimeDiagnostic>> {
     let units = units.map_or_else(
         || Rc::clone(&previous.units),
         |units| Rc::new(units.clone()),
@@ -267,10 +350,26 @@ pub fn update_with_units(
         },
         &previous.model,
     )?;
-    let values = validated_values(&valid, &snapshot)?;
+    let (values, context) = match context {
+        Some(context) => {
+            let (values, context) = validated_inputs(&valid, &snapshot, context)?;
+            (values, Rc::new(context))
+        }
+        None => (
+            validated_values(&valid, &snapshot)?,
+            Rc::clone(&previous.context),
+        ),
+    };
     let Rendered {
         tree, instances, ..
-    } = tree_of(&valid, &values, false, Some(&previous.tree.root), &units)?;
+    } = tree_of(
+        &valid,
+        &values,
+        &context,
+        false,
+        reusable(previous, &context),
+        &units,
+    )?;
     let patches = crate::patch::diff(&previous.tree, &tree);
     Ok(Update {
         render: Render {
@@ -280,6 +379,7 @@ pub fn update_with_units(
             values,
             tree,
             units,
+            context,
             instances,
             id: next_version(),
         },
@@ -341,7 +441,13 @@ pub fn update_changes_units(
         &previous.model,
     )?;
     let mut values = previous.values.clone();
-    crate::changes::apply(&valid, &mut values, &changes.changes)?;
+    let mut context = (*previous.context).clone();
+    crate::changes::apply(&valid, &mut values, &mut context, &changes.changes)?;
+    let context = if same_values(&context, &previous.context) {
+        Rc::clone(&previous.context)
+    } else {
+        Rc::new(context)
+    };
     if let Some(whole) = verify {
         let believed = validated_values(&valid, whole)?;
         if let Some(path) = crate::changes::first_difference(&values, &believed) {
@@ -357,7 +463,14 @@ pub fn update_changes_units(
     }
     let Rendered {
         tree, instances, ..
-    } = tree_of(&valid, &values, false, Some(&previous.tree.root), &units)?;
+    } = tree_of(
+        &valid,
+        &values,
+        &context,
+        false,
+        reusable(previous, &context),
+        &units,
+    )?;
     let patches = crate::patch::diff(&previous.tree, &tree);
     Ok(Update {
         render: Render {
@@ -367,11 +480,33 @@ pub fn update_changes_units(
             values,
             tree,
             units,
+            context,
             instances,
             id: next_version(),
         },
         patches,
     })
+}
+
+/// The previous tree, for an update to reuse its parts, when the context is as it was; `None`
+/// otherwise, so that everything is rendered again (the patches are still from the previous tree).
+// ponytail: a context change renders the whole tree again (context is for values that change
+// rarely: a theme, a locale, the current user); per-part tracking of the names read below a node,
+// as units have, if that ever measurably costs.
+fn reusable<'p>(
+    previous: &'p Render,
+    context: &Rc<BTreeMap<String, Value>>,
+) -> Option<&'p Rc<Node>> {
+    (Rc::ptr_eq(&previous.context, context) || same_values(&previous.context, context))
+        .then_some(&previous.tree.root)
+}
+
+/// Whether two sets of named values are the same, by bits (`0` and `-0` differ).
+fn same_values(a: &BTreeMap<String, Value>, b: &BTreeMap<String, Value>) -> bool {
+    a.len() == b.len()
+        && a.iter()
+            .zip(b)
+            .all(|((x, v), (y, w))| x == y && v.identical(w))
 }
 
 /// The scope names an expression reads. An expression is a pure function
@@ -516,7 +651,7 @@ pub(crate) struct Link<'v> {
     pub occurrence: &'v Element,
     pub values: BTreeMap<String, Value>,
     /// The occurrence as a unit, if its component has one.
-    pub instance: Option<Rc<Instance>>,
+    pub instance: Option<Rc<Occurrence>>,
 }
 
 /// A composite occurrence being rendered: whose children a `mesh-slot` in
@@ -528,7 +663,7 @@ struct Frame<'v> {
     /// The caller's scope at the occurrence; only kept when the occurrence has children.
     values: Option<BTreeMap<String, Value>>,
     /// The occurrence as a unit, if its component has one.
-    instance: Option<Rc<Instance>>,
+    instance: Option<Rc<Occurrence>>,
 }
 
 /// What rendering a list of children gives.
@@ -605,7 +740,7 @@ pub(crate) struct Recorded<'v> {
     pub chain: Vec<Link<'v>>,
     /// The innermost composite occurrence around the node as a unit, if it is one: the one whose
     /// template the node is in, and so the owner of the commands it invokes.
-    pub instance: Option<Rc<Instance>>,
+    pub instance: Option<Rc<Occurrence>>,
 }
 
 /// Every handler of a render, by identifier.
@@ -613,12 +748,12 @@ pub(crate) type Sites<'v> = BTreeMap<String, Recorded<'v>>;
 
 /// A unit occurrence as a render found it: the occurrence in the template of `component`, the scope it
 /// was written in, and the occurrences around it. Only a render that was asked to record has them.
-pub(crate) struct Occurrence<'v> {
+pub(crate) struct Found<'v> {
     pub component: String,
     pub occurrence: &'v Element,
     pub values: BTreeMap<String, Value>,
     pub chain: Vec<Link<'v>>,
-    pub instance: Rc<Instance>,
+    pub instance: Rc<Occurrence>,
 }
 
 /// What a render of a validated program gives: its tree, and the parts a host and a dispatch need.
@@ -627,9 +762,9 @@ pub(crate) struct Rendered<'v> {
     /// The handlers, when the render recorded.
     pub sites: Sites<'v>,
     /// The unit occurrences in the tree, in the order they were met.
-    pub instances: Vec<Rc<Instance>>,
+    pub instances: Vec<Rc<Occurrence>>,
     /// The unit occurrences by key, when the render recorded.
-    pub occurrences: BTreeMap<String, Occurrence<'v>>,
+    pub occurrences: BTreeMap<String, Found<'v>>,
 }
 
 /// The render tree of a validated program, and, when `record`, the sites of
@@ -637,12 +772,72 @@ pub(crate) struct Rendered<'v> {
 pub(crate) fn tree<'v>(
     valid: &'v Valid,
     snapshot: &HostRecord,
+    context: &HostRecord,
     record: bool,
     previous: Option<&Rc<Node>>,
     units: &Rc<Units>,
 ) -> Result<Rendered<'v>, Vec<RuntimeDiagnostic>> {
-    let scope = validated_values(valid, snapshot)?;
-    tree_of(valid, &scope, record, previous, units)
+    let (scope, context) = validated_inputs(valid, snapshot, context)?;
+    tree_of(valid, &scope, &Rc::new(context), record, previous, units)
+}
+
+/// Named values: a scope's, or the context's.
+type Values = BTreeMap<String, Value>;
+
+/// The root scope's values from a snapshot and the context values, validated together: every
+/// mismatch in either is reported, at its path (a context value's is `$context.<name>`).
+pub(crate) fn validated_inputs(
+    valid: &Valid,
+    snapshot: &HostRecord,
+    context: &HostRecord,
+) -> Result<(Values, Values), Vec<RuntimeDiagnostic>> {
+    let mut inputs = Inputs::new(&valid.manifest);
+    let scope = snapshot_values(valid, snapshot, &mut inputs);
+    let context = context_values(valid, context, &mut inputs);
+    let diagnostics = inputs.sorted();
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+    Ok((scope, context))
+}
+
+/// The context values (docs/manual/runtime.md, "Context"): each name the manifest's `context`
+/// declares, checked against its type as a snapshot's scope name is; names it doesn't declare are
+/// never looked at.
+pub(crate) fn context_values(
+    valid: &Valid,
+    context: &HostRecord,
+    inputs: &mut Inputs<'_>,
+) -> BTreeMap<String, Value> {
+    valid
+        .manifest
+        .context()
+        .iter()
+        .map(|(name, ty)| {
+            let mut path = vec![
+                PathSegment::Name(CONTEXT_ROOT.to_string()),
+                PathSegment::Name(name.clone()),
+            ];
+            (name.clone(), inputs.value(context.get(name), ty, &mut path))
+        })
+        .collect()
+}
+
+/// The first segment of a path into the context values, in a change and in a diagnostic's
+/// location: a name no scope name can be, as `$event` and `$units` are.
+pub(crate) const CONTEXT_ROOT: &str = "$context";
+
+/// `values`, the scope of the template of `component`, with the context names its component uses.
+pub(crate) fn with_context(
+    valid: &Valid,
+    component: &str,
+    values: &mut BTreeMap<String, Value>,
+    context: &BTreeMap<String, Value>,
+) {
+    for name in &valid.component(component).uses {
+        let value = context.get(name).cloned().unwrap_or(Value::Absent);
+        values.insert(name.clone(), value);
+    }
 }
 
 /// The root scope's values from a snapshot, validated (§9.8.4): every
@@ -665,13 +860,25 @@ pub(crate) fn validated_values(
 pub(crate) fn tree_of<'v>(
     valid: &'v Valid,
     scope: &BTreeMap<String, Value>,
+    context: &Rc<BTreeMap<String, Value>>,
     record: bool,
     previous: Option<&Rc<Node>>,
     units: &Rc<Units>,
 ) -> Result<Rendered<'v>, Vec<RuntimeDiagnostic>> {
+    // The root's own context names join its scope; the snapshot's are never copied otherwise.
+    let rooted;
+    let scope = if valid.component(&valid.root).uses.is_empty() {
+        scope
+    } else {
+        let mut values = scope.clone();
+        with_context(valid, &valid.root, &mut values, context);
+        rooted = values;
+        &rooted
+    };
     let mut renderer = Renderer {
         valid,
         units: Rc::clone(units),
+        context: Rc::clone(context),
         instances: Vec::new(),
         keys: HashSet::new(),
         sites: record.then(BTreeMap::new),
@@ -710,7 +917,12 @@ pub(crate) fn snapshot_values(
     inputs: &mut Inputs<'_>,
 ) -> BTreeMap<String, Value> {
     let mut values = BTreeMap::new();
-    for (name, ty) in &valid.component(&valid.root).scope {
+    let root = valid.component(&valid.root);
+    for (name, ty) in &root.scope {
+        // A context name is the context's, not the snapshot's.
+        if root.uses.contains(name) {
+            continue;
+        }
         let mut path = vec![PathSegment::Name(name.clone())];
         let value = inputs.value(snapshot.get(name), ty, &mut path);
         values.insert(name.clone(), value);
@@ -784,6 +996,7 @@ pub(crate) fn bind(
     element: &Element,
     key: Option<&str>,
     units: &Units,
+    context: &BTreeMap<String, Value>,
 ) -> Result<Bound, RuntimeDiagnostic> {
     let composite = valid.component(&element.component);
     let mut written = BTreeMap::new();
@@ -824,6 +1037,8 @@ pub(crate) fn bind(
             )
         })
         .collect();
+    // The context names it uses are the host's context values, never a prop.
+    with_context(valid, &element.component, &mut values, context);
     let (Some(unit), Some(key)) = (&composite.unit, key) else {
         return Ok((values, None));
     };
@@ -889,7 +1104,7 @@ pub(crate) fn bind(
         .collect();
     Ok((
         values,
-        Some(Rc::new(Instance {
+        Some(Rc::new(Occurrence {
             key: key.to_string(),
             component: element.component.clone(),
             state,
@@ -925,12 +1140,14 @@ struct Renderer<'v> {
     valid: &'v Valid,
     /// The state the host holds for the unit occurrences.
     units: Rc<Units>,
+    /// The context values, validated.
+    context: Rc<BTreeMap<String, Value>>,
     /// The unit occurrences met so far, in order: those a kept part holds are added back from its memo.
-    instances: Vec<Rc<Instance>>,
+    instances: Vec<Rc<Occurrence>>,
     keys: HashSet<String>,
     sites: Option<Sites<'v>>,
     /// The unit occurrences by key, when recording.
-    occurrences: Option<BTreeMap<String, Occurrence<'v>>>,
+    occurrences: Option<BTreeMap<String, Found<'v>>>,
     /// The scope names read from outside each element's subtree, by element.
     free: HashMap<*const Element, Rc<Vec<String>>>,
     /// For the repeats being rendered, innermost last: the hash of the path
@@ -1054,7 +1271,9 @@ impl<'v> Renderer<'v> {
                 key
             });
         let units = Rc::clone(&self.units);
-        let (mut bound, instance) = bind(self.valid, scope, element, key.as_deref(), &units)?;
+        let context = Rc::clone(&self.context);
+        let (mut bound, instance) =
+            bind(self.valid, scope, element, key.as_deref(), &units, &context)?;
         if let Some(instance) = &instance {
             self.instances.push(Rc::clone(instance));
             if self.occurrences.is_some() {
@@ -1068,7 +1287,7 @@ impl<'v> Renderer<'v> {
                         instance: frame.instance.clone(),
                     })
                     .collect();
-                let found = Occurrence {
+                let found = Found {
                     component: scope.component.to_string(),
                     occurrence: element,
                     values: scope.values.clone(),
@@ -1201,7 +1420,7 @@ impl<'v> Renderer<'v> {
     }
 
     /// Whether every unit occurrence in `kept` has the host state it was rendered with.
-    fn units_unchanged(&self, kept: &[Rc<Instance>]) -> bool {
+    fn units_unchanged(&self, kept: &[Rc<Occurrence>]) -> bool {
         kept.iter()
             .all(|instance| self.units.0.get(&instance.key) == instance.entry.as_ref())
     }

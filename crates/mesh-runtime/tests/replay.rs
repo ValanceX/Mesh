@@ -48,7 +48,14 @@ struct Loaded {
 
 fn load(name: &str) -> Loaded {
     let here = dir().join(name);
-    let model = read(&dir().join("components.json"));
+    // A directory may have its own manifest (`named-arguments` does), so the shared one, and every
+    // other log, is untouched.
+    let own = here.join("components.json");
+    let model = read(&if own.is_file() {
+        own
+    } else {
+        dir().join("components.json")
+    });
     let program: Value = serde_json::from_str(&read(&here.join("program.json"))).unwrap();
     let root = program["root"].as_str().unwrap().to_string();
     let mut sources = String::new();
@@ -157,6 +164,28 @@ fn outcome(render: &Render, handler: &str, payload: Option<&Value>) -> Value {
         Ok(intent) => {
             json!({ "intent": serde_json::from_str::<Value>(&intent.to_json()).unwrap() })
         }
+        Err(diagnostics) => json!({ "diag": diagnostics[0].code }),
+    }
+}
+
+/// `out` without the arguments' `name`s: a log of format 1 doesn't record them (0.16 and 0.17 had
+/// none), so a player compares an event's outcome without them.
+fn without_names(out: &Value) -> Value {
+    let mut out = out.clone();
+    if let Some(arguments) = out["intent"]["arguments"].as_array_mut() {
+        for argument in arguments {
+            argument.as_object_mut().unwrap().remove("name");
+        }
+    }
+    out
+}
+
+/// What a dispatch gives a host that sees the arguments' names, as the WebAssembly module does.
+fn outcome_named(render: &Render, handler: &str, payload: Option<&Value>) -> Value {
+    let payload = payload.map(|value| HostValue::from_json(&value.to_string()).unwrap());
+
+    match mesh_runtime::dispatch_named(render, handler, payload.as_ref()) {
+        Ok(named) => json!({ "intent": serde_json::from_str::<Value>(&named.to_json()).unwrap() }),
         Err(diagnostics) => json!({ "diag": diagnostics[0].code }),
     }
 }
@@ -387,15 +416,16 @@ fn play(name: &str, lines: &[Value], route: &str) -> Vec<String> {
             }
             "event" => {
                 let on = line["on"].as_u64().unwrap() as usize;
-                let out = outcome(
+                // Played with the names, as the module gives them, and compared without them.
+                let out = outcome_named(
                     &renders[on],
                     line["handler"].as_str().unwrap(),
                     line.get("payload"),
                 );
 
                 assert_eq!(
-                    out,
-                    line["out"],
+                    without_names(&out),
+                    without_names(&line["out"]),
                     "{name} line {}: {route} dispatches as recorded",
                     index + 1
                 );
@@ -447,6 +477,29 @@ fn lines_of(text: &str) -> Vec<Value> {
 #[test]
 fn there_are_at_least_six_logs() {
     assert!(names().len() >= 6, "{:?}", names());
+}
+
+#[test]
+fn a_log_recorded_without_argument_names_replays_against_a_runtime_that_gives_them() {
+    // `named-arguments` dispatches `move(item.label)`: the log has no `name`, the runtime gives one.
+    let lines = lines_of(&read(&dir().join("named-arguments").join("log.jsonl")));
+    let events: Vec<&Value> = lines
+        .iter()
+        .filter(|line| line["line"] == "event")
+        .collect();
+    assert!(!events.is_empty());
+    for event in &events {
+        assert_eq!(event["out"]["intent"]["arguments"][0].get("name"), None);
+    }
+    let loaded = load("named-arguments");
+    let first = start(&loaded, &lines[0]["snapshot"]);
+    let out = outcome_named(&first, events[0]["handler"].as_str().unwrap(), None);
+    assert_eq!(out["intent"]["arguments"][0]["name"], "label");
+    assert_ne!(out, events[0]["out"]);
+    assert_eq!(without_names(&out), without_names(&events[0]["out"]));
+    for route in ["changes", "update", "render"] {
+        play("named-arguments", &lines, route);
+    }
 }
 
 #[test]

@@ -1,0 +1,5 @@
+<page>
+  <tile label="by name" on.press={move(from, to)} on.pick={move($event, from)} />
+  <tile label="computed" on.press={move(draft ?? to, "home")} on.pick={note(draft)} />
+  {#each items as item (item.id)}<tile label="item" on.press={open(item.id)} />{/each}
+</page>

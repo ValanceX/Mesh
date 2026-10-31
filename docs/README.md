@@ -32,6 +32,7 @@ Reference material for when you need exact details.
 - [**Templates and programs**](./manual/templates.md): the compiled form of a template, the model fingerprint, and the assembly rules. Also a [JSON Schema](../schemas/template-v1.schema.json). `mesh compile` and `compile()` emit templates; `mesh check-program` and `checkProgram()` check programs.
 - [**API stability**](./manual/stability.md): what each public surface promises (stable, unreleased, provisional, internal).
 - [**The MESH runtime**](./manual/runtime.md): render and dispatch, the host's obligations, the render tree and `propText`, event resolution, keys, handler identifiers, command intents, and runtime diagnostics. Also JSON Schemas for [render trees and intents](../schemas/render-v1.schema.json) and [runtime diagnostics](../schemas/runtime-diagnostics-v1.schema.json).
+- [**Glossary**](https://github.com/ValanceX/Valance/blob/main/docs/understand/glossary.md): words that mean different things across the Valance repos (`instance`, `unit`, `scope`, `Render`), and the canonical name for each.
 
 ## Background
 

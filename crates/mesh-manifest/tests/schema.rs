@@ -37,8 +37,10 @@ const SCHEMA_CODES: [&str; 6] = [
 ];
 
 /// Codes for mistakes only the loader can find.
-const LOADER_CODES: [&str; 11] = [
+const LOADER_CODES: [&str; 13] = [
     "manifest-unit-clash",
+    "manifest-context-clash",
+    "manifest-unknown-context",
     "manifest-snippet-misplaced",
     "manifest-children-not-snippet",
     "manifest-enum-too-large",
@@ -128,4 +130,16 @@ fn the_manifest_references_example_is_valid() {
     mesh_manifest::load(example).expect("the loader accepts the example");
     let example: serde_json::Value = serde_json::from_str(example).expect("the example is JSON");
     assert!(validator().is_valid(&example));
+}
+
+#[test]
+fn the_schema_accepts_a_manifest_with_a_context_channel() {
+    let source = read(&repo("examples/conformance/context/components.json"));
+    let instance = serde_json::from_str(&source).expect("the manifest is JSON");
+    let errors: Vec<String> = validator()
+        .iter_errors(&instance)
+        .map(|error| error.to_string())
+        .collect();
+    assert!(errors.is_empty(), "{errors:#?}");
+    assert!(mesh_manifest::load(&source).is_ok());
 }

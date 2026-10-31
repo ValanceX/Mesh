@@ -10,12 +10,13 @@ use crate::program::{
     COMPOSITE, CONDITIONAL, FRAGMENT, FRAGMENT_COMPONENT, NODE, SLOT,
 };
 use crate::render::{
-    bind, is_live, render_children, snapshot_values, statics, Instance, Link, Render, RenderChild,
+    bind, context_values, is_live, render_children, snapshot_values, statics, with_context, Link,
+    Occurrence, Render, RenderChild,
 };
-use crate::tree::Intent;
+use crate::tree::{Intent, NamedIntent};
 use crate::types::fits;
 use crate::value::{HostRecord, HostValue, Units, Value};
-use mesh_template::Element;
+use mesh_template::{Element, Expression};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -37,7 +38,7 @@ struct Site<'v> {
     /// event needs them); a walk of the program derives them from `composites`.
     chain: Option<&'v [Link<'v>]>,
     /// The unit occurrence whose template the node is in, when a render recorded it.
-    instance: Option<Rc<Instance>>,
+    instance: Option<Rc<Occurrence>>,
 }
 
 /// Every handler of the program, by identifier: a walk of its structure,
@@ -224,8 +225,17 @@ pub fn dispatch(
     handler: &str,
     payload: Option<&HostValue>,
 ) -> Result<Intent, Vec<RuntimeDiagnostic>> {
+    dispatch_named(render, handler, payload).map(|named| named.intent)
+}
+
+/// [`dispatch`], with the name of each argument written as a plain path (`to`, `item.id`).
+pub fn dispatch_named(
+    render: &Render,
+    handler: &str,
+    payload: Option<&HostValue>,
+) -> Result<NamedIntent, Vec<RuntimeDiagnostic>> {
     let (templates, root) = render.program();
-    dispatch_from_units(
+    dispatch_named_from_context(
         &Program {
             root,
             templates: &templates,
@@ -233,6 +243,7 @@ pub fn dispatch(
         &render.model,
         &render.host_snapshot(),
         &render.units,
+        &render.host_context(),
         handler,
         payload,
     )
@@ -273,6 +284,41 @@ pub fn dispatch_from_units(
     handler: &str,
     payload: Option<&HostValue>,
 ) -> Result<Intent, Vec<RuntimeDiagnostic>> {
+    dispatch_named_from_units(program, model, snapshot, units, handler, payload)
+        .map(|named| named.intent)
+}
+
+/// [`dispatch_from_units`], with the name of each argument written as a plain path.
+pub fn dispatch_named_from_units(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Rc<Units>,
+    handler: &str,
+    payload: Option<&HostValue>,
+) -> Result<NamedIntent, Vec<RuntimeDiagnostic>> {
+    dispatch_named_from_context(
+        program,
+        model,
+        snapshot,
+        units,
+        &HostRecord::default(),
+        handler,
+        payload,
+    )
+}
+
+/// [`dispatch_named_from_units`], for a render made with context values (`render_context`): they
+/// are given again, as they were.
+pub fn dispatch_named_from_context(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Rc<Units>,
+    context: &HostRecord,
+    handler: &str,
+    payload: Option<&HostValue>,
+) -> Result<NamedIntent, Vec<RuntimeDiagnostic>> {
     // 1. Program validation, of the render's own copies (I14).
     let valid = program::validate(program, model)?;
 
@@ -293,7 +339,7 @@ pub fn dispatch_from_units(
     let recorded;
     let sites;
     let site = if repeats {
-        recorded = crate::render::tree(&valid, snapshot, true, None, units)?.sites;
+        recorded = crate::render::tree(&valid, snapshot, context, true, None, units)?.sites;
         recorded.get(handler).map(|found| Site {
             composites: Vec::new(),
             component: &found.component,
@@ -328,7 +374,9 @@ pub fn dispatch_from_units(
     // inputs can't be rendered there is no tree to check against, and step 3
     // reports what is wrong with them.
     if uses_conditional(&valid.templates) {
-        if let Ok(rendered) = crate::render::render_units(program, model, snapshot, units) {
+        if let Ok(rendered) =
+            crate::render::render_context(program, model, snapshot, units, context)
+        {
             if !handlers(&rendered.tree().root).contains(handler) {
                 return Err(vec![RuntimeDiagnostic::new(
                     RuntimeCode::UNKNOWN_HANDLER,
@@ -342,6 +390,8 @@ pub fn dispatch_from_units(
     // 3. The render's snapshot and the payload, together.
     let mut inputs = Inputs::new(&valid.manifest);
     let mut root_values = snapshot_values(&valid, snapshot, &mut inputs);
+    let context = context_values(&valid, context, &mut inputs);
+    with_context(&valid, &valid.root, &mut root_values, &context);
     if let Some(values) = site.values {
         root_values = values.clone();
     }
@@ -372,7 +422,7 @@ pub fn dispatch_from_units(
     // it, then the handler's arguments, left to right. A handler that
     // forwards an event of its component goes on, out through the
     // occurrences around it, until one binds the event to a command.
-    let evaluate = || -> Result<Intent, RuntimeDiagnostic> {
+    let evaluate = || -> Result<NamedIntent, RuntimeDiagnostic> {
         let mut values = root_values;
         // The occurrences around the node, outermost first, with the scope
         // each was written in.
@@ -399,7 +449,7 @@ pub fn dispatch_from_units(
                         statics: statics(&valid, component, None),
                     };
                     let (bound, instance) =
-                        bind(&valid, &scope, occurrence, key.as_deref(), units)?;
+                        bind(&valid, &scope, occurrence, key.as_deref(), units, &context)?;
                     owner.clone_from(&instance);
                     around.push((
                         (*component).to_string(),
@@ -450,7 +500,7 @@ type Around<'v> = (
     String,
     &'v Element,
     BTreeMap<String, Value>,
-    Option<Rc<Instance>>,
+    Option<Rc<Occurrence>>,
 );
 
 /// Delivers the event `name` of `component`, carrying `carried`, out through the occurrences in
@@ -463,7 +513,7 @@ fn deliver<'v>(
     mut component: String,
     mut name: &'v str,
     mut carried: Value,
-) -> Result<Option<Intent>, RuntimeDiagnostic> {
+) -> Result<Option<NamedIntent>, RuntimeDiagnostic> {
     loop {
         let Some((caller, occurrence, caller_values, _)) = around.pop() else {
             return Ok(None);
@@ -499,8 +549,8 @@ fn intent_of(
     scope: &Scope<'_, '_>,
     component: &str,
     binding: &mesh_template::EventBinding,
-    owner: Option<&Instance>,
-) -> Result<Intent, RuntimeDiagnostic> {
+    owner: Option<&Occurrence>,
+) -> Result<NamedIntent, RuntimeDiagnostic> {
     let command = &valid.component(component).commands[&binding.command];
     let mut arguments = Vec::with_capacity(binding.arguments.len());
     for (argument, parameter) in binding.arguments.iter().zip(&command.parameters) {
@@ -530,13 +580,34 @@ fn intent_of(
         .as_ref()
         .is_some_and(|unit| unit.commands.contains(&binding.command));
     let owner = owner.filter(|_| of_unit);
-    Ok(Intent {
-        component: component.to_string(),
-        command: binding.command.clone(),
-        arguments,
-        instance: owner.map(|owner| owner.key.clone()),
-        controlled: owner.map_or_else(Vec::new, |owner| owner.controlled.clone()),
+    Ok(NamedIntent {
+        intent: Intent {
+            component: component.to_string(),
+            command: binding.command.clone(),
+            arguments,
+            #[allow(deprecated)]
+            instance: owner.map(|owner| owner.key.clone()),
+            controlled: owner.map_or_else(Vec::new, |owner| owner.controlled.clone()),
+        },
+        names: binding.arguments.iter().map(path_name).collect(),
     })
+}
+
+/// The last segment of `argument` when it is a plain path: a scope name (`to`), or fields of one
+/// (`item.id`). `None` for any other expression, `$event` included.
+fn path_name(argument: &Expression) -> Option<String> {
+    fn rooted(expression: &Expression) -> bool {
+        match expression {
+            Expression::Scope { .. } => true,
+            Expression::Member { object, .. } => rooted(object),
+            _ => false,
+        }
+    }
+    match argument {
+        Expression::Scope { name, .. } => Some(name.clone()),
+        Expression::Member { object, field, .. } if rooted(object) => Some(field.clone()),
+        _ => None,
+    }
 }
 
 /// The payload a forwarding `binding` gives the event it names (an event of
@@ -573,12 +644,22 @@ fn forwarded(
 /// [`raise_from_units`], against a [`Render`] the host holds.
 pub fn raise(
     render: &Render,
-    instance: &str,
+    occurrence: &str,
     event: &str,
     payload: Option<&HostValue>,
 ) -> Result<Option<Intent>, Vec<RuntimeDiagnostic>> {
+    raise_named(render, occurrence, event, payload).map(|named| named.map(|named| named.intent))
+}
+
+/// [`raise`], with the name of each argument written as a plain path.
+pub fn raise_named(
+    render: &Render,
+    occurrence: &str,
+    event: &str,
+    payload: Option<&HostValue>,
+) -> Result<Option<NamedIntent>, Vec<RuntimeDiagnostic>> {
     let (templates, root) = render.program();
-    raise_from_units(
+    raise_named_from_context(
         &Program {
             root,
             templates: &templates,
@@ -586,34 +667,74 @@ pub fn raise(
         &render.model,
         &render.host_snapshot(),
         &render.units,
-        instance,
+        &render.host_context(),
+        occurrence,
         event,
         payload,
     )
 }
 
-/// Raises the event `event` of the unit occurrence `instance`, carrying `payload` (absent when
+/// Raises the event `event` of the unit occurrence `occurrence`, carrying `payload` (absent when
 /// `None`), against the render the host holds: what the occurrence's unit announces to its caller
 /// (docs/manual/runtime.md, "Units"). The result is the intent of the handler the caller bound to
 /// the event, found as a handler is when the event is forwarded out through occurrences; `None` when
 /// the caller bound none. Nothing is rendered.
 ///
-/// `Err` when the program, snapshot or units are not valid, the instance is not in the render, its
+/// `Err` when the program, snapshot or units are not valid, the occurrence is not in the render, its
 /// component declares no such event, or the payload does not fit the event's.
 pub fn raise_from_units(
     program: &Program<'_>,
     model: &str,
     snapshot: &HostRecord,
     units: &Rc<Units>,
-    instance: &str,
+    occurrence: &str,
     event: &str,
     payload: Option<&HostValue>,
 ) -> Result<Option<Intent>, Vec<RuntimeDiagnostic>> {
+    raise_named_from_units(program, model, snapshot, units, occurrence, event, payload)
+        .map(|named| named.map(|named| named.intent))
+}
+
+/// [`raise_from_units`], with the name of each argument written as a plain path.
+pub fn raise_named_from_units(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Rc<Units>,
+    occurrence: &str,
+    event: &str,
+    payload: Option<&HostValue>,
+) -> Result<Option<NamedIntent>, Vec<RuntimeDiagnostic>> {
+    raise_named_from_context(
+        program,
+        model,
+        snapshot,
+        units,
+        &HostRecord::default(),
+        occurrence,
+        event,
+        payload,
+    )
+}
+
+/// [`raise_named_from_units`], for a render made with context values (`render_context`): they are
+/// given again, as they were.
+#[allow(clippy::too_many_arguments)]
+pub fn raise_named_from_context(
+    program: &Program<'_>,
+    model: &str,
+    snapshot: &HostRecord,
+    units: &Rc<Units>,
+    context: &HostRecord,
+    occurrence: &str,
+    event: &str,
+    payload: Option<&HostValue>,
+) -> Result<Option<NamedIntent>, Vec<RuntimeDiagnostic>> {
     let valid = program::validate(program, model)?;
-    let rendered = crate::render::tree(&valid, snapshot, true, None, units)?;
-    let Some(found) = rendered.occurrences.get(instance) else {
+    let rendered = crate::render::tree(&valid, snapshot, context, true, None, units)?;
+    let Some(found) = rendered.occurrences.get(occurrence) else {
         return Err(vec![RuntimeDiagnostic::new(
-            RuntimeCode::UNKNOWN_INSTANCE,
+            RuntimeCode::UNKNOWN_OCCURRENCE,
             "this key names no unit occurrence in this render",
             Location::Handler,
         )]);

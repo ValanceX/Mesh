@@ -49,27 +49,34 @@ pub enum HostKey {
 pub struct Units(pub std::collections::BTreeMap<String, HostRecord>);
 
 impl Units {
-    /// Reads units from JSON text: an array of `{ "instance": <key>, "state": { ... } }`. For a
-    /// native host; see [`HostValue::from_json`].
+    /// Reads units from JSON text: an array of `{ "occurrence": <key>, "state": { ... } }`. The old
+    /// name `"instance"` for the key is still read, deprecated since 0.18.0 and dropped after it;
+    /// an entry giving both is refused. For a native host; see [`HostValue::from_json`].
     pub fn from_json(text: &str) -> Result<Units, String> {
         let HostValue::List(items) = HostValue::from_json(text)? else {
-            return Err("units are a JSON array of { \"instance\", \"state\" }".to_string());
+            return Err("units are a JSON array of { \"occurrence\", \"state\" }".to_string());
         };
         let mut units = std::collections::BTreeMap::new();
         for item in items {
             let Some(HostValue::Record(entry)) = item else {
                 return Err("each of the units is a JSON object".to_string());
             };
-            let (Some(HostValue::String(instance)), Some(HostValue::Record(state))) =
-                (entry.get("instance"), entry.get("state"))
-            else {
+            if entry.get("occurrence").is_some() && entry.get("instance").is_some() {
                 return Err(
-                    "each of the units has an \"instance\" (text) and a \"state\" (an object)"
+                    "a unit gives \"occurrence\" or the old \"instance\", not both".to_string(),
+                );
+            }
+            let (Some(HostValue::String(occurrence)), Some(HostValue::Record(state))) = (
+                entry.get("occurrence").or_else(|| entry.get("instance")),
+                entry.get("state"),
+            ) else {
+                return Err(
+                    "each of the units has an \"occurrence\" (text) and a \"state\" (an object)"
                         .to_string(),
                 );
             };
-            if units.insert(instance.clone(), state.clone()).is_some() {
-                return Err(format!("the unit {instance:?} is given twice"));
+            if units.insert(occurrence.clone(), state.clone()).is_some() {
+                return Err(format!("the unit {occurrence:?} is given twice"));
             }
         }
         Ok(Units(units))

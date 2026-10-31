@@ -550,6 +550,34 @@ error[manifest-unit-clash]: the unit's state field `open` is also a scope name o
 
 **Fix:** delete the name from `scope` (a unit's state names join the scope by themselves), or rename the unit's.
 
+### `manifest-context-clash`
+
+A name in a component's `uses` is already a prop or a scope name of the component (a unit's state names included), or is listed twice. A context name joins the scope by itself, so it can't also be bound by a prop. Points at the name in `uses`. *Since 0.18.0.*
+
+```text
+error[manifest-context-clash]: the context name `theme` is a prop of the component
+  --> examples/fixtures/manifest/fail/context-clash.json:11:16
+   |
+11 |       "uses": ["theme"]
+   |                ^^^^^^^
+```
+
+**Fix:** drop the prop (and any scope name) of that name, or the name from `uses`: the component reads either a prop or the context value, never both.
+
+### `manifest-unknown-context`
+
+A name in a component's `uses` that the manifest's top-level `context` doesn't declare. Points at the name in `uses`. *Since 0.18.0.*
+
+```text
+error[manifest-unknown-context]: component "badge" uses `locale`, which the manifest's "context" doesn't declare
+ --> examples/fixtures/manifest/fail/unknown-context.json:6:81
+  |
+6 |     "badge": { "props": {}, "events": {}, "commands": {}, "scope": {}, "uses": ["locale"] },
+  |                                                                                 ^^^^^^^^
+```
+
+**Fix:** declare the name and its type in `context`, or correct the spelling.
+
 ### `manifest-snippet-misplaced`
 
 A `snippet` type is somewhere but a component's prop or scope name (or an `optional` of one there). A snippet is never stored, returned or sent, so it isn't a record's field, a list's element, a named type, an event's payload, a command's parameter, or another snippet's parameter. Points at the `"snippet"`.
@@ -1280,11 +1308,17 @@ Dispatch was given a handler identifier of the render's program that names no ha
 
 Location: `handler`.
 
-### `runtime-unknown-instance`
+### `runtime-unknown-occurrence`
 
 `raise` was given a unit occurrence key that names no unit occurrence in the render: the occurrence is not in the tree (a conditional hid it, or its item left the list), or the key is another program's.
 
 Location: `handler` (the key stands where a handler identifier does).
+
+### `runtime-unknown-instance`
+
+**Retired** in 0.18.0. Nothing reports this code any more: it was `raise`'s code for a key that names no unit occurrence, and the unit sense of "instance" is now "occurrence" (see [`runtime-unknown-occurrence`](#runtime-unknown-occurrence)). The code stays in the catalogue because a code is never reused for a different meaning.
+
+Location: `handler`.
 
 ### `runtime-unknown-event`
 

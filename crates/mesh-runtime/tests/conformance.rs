@@ -431,6 +431,33 @@ fn an_interaction_on_a_key_the_tree_lacks_is_refused() {
     );
 }
 
+/// `arguments/`: an intent's argument names. Each case is an event reported on a node, with a
+/// payload or none, and the intent it gives: an argument written as a plain path carries its last
+/// segment as `name`, any other has none.
+#[test]
+fn arguments_carry_their_names_as_committed() {
+    let render = render("arguments");
+    let mut all = BTreeMap::new();
+    nodes(&render.tree().root, &mut all);
+    let mut failures = Vec::new();
+    for case in json(&dir().join("arguments/cases.json"))
+        .as_array()
+        .unwrap()
+    {
+        let handler = &all[case["node"].as_str().unwrap()].events[case["event"].as_str().unwrap()];
+        let payload = case
+            .get("payload")
+            .map(|p| HostValue::from_json(&p.to_string()).unwrap());
+        let intent = mesh_runtime::dispatch_named(&render, handler, payload.as_ref())
+            .unwrap_or_else(|d| panic!("{}: {d:#?}", case["case"]));
+        let actual = serde_json::from_str::<Value>(&intent.to_json()).unwrap();
+        if actual != case["intent"] {
+            failures.push(format!("{}: {actual}", case["case"]));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
 /// `enums/`: the first program with its own manifest. Its `cases.json` is
 /// `{ props, rejects, dispatches }`:
 ///
@@ -681,7 +708,7 @@ snippet_vectors!(passing, "passing");
 
 /// `units/`: a component's state for one occurrence, which a render takes beside the snapshot (docs/manual/runtime.md, "Units").
 /// `steps.json` is a list of `{ case, snapshot, units }`; each step's committed outputs are `step-N.expected.tree.json` and
-/// `step-N.expected.instances.json` (the occurrences the render lists). An update from a step to the next, given the next's units,
+/// `step-N.expected.occurrences.json` (the occurrences the render lists). An update from a step to the next, given the next's units,
 /// is the render of the next.
 mod units {
     use super::*;
@@ -757,7 +784,7 @@ mod units {
         for (at, step) in steps().iter().enumerate() {
             let render = render_step(step);
             committed(at, "tree", &(render.tree().to_json() + "\n"));
-            committed(at, "instances", &(render.instances_to_json() + "\n"));
+            committed(at, "occurrences", &(render.occurrences_to_json() + "\n"));
         }
     }
 
@@ -778,11 +805,196 @@ mod units {
                 step["case"]
             );
             assert_eq!(
-                updated.render.instances_to_json(),
-                fresh.instances_to_json(),
+                updated.render.occurrences_to_json(),
+                fresh.occurrences_to_json(),
                 "and lists what it lists"
             );
             previous = updated.render;
+        }
+    }
+}
+
+/// `context/`: the context channel, values a host gives beside the snapshot that a component reads only if
+/// its manifest entry `uses` them (docs/manual/runtime.md, "Context"). `steps.json` is a list of
+/// `{ case, snapshot, context, changes }`; each step renders its committed tree (`step-N.expected.tree.json`),
+/// and from the step before, an update by `changes` (whose paths into the context start `{ "context": name }`)
+/// and an update with the whole snapshot and context are both the render of the step. `cases.json` is
+/// `{ checks, manifests, rejects, dispatches }`: templates and manifests that fail to check, with the code;
+/// context values a render refuses, with the first diagnostic's code and location; and the intent a handler that
+/// passes a context value gives.
+mod context {
+    use super::*;
+    use mesh_runtime::{Changes, Units};
+
+    fn here() -> PathBuf {
+        dir().join("context")
+    }
+
+    fn compiled() -> (String, String, Vec<String>) {
+        let model = read(&here().join("components.json"));
+        let program = json(&here().join("program.json"));
+        let templates = program["templates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|component| {
+                let component = component.as_str().unwrap();
+                let loaded = check::Model::load(&model, component).expect("the manifest loads");
+                let compiled =
+                    check::template(&read(&here().join(format!("{component}.mprx"))), &loaded);
+                assert!(
+                    compiled.diagnostics.is_empty(),
+                    "{component}: {:#?}",
+                    compiled.diagnostics
+                );
+                mesh_template::to_json(&compiled.template.expect("it compiles"))
+            })
+            .collect();
+        (
+            program["root"].as_str().unwrap().to_string(),
+            model,
+            templates,
+        )
+    }
+
+    fn record(value: &Value) -> HostRecord {
+        HostRecord::from_json(&value.to_string()).unwrap()
+    }
+
+    fn render_with(snapshot: &Value, context: &Value) -> Result<Render, Vec<RuntimeDiagnostic>> {
+        let (root, model, templates) = compiled();
+        let texts: Vec<&str> = templates.iter().map(String::as_str).collect();
+        mesh_runtime::render_context(
+            &Program {
+                root: &root,
+                templates: &texts,
+            },
+            &model,
+            &record(snapshot),
+            &Units::default(),
+            &record(context),
+        )
+    }
+
+    fn steps() -> Vec<Value> {
+        json(&here().join("steps.json")).as_array().unwrap().clone()
+    }
+
+    fn cases() -> Value {
+        json(&here().join("cases.json"))
+    }
+
+    #[test]
+    fn every_step_renders_its_committed_tree() {
+        for (at, step) in steps().iter().enumerate() {
+            let render = render_with(&step["snapshot"], &step["context"])
+                .unwrap_or_else(|d| panic!("{} renders: {d:#?}", step["case"]));
+            let text = render.tree().to_json() + "\n";
+            let file = here().join(format!("step-{at}.expected.tree.json"));
+            if std::env::var_os("MESH_BLESS").is_some() {
+                fs::write(&file, &text).unwrap();
+            } else {
+                assert_eq!(read(&file), text, "step {at}'s tree is the committed one");
+            }
+        }
+    }
+
+    #[test]
+    fn an_update_by_changes_or_by_whole_inputs_is_the_render_of_the_next_step() {
+        let all = steps();
+        let mut by_changes = render_with(&all[0]["snapshot"], &all[0]["context"]).unwrap();
+        let mut by_whole = by_changes.clone();
+        for step in &all[1..] {
+            let fresh = render_with(&step["snapshot"], &step["context"]).unwrap();
+            let document =
+                serde_json::json!({ "base": by_changes.version(), "changes": step["changes"] });
+            let changes =
+                Changes::from_host(&HostValue::from_json(&document.to_string()).unwrap()).unwrap();
+            let updated = mesh_runtime::update_changes(&by_changes, &changes, None)
+                .unwrap_or_else(|d| panic!("{} updates by changes: {d:#?}", step["case"]));
+            assert_eq!(
+                updated.render.tree(),
+                fresh.tree(),
+                "{}: by changes",
+                step["case"]
+            );
+            assert_eq!(
+                updated.render.context_to_json(),
+                step["context"].to_string()
+            );
+            // The patches turn the previous tree into this one: a context change re-evaluates its readers.
+            assert!(
+                !updated.patches.is_empty(),
+                "{}: something changed",
+                step["case"]
+            );
+            let whole = mesh_runtime::update_with_context(
+                &by_whole,
+                record(&step["snapshot"]),
+                None,
+                Some(&record(&step["context"])),
+            )
+            .unwrap_or_else(|d| panic!("{} updates: {d:#?}", step["case"]));
+            assert_eq!(whole.render.tree(), fresh.tree(), "{}: whole", step["case"]);
+            by_changes = updated.render;
+            by_whole = whole.render;
+        }
+    }
+
+    #[test]
+    fn templates_and_manifests_that_misuse_the_context_do_not_check() {
+        let model = read(&here().join("components.json"));
+        for case in cases()["checks"].as_array().unwrap() {
+            let loaded = check::Model::load(&model, case["component"].as_str().unwrap()).unwrap();
+            let compiled = check::template(case["source"].as_str().unwrap(), &loaded);
+            let codes: Vec<&str> = compiled
+                .diagnostics
+                .iter()
+                .map(|d| d.code.as_str())
+                .collect();
+            assert_eq!(codes, [case["code"].as_str().unwrap()], "{}", case["case"]);
+        }
+        for case in cases()["manifests"].as_array().unwrap() {
+            let found = mesh_manifest::load(&case["manifest"].to_string()).unwrap_err();
+            let codes: Vec<&str> = found.iter().map(|d| d.code.as_str()).collect();
+            assert_eq!(codes, [case["code"].as_str().unwrap()], "{}", case["case"]);
+        }
+    }
+
+    #[test]
+    fn context_values_that_do_not_fit_are_refused_at_their_path() {
+        for case in cases()["rejects"].as_array().unwrap() {
+            let found = render_with(&case["snapshot"], &case["context"]).unwrap_err();
+            let document: Value = serde_json::from_str(&mesh_runtime::to_json(
+                &found,
+                &read(&here().join("components.json")),
+            ))
+            .unwrap();
+            let first = &document["diagnostics"][0];
+            assert_eq!(first["code"], case["code"], "{}", case["case"]);
+            assert_eq!(first["location"], case["location"], "{}", case["case"]);
+        }
+    }
+
+    #[test]
+    fn a_handler_that_passes_a_context_value_gives_the_committed_intent() {
+        for case in cases()["dispatches"].as_array().unwrap() {
+            let step = &steps()[case["step"].as_u64().unwrap() as usize];
+            let render = render_with(&step["snapshot"], &step["context"]).unwrap();
+            let mut all = BTreeMap::new();
+            nodes(&render.tree().root, &mut all);
+            let node = all
+                .values()
+                .find(|node| node.component == case["component"].as_str().unwrap())
+                .unwrap();
+            let handler = &node.events[case["event"].as_str().unwrap()];
+            let intent = mesh_runtime::dispatch_named(&render, handler, None).unwrap();
+            assert_eq!(
+                serde_json::from_str::<Value>(&intent.to_json()).unwrap(),
+                case["intent"],
+                "{}",
+                case["case"]
+            );
         }
     }
 }

@@ -1,0 +1,49 @@
+[
+  {
+    "case": "each argument written as a scope name carries that name, whatever its position",
+    "node": "kaSWeG8l2tTB-6zAacs61NQ",
+    "event": "press",
+    "intent": {
+      "command": { "component": "arguments", "name": "move" },
+      "arguments": [{ "value": "hall", "name": "from" }, { "value": "kitchen", "name": "to" }]
+    }
+  },
+  {
+    "case": "$event is not a path, so its argument has no name",
+    "node": "kaSWeG8l2tTB-6zAacs61NQ",
+    "event": "pick",
+    "payload": "cellar",
+    "intent": {
+      "command": { "component": "arguments", "name": "move" },
+      "arguments": [{ "value": "cellar" }, { "value": "hall", "name": "from" }]
+    }
+  },
+  {
+    "case": "an expression that is not a path, and a literal, have no name",
+    "node": "kfETl_elsc81fdXntyYg3Dw",
+    "event": "press",
+    "intent": {
+      "command": { "component": "arguments", "name": "move" },
+      "arguments": [{ "value": "kitchen" }, { "value": "home" }]
+    }
+  },
+  {
+    "case": "an absent argument written as a path keeps its name",
+    "node": "kfETl_elsc81fdXntyYg3Dw",
+    "event": "pick",
+    "payload": "ignored",
+    "intent": {
+      "command": { "component": "arguments", "name": "note" },
+      "arguments": [{ "absent": true, "name": "draft" }]
+    }
+  },
+  {
+    "case": "a field path carries its last segment",
+    "node": "kselv3jvVX37b20B7ED0uFw",
+    "event": "press",
+    "intent": {
+      "command": { "component": "arguments", "name": "open" },
+      "arguments": [{ "value": 7, "name": "id" }]
+    }
+  }
+]

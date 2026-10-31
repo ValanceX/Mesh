@@ -10,6 +10,37 @@ host ── program, model, snapshot ──▶ render ──▶ a render ──�
 host ◀── command intent ◀── dispatch ◀── the render, handler identifier, payload
 ```
 
+## Showing a program
+
+A host that draws one program and relays its events needs one object: a **screen** (`openScreen`, in `@valancex/mesh-runtime`). It is the Tier 1 way to host a program. Give it the program and the manifest, then show snapshots and dispatch the events the renderer reports; the screen does the host's duties below (keeping the render on screen, releasing the one before it, holding unit state) so its caller never meets them.
+
+```js
+import { openScreen } from "@valancex/mesh-runtime";
+
+const screen = openScreen({ program: { root: "users", templates }, model: manifest });
+const first = await screen.show(snapshot);
+if (first.diagnostics) throw new Error(first.diagnostics.diagnostics[0].message);
+renderer.draw(first.tree);
+
+// When the renderer reports an event on the tree it drew:
+const result = await screen.dispatch(handler, payload);
+if (result.patches) renderer.patch(result.patches); // a unit's command, which the screen ran
+if (result.intent) run(result.intent);             // a command for the application
+
+// Each new snapshot gives the patches from the tree drawn:
+renderer.patch((await screen.show(next)).patches);
+screen.close();
+```
+
+- **`show(snapshot, context?)`** gives `{ tree }` the first time (and after `close()`), then `{ patches }`: the `render-patch-v1` list from the tree it last gave to this snapshot's ([Update](#update)). Or `{ diagnostics }`, and then nothing changes: the tree drawn still dispatches. `context` is the manifest's [context](#context) values, when it declares any; given none, the screen keeps those last shown.
+- **`dispatch(handler, payload?)`** dispatches with the render whose tree or patches the screen gave last (so a renderer applies each result before it reports the next event) and gives `{ intent }`, the command for the host to run, or `{ diagnostics }`. A command of a [unit](#units) whose transition the screen was given is run by the screen instead, and gives `{ occurrence, patches }`: the occurrence it changed, and the patches to draw its new state. It also has an `intent` when there is one for the host: the handler the caller bound to the event the transition raised, or, when the transition changed a field the caller owns and raised nothing, the unit's own intent, so the caller can make the change it owns.
+- **`transitions`** (optional) are the units' commands, by component and command: `{ disclosure: { toggle: (state) => ({ changes: { open: !state.open } }) } }`. A transition takes the occurrence's state as the person saw it and the command's arguments in order, and returns `{ changes?, raise? }`: the fields it changes (a field the caller owns is not applied), and an event of the component with its payload, `raise: ["change", n]`, which the screen [raises](#units) for it. A result of another shape rejects with `MeshUsageError` (`invalid-argument`). A unit command with no transition comes back as its intent. The screen holds the state of the occurrences a transition changed, and lets go of an occurrence's when a render no longer lists it.
+- **`close()`** releases the render on screen and the occurrences' state, and is safe twice; `[Symbol.dispose]` does the same. The screen stays usable: the next `show` gives a tree to draw afresh.
+- **Calls run one at a time, in the order made,** so a `show` not awaited still patches from the one before it. Every render the screen keeps has its own snapshot, so it carries on after the package replaces its module (a trap); for the same reason, don't change a snapshot's objects after showing it, since a unit's change renders that snapshot again.
+- It is for **one program**. A different program is a new screen, and its first tree is drawn afresh.
+
+The screen is JavaScript only: in Rust a render is a value that `update` borrows and dropping it frees it, so there is nothing to release, and a host keeps the `Render` it drew. Everything below is what the screen is made of, for a host that does the duties itself (Tier 2).
+
 ## The operations
 
 - **render:** a program, a model and a snapshot in. Out: a **render**, or diagnostics.
@@ -18,7 +49,7 @@ host ◀── command intent ◀── dispatch ◀── the render, handler i
 - **updateChanges:** a render and edits to its snapshot in. Out: as update ([Changes](#changes)).
 - **raise:** a render, a unit occurrence's key, an event and a payload in. Out: the command intent of the handler the caller bound to the event, or nothing ([Units](#units)).
 
-Render, update, updateChanges and dispatch also take the state of the component's **units**, beside the snapshot ([Units](#units)); without it, every occurrence has its defaults.
+Render, update, updateChanges and dispatch also take the state of the component's **units**, beside the snapshot ([Units](#units)); without it, every occurrence has its defaults. Render and update also take the **context** values, beside the snapshot ([Context](#context)).
 
 Render and dispatch are the two the lifecycle below is about; `declaredEvents` (a program's declared events, below) is another, and takes no snapshot.
 
@@ -28,9 +59,9 @@ Each returns either its result and no diagnostics, or diagnostics and no result.
 
 **The snapshot** is one record of scope values for the program's root template: a scope name to each value (§9.8.4). **A payload** is the value an event carries, or absent.
 
-## The host
+## The host by hand (Tier 2)
 
-A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any program. It supplies snapshots, keeps renders, relays events, and receives intents.
+A **host** is whatever calls the runtime: a [screen](#showing-a-program), NEXUS's adapter, a test host, or any program. It supplies snapshots, keeps renders, relays events, and receives intents. A screen does all of this; this section is for a host that calls the operations itself.
 
 **The dispatch lifecycle:**
 1. The host calls render with a program, a model and a snapshot. The result is a render.
@@ -55,7 +86,7 @@ A **host** is whatever calls the runtime: NEXUS's adapter, a test host, or any p
 
 **From JavaScript,** `@valancex/mesh-runtime` has the same operations (`render`, `dispatch` and `update`, and `declaredEvents`, below): `render({ program: { root, templates }, model, snapshot })` resolves to `{ render }` or `{ diagnostics }`, and `dispatch(render, handler, payload?)` to `{ intent }` or `{ diagnostics }`. `update(render, snapshot)` resolves to `{ render, patches }` or `{ diagnostics }` (see [Update](#update)), and `declaredEvents({ program, model })` resolves to a program's [declared events](#the-declared-events) or `{ diagnostics }`. `render.tree` is the render tree, frozen. Its [README](../../packages/mesh-runtime/README.md) has the details. What a JavaScript host needs to know about its values (§9.8.6):
 - The package **encodes, and never judges.** (The one tree it reads is `update`'s: it applies the patches the module returns to the previous render's tree, as a renderer would, moving parts by key and reading no value, so that an update costs what changed and not the size of the tree. The package's review test names that file, and `changes.ts` (the host-side `diff`, which compares two host snapshots for sameness and is on no path of render, update or dispatch), as its only exceptions.) Every value reaches the runtime, which reports what it can't accept: NaN, the infinities, a hole or `undefined` in an array, an unpaired surrogate, a `Map`, a `Date`, a class instance, a function, a `bigint` or a value that contains itself. So a JavaScript host gets exactly the diagnostics a native host gets for the same values.
-- **Units** are an object of objects, the occurrence's key and its state: `render({ program, model, snapshot, units })`, `update(previous, snapshot, units)` and `updateChanges(previous, changes, { units })`. An update without them keeps the previous render's. `render.instances` lists the occurrences (`{ instance, component, state, controlled? }`), and `raise(render, instance, event, payload)` resolves to `{ intent }` (`intent` is `undefined` when the caller bound no handler to the event) or `{ diagnostics }`. See [Units](#units).
+- **Units** are an object of objects, the occurrence's key and its state: `render({ program, model, snapshot, units })`, `update(previous, snapshot, units)` and `updateChanges(previous, changes, { units })`. An update without them keeps the previous render's. `render.occurrences` lists the occurrences (`{ occurrence, component, state, controlled? }`), and `raise(render, occurrence, event, payload)` resolves to `{ intent }` (`intent` is `undefined` when the caller bound no handler to the event) or `{ diagnostics }`. See [Units](#units).
 - A missing property and a property that is `undefined` are both absent. A payload that isn't given is absent too.
 - `-0` crosses in as `-0`, and never comes out (§9.8.2).
 - A render keeps its snapshot as it was encoded when `render` was called, so changing the host's objects afterwards changes nothing.
@@ -232,6 +263,17 @@ It is `$defs/intent` in `render-v1.schema.json`:
 
 `{ "value": null }` is `null`, and `{ "absent": true }` is absent: the two are always distinct.
 
+An argument **written as a plain path**, a scope name or fields of one, also has its **`name`**: the path's last segment. `on.press={move(to, item.id)}` gives
+
+```json intent
+{
+  "command": { "component": "board", "name": "move" },
+  "arguments": [ { "value": "kitchen", "name": "to" }, { "value": 7, "name": "id" } ]
+}
+```
+
+and an absent argument keeps its name (`{ "absent": true, "name": "draft" }`). Any other argument (`$event`, a literal, `a ?? b`, a record) has no `name`, so an intent with none is written exactly as before. The name is the argument's, not the parameter's: for parameters declared `(to, from)`, `move(from, to)` gives the names `from`, `to`. That is what lets a host see the two differ and bind by name. From JavaScript it is `IntentArgument.name`. From Rust, `dispatch` and `raise` give the `Intent` as before, and `dispatch_named`, `dispatch_named_from_units`, `raise_named` and `raise_named_from_units` give a `NamedIntent`: the same `intent` and its `names`, one per argument, which its `to_json` writes as above. A session log (`examples/conformance/replay/`) does not record names, and a player compares an event's outcome without them. Provisional (spec §9.7.5).
+
 ```json intent-invalid
 { "command": { "component": "user-card", "name": "selectUser" }, "arguments": [ { "value": 1, "absent": true } ] }
 ```
@@ -294,21 +336,41 @@ A renderer implements the rule for its target, and checks itself against `exampl
 
 A component whose manifest entry has a [`unit`](./manifest.md#units) has state and commands that belong to **one occurrence** of it: a disclosure's open or closed, a tab strip's selection. Neither the snapshot nor the runtime holds that state. The host does, and gives it to each operation as an input beside the snapshot, so that a render is still a function of its inputs and the equivalence law of [Update](#update) holds with units in it.
 
-**The input.** `units` is, for each occurrence the host has changed, its key and a record of the unit's fields: `[ { "instance": "<key>", "state": { "open": true } } ]`. An occurrence with no entry has its unit's defaults, which is also what the first render, on a server or a client, uses. An entry is validated as any input is, against the types of the manifest's `unit.state` (`runtime-value-mismatch`, `runtime-unknown-field`, at a path that begins `$units`). An entry whose key is not in the render is ignored; the host lets it go.
+**The input.** `units` is, for each occurrence the host has changed, its key and a record of the unit's fields: `[ { "occurrence": "<key>", "state": { "open": true } } ]`. An occurrence with no entry has its unit's defaults, which is also what the first render, on a server or a client, uses. An entry is validated as any input is, against the types of the manifest's `unit.state` (`runtime-value-mismatch`, `runtime-unknown-field`, at a path that begins `$units`). An entry whose key is not in the render is ignored; the host lets it go.
 
 **The key** is the occurrence's identity: the key of its place in the program, composite step included (spec §9.10). It is not a node's key, and nothing else has it. A reorder inside a keyed `{#each}` keeps it, hiding the occurrence under an `{#if}` and showing it again does not (the node leaves the render, so the occurrence ends and the next is new, §9.10.6), and a changed item key is a different occurrence.
 
-**What a render says.** Its `instances` list each unit occurrence in the tree, in the order met, with its component, the key, the state the template saw (`state`: the caller's prop for a controlled field, else the host's value, else the default) and `controlled`. The host keeps the state of the occurrences it has changed and lets go of those a later render does not list.
+**What a render says.** Its `occurrences` list each unit occurrence in the tree, in the order met, with its component, the key, the state the template saw (`state`: the caller's prop for a controlled field, else the host's value, else the default) and `controlled`. The host keeps the state of the occurrences it has changed and lets go of those a later render does not list.
 
 **A kept part is not kept stale.** An update reuses every part whose inputs are as they were. The state of the units below a part is one of its inputs, so it is rebuilt when one of them has changed, and the occurrences below a part that is reused are still listed.
 
-**Commands.** A unit's commands are invoked like any command of a template. The intent names the component whose unit declares it, as usual, and gains `instance` (the occurrence it is for) and, if the caller owned any field, `controlled`. The handler's arguments are evaluated against the state the person saw: the render's units are kept with it and dispatch evaluates against them. The runtime does not apply the command: the host runs the unit's transition on the occurrence's state, leaves out the fields in `controlled`, and renders again with the new `units`.
+**Commands.** A unit's commands are invoked like any command of a template. The intent names the component whose unit declares it, as usual, and gains `occurrence` (the occurrence it is for) and, if the caller owned any field, `controlled`. The handler's arguments are evaluated against the state the person saw: the render's units are kept with it and dispatch evaluates against them. The runtime does not apply the command: the host runs the unit's transition on the occurrence's state, leaves out the fields in `controlled`, and renders again with the new `units`.
 
 **Controlled fields.** A field declared `controllable` is owned by the caller when the occurrence writes a prop of the same name with a value: the prop is then the value of the scope name, and the host's state for the field is not read. This is the rule the ecosystem already states for controls: the component reports, the application owns the value.
 
-**Raising.** A transition may announce something to the caller (a controlled tab strip tells its caller what the person chose). `raise(render, instance, event, payload)` takes an event the occurrence's component declares and resolves it as an event forwarded out of the component is (§9.9): the result is the intent of the handler the caller bound to it, found through the occurrences around, or nothing when the caller bound none. It renders nothing and changes nothing. An instance not in the render is `runtime-unknown-instance`, an event the component does not declare is `runtime-unknown-event`, and a payload that does not fit the event's is the usual input diagnostics (the key stands where a handler identifier does, location `handler`).
+**Raising.** A transition may announce something to the caller (a controlled tab strip tells its caller what the person chose). `raise(render, occurrence, event, payload)` takes an event the occurrence's component declares and resolves it as an event forwarded out of the component is (§9.9): the result is the intent of the handler the caller bound to it, found through the occurrences around, or nothing when the caller bound none. It renders nothing and changes nothing. An occurrence not in the render is `runtime-unknown-occurrence`, an event the component does not declare is `runtime-unknown-event`, and a payload that does not fit the event's is the usual input diagnostics (the key stands where a handler identifier does, location `handler`).
+
+**The old names (deprecated in 0.18.0, removed after it).** Until 0.18.0 the unit sense of "occurrence" was spelled "instance". For one release the old names are still accepted and still read, and the new ones are what is written. Input: a `units` entry may say `"instance"` for its key in Rust's `Units::from_json` (an entry giving both is refused); the JavaScript `units` object is keyed by occurrence and never had the word. Output: `Render.instances` (JavaScript) is `Render.occurrences`; each listed occurrence and each command intent also answers to `instance` (the same value, on the object but not enumerable, so it is not in a comparison or in `JSON.stringify`); in Rust `Render::instances`, `Render::instances_to_json`, the type `Instance` and the `Intent.instance` field remain, deprecated, beside `occurrences`, `occurrences_to_json`, `Occurrence` and `Intent::occurrence()`. What is *written* has the new names only: the JSON of a render's occurrences, of an intent (`to_json`) and the WebAssembly module's result documents say `occurrence` and `occurrences`. The diagnostic `runtime-unknown-instance` is retired, not renamed: nothing reports it, the code is never reused, and `raise` reports `runtime-unknown-occurrence`. A host that matched the old code must match the new one. "Instance" keeps its other meanings (an element of a component, a repeat's key, §9.10).
+
+**With a screen,** the host holds none of this, and raises nothing by hand: given a unit's `transitions`, a [screen](#showing-a-program) keeps the state of the occurrences, runs a command's transition on the state the person saw, leaves out the fields in `controlled`, raises the event the transition names and gives the intent of the handler the caller bound, renders again and gives the patches, and lets go of an occurrence's state when a render no longer lists it.
 
 **What does not change.** `render-v1` and the patches are as they were: no renderer needs to know units exist. Units are not persisted by the runtime; state that must outlive a reload is the application's. Changing the program resets them, since keys are not stable across programs.
+
+## Context
+
+A manifest may declare a [context channel](./manifest.md#context): names a host gives values for beside the snapshot, each with its type, which a component reads only if its manifest entry `uses` it. *Provisional, since 0.18.0 (refinements C-1, decision K27).* It is for values that many distant components need (a theme, a locale, the current user). Pass props or children first: a value one or two levels down is a prop.
+
+**The input.** `context` is a record of each context name's value: `render({ program, model, snapshot, context })` in JavaScript, `mesh_runtime::render_context(program, model, snapshot, units, context)` in Rust. A [screen](#showing-a-program) takes it with each snapshot it shows, `screen.show(snapshot, context)`, and keeps the values last shown when given none. Each declared name is validated as a snapshot's scope name is (§9.8.4), at a path that begins `$context`: a value that doesn't fit its type is `runtime-value-mismatch` at `$context.theme`, and one that is missing, when its type isn't optional, is `runtime-missing-value` there. A name the manifest doesn't declare is ignored. Without `context`, no name has a value, which is valid only when every context type is optional; `render`, `render_units` and the other entry points without it are the same operations with none.
+
+**Where a value is read.** In the template of each component that uses the name, and nowhere else: the root's too, whose `uses` names are read from the context, never from the snapshot. A snippet or a slot's content reads the context of the template it was declared in, like every name it reads ([templates](./templates.md#snippets)). The runtime stays stateless: the values are an input like the snapshot, so a server and a client given the same ones render the same tree.
+
+**A render keeps its context,** as it keeps its snapshot and units: `dispatch` evaluates a handler's arguments against the values the person saw, and an `update` given no `context` (Rust: `update_with_context(previous, snapshot, units, None)`; JavaScript: `update(render, snapshot)`) keeps the previous render's. `update(render, snapshot, units, context)` gives new ones.
+
+**Changes.** An edit of [Changes](#changes) whose path starts `{ "context": name }` edits that context value instead of the snapshot, as a snapshot path edits a scope name: `{ "op": "set", "path": [{ "context": "theme" }], "value": "dark" }`, or below it into a record or list. In Rust's `Change` the root is the two segments `$context` and the name. A name the context doesn't declare is `runtime-invalid-change`. `Render::context_to_json()` gives the values a render has, which is how a host that keeps a render's inputs itself learns what changes made them; the JavaScript package does that for its renders.
+
+**What an update re-evaluates.** Every node that reads a context name whose value changed is rendered again, with the new value; the conformance vectors (`examples/conformance/context/`) pin it. In this implementation a change of any context value renders the whole tree again (the patches are still from the previous tree, and a part that comes out the same has no patch); an update that changes no context value reuses parts as before.
+
+**What does not change.** `render-v1`, the patches and the intent are as they were: no renderer needs to know the context exists. The values cross to a client with the snapshot, so whatever a host would not put in a snapshot does not belong in the context either.
 
 ## Updates
 
@@ -346,6 +408,8 @@ A component whose manifest entry has a [`unit`](./manifest.md#units) has state a
 - **The module returns the patches, not the new tree.** The caller already has the previous tree, and applying the patches to it gives the new one (the law above), so what crosses the boundary on an update is what changed. The JavaScript package applies them (`src/patches.ts`) as a renderer would, over immutable data: the new tree is frozen and shares with the previous tree every part the patches didn't reach, so a part that didn't change is the very same object. The package's review test names that file as the one place it reads a tree, and checks that it makes no text and no number.
 - **The module's calls are one at a time,** so retention adds no ordering of its own: a `release` is queued behind the calls already made.
 
+Keeping a render, its version, calling `release()` and holding unit state are Tier 2 host duties: they belong to the code that embeds the runtime. A Tier 1 author never meets them: a [screen](#showing-a-program) does them, and so does Valance on its author's behalf.
+
 Measured on one machine, a keyed list of 10,000 items with one changed (the least of 15 runs; `cargo test -p mesh-runtime --release --test update_baseline full_render -- --ignored --nocapture` in Rust, `node scripts/bench-update.mjs` in the package):
 
 | | full render | update, one item changed | update, nothing changed |
@@ -373,7 +437,7 @@ At 1,000 items the update is 1.6 ms in Rust against 6.2 ms to render, and about 
 ```
 
 - **`op`.** `set` makes the value at `path` the given one (a scope name's, a record field's, made if the record lacks it and the type allows, or a list element's; a list's length appends one). `insert` puts a value at a list index, and the elements from there on are one later. `remove` takes a record field (which the type lets be absent) or a list element (the later ones are one earlier) away.
-- **`path`.** A non-empty list: a scope name first, then record field names (strings) and list indices (non-negative integers). Edits apply in order, each seeing those before it.
+- **`path`.** A non-empty list: a scope name first, then record field names (strings) and list indices (non-negative integers). The first segment may instead be `{ "context": name }`, which edits a [context](#context) value. Edits apply in order, each seeing those before it.
 - **`base`.** The `version` of the render the changes were computed against: a number each render has for life (`render.version`; `Render::version()` in Rust), different for every render the package or thread makes; the JavaScript package gives them, so a render's result never depends on how many came before it. Changes for any other render are refused (`runtime-changes-base-mismatch`), so changes made against a snapshot the runtime no longer holds are never applied to another. The version stands in for a digest of the snapshot: it costs nothing, and it detects the same mistake (changes for the wrong snapshot) without reading the snapshot.
 - **All or none.** Every edit is checked, with the document, before anything is done: a path that leads nowhere the type allows, a value that doesn't fit its type, a malformed edit. The first is `runtime-invalid-change`; a value's mismatch is reported by the input codes, at its path. On diagnostics `previous` is untouched and still dispatches.
 - **`verify`.** With the whole snapshot the host believes it now has, the runtime validates it, compares it with what the edits make, and refuses with `runtime-changes-disagree` at the first path that differs. It costs a whole validation, so it is for tests and development: the package's own tests run every chain with it.

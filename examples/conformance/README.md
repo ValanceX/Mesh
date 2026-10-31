@@ -35,6 +35,12 @@ Each node must be exactly as given, and no two states may be written alike: abse
 
 A renderer realizing any of these props in a slot that holds only text must produce exactly the value (for a string) or the `propText` entry, and must refuse a list or record there. It never makes a text itself.
 
+## `arguments/`: an intent's argument names (spec §9.7.5)
+
+This program has **its own `components.json`**. `cases.json` is a list of events reported on a node (`node`, `event`, and `payload` when the event has one), each with the exact `intent` it dispatches to. An argument written as a plain path, a scope name or fields of one, carries its last segment as `name`, and an absent one keeps it; `$event`, a literal and any other expression have none. The cases cover names in an order other than the parameters', `$event`, a computed argument and a literal, an absent argument, and a field path inside a repeat's item.
+
+A renderer needs none of this. A host that binds an intent's arguments by name does.
+
 ## `enums/`: enum types, `has`, `??` and prop defaults (spec §9.2, §9.3, §9.4, §9.8)
 
 This program has **its own `components.json`** (the shared one, and so every other program's keys, is untouched). `cases.json` is `{ props, rejects, dispatches }`:
@@ -79,9 +85,17 @@ This program has **its own `components.json`** and is a `template-v2` program. A
 
 ## `units/`: a component's state for one occurrence (docs/manual/runtime.md, "Units")
 
-This program has its own `components.json`: `disclosure` has a unit (`open`, and `toggle`), `tabs` has one whose field `at` is `controllable`, and the page writes `at={tab}` on its tabs. `steps.json` is a list of `{ case, snapshot, units }`; `units` is `[ { instance, state } ]`, the state a host holds for the occurrences it has changed, by the key the render gave each (`step-N.expected.instances.json` lists the occurrences a render has, with the keys). Each step has a committed tree (`step-N.expected.tree.json`) and a committed list of occurrences (`step-N.expected.instances.json`), and updating from a step to the next, with the next's `units`, gives exactly the render of the next.
+This program has its own `components.json`: `disclosure` has a unit (`open`, and `toggle`), `tabs` has one whose field `at` is `controllable`, and the page writes `at={tab}` on its tabs. `steps.json` is a list of `{ case, snapshot, units }`; `units` is `[ { occurrence, state } ]`, the state a host holds for the occurrences it has changed, by the key the render gave each (`step-N.expected.occurrences.json` lists the occurrences a render has, with the keys). Each step has a committed tree (`step-N.expected.tree.json`) and a committed list of occurrences (`step-N.expected.occurrences.json`), and updating from a step to the next, with the next's `units`, gives exactly the render of the next.
 
 What the steps pin: with no state held an occurrence has the defaults; the state held for an occurrence is what its template sees and only its; a re-sorted list keeps the state with the row (the occurrence's key is its place by the item's declared key, not its position); a row that leaves is not listed and the state held for it is not used; and a `controllable` field the caller writes a prop for is the caller's value whatever the host holds.
+
+## `context/`: the context channel (docs/manual/runtime.md, "Context"; spec §9.11)
+
+This program has its own `components.json`, whose top-level `context` declares `theme` (an enum) and `user` (an optional string). `page`, the root, `uses` `theme`; `badge` uses both; `frame` uses neither, and is given a snippet and content that `page` declared, which read `theme`. `steps.json` is a list of `{ case, snapshot, context, changes }`: each step renders its committed tree (`step-N.expected.tree.json`) with its `snapshot` and `context`, and from the step before, an update by its `changes` (a path into the context starts `{ "context": name }`) and an update with the whole snapshot and context are both the render of the step. The steps change the theme, give the optional user, change the snapshot alone (the context is kept), and change both at once.
+
+`cases.json` is `{ checks, manifests, rejects, dispatches }`: templates that don't check against this manifest (a component that doesn't use a name can't read it; a context name has its declared type), with the one code each gives; manifests that don't load (`manifest-unknown-context`, `manifest-context-clash`); context values a render refuses, with the first diagnostic's code and location (at `$context.<name>`; the snapshot never supplies one); and the intent a handler gives that passes a context value as an argument.
+
+A renderer needs none of this: the tree's format is unchanged. A host does.
 
 ## `replay/`: session logs (Bet 15)
 

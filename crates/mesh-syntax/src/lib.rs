@@ -126,6 +126,11 @@ impl DiagnosticCode {
     /// component (a prop only if the field is not `controllable`, and then it must be of the
     /// same type).
     pub const MANIFEST_UNIT_CLASH: DiagnosticCode = DiagnosticCode("manifest-unit-clash");
+    /// A name in a component's `uses` that is also a prop or a scope name of the component (its
+    /// unit's state names included), or that it lists twice.
+    pub const MANIFEST_CONTEXT_CLASH: DiagnosticCode = DiagnosticCode("manifest-context-clash");
+    /// A name in a component's `uses` that the manifest's `context` doesn't declare.
+    pub const MANIFEST_UNKNOWN_CONTEXT: DiagnosticCode = DiagnosticCode("manifest-unknown-context");
     /// A manifest `enum` that lists a value twice.
     pub const MANIFEST_DUPLICATE_VARIANT: DiagnosticCode =
         DiagnosticCode("manifest-duplicate-variant");
@@ -259,6 +264,8 @@ impl DiagnosticCode {
         DiagnosticCode::MANIFEST_SNIPPET_MISPLACED,
         DiagnosticCode::MANIFEST_CHILDREN_NOT_SNIPPET,
         DiagnosticCode::MANIFEST_UNIT_CLASH,
+        DiagnosticCode::MANIFEST_CONTEXT_CLASH,
+        DiagnosticCode::MANIFEST_UNKNOWN_CONTEXT,
         DiagnosticCode::MANIFEST_MISSING_COMPONENT,
         DiagnosticCode::UNKNOWN_COMPONENT,
         DiagnosticCode::UNKNOWN_PROP,
@@ -1173,6 +1180,8 @@ mod tests {
                 "manifest-snippet-misplaced",
                 "manifest-children-not-snippet",
                 "manifest-unit-clash",
+                "manifest-context-clash",
+                "manifest-unknown-context",
                 "manifest-missing-component",
                 "unknown-component",
                 "unknown-prop",

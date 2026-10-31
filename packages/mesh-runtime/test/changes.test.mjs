@@ -244,7 +244,7 @@ test("a render made from changes dispatches in the module, and can be updated by
   const handler = rowHandler(made.render.tree);
   const result = await dispatch(made.render, handler);
   assert.deepEqual(result.intent.command, { component: "view", name: "pick" });
-  assert.deepEqual(result.intent.arguments, [{ value: 7 }], "the id the changes gave");
+  assert.deepEqual(result.intent.arguments, [{ value: 7, name: "id" }], "the id the changes gave");
   // The whole-snapshot form from it, and the changes form from that.
   const whole = await update(made.render, { ...next, title: "W" });
   assert.equal(whole.render.tree.root.children[0].children[0].text, "W has 4");

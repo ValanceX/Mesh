@@ -1,0 +1,1 @@
+<box>{#if has(header)}{@render header()}{/if}{#if has(children)}{@render children()}{/if}</box>

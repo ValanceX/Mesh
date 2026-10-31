@@ -47,7 +47,7 @@ impl Host {
         collect(&kept.tree().root, event, &mut handlers);
         let handler = &handlers[occurrence];
         let payload = payload.map(|text| HostValue::from_json(text).expect("the payload is JSON"));
-        match mesh_runtime::dispatch(kept, handler, payload.as_ref()) {
+        match mesh_runtime::dispatch_named(kept, handler, payload.as_ref()) {
             Ok(intent) => intent.to_json(),
             Err(diagnostics) => mesh_runtime::to_json(&diagnostics, &self.model),
         }

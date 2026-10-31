@@ -16,7 +16,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { compile } from "../../mesh-compiler/dist/index.js";
-import { dispatch, render, update } from "../dist/index.js";
+import { dispatch, render, update, updateChanges } from "../dist/index.js";
 import { root, validateTree } from "./common.mjs";
 
 const conformance = join(root, "examples", "conformance");
@@ -159,6 +159,18 @@ test("events: each interaction resolves to its committed binding, and one intent
   }
 });
 
+// `arguments/`: an intent's argument names. Each case is an event on a node, with a payload or none,
+// and the intent it gives: an argument written as a plain path carries its last segment as `name`.
+test("arguments: each argument written as a path carries its name, as committed", async () => {
+  const kept = await rendered("arguments");
+  const all = nodes(kept.tree.root);
+  for (const item of JSON.parse(read("arguments", "cases.json"))) {
+    const { intent, diagnostics } = await dispatch(kept, all.get(item.node).events[item.event], item.payload);
+    assert.equal(diagnostics, undefined, item.case);
+    assert.deepEqual(intent, item.intent, item.case);
+  }
+});
+
 // `enums/`: the first program with its own manifest. Its cases are
 // `{ props, rejects, dispatches }`: a node's props; snapshots that don't
 // render, with the first diagnostic's code and location; and events with a
@@ -256,14 +268,14 @@ test(`${dir}: an event in a snippet's body is the declaring template's, and disp
   const press = [...all.values()].find((node) => node.component === "row" && node.props.label === "Grace");
   const { intent, diagnostics } = await dispatch(kept, press.events.press);
   assert.equal(diagnostics, undefined);
-  assert.deepEqual(intent, { command: { component: "screen", name: "select" }, arguments: [{ value: 2 }] });
+  assert.deepEqual(intent, { command: { component: "screen", name: "select" }, arguments: [{ value: 2, name: "id" }] });
 });
 }
 
 // `units/`: a component's state for one occurrence, which a render takes beside the snapshot. Each step of `steps.json` is rendered with its
 // units against the committed tree and the committed list of occurrences, and updating from a step to the next with the next's units is the
-// render of the next. The units are the vectors' `[ { instance, state } ]`, given to the package as an object of states by occurrence.
-const unitStates = (units) => Object.fromEntries(units.map((each) => [each.instance, each.state]));
+// render of the next. The units are the vectors' `[ { occurrence, state } ]`, given to the package as an object of states by occurrence.
+const unitStates = (units) => Object.fromEntries(units.map((each) => [each.occurrence, each.state]));
 const unitSteps = () => JSON.parse(read("units", "steps.json"));
 
 test("units: every step renders its committed tree and lists its committed occurrences, and an update with the next units is a render", async () => {
@@ -272,13 +284,100 @@ test("units: every step renders its committed tree and lists its committed occur
     const result = await build("units", step.snapshot, unitStates(step.units));
     assert.ok(result.render, JSON.stringify(result.diagnostics));
     assert.deepEqual(result.render.tree, JSON.parse(read("units", `step-${at}.expected.tree.json`)), step.case);
-    assert.deepEqual(result.render.instances, JSON.parse(read("units", `step-${at}.expected.instances.json`)), step.case);
+    assert.deepEqual(result.render.occurrences, JSON.parse(read("units", `step-${at}.expected.occurrences.json`)), step.case);
     if (previous !== undefined) {
       const updated = await update(previous, step.snapshot, unitStates(step.units));
       assert.ok(updated.render, JSON.stringify(updated.diagnostics));
       assert.deepEqual(updated.render.tree, result.render.tree, `an update to step ${at} is its render`);
-      assert.deepEqual(updated.render.instances, result.render.instances, `and lists what it lists`);
+      assert.deepEqual(updated.render.occurrences, result.render.occurrences, `and lists what it lists`);
     }
     previous = result.render;
+  }
+});
+
+// `context/`: values a host gives beside the snapshot, read only by components whose manifest entry `uses` them. Each step of `steps.json`
+// renders its committed tree with its `context`; from the step before, `updateChanges` by the step's `changes` (a path into the context
+// starts `{ context: name }`) and `update` with the whole snapshot and context are both the render of the step. The cases: context values a
+// render refuses, at their path, and the intent of a handler that passes a context value. (The check cases need the compiler: below.)
+const contextSteps = () => JSON.parse(read("context", "steps.json"));
+const contextCases = () => JSON.parse(read("context", "cases.json"));
+
+async function contextRender(snapshot, context) {
+  const model = read("context", "components.json");
+  const program = JSON.parse(read("context", "program.json"));
+  const templates = [];
+  for (const component of program.templates) {
+    const result = await compile({
+      source: read("context", `${component}.mprx`),
+      path: `${component}.mprx`,
+      model: { manifest: model, path: "components.json", component },
+    });
+    assert.deepEqual(result.diagnostics.diagnostics, [], component);
+    templates.push(JSON.stringify(result.template));
+  }
+  return render({ program: { root: program.root, templates }, model, snapshot, context });
+}
+
+test("context: every step renders its committed tree, and an update by changes or by whole inputs is the render of the step", async () => {
+  let byChanges;
+  let byWhole;
+  for (const [at, step] of contextSteps().entries()) {
+    const fresh = await contextRender(step.snapshot, step.context);
+    assert.ok(fresh.render, JSON.stringify(fresh.diagnostics));
+    assert.deepEqual(fresh.render.tree, JSON.parse(read("context", `step-${at}.expected.tree.json`)), step.case);
+    assert.ok(validateTree(fresh.render.tree), JSON.stringify(validateTree.errors));
+    if (at === 0) {
+      byChanges = fresh.render;
+      byWhole = fresh.render;
+      continue;
+    }
+    const changed = await updateChanges(byChanges, { base: byChanges.version, changes: step.changes });
+    assert.ok(changed.render, JSON.stringify(changed.diagnostics));
+    assert.deepEqual(changed.render.tree, fresh.render.tree, `${step.case}: by changes`);
+    assert.ok(changed.patches.patches.length > 0, `${step.case}: something changed`);
+    const whole = await update(byWhole, step.snapshot, undefined, step.context);
+    assert.ok(whole.render, JSON.stringify(whole.diagnostics));
+    assert.deepEqual(whole.render.tree, fresh.render.tree, `${step.case}: whole`);
+    byChanges = changed.render;
+    byWhole = whole.render;
+  }
+});
+
+test("context: values that don't fit are refused at their path, and a handler reads the context the render had", async () => {
+  for (const reject of contextCases().rejects) {
+    const result = await contextRender(reject.snapshot, reject.context);
+    assert.ok(result.diagnostics, reject.case);
+    const [first] = result.diagnostics.diagnostics;
+    assert.equal(first.code, reject.code, reject.case);
+    assert.deepEqual(first.location, reject.location, reject.case);
+  }
+  for (const each of contextCases().dispatches) {
+    const step = contextSteps()[each.step];
+    const { render: made } = await contextRender(step.snapshot, step.context);
+    const find = (node) =>
+      node.type === "node" && node.component === each.component ? node : node.children?.map(find).find(Boolean);
+    const node = find(made.tree.root);
+    const result = await dispatch(made, node.events[each.event]);
+    assert.deepEqual({ ...result.intent }, each.intent, each.case);
+  }
+});
+
+test("context: templates and manifests that misuse the context do not check", async () => {
+  const model = read("context", "components.json");
+  for (const each of contextCases().checks) {
+    const result = await compile({
+      source: each.source,
+      path: `${each.component}.mprx`,
+      model: { manifest: model, path: "components.json", component: each.component },
+    });
+    assert.deepEqual(result.diagnostics.diagnostics.map((d) => d.code), [each.code], each.case);
+  }
+  for (const each of contextCases().manifests) {
+    const result = await compile({
+      source: "<badge />",
+      path: "badge.mprx",
+      model: { manifest: JSON.stringify(each.manifest), path: "components.json", component: "badge" },
+    });
+    assert.deepEqual(result.diagnostics.diagnostics.map((d) => d.code), [each.code], each.case);
   }
 });

@@ -93,6 +93,12 @@ export interface RenderInput {
   readonly snapshot: Record<string, unknown>;
   /** The state of the unit occurrences the host holds, beside the snapshot. Without it, every occurrence has its unit's defaults. */
   readonly units?: UnitStates;
+  /**
+   * The values of the manifest's context channel, by context name, beside the snapshot (docs/manual/runtime.md,
+   * "Context"). Each is checked against its declared type, as a snapshot's scope names are; a component reads only
+   * the names its `uses` lists. Without it, no name has a value, which is valid only when every context type is optional.
+   */
+  readonly context?: Record<string, unknown>;
 }
 
 declare const versionBrand: unique symbol;
@@ -104,8 +110,11 @@ declare const versionBrand: unique symbol;
  */
 export type RenderVersion = number & { readonly [versionBrand]: true };
 
-/** One step of a change's path: a record field's name or a list index. */
-export type PathStep = string | number;
+/**
+ * One step of a change's path: a record field's name or a list index. The first step may instead be
+ * `{ context: name }`, which edits that context value instead of the snapshot.
+ */
+export type PathStep = string | number | { readonly context: string };
 
 /** One edit of a snapshot, at a path into it. See `updateChanges`. */
 export type Change =
@@ -172,7 +181,7 @@ export class Render {
   /** The render tree, for a renderer. Frozen. */
   readonly tree: RenderTree;
   /** The unit occurrences in the tree, in the order the runtime met them. Frozen; empty when no component has a unit. */
-  readonly instances: readonly UnitOccurrence[];
+  readonly occurrences: readonly UnitOccurrence[];
   readonly #root: string;
   readonly #templates: Uint8Array;
   readonly #model: string;
@@ -180,10 +189,20 @@ export class Render {
   readonly #snapshot: Uint8Array | undefined;
   /** The unit states as encoded (empty for none), kept like the snapshot, so dispatch and a later update evaluate against what the person saw. */
   readonly #units: Uint8Array;
+  /** The context values as encoded (empty for none), kept like the units. */
+  readonly #context: Uint8Array;
   /** This render's version, which changes to it name. It is the render's for life. */
   readonly #version: RenderVersion;
   /** The module's copy of this render, if it has one: its handle, and the module it is in. */
   #kept: Kept | undefined;
+
+  /**
+   * The old name of {@link Render.occurrences}.
+   * @deprecated Use `occurrences` (refinements C-4). Removed after 0.18.
+   */
+  get instances(): readonly UnitOccurrence[] {
+    return this.occurrences;
+  }
 
   /** Not public: renders come from {@link render} and {@link update}. */
   constructor(
@@ -195,15 +214,17 @@ export class Render {
     snapshot: Uint8Array | undefined,
     version: RenderVersion,
     units: Uint8Array,
-    instances: readonly UnitOccurrence[],
+    occurrences: readonly UnitOccurrence[],
     kept?: Kept,
+    context: Uint8Array = new Uint8Array(0),
   ) {
     if (token !== MAKING) {
       throw new MeshUsageError("a Render comes from render(), update() or updateChanges()", "not-a-render");
     }
     this.tree = tree;
-    this.instances = instances;
+    this.occurrences = occurrences;
     this.#units = units;
+    this.#context = context;
     this.#root = root;
     this.#templates = templates;
     this.#model = model;
@@ -258,11 +279,11 @@ export class Render {
   }
 
   /** The inputs dispatch passes back to the module. Throws a TypeError for a foreign object. */
-  static inputsOf(render: Render, operation: string): [string, Uint8Array, string, Uint8Array | undefined, Uint8Array] {
+  static inputsOf(render: Render, operation: string): [string, Uint8Array, string, Uint8Array | undefined, Uint8Array, Uint8Array] {
     if (!(typeof render === "object" && render !== null && #root in render)) {
       throw new MeshUsageError(`${operation}() takes a Render that render(), update() or updateChanges() returned`, "not-a-render");
     }
-    return [render.#root, render.#templates, render.#model, render.#snapshot, render.#units];
+    return [render.#root, render.#templates, render.#model, render.#snapshot, render.#units, render.#context];
   }
 }
 
@@ -618,18 +639,58 @@ function encodeUnits(units: UnitStates | undefined): Uint8Array {
   return encodeValue(units as Record<string, unknown>);
 }
 
-/** The unit occurrences a result lists, frozen. */
-function instancesOf(result: Record<string, unknown>): readonly UnitOccurrence[] {
-  if (result.instances === undefined) {
-    return emptyInstances;
-  }
-  if (!Array.isArray(result.instances)) {
-    throw new MeshInternalError("the runtime's unit occurrences aren't a list");
-  }
-  return Object.freeze(result.instances as UnitOccurrence[]);
+/**
+ * Gives `target` the deprecated name `instance` for its `occurrence`, for one release (refinements C-4).
+ * It is not enumerable, so the value is what it is without it: it does not appear in a comparison, a
+ * spread or `JSON.stringify`. Drop this and its two callers when the alias is removed.
+ */
+function withInstanceAlias<T extends { readonly occurrence?: string }>(target: T): T {
+  // The runtime's result arrives frozen, so the alias goes on a frozen copy (its nested values are shared, and frozen).
+  const copy = { ...target };
+  Object.defineProperty(copy, "instance", { get: () => copy.occurrence, enumerable: false });
+  return Object.freeze(copy);
 }
 
-const emptyInstances: readonly UnitOccurrence[] = Object.freeze([]);
+/** The intent of a result, with the deprecated alias. */
+function intentOf(value: object): CommandIntent {
+  return withInstanceAlias(value as CommandIntent);
+}
+
+/** The unit occurrences a result lists, frozen. */
+function occurrencesOf(result: Record<string, unknown>): readonly UnitOccurrence[] {
+  if (result.occurrences === undefined) {
+    return emptyOccurrences;
+  }
+  if (!Array.isArray(result.occurrences)) {
+    throw new MeshInternalError("the runtime's unit occurrences aren't a list");
+  }
+  return Object.freeze((result.occurrences as UnitOccurrence[]).map(withInstanceAlias));
+}
+
+const emptyOccurrences: readonly UnitOccurrence[] = Object.freeze([]);
+
+/** The context values as bytes: a record, or nothing at all. */
+function encodeContext(context: Record<string, unknown> | undefined): Uint8Array {
+  if (context === undefined) {
+    return new Uint8Array(0);
+  }
+  if (typeof context !== "object" || context === null) {
+    throw new MeshUsageError("context must be an object: each context name's value");
+  }
+  // Whether each value fits its declared type is the runtime's to judge, as it is for the snapshot.
+  return encodeValue(context);
+}
+
+/** The context a kept render has, as the module reports it after an update (it may have been changed there). */
+function contextOf(result: Record<string, unknown>): Uint8Array {
+  if (result.context === undefined) {
+    return new Uint8Array(0);
+  }
+  if (typeof result.context !== "object" || result.context === null) {
+    throw new MeshInternalError("the runtime's context isn't an object");
+  }
+  return encodeValue(result.context as Record<string, unknown>);
+}
 
 /** Renders. See the package's `render`. */
 export function render(input: RenderInput): Promise<RenderResult> {
@@ -640,9 +701,10 @@ export function render(input: RenderInput): Promise<RenderResult> {
     const model = input.model;
     const snapshot = encodeValue(input.snapshot);
     const units = encodeUnits(input.units);
+    const context = encodeContext(input.context);
     const version = nextVersion();
     return runNow(
-      [encoder.encode(root), templates, encoder.encode(model), snapshot, units],
+      [encoder.encode(root), templates, encoder.encode(model), snapshot, units, context],
       (exports, pointers) => exports.mesh_render(...pointers),
       (result): RenderResult => {
         if (isDiagnostics(result.diagnostics)) {
@@ -652,7 +714,7 @@ export function render(input: RenderInput): Promise<RenderResult> {
           throw new MeshInternalError("the runtime's result is neither a tree nor diagnostics");
         }
         const tree = result.tree as RenderTree;
-        return Object.freeze({ render: new Render(MAKING, tree, root, templates, model, snapshot, version, units, instancesOf(result)) });
+        return Object.freeze({ render: new Render(MAKING, tree, root, templates, model, snapshot, version, units, occurrencesOf(result), undefined, context) });
       },
     );
   });
@@ -690,9 +752,14 @@ function keptFrom(result: Record<string, unknown>): Kept {
 }
 
 /** Updates. See the package's `update`. */
-export function update(previous: Render, snapshotInput: Record<string, unknown>, unitsInput?: UnitStates): Promise<UpdateResult> {
+export function update(
+  previous: Render,
+  snapshotInput: Record<string, unknown>,
+  unitsInput?: UnitStates,
+  contextInput?: Record<string, unknown>,
+): Promise<UpdateResult> {
   return enqueue(async () => {
-    const [root, templates, model, previousSnapshot, previousUnits] = Render.inputsOf(previous, "update");
+    const [root, templates, model, previousSnapshot, previousUnits, previousContext] = Render.inputsOf(previous, "update");
     const kept = Render.keptOf(previous, "update");
     if (previousSnapshot === undefined && !liveIn(kept)) {
       throw gone("update");
@@ -700,9 +767,21 @@ export function update(previous: Render, snapshotInput: Record<string, unknown>,
     const snapshot = encodeValue(snapshotInput);
     // Without new units, the render's own: the state the person saw is the state this one is made with.
     const units = unitsInput === undefined ? previousUnits : encodeUnits(unitsInput);
+    // Without new context values, nothing is sent and the module keeps the render's own.
+    const context = encodeContext(contextInput);
     const version = nextVersion();
     return runNow(
-      [encoder.encode(root), templates, encoder.encode(model), previousSnapshot === undefined ? new Uint8Array(0) : previousSnapshot, previousUnits, snapshot, units],
+      [
+        encoder.encode(root),
+        templates,
+        encoder.encode(model),
+        previousSnapshot === undefined ? new Uint8Array(0) : previousSnapshot,
+        previousUnits,
+        previousContext,
+        snapshot,
+        units,
+        context,
+      ],
       (exports, pointers) => {
         // The module's copy is good only in the instance that made it.
         const held = kept !== undefined && generations.get(exports) === kept.generation;
@@ -718,7 +797,19 @@ export function update(previous: Render, snapshotInput: Record<string, unknown>,
         // The module returns what changed; the new tree is the previous one with it applied.
         const patches = result.patches as RenderPatches;
         return Object.freeze({
-          render: new Render(MAKING, applyPatches(previous.tree, patches), root, templates, model, snapshot, version, units, instancesOf(result), keptFrom(result)),
+          render: new Render(
+            MAKING,
+            applyPatches(previous.tree, patches),
+            root,
+            templates,
+            model,
+            snapshot,
+            version,
+            units,
+            occurrencesOf(result),
+            keptFrom(result),
+            contextOf(result),
+          ),
           patches,
         });
       },
@@ -733,7 +824,7 @@ export function updateChanges(
   options?: { readonly verify?: Record<string, unknown>; readonly units?: UnitStates },
 ): Promise<UpdateResult> {
   return enqueue(async () => {
-    const [root, templates, model, previousSnapshot, previousUnits] = Render.inputsOf(previous, "updateChanges");
+    const [root, templates, model, previousSnapshot, previousUnits, previousContext] = Render.inputsOf(previous, "updateChanges");
     const kept = Render.keptOf(previous, "updateChanges");
     // A render the module no longer holds is derived again from its own snapshot, under the version it was given; a render made from changes has none.
     if (previousSnapshot === undefined && !liveIn(kept)) {
@@ -753,6 +844,7 @@ export function updateChanges(
         encoder.encode(model),
         previousSnapshot === undefined ? new Uint8Array(0) : previousSnapshot,
         previousUnits,
+        previousContext,
         encoded,
         verify === undefined ? new Uint8Array(0) : verify,
         units,
@@ -772,7 +864,19 @@ export function updateChanges(
         const patches = result.patches as RenderPatches;
         // No snapshot is kept outside the module: the new render is the module's.
         return Object.freeze({
-          render: new Render(MAKING, applyPatches(previous.tree, patches), root, templates, model, undefined, version, units, instancesOf(result), keptFrom(result)),
+          render: new Render(
+            MAKING,
+            applyPatches(previous.tree, patches),
+            root,
+            templates,
+            model,
+            undefined,
+            version,
+            units,
+            occurrencesOf(result),
+            keptFrom(result),
+            contextOf(result),
+          ),
           patches,
         });
       },
@@ -822,7 +926,7 @@ export function declaredEvents(input: DeclaredEventsInput): Promise<DeclaredEven
 /** Dispatches. See the package's `dispatch`. */
 export function dispatch(render: Render, handler: string, payload?: unknown): Promise<DispatchResult> {
   return enqueue(async () => {
-    const [root, templates, model, snapshot, units] = Render.inputsOf(render, "dispatch");
+    const [root, templates, model, snapshot, units, context] = Render.inputsOf(render, "dispatch");
     const kept = Render.keptOf(render, "dispatch");
     if (typeof handler !== "string") {
       throw new MeshUsageError("handler must be a string: a handler identifier from the render's tree");
@@ -837,7 +941,7 @@ export function dispatch(render: Render, handler: string, payload?: unknown): Pr
     return runNow(
       inModule
         ? [encoder.encode(model), encoder.encode(handler), encoded]
-        : [encoder.encode(root), templates, encoder.encode(model), snapshot as Uint8Array, units, encoder.encode(handler), encoded],
+        : [encoder.encode(root), templates, encoder.encode(model), snapshot as Uint8Array, units, context, encoder.encode(handler), encoded],
       (exports, pointers) =>
         inModule
           ? exports.mesh_dispatch_kept(...pointers, absent ? 0 : 1, kept.handle)
@@ -849,18 +953,18 @@ export function dispatch(render: Render, handler: string, payload?: unknown): Pr
         if (typeof result.intent !== "object" || result.intent === null) {
           throw new MeshInternalError("the runtime's result is neither an intent nor diagnostics");
         }
-        return Object.freeze({ intent: result.intent as CommandIntent });
+        return Object.freeze({ intent: intentOf(result.intent) });
       },
     );
   });
 }
 
 /** Raises an event of a unit occurrence. See the package's `raise`. */
-export function raise(render: Render, instance: string, event: string, payload?: unknown): Promise<RaiseResult> {
+export function raise(render: Render, occurrence: string, event: string, payload?: unknown): Promise<RaiseResult> {
   return enqueue(async () => {
-    const [root, templates, model, snapshot, units] = Render.inputsOf(render, "raise");
+    const [root, templates, model, snapshot, units, context] = Render.inputsOf(render, "raise");
     const kept = Render.keptOf(render, "raise");
-    if (typeof instance !== "string" || typeof event !== "string") {
+    if (typeof occurrence !== "string" || typeof event !== "string") {
       throw new MeshUsageError("raise() takes the occurrence's key and the event's name, both strings");
     }
     const absent = payload === undefined;
@@ -871,8 +975,18 @@ export function raise(render: Render, instance: string, event: string, payload?:
     }
     return runNow(
       inModule
-        ? [encoder.encode(model), encoder.encode(instance), encoder.encode(event), encoded]
-        : [encoder.encode(root), templates, encoder.encode(model), snapshot as Uint8Array, units, encoder.encode(instance), encoder.encode(event), encoded],
+        ? [encoder.encode(model), encoder.encode(occurrence), encoder.encode(event), encoded]
+        : [
+            encoder.encode(root),
+            templates,
+            encoder.encode(model),
+            snapshot as Uint8Array,
+            units,
+            context,
+            encoder.encode(occurrence),
+            encoder.encode(event),
+            encoded,
+          ],
       (exports, pointers) =>
         inModule
           ? exports.mesh_raise_kept(...pointers, absent ? 0 : 1, kept.handle)
@@ -887,7 +1001,7 @@ export function raise(render: Render, instance: string, event: string, payload?:
         if (typeof result.intent !== "object" || result.intent === null) {
           throw new MeshInternalError("the runtime's result is neither an intent, nothing, nor diagnostics");
         }
-        return Object.freeze({ intent: result.intent as CommandIntent });
+        return Object.freeze({ intent: intentOf(result.intent) });
       },
     );
   });

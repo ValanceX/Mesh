@@ -33,9 +33,11 @@ function compact(value) {
 }
 
 const hash = (made) => sha(compact(made.tree));
-const model = read("components.json");
+const shared = read("components.json");
 
 async function load(name) {
+  // A directory may have its own manifest (`named-arguments` does), so the shared one, and every other log, is untouched.
+  const model = existsSync(join(replay, name, "components.json")) ? read(name, "components.json") : shared;
   const program = JSON.parse(read(name, "program.json"));
   const templates = [];
   let sources = "";
@@ -46,11 +48,11 @@ async function load(name) {
     templates.push(JSON.stringify(result.template));
     sources += `${source}\0`;
   }
-  return { root: program.root, templates, programHash: sha(sources), manifestHash: sha(model) };
+  return { root: program.root, templates, model, programHash: sha(sources), manifestHash: sha(model) };
 }
 
 const start = async (loaded, snapshot) => {
-  const result = await render({ program: { root: loaded.root, templates: loaded.templates }, model, snapshot: structuredClone(snapshot) });
+  const result = await render({ program: { root: loaded.root, templates: loaded.templates }, model: loaded.model, snapshot: structuredClone(snapshot) });
   assert.ok(result.render, JSON.stringify(result.diagnostics));
   return result.render;
 };
@@ -74,6 +76,10 @@ async function outcome(made, handler, payload) {
   return result.intent !== undefined ? { intent: result.intent } : { diag: result.diagnostics.diagnostics[0].code };
 }
 
+/** `out` without the arguments' `name`s: a log of format 1 doesn't record them (0.16 and 0.17 had none). */
+const withoutNames = (out) =>
+  out.intent === undefined ? out : { intent: { ...out.intent, arguments: out.intent.arguments.map(({ name: _, ...rest }) => rest) } };
+
 /** Plays a log's lines by one route and returns the tree hashes it gave. */
 async function play(name, lines, route) {
   const loaded = await load(name);
@@ -93,7 +99,7 @@ async function play(name, lines, route) {
       let result;
       if (route === "changes") result = await updateChanges(current, { base: current.version, changes: line.changes });
       else if (route === "update") result = await update(current, structuredClone(next));
-      else result = await render({ program: { root: loaded.root, templates: loaded.templates }, model, snapshot: structuredClone(next) });
+      else result = await render({ program: { root: loaded.root, templates: loaded.templates }, model: loaded.model, snapshot: structuredClone(next) });
       if (line.rejects === undefined) {
         assert.ok(result.render, `${where} rejected: ${JSON.stringify(result.diagnostics)}`);
         snapshot = next;
@@ -104,7 +110,8 @@ async function play(name, lines, route) {
         assert.equal(result.diagnostics.diagnostics[0].code, line.rejects, where);
       }
     } else if (line.line === "event") {
-      assert.deepEqual(await outcome(renders[line.on], line.handler, line.payload), line.out, `${where} dispatches as recorded`);
+      // The module gives the arguments' names; the log doesn't record them, so they are not compared.
+      assert.deepEqual(withoutNames(await outcome(renders[line.on], line.handler, line.payload)), withoutNames(line.out), `${where} dispatches as recorded`);
     } else if (line.line === "tree") {
       assert.equal(hash(current), line.sha256, `${where} gives the recorded tree`);
       if (line.tree !== undefined) assert.deepEqual(current.tree, line.tree, `${where}'s checkpoint`);
@@ -132,6 +139,20 @@ for (const name of names) {
     assert.ok(byChanges.length >= 2);
   });
 }
+
+test("a log recorded without argument names replays, though the module gives them", async () => {
+  // `named-arguments` dispatches `move(item.label)`: the log has no `name`, the module gives one.
+  const lines = linesOf("named-arguments");
+  const events = lines.filter((line) => line.line === "event");
+  assert.ok(events.length > 0);
+  for (const event of events) assert.equal(event.out.intent.arguments[0].name, undefined);
+  const loaded = await load("named-arguments");
+  const first = await start(loaded, structuredClone(lines[0].snapshot));
+  const out = await outcome(first, events[0].handler);
+  assert.equal(out.intent.arguments[0].name, "label");
+  assert.deepEqual(withoutNames(out), withoutNames(events[0].out));
+  for (const route of ["changes", "update", "render"]) await play("named-arguments", lines, route);
+});
 
 test("a log with a wrong hash does not replay", async () => {
   const lines = linesOf(names[0]);
@@ -206,7 +227,7 @@ function session(spec, index) {
 test("a thousand random sessions agree by the three routes, and with the digests the native runtime recorded", async () => {
   const spec = JSON.parse(read("random.expected.json"));
   const loaded = await load(spec.program);
-  const whole = { program: { root: loaded.root, templates: loaded.templates }, model };
+  const whole = { program: { root: loaded.root, templates: loaded.templates }, model: loaded.model };
   const digests = [];
   for (let index = 0; index < spec.sessions; index += 1) {
     const { initial, steps } = session(spec, index);

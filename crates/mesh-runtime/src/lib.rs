@@ -33,18 +33,24 @@ mod value;
 
 pub use changes::{Change, Changes};
 pub use diagnostic::{to_json, Form, Location, PathSegment, RuntimeCode, RuntimeDiagnostic};
-pub use dispatch::{dispatch, dispatch_from, dispatch_from_units, raise, raise_from_units};
+pub use dispatch::{
+    dispatch, dispatch_from, dispatch_from_units, dispatch_named, dispatch_named_from_context,
+    dispatch_named_from_units, raise, raise_from_units, raise_named, raise_named_from_context,
+    raise_named_from_units,
+};
 #[doc(hidden)]
 pub use eval::evaluations;
 pub use number::number_to_text;
 pub use patch::{diff, patches_to_json, Patch};
 pub use program::{declared_events_to_json, DeclaredEvent, Program};
+#[allow(deprecated)]
+pub use render::Instance;
 pub use render::{
-    render, render_units, update, update_changes, update_changes_units, update_with,
-    update_with_units, Instance, Render, Update,
+    render, render_context, render_units, update, update_changes, update_changes_units,
+    update_with, update_with_context, update_with_units, Occurrence, Render, Update,
 };
 pub use resolve::{resolve, Interaction, ResolveError, Resolved};
-pub use tree::{Intent, Node, Tree, TreeChild};
+pub use tree::{Intent, NamedIntent, Node, Tree, TreeChild};
 pub use value::{HostKey, HostRecord, HostValue, Units};
 
 /// Validates `program` against `model` as render and dispatch do before

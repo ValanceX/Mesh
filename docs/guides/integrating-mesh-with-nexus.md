@@ -45,7 +45,7 @@ A key and a handler identifier name the same node and handler in every render of
 
 ## Mapping intents to commands
 
-An intent names a command by the component whose template declares it and the command's name, `user-card`'s `selectUser`, and holds its evaluated arguments in parameter order: `{ value }` for a present argument, or `{ absent: true }`. The command's meaning belongs to NEXUS: which NEXUS command it is (`"users.select"`), and what its input looks like (`{ userId }`), is a table the adapter owns. MESH has no NEXUS names in it.
+An intent names a command by the component whose template declares it and the command's name, `user-card`'s `selectUser`, and holds its evaluated arguments in parameter order: `{ value }` for a present argument, or `{ absent: true }`. An argument written as a plain path (`user`, `item.id`) also has its `name`, the path's last segment, so an adapter can bind it to an input field by name instead of by position. The command's meaning belongs to NEXUS: which NEXUS command it is (`"users.select"`), and what its input looks like (`{ userId }`), is a table the adapter owns. MESH has no NEXUS names in it.
 
 ## Diagnostics
 

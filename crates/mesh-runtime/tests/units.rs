@@ -106,9 +106,9 @@ fn tree_json(render: &Render) -> Value {
 }
 
 /// The key of the occurrence whose `label` is `label`, in a render of `LIST`.
-fn instance_of(render: &Render, label: &str) -> String {
+fn occurrence_of(render: &Render, label: &str) -> String {
     let keys: Vec<&str> = render
-        .instances()
+        .occurrences()
         .map(|instance| instance.key.as_str())
         .collect();
     let labels: Vec<String> = serde_json::from_str::<Value>(&render.tree().to_json()).unwrap()
@@ -147,7 +147,7 @@ fn texts_of(render: &Render) -> Vec<String> {
 #[test]
 fn an_occurrence_with_no_entry_has_the_defaults_and_is_listed() {
     let render = ok(LIST, SNAPSHOT, &Units::default());
-    let listed: Vec<_> = render.instances().collect();
+    let listed: Vec<_> = render.occurrences().collect();
 
     assert_eq!(listed.len(), 3);
     assert!(listed
@@ -163,18 +163,18 @@ fn an_occurrence_with_no_entry_has_the_defaults_and_is_listed() {
 #[test]
 fn the_host_s_state_for_an_occurrence_is_what_the_template_sees() {
     let plain = ok(LIST, SNAPSHOT, &Units::default());
-    let b = instance_of(&plain, "b");
+    let b = occurrence_of(&plain, "b");
     let render = ok(
         LIST,
         SNAPSHOT,
         &units(&format!(
-            r#"[{{ "instance": "{b}", "state": {{ "open": true }} }}]"#
+            r#"[{{ "occurrence": "{b}", "state": {{ "open": true }} }}]"#
         )),
     );
 
     assert_eq!(texts_of(&render), ["top", "a", "b", "open b", "c"]);
     assert_eq!(
-        render.instances().find(|i| i.key == b).unwrap().state["open"],
+        render.occurrences().find(|i| i.key == b).unwrap().state["open"],
         json!(true)
     );
 }
@@ -182,9 +182,9 @@ fn the_host_s_state_for_an_occurrence_is_what_the_template_sees() {
 #[test]
 fn a_reorder_keeps_the_state_with_the_row_and_an_unlisted_key_is_ignored() {
     let plain = ok(LIST, SNAPSHOT, &Units::default());
-    let b = instance_of(&plain, "b");
+    let b = occurrence_of(&plain, "b");
     let given = units(&format!(
-        r#"[{{ "instance": "{b}", "state": {{ "open": true }} }}, {{ "instance": "k-gone", "state": {{ "open": true }} }}]"#
+        r#"[{{ "occurrence": "{b}", "state": {{ "open": true }} }}, {{ "occurrence": "k-gone", "state": {{ "open": true }} }}]"#
     ));
     let resorted = r#"{ "tab": 2, "items": [
       { "id": 3, "label": "c" }, { "id": 2, "label": "b" }, { "id": 1, "label": "a" } ] }"#;
@@ -192,10 +192,10 @@ fn a_reorder_keeps_the_state_with_the_row_and_an_unlisted_key_is_ignored() {
 
     // The same occurrence, by key, is still open, and now second.
     assert_eq!(texts_of(&render), ["top", "c", "b", "open b", "a"]);
-    assert_eq!(instance_of(&render, "b"), b);
-    let mut keys: Vec<_> = render.instances().map(|i| i.key.clone()).collect();
+    assert_eq!(occurrence_of(&render, "b"), b);
+    let mut keys: Vec<_> = render.occurrences().map(|i| i.key.clone()).collect();
     keys.sort();
-    let mut before: Vec<_> = plain.instances().map(|i| i.key.clone()).collect();
+    let mut before: Vec<_> = plain.occurrences().map(|i| i.key.clone()).collect();
     before.sort();
     assert_eq!(keys, before);
 }
@@ -203,9 +203,9 @@ fn a_reorder_keeps_the_state_with_the_row_and_an_unlisted_key_is_ignored() {
 #[test]
 fn a_part_the_update_keeps_is_not_kept_when_a_unit_under_it_has_changed() {
     let (before, texts) = made(LIST, SNAPSHOT, &Units::default()).unwrap();
-    let b = instance_of(&before, "b");
+    let b = occurrence_of(&before, "b");
     let given = units(&format!(
-        r#"[{{ "instance": "{b}", "state": {{ "open": true }} }}]"#
+        r#"[{{ "occurrence": "{b}", "state": {{ "open": true }} }}]"#
     ));
     // The same snapshot, other units: nothing the snapshot says has changed.
     let updated = update_with_units(&before, snapshot(SNAPSHOT), Some(&given)).unwrap();
@@ -229,7 +229,7 @@ fn a_part_the_update_keeps_is_not_kept_when_a_unit_under_it_has_changed() {
         patches_to_json(&updated.patches)
     );
     // The occurrences are listed again, though most of the tree was kept.
-    assert_eq!(updated.render.instances().count(), 3);
+    assert_eq!(updated.render.occurrences().count(), 3);
 
     // And back to the defaults.
     let back =
@@ -248,13 +248,13 @@ fn a_command_of_the_unit_names_the_occurrence_it_is_for() {
     for (page, snapshot_json) in [(ONE, SNAPSHOT), (LIST, SNAPSHOT)] {
         let render = ok(page, snapshot_json, &Units::default());
         let intent = dispatch(&render, &common::handler(&render, "click"), None).unwrap();
-        let first = render.instances().next().unwrap().key.clone();
+        let first = render.occurrences().next().unwrap().key.clone();
 
         assert_eq!(intent.component, "disclosure");
         assert_eq!(intent.command, "toggle");
-        assert_eq!(intent.instance.as_deref(), Some(first.as_str()));
+        assert_eq!(intent.occurrence(), Some(first.as_str()));
         let json: Value = serde_json::from_str(&intent.to_json()).unwrap();
-        assert_eq!(json["instance"], json!(first));
+        assert_eq!(json["occurrence"], json!(first));
         assert!(json.get("controlled").is_none());
     }
 }
@@ -262,9 +262,9 @@ fn a_command_of_the_unit_names_the_occurrence_it_is_for() {
 #[test]
 fn a_handler_s_arguments_are_evaluated_against_the_state_the_person_saw() {
     let plain = ok(CONTROLLED_FREE, SNAPSHOT, &Units::default());
-    let tabs = plain.instances().next().unwrap().key.clone();
+    let tabs = plain.occurrences().next().unwrap().key.clone();
     let given = units(&format!(
-        r#"[{{ "instance": "{tabs}", "state": {{ "at": 4 }} }}]"#
+        r#"[{{ "occurrence": "{tabs}", "state": {{ "at": 4 }} }}]"#
     ));
     let render = ok(CONTROLLED_FREE, SNAPSHOT, &given);
     let intent = dispatch(&render, &common::handler(&render, "click"), None).unwrap();
@@ -280,16 +280,16 @@ const CONTROLLED_FREE: &str = "<box><tabs count={3} /></box>";
 fn a_controllable_field_takes_the_callers_prop_and_the_intent_says_so() {
     let free = ok(UNCONTROLLED, SNAPSHOT, &Units::default());
     let owned = ok(CONTROLLED, SNAPSHOT, &Units::default());
-    let key = owned.instances().next().unwrap().key.clone();
+    let key = owned.occurrences().next().unwrap().key.clone();
 
     // The prop is the value; the host's own state for the occurrence is not used.
     assert_eq!(texts_of(&free), ["at 0"]);
     assert_eq!(texts_of(&owned), ["at 2"]);
-    assert_eq!(owned.instances().next().unwrap().controlled, ["at"]);
-    assert!(free.instances().next().unwrap().controlled.is_empty());
+    assert_eq!(owned.occurrences().next().unwrap().controlled, ["at"]);
+    assert!(free.occurrences().next().unwrap().controlled.is_empty());
 
     let given = units(&format!(
-        r#"[{{ "instance": "{key}", "state": {{ "at": 7 }} }}]"#
+        r#"[{{ "occurrence": "{key}", "state": {{ "at": 7 }} }}]"#
     ));
     let still = ok(CONTROLLED, SNAPSHOT, &given);
 
@@ -297,7 +297,7 @@ fn a_controllable_field_takes_the_callers_prop_and_the_intent_says_so() {
 
     let intent = dispatch(&still, &common::handler(&still, "click"), None).unwrap();
 
-    assert_eq!(intent.instance.as_deref(), Some(key.as_str()));
+    assert_eq!(intent.occurrence(), Some(key.as_str()));
     assert_eq!(intent.controlled, ["at"]);
     let json: Value = serde_json::from_str(&intent.to_json()).unwrap();
     assert_eq!(json["controlled"], json!(["at"]));
@@ -306,7 +306,7 @@ fn a_controllable_field_takes_the_callers_prop_and_the_intent_says_so() {
 #[test]
 fn a_host_state_the_manifest_forbids_is_refused_at_its_path() {
     let plain = ok(ONE, SNAPSHOT, &Units::default());
-    let key = plain.instances().next().unwrap().key.clone();
+    let key = plain.occurrences().next().unwrap().key.clone();
     let texts = templates(ONE);
     let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
     let program = Program {
@@ -321,7 +321,9 @@ fn a_host_state_the_manifest_forbids_is_refused_at_its_path() {
             "runtime-unknown-field",
         ),
     ] {
-        let given = units(&format!(r#"[{{ "instance": "{key}", "state": {state} }}]"#));
+        let given = units(&format!(
+            r#"[{{ "occurrence": "{key}", "state": {state} }}]"#
+        ));
         let refused = render_units(&program, MODEL, &snapshot(SNAPSHOT), &given).unwrap_err();
 
         assert_eq!(codes(&refused), [code], "{state}");
@@ -341,9 +343,9 @@ fn units_are_read_from_json_or_refused() {
     for bad in [
         "{}",
         "[1]",
-        r#"[{ "instance": 1, "state": {} }]"#,
-        r#"[{ "instance": "a" }]"#,
-        r#"[{ "instance": "a", "state": {} }, { "instance": "a", "state": {} }]"#,
+        r#"[{ "occurrence": 1, "state": {} }]"#,
+        r#"[{ "occurrence": "a" }]"#,
+        r#"[{ "occurrence": "a", "state": {} }, { "occurrence": "a", "state": {} }]"#,
     ] {
         assert!(Units::from_json(bad).is_err(), "{bad}");
     }
@@ -352,7 +354,7 @@ fn units_are_read_from_json_or_refused() {
 #[test]
 fn a_unit_raises_an_event_to_the_handler_its_caller_bound() {
     let bound = ok(UNCONTROLLED, SNAPSHOT, &Units::default());
-    let key = bound.instances().next().unwrap().key.clone();
+    let key = bound.occurrences().next().unwrap().key.clone();
     let five = HostValue::from_json("5").unwrap();
     let intent = mesh_runtime::raise(&bound, &key, "change", Some(&five))
         .unwrap()
@@ -364,11 +366,11 @@ fn a_unit_raises_an_event_to_the_handler_its_caller_bound() {
     );
     assert_eq!(intent.arguments, [Some(json!(5))]);
     // A command of the page, not of the unit: no occurrence is named.
-    assert_eq!(intent.instance, None);
+    assert_eq!(intent.occurrence(), None);
 
     // The caller bound nothing: nothing to tell.
     let quiet = ok("<box><tabs count={3} /></box>", SNAPSHOT, &Units::default());
-    let key = quiet.instances().next().unwrap().key.clone();
+    let key = quiet.occurrences().next().unwrap().key.clone();
 
     assert_eq!(
         mesh_runtime::raise(&quiet, &key, "change", Some(&five)).unwrap(),
@@ -379,13 +381,13 @@ fn a_unit_raises_an_event_to_the_handler_its_caller_bound() {
 #[test]
 fn raising_what_does_not_exist_is_refused() {
     let render = ok(UNCONTROLLED, SNAPSHOT, &Units::default());
-    let key = render.instances().next().unwrap().key.clone();
+    let key = render.occurrences().next().unwrap().key.clone();
     let five = HostValue::from_json("5").unwrap();
     let text = HostValue::from_json("\"five\"").unwrap();
 
     assert_eq!(
         codes(&mesh_runtime::raise(&render, "k-nowhere", "change", Some(&five)).unwrap_err()),
-        ["runtime-unknown-instance"]
+        ["runtime-unknown-occurrence"]
     );
     assert_eq!(
         codes(&mesh_runtime::raise(&render, &key, "shout", Some(&five)).unwrap_err()),
@@ -399,4 +401,43 @@ fn raising_what_does_not_exist_is_refused() {
         codes(&mesh_runtime::raise(&render, &key, "change", None).unwrap_err()),
         ["runtime-missing-value"]
     );
+}
+
+// The old names of the unit occurrence, deprecated in 0.18.0 for one release (refinements C-4).
+#[test]
+#[allow(deprecated)]
+fn the_old_names_still_work_and_say_the_same() {
+    let plain = ok(UNCONTROLLED, SNAPSHOT, &Units::default());
+    let key = plain.occurrences().next().unwrap().key.clone();
+
+    // The old input name reads as the new one; both at once are refused.
+    let old = units(&format!(
+        r#"[{{ "instance": "{key}", "state": {{ "at": 4 }} }}]"#
+    ));
+    let new = units(&format!(
+        r#"[{{ "occurrence": "{key}", "state": {{ "at": 4 }} }}]"#
+    ));
+    assert_eq!(old, new);
+    assert!(Units::from_json(&format!(
+        r#"[{{ "instance": "{key}", "occurrence": "{key}", "state": {{}} }}]"#
+    ))
+    .is_err());
+
+    // The old accessors give what the new ones do, and the old field mirrors the new method.
+    assert_eq!(plain.instances().count(), plain.occurrences().count());
+    assert_eq!(plain.instances_to_json(), plain.occurrences_to_json());
+    let _: Option<&mesh_runtime::Instance> = plain.instances().next();
+    let five = HostValue::from_json("5").unwrap();
+    let intent = mesh_runtime::raise(&plain, &key, "change", Some(&five)).unwrap();
+    if let Some(intent) = intent {
+        assert_eq!(intent.instance.as_deref(), intent.occurrence());
+    }
+
+    // The old diagnostic code is retired: the catalogue keeps it, nothing reports it.
+    assert_eq!(
+        mesh_runtime::RuntimeCode::UNKNOWN_INSTANCE.as_str(),
+        "runtime-unknown-instance"
+    );
+    let refused = mesh_runtime::raise(&plain, "k-nowhere", "change", Some(&five)).unwrap_err();
+    assert_eq!(codes(&refused), ["runtime-unknown-occurrence"]);
 }

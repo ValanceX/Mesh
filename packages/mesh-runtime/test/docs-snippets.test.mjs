@@ -79,3 +79,21 @@ test("the JavaScript guide's samples check, and slice a diagnostic's span", asyn
   assert.ok(text.length > 0 && source.includes(text), "the span is text of the source");
   assert.ok(repairSample.includes("check("), "the repair loop is run by the compiler's guide test");
 });
+
+test("the runtime manual's screen sample shows, dispatches, patches and closes", async () => {
+  const [sample, ...others] = jsBlocks(join(root, "docs", "manual", "runtime.md"));
+  assert.equal(others.length, 0, "one sample; add its scope here when another is added");
+  const { manifest, templates, snapshot } = await sliceProgram();
+  const first = await modules["@valancex/mesh-runtime"].render({ program: { root: "users", templates }, model: manifest, snapshot });
+  const handler = first.render.tree.root.children[0].children[0].events.click;
+  const drawn = [];
+  const patched = [];
+  const ran = [];
+  const renderer = { draw: (tree) => drawn.push(tree), patch: (patches) => patched.push(patches) };
+  const next = JSON.parse(slice("snapshots/second.json"));
+  await run(sample, { templates, manifest, snapshot, next, renderer, handler, payload: { x: 1, y: 2 }, run: (intent) => ran.push(intent) });
+  assert.equal(drawn.length, 1, "the first show was drawn");
+  assert.equal(ran.length, 1, "the event's intent was run");
+  assert.equal(patched.length, 1, "the next snapshot's patches were applied");
+  assert.ok(Array.isArray(patched[0].patches));
+});

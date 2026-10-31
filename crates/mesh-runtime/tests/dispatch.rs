@@ -242,3 +242,45 @@ fn dispatch_through_two_composites_derives_each_scope() {
         json!("Hopper")
     );
 }
+
+#[test]
+fn an_argument_that_is_a_plain_path_carries_its_last_segment_as_its_name() {
+    // `user.name` and `count` are paths; `count + 1` and `$event` are not.
+    let render = view(
+        r#"<page>
+  <probe on.tap={setName(user.name)} on.pick={take(count + 1)} />
+  <probe on.tap={setName(maybeName)} on.click={place($event)} on.pick={take(count)} />
+</page>"#,
+    )
+    .unwrap();
+    let at = |n: usize, event: &str, payload: Option<&str>| {
+        let payload = payload.map(|text| HostValue::from_json(text).unwrap());
+        let named =
+            mesh_runtime::dispatch_named(&render, &nth(&render, n, event), payload.as_ref())
+                .unwrap();
+        // `dispatch` gives the same intent, without the names.
+        let plain = mesh_runtime::dispatch(&render, &nth(&render, n, event), payload.as_ref());
+        assert_eq!(plain.unwrap(), named.intent);
+        serde_json::from_str::<Value>(&named.to_json()).unwrap()["arguments"].clone()
+    };
+    assert_eq!(
+        at(0, "tap", None),
+        json!([{ "value": "Ada", "name": "name" }])
+    );
+    assert_eq!(at(0, "pick", Some("0")), json!([{ "value": 4 }]));
+    // An absent argument keeps its name.
+    assert_eq!(
+        at(1, "tap", None),
+        json!([{ "absent": true, "name": "maybeName" }])
+    );
+    assert_eq!(
+        at(1, "click", Some(r#"{ "x": 1, "y": 2 }"#)),
+        json!([{ "value": { "x": 1, "y": 2 } }])
+    );
+    assert_eq!(
+        at(1, "pick", Some("0")),
+        json!([{ "value": 3, "name": "count" }])
+    );
+    let intent = mesh_runtime::dispatch_named(&render, &nth(&render, 1, "tap"), None).unwrap();
+    assert_eq!(intent.names, [Some("maybeName".to_string())]);
+}

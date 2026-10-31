@@ -83,8 +83,15 @@ impl RuntimeCode {
         RuntimeCode("runtime-handler-other-program", Form::Handler);
     pub const UNKNOWN_HANDLER: RuntimeCode = RuntimeCode("runtime-unknown-handler", Form::Handler);
     // Raising an event of a unit occurrence.
+    /// Retired in 0.18.0 for [`RuntimeCode::UNKNOWN_OCCURRENCE`]: nothing reports it, and the code is never reused.
+    #[deprecated(
+        since = "0.18.0",
+        note = "retired; `raise` reports `runtime-unknown-occurrence`"
+    )]
     pub const UNKNOWN_INSTANCE: RuntimeCode =
         RuntimeCode("runtime-unknown-instance", Form::Handler);
+    pub const UNKNOWN_OCCURRENCE: RuntimeCode =
+        RuntimeCode("runtime-unknown-occurrence", Form::Handler);
     pub const UNKNOWN_EVENT: RuntimeCode = RuntimeCode("runtime-unknown-event", Form::Handler);
     // Changes to a render's snapshot (`update_changes`).
     pub const CHANGES_BASE_MISMATCH: RuntimeCode =
@@ -112,7 +119,8 @@ impl RuntimeCode {
     // Internal.
     pub const KEY_COLLISION: RuntimeCode = RuntimeCode("runtime-key-collision", Form::Source);
 
-    /// Every code, in catalogue order.
+    /// Every code, in catalogue order. (A retired code stays in it.)
+    #[allow(deprecated)]
     pub const ALL: &'static [RuntimeCode] = &[
         RuntimeCode::MALFORMED_TEMPLATE,
         RuntimeCode::UNSUPPORTED_FORMAT_VERSION,
@@ -139,6 +147,7 @@ impl RuntimeCode {
         RuntimeCode::HANDLER_OTHER_PROGRAM,
         RuntimeCode::UNKNOWN_HANDLER,
         RuntimeCode::UNKNOWN_INSTANCE,
+        RuntimeCode::UNKNOWN_OCCURRENCE,
         RuntimeCode::UNKNOWN_EVENT,
         RuntimeCode::CHANGES_BASE_MISMATCH,
         RuntimeCode::INVALID_CHANGE,

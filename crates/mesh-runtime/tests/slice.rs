@@ -108,7 +108,8 @@ fn the_slice_renders_dispatches_and_rerenders_as_committed() {
 
     let click = first_avatar_click(&tree.root).expect("an avatar with a click");
     let payload = HostValue::from_json(r#"{ "x": 12, "y": 34 }"#).unwrap();
-    let intent = mesh_runtime::dispatch(&rendered, &click, Some(&payload)).expect("an intent");
+    let intent =
+        mesh_runtime::dispatch_named(&rendered, &click, Some(&payload)).expect("an intent");
     expect(
         "select-first.intent.json",
         &format!("{}\n", intent.to_json()),

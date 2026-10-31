@@ -1,0 +1,51 @@
+{
+ "snapshot": {
+  "items": [
+   {
+    "id": 0,
+    "label": "hall"
+   },
+   {
+    "id": 1,
+    "label": "kitchen"
+   }
+  ]
+ },
+ "steps": [
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 1,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  },
+  {
+   "changes": [
+    {
+     "op": "set",
+     "path": [
+      "items",
+      1,
+      "label"
+     ],
+     "value": "cellar"
+    }
+   ]
+  },
+  {
+   "event": {
+    "find": {
+     "component": "row",
+     "nth": 1,
+     "tree": "latest"
+    },
+    "name": "press",
+    "on": "latest"
+   }
+  }
+ ]
+}

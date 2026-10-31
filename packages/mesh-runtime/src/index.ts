@@ -4,14 +4,17 @@
  * reports into command intents, for the host.
  *
  * ```js
- * import { render, dispatch } from "@valancex/mesh-runtime";
+ * import { openScreen } from "@valancex/mesh-runtime";
  *
- * const result = await render({ program: { root: "users", templates }, model, snapshot });
- * if (result.diagnostics) throw new Error(result.diagnostics.diagnostics[0].message);
- * draw(result.render.tree);
+ * const screen = openScreen({ program: { root: "users", templates }, model });
+ * const first = await screen.show(snapshot);
+ * if (first.diagnostics) throw new Error(first.diagnostics.diagnostics[0].message);
+ * draw(first.tree);
  * // later, when the renderer reports an event on that tree:
- * const { intent } = await dispatch(result.render, handler, payload);
+ * const { intent } = await screen.dispatch(handler, payload);
  * ```
+ *
+ * `render`, `update`, `dispatch` and `release()` are what a screen is made of, for a host that does its duties itself (Tier 2).
  *
  * The runtime runs entirely in WebAssembly: this package encodes values
  * and transports them, and evaluates, converts and judges nothing (I11).
@@ -87,6 +90,8 @@ export type {
 export { MeshInternalError, MeshUsageError, MeshVersionError, Render } from "./engine.js";
 export type { MeshUsageCode } from "./engine.js";
 export { diff } from "./changes.js";
+export { openScreen, Screen } from "./screen.js";
+export type { ScreenDispatchResult, ScreenInput, ShowResult, Transition, TransitionResult } from "./screen.js";
 export { version } from "./version.js";
 
 /**
@@ -132,10 +137,18 @@ export function render(input: RenderInput): Promise<RenderResult> {
  * Without it the new render is made with the previous render's, which is also what
  * `updateChanges` does unless `options.units` gives others.
  *
+ * `context` is the context values the host holds now (see {@link RenderInput.context}); without it,
+ * the previous render's. A part that reads a context name whose value changed is rendered again.
+ *
  * It rejects as {@link render} does.
  */
-export function update(previous: Render, snapshot: Record<string, unknown>, units?: UnitStates): Promise<UpdateResult> {
-  return updateWith(previous, snapshot, units);
+export function update(
+  previous: Render,
+  snapshot: Record<string, unknown>,
+  units?: UnitStates,
+  context?: Record<string, unknown>,
+): Promise<UpdateResult> {
+  return updateWith(previous, snapshot, units, context);
 }
 
 /**
@@ -149,7 +162,8 @@ export function update(previous: Render, snapshot: Record<string, unknown>, unit
  * computed against another state, applied twice, or applied out of order is
  * refused (`runtime-changes-base-mismatch`). Each edit is a `set`, an `insert`
  * (into a list, shifting the rest) or a `remove`, at a `path` of record field
- * names and list indices from a scope name down; edits apply in order, each
+ * names and list indices from a scope name down (or, from `{ context: name }`,
+ * from a context value down: the context values change like the snapshot); edits apply in order, each
  * seeing those before it. The changes *define* the new snapshot: the runtime
  * applies them to the one it holds, sharing what they don't touch, and
  * validates only the values they give. So an update costs the changes and what
@@ -200,7 +214,7 @@ export function dispatch(render: Render, handler: string, payload?: unknown): Pr
 
 /**
  * Raises an event of a unit occurrence, which a unit's transition does to tell its caller
- * something (docs/manual/runtime.md, "Units"): `instance` is a key from `render.instances`,
+ * something (docs/manual/runtime.md, "Units"): `occurrence` is a key from `render.occurrences`,
  * `event` one the occurrence's component declares, and `payload` what it carries. Returns
  * `{ intent }`, the intent of the handler the caller bound to the event (found as an event
  * forwarded out of a component is), `{ intent: undefined }` when the caller bound none, or
@@ -210,8 +224,8 @@ export function dispatch(render: Render, handler: string, payload?: unknown): Pr
  *
  * It rejects as {@link dispatch} does.
  */
-export function raise(render: Render, instance: string, event: string, payload?: unknown): Promise<RaiseResult> {
-  return raiseWith(render, instance, event, payload);
+export function raise(render: Render, occurrence: string, event: string, payload?: unknown): Promise<RaiseResult> {
+  return raiseWith(render, occurrence, event, payload);
 }
 
 /**

@@ -3,25 +3,30 @@
 The MESH runtime, in WebAssembly. It renders a **program** of MESH templates against a **snapshot** of your values, producing a render tree for a renderer to draw, and turns the events the renderer reports into **command intents** for your application. It's the same Rust runtime as MESH's native one, so the same inputs give the same results everywhere.
 
 ```js
-import { render, dispatch } from "@valancex/mesh-runtime";
+import { openScreen } from "@valancex/mesh-runtime";
 
-const result = await render({
+const screen = openScreen({
   program: { root: "users", templates },   // template-v1 documents, as text
   model: manifest,                          // the component manifest's text
-  snapshot,                                 // the root's scope values, by name
 });
-if (result.diagnostics) {
-  throw new Error(result.diagnostics.diagnostics[0].message);
+const first = await screen.show(snapshot);  // the root's scope values, by name
+if (first.diagnostics) {
+  throw new Error(first.diagnostics.diagnostics[0].message);
 }
-draw(result.render.tree);
+draw(first.tree);
 
 // When the renderer reports an event on that tree:
-const { intent, diagnostics } = await dispatch(result.render, handler, payload);
+const { intent, diagnostics } = await screen.dispatch(handler, payload);
 ```
+
+The screen keeps the render on screen, releases the one before it, and holds unit state, so you never call a lifecycle step; each later `show(snapshot)` gives the patches from the tree drawn. Everything else in the API below is Tier 2: for a host that does those duties itself.
 
 Templates come from the compiler: `mesh compile`, or `compile()` in [`@valancex/mesh-compiler`](https://www.npmjs.com/package/@valancex/mesh-compiler). This package has no dependencies, and doesn't include the compiler.
 
 ## The API
+
+- **`openScreen({ program, model, transitions? })`** is the simplest way to host a program: `show(snapshot)` gives the first tree, then patches; `dispatch(handler, payload?)` gives the intent (or, for a unit command it was given a transition for, runs it and gives patches); `close()` releases everything. It keeps, updates and releases renders and holds unit state for you, so the rest of this list is for a host that does that itself. See [Showing a program](https://github.com/ValanceX/Mesh/blob/main/docs/manual/runtime.md#showing-a-program) (Provisional).
+**Tier 2: the operations a screen is made of.**
 
 - **`render({ program, model, snapshot })`** returns a promise of `{ render }` or `{ diagnostics }`. `render.tree` is the render tree ([`schemas/render-v1.schema.json`](https://github.com/ValanceX/Mesh/blob/main/schemas/render-v1.schema.json)), frozen: primitive nodes, final prop values with the MESH text of each number, boolean and `null` prop (`propText`), text and handler identifiers, and nothing to compute: a renderer realizes a prop natively or with that text, and never converts a value itself. `diagnostics` is the runtime diagnostics document ([`schemas/runtime-diagnostics-v1.schema.json`](https://github.com/ValanceX/Mesh/blob/main/schemas/runtime-diagnostics-v1.schema.json)): every problem with the program or the snapshot, each at its location, or the first evaluation error.
 - **`dispatch(render, handler, payload?)`** returns a promise of `{ intent }` or `{ diagnostics }`. The intent names the command and holds its evaluated arguments. It evaluates against the snapshot `render` was made from, never a newer one.
